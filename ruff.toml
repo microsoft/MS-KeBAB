@@ -1,0 +1,121 @@
+line-length = 120
+src = ["*/src"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[lint]
+# See https://docs.astral.sh/ruff/rules for more details
+# Listing here all available rulesets and commenting out those we want to disable
+select = [
+    "F", # Pyflakes, icluded in the default set
+    "E", # pycodestyle errors
+    "W", # pycodestyle warnings
+    #"C90", # mccabe - restrictions on function complexity
+    "I",     # isort
+    "N",     # pep8-naming
+    "D",     # pydocstyle
+    "UP",    # pyupgrade
+    "YTT",   # checks for misuse of sys.version or sys.version_info
+    "ANN",   # detects the absence of PEP 3107-style function annotations
+    "ASYNC", # errors in async code
+    "TRIO",  # more errors in async code
+    "S",     # flake8-bandit - security issues
+    "BLE",   # prohibit catch-all exceptions
+    #"FBT", # prohibit boolean positional arguments
+    "B", # flake8-bugbear
+    "A", # Check for python builtins being used as variables or parameters
+    #"COM", # Trailing commas, handled by Black
+    #"CPY", # Require copyright headers - preview state
+    "C4", # Enforce better comprehensions
+    #"DTZ", # ban the usage of unsafe naive datetime class.
+    "T10", # flake8-debugger
+    "DJ",  # flake8-django
+    #"EM", # prohibit string literals in exceptions
+    "EXE", # executable permissions and shebangs of Python files
+    "FA",  # Verifies python 3.7+ files use from __future__ import annotations
+    #"ISC", # Implicit string concatenation
+    #"ICN", # flake8-import-conventions
+    "LOG", # proper logging
+    #"G", # logging format
+    #"INP", # ban implicit name packages
+    "PIE", # flake8-pie
+    #"T20", # ban print
+    "PYI", # flake8-pyi
+    "PT",  # pytest style
+    "Q", # quotes
+    "RSE",  # better exception raising
+    "RET",  # checks return values
+    "SLF",  # private member access checks
+    "SLOT", # require __slots__ to be defined for subclasses of immutable types
+    "SIM",  # code simplifications
+    "TID",  # Tidier imports
+    #"TCH", # Moving  imports in or out of type-checking blocks
+    "INT", # flake8-gettext
+    "ARG", # unused arguments
+    #"PTH", # Use pathlib
+    "TD", # TODOs formatting
+    #"FIX", # ban TODOs
+    #"ERA", # ban commented out code
+    "PD", # linting pandas code
+    #"PGH", # pygrep-hooks - ban blanket rule ignoring - won't easily work with pyright
+    "PLC",  # pylint - convention
+    "PLE",  # pylint - error
+    "PLR",  # pylint - refactor
+    "PLW",  # pylint - warning
+    "TRY",  # try.ceratops - Prevent Exception Handling AntiPatterns in Python
+    "FLY",  # flynt - move to f-strings
+    "NPY",  # NumPy-specific rules
+    "AIR",  # rules for Apache AirFlow
+    "PERF", # perflint
+    #"FURB", # refurb - preview state
+    "RUF", # Ruff-specific rules
+]
+
+ignore = [
+    "ANN10",   # Missing type for self/cls
+    "D100",    # Missing docstring in public module
+    "D104",    # Missing docstring in public package
+    "D205",    # blank-line-after-summary
+    "D212",    # multi-line-summary-first-line
+    "D301",    # escape-sequence-in-docstring - VS Code needs backslashes in argument descriptions
+    "E501",    # line-too-long - handled by Black
+    "PLC0414", # useless-import-alias - redundant import aliases are used for explicit re-exporting
+    "PLR09",   # too-many-* - pylint design checker
+    "PLR1702", # too-many-nested-blocks
+    "PLR5501", # collapsible-else-if
+    "RET501",  # unnecessary-return-none
+    "RET504",  # unnecessary-assign
+    "RET506",  # superfluous-else-raise - sometimes we raise a NotImplementedError as a placeholder
+    "TD003",   # Missing issue link on the line following this TODO
+    "TRY002",  # raise-vanilla-class
+    "TRY003",  # raise-vanilla-args
+    "TRY300",  # Checks for return statements in try blocks
+]
+
+[lint.per-file-ignores]
+"*/tests/**/*.py" = [
+    "D",       # pydocstyle
+    "ANN",     # detects the absence of PEP 3107-style function annotations
+    "S",       # flake8-bandit - security issues
+    "RUF015",  # unnecessary-iterable-allocation-for-first-element - in tests we may create lists to assert their length
+    "PLR2004", # magic-value-comparison - we often have constants as expected values in tests
+]
+
+[lint.pydocstyle]
+convention = "google"
+ignore-decorators = ["typing.overload"]
+
+[lint.flake8-annotations]
+suppress-none-returning = true
+mypy-init-return = true
+
+[lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+
+[lint.isort]
+lines-after-imports = 2

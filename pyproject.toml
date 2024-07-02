@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kebab"
+version = "0.0.1"
+description = "Knowledge Base construction and Access Benchmark (KeBAB)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pyright", "ruff", "pytest-cov", "pytest"]
+
+all = ["kebab[dev]"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["*_test.py", "tests/*", "experiments/*", "configs/*"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
+[tool.pyright]
+typeCheckingMode = "standard"
+exclude = [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/.*", # this covers .venv*
+    "**/venv*",
+    "**/ENV",
+    "**/env",
+]
+pythonVersion = "3.12"
+
+[tool.ruff]
+extend = "ruff.toml"
