@@ -1,0 +1,1 @@
+{"document_id":"email_1","schema_id":"email","data":{"from":"David <david@email.com>","to":["John Doe <john@email.com>", "receipient2@email.com"],"cc":[],"subject":"Hello","date":"2024-04-25T00:00:00Z","body":"Hello, John, Happy Birthday!"}}

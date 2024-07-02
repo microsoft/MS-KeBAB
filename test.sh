@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 # Exit immediately if anything goes wrong
 set -e
 
@@ -13,6 +16,5 @@ ruff check
 # Type check
 pyright
 
-# TODO: Uncomment this once the repository has at least one test
 # Run tests
-# python3 -m pytest
+python3 -m pytest
