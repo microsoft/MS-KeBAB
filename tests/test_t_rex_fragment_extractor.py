@@ -18,8 +18,8 @@ def t_rex_input_file_path() -> Path:
 
 
 def test_extract_entities(t_rex_input_file_path: Path) -> None:
-    """Test the extraction of entities and properties from a single T-REX JSON document record."""
-    # load a single T-Rex document
+    """Test the extraction of entities and properties from a single T-REx JSON document record."""
+    # load a single T-REx document
     with open(t_rex_input_file_path, encoding="utf-8") as f:
         doc_record = json.load(f)[0]
 
