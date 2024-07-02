@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 import pytest
+
 from kebab.dataset.trex.t_rex_fragment_extractor import TRexFragmentExtractor
 
 

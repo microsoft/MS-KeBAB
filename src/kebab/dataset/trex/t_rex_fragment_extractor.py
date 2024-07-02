@@ -84,7 +84,7 @@ class TRexFragmentExtractor:
                 for entity in entities.values():
                     try:
                         f.write(entity.model_dump_json() + "\n")
-                    except ValueError:
+                    except ValueError:  # noqa: PERF203
                         err_count += 1
 
         if err_count:
