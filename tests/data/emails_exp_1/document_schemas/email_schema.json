@@ -1,0 +1,29 @@
+{
+    "schema_id": "email",
+    "fields": [
+        {
+            "field_id": "from",
+            "description": "The email address of the sender"
+        },
+        {
+            "field_id": "to",
+            "description": "The email addresses of the recipients"
+        },
+        {
+            "field_id": "cc",
+            "description": "The email addresses of the CC recipients"
+        },
+        {
+            "field_id": "subject",
+            "description": "The subject of the email"
+        },
+        {
+            "field_id": "date",
+            "description": "The date the email was sent"
+        },
+        {
+            "field_id": "body",
+            "description": "The body of the email"
+        }
+    ]
+}

@@ -1,0 +1,36 @@
+{
+    "entity_id": "john_doe",
+    "property_values": {
+        "name": [
+            "John Doe"
+        ],
+        "email_addresses": [
+            [
+                "john@email.com"
+            ]
+        ],
+        "date_of_birth": [
+            "25 April"
+        ]
+    },
+    "source_ids": [
+        "email_1"
+    ],
+    "evidence_map": {
+        "name": [
+            [
+                0
+            ]
+        ],
+        "email_addresses": [
+            [
+                0
+            ]
+        ],
+        "date_of_birth": [
+            [
+                0
+            ]
+        ]
+    }
+}

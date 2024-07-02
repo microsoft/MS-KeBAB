@@ -1,0 +1,38 @@
+{
+    "name": "email_exp_schema",
+    "data_types": [
+        {
+            "data_type_id": "text",
+            "value_type": "Text",
+            "description": "A generic text or a value stored as a string."
+        },
+        {
+            "data_type_id": "text_collection",
+            "value_type": "Collection",
+            "description": "A collection of text values.",
+            "element_data_type": {
+                "data_type_id": "text"
+            }
+        }
+    ],
+    "properties": [
+        {
+            "property_id": "name",
+            "data_type_id": "text",
+            "description": "The name of the person.",
+            "display_name": "name"
+        },
+        {
+            "property_id": "email_addresses",
+            "data_type_id": "text_collection",
+            "description": "The person's email addresses.",
+            "display_name": "email addresses"
+        },
+        {
+            "property_id": "date_of_birth",
+            "data_type_id": "text",
+            "description": "The person's date of birth.",
+            "display_name": "date of birth"
+        }
+    ]
+}

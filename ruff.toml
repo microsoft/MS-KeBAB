@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 line-length = 120
 src = ["*/src"]
 
@@ -94,6 +97,7 @@ ignore = [
     "TRY002",  # raise-vanilla-class
     "TRY003",  # raise-vanilla-args
     "TRY300",  # Checks for return statements in try blocks
+    "S101",    # Checks for uses of the assert keyword
 ]
 
 [lint.per-file-ignores]
