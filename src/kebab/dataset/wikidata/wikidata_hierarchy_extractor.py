@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-# ruff: noqa: S101
 """
 Extract type hierarchy from Wikidata.
 
