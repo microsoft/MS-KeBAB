@@ -18,7 +18,7 @@ def wikidata_records_file_path() -> Path:
 
 
 @pytest.fixture
-def temp_output_file(tmp_path) -> Path:
+def temp_output_file(tmp_path: Path) -> Path:
     """Return the path to a temporary output file."""
     return tmp_path / "temp_output.json"
 
