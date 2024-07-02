@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 line-length = 120
-src = ["*/src"]
+src = ["src", "experiments", "tests"]
 
 [format]
 quote-style = "double"
@@ -25,7 +25,7 @@ select = [
     "YTT",   # checks for misuse of sys.version or sys.version_info
     "ANN",   # detects the absence of PEP 3107-style function annotations
     "ASYNC", # errors in async code
-    "TRIO",  # more errors in async code
+    "ASYNC1",  # more errors in async code
     "S",     # flake8-bandit - security issues
     "BLE",   # prohibit catch-all exceptions
     #"FBT", # prohibit boolean positional arguments
@@ -101,7 +101,7 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
-"*/tests/**/*.py" = [
+"**/tests/**/*.py" = [
     "D",       # pydocstyle
     "ANN",     # detects the absence of PEP 3107-style function annotations
     "S",       # flake8-bandit - security issues

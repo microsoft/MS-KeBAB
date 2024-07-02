@@ -5,6 +5,9 @@ name: PR.$(date:yyyyMMdd)$(rev:.r)
 
 trigger: none
 
+pr:
+- main
+
 pool:
   vmImage: 'ubuntu-latest'
 
