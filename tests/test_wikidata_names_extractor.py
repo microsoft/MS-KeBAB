@@ -42,3 +42,6 @@ def test_extract_names(
 
     with open(output_file_path, encoding="utf-8") as f:
         lines = f.readlines()
+
+    assert len(lines) == 1
+    assert lines[0].strip().startswith('{"id": "Q23"')

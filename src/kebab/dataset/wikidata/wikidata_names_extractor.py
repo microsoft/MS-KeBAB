@@ -127,6 +127,11 @@ class WikidataNamesExtractor:
         stack = [type_id]
         while stack:
             current_type_id = stack.pop()
+
+            if current_type_id not in graph:
+                logging.warning(f"Type {current_type_id} not found in the graph")
+                continue
+
             for merged_id in graph[current_type_id]["merged_ids"]:
                 subtypes.add(merged_id)
 
@@ -134,4 +139,5 @@ class WikidataNamesExtractor:
 
             for child_id in graph[current_type_id]["children"]:
                 stack.append(child_id)  # noqa: PERF402
+
         return subtypes

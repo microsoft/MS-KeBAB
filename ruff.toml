@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 line-length = 120
-src = ["src", "experiments", "tests"]
+src = ["src", "experiments", "tests", "notebooks"]
 
 [format]
 quote-style = "double"
