@@ -1,7 +1,24 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Extract names of entities of a particular types from Wikidata."""
+"""
+Extract the names of entities of a particular type (and its subtypes) from Wikidata.
+
+Necessary inputs:
+- A file with simplified "concrete" Wikidata entities.
+- A file with the type hierarchy for Wikidata.
+
+Example output:
+- `wikidata_person_names.jsonl`, each line like:
+{"id": "Q23",
+ "name": "George Washington",
+  "description": "president of the United States from 1789 to 1797",
+   "aliases": ["Father of the United States", "The American Fabius", "American Fabius"]}...
+
+The workflow of extracting the hierarchy is as follows:
+1. Collect all subtypes of the given type.
+2. Filter the concrete entities to the ones that have the given type and have the required number of aliases.
+"""
 
 from __future__ import annotations
 
