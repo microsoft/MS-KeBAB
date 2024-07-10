@@ -11,7 +11,7 @@ The extraction process runs in two steps:
 2. Build the hierarchy of Wikidata type entities, including removing cycles and grandparent links.
 
 Necessary input:
-- Wikidata dump in JSONL format (e.g. from https://dumps.wikimedia.org/wikidatawiki/entities/latest-all.json.gz)
+- Wikidata dump in JSON format (e.g. from https://dumps.wikimedia.org/wikidatawiki/entities/latest-all.json.gz)
 
 Example output:
 - `wikidata_concrete_entities.jsonl`, each line like:
@@ -304,6 +304,7 @@ class WikidataHierarchyExtractor:
         # rebuild the map since the IDs might have changed due to redirects
         type_entities = {e["id"]: e for e in type_entities.values()}
 
+        # TODO(pmyshkov): Store reference-map into merged-ids
         return type_entities
 
     def construct_wikidata_type_entities(
