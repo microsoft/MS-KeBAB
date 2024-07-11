@@ -26,7 +26,6 @@ class ValueType(Enum):
     BOOLEAN = "Boolean"
     CATEGORY = "Category"
     REFERENCE = "Reference"
-    COLLECTION = "Collection"
 
 
 @dataclass
@@ -39,7 +38,6 @@ class DataType:
     value_type: ValueType
     description: str
     category_values: list[Any] | None = None
-    element_data_type: Self | None = None
 
     def __post_init__(self):
         """Post-initialisation checks."""
@@ -61,7 +59,6 @@ class DataType:
             "value_type": self.value_type.value,
             "description": self.description,
             "category_values": self.category_values,
-            "element_data_type": self.element_data_type.to_dict(as_reference=True) if self.element_data_type else None,
         }
 
     @classmethod
@@ -84,9 +81,6 @@ class DataType:
             value_type=ValueType(data["value_type"]),
             description=data["description"],
             category_values=data.get("category_values"),
-            element_data_type=(
-                cls.from_dict(data["element_data_type"], data_types) if data.get("element_data_type") else None
-            ),
         )
 
 
@@ -100,6 +94,7 @@ class Property:
     data_type: DataType
     description: str
     display_name: str | None = None
+    is_collection: bool = False
 
     def __post_init__(self):
         """Post-initialisation checks."""
@@ -113,6 +108,7 @@ class Property:
             "data_type_id": self.data_type.data_type_id,
             "description": self.description,
             "display_name": self.display_name,
+            "is_collection": self.is_collection,
         }
 
     @classmethod
@@ -123,6 +119,7 @@ class Property:
             data_type=data_types[data["data_type_id"]],
             description=data["description"],
             display_name=data.get("display_name"),
+            is_collection=data.get("is_collection", False),
         )
 
 
@@ -196,7 +193,7 @@ class Entity:
     entity_id: str
 
     property_values: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
-    """Dictionary of property values. Keys are property IDs, values are lists of alternative values."""
+    """Dictionary of property values. Keys are property IDs, values are the lists of actual values."""
 
     source_ids: list[str] = field(default_factory=list)
     evidence_map: dict[str, list[list[int]]] = field(default_factory=lambda: defaultdict(list))
