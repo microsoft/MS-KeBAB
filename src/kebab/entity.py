@@ -18,7 +18,14 @@ from typing import Any, Self
 
 
 class ValueType(Enum):
-    """Names of value types."""
+    """
+    Names of value types.
+
+    All properties are assumed to be collections of simple values.
+    ValueType represents the element type of this collection.
+    The element type can never be a collection itself (no nested collections).
+    If an element is partially known and has a distribution over it, ValueType is the domain type of that distribution.
+    """
 
     TEXT = "Text"
     NUMERIC = "Numeric"
@@ -36,8 +43,13 @@ class DataType:
     """Unique identifier for the data type."""
 
     value_type: ValueType
+    """Type of the data."""
+
     description: str
+    """Textual description of the data type."""
+
     category_values: list[Any] | None = None
+    """List of possible values for a category data type, if applicable."""
 
     def __post_init__(self):
         """Post-initialisation checks."""
@@ -92,9 +104,19 @@ class Property:
     """Unique (within the experiment) identifier for the property."""
 
     data_type: DataType
+    """Data type that the property values must conform to."""
+
     description: str
+    """Textual description of the property."""
+
     display_name: str | None = None
+    """Human-readable name of the property."""
+
     is_collection: bool = False
+    """
+    Whether the property is interpreted as a collection-valued property.
+    Having `is_collection = True` means that missing values are heavily penalized during evaluation.
+    """
 
     def __post_init__(self):
         """Post-initialisation checks."""
@@ -125,11 +147,26 @@ class Property:
 
 @dataclass
 class PropertySchema:
-    """A complete specification of all properties and data types available in a given experiment."""
+    """
+    A complete specification of all properties and data types available in a given experiment.
+
+    This is a container for data types and properties and a helper functionality to load and save them.
+    """
 
     name: str  # optional
+    """An optional name of the schema."""
+
     data_types: dict[str, DataType]
+    """
+    Dictionary of data types, indexed by their unique IDs.
+    Always satisfied: data_types[some_id]["data_type_id"] == some_id
+    """
+
     properties: dict[str, Property]
+    """
+    Dictionary of properties, indexed by their unique IDs.
+    Always satisfied: properties[some_id]["property_id"] == some_id
+    """
 
     def __init__(
         self,
@@ -191,12 +228,23 @@ class Entity:
     """Represents an entity with its property values and evidence that supports them."""
 
     entity_id: str
+    """Unique identifier for the entity."""
 
     property_values: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
-    """Dictionary of property values. Keys are property IDs, values are the lists of actual values."""
+    """
+    Dictionary of property values. Keys are property IDs, values are the lists of actual values.
+
+    For each property, a list element must be one of 3 things:
+        - An actual value of type given by the ValueType of the property (string, number, etc.).
+        - A set of values (treated as one-of alternatives).
+        - A dictionary mapping values to probabilities.
+    """
 
     source_ids: list[str] = field(default_factory=list)
+    """List of source IDs that contributed to the entity."""
+
     evidence_map: dict[str, list[list[int]]] = field(default_factory=lambda: defaultdict(list))
+    """Map from property ID to a list that maps each value index to a list of evidence indices that support it."""
 
     def __post_init__(self) -> None:
         """Post-initialisation checks."""
