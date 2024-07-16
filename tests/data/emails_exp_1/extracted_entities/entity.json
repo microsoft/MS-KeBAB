@@ -1,6 +1,6 @@
 {
     "entity_id": "john_doe",
-    "property_values": {
+    "properties": {
         "name": [
             "John Doe"
         ],

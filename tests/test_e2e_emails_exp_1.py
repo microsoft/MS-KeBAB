@@ -111,10 +111,10 @@ def test_load_entities(emails_exp_1_path: pathlib.Path):
     entity = entities[0]
 
     name_property_id = [p for p in schema.properties.values() if p.display_name == "name"][0].property_id
-    assert entity.property_values[name_property_id] == ["John Doe"]
+    assert entity.properties[name_property_id] == ["John Doe"]
 
     emails_property_id = [p for p in schema.properties.values() if p.display_name == "email addresses"][0].property_id
-    assert entity.property_values[emails_property_id] == ["john@email.com"]
+    assert entity.properties[emails_property_id] == ["john@email.com"]
 
 
 def test_entity_to_from_dict(emails_exp_1_path: pathlib.Path):
@@ -126,7 +126,7 @@ def test_entity_to_from_dict(emails_exp_1_path: pathlib.Path):
     new_entity = Entity.from_dict(entity_dict)
 
     assert entity == new_entity
-    assert entity.property_values == new_entity.property_values
+    assert entity.properties == new_entity.properties
 
     evidence = entity.get_evidence_for_property_value("name", 0)
     assert evidence == ["email_1"]

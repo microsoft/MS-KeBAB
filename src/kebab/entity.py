@@ -230,7 +230,7 @@ class Entity:
     entity_id: str
     """Unique identifier for the entity."""
 
-    property_values: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
+    properties: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
     """
     Dictionary of property values. Keys are property IDs, values are the lists of actual values.
 
@@ -250,8 +250,8 @@ class Entity:
         """Post-initialisation checks."""
         assert self.entity_id, "Entity ID must be provided."
 
-        if self.property_values is None:
-            self.property_values = defaultdict(list)
+        if self.properties is None:
+            self.properties = defaultdict(list)
 
         if self.source_ids is None:
             self.source_ids = []
@@ -261,7 +261,7 @@ class Entity:
 
     def get_evidence_for_property_value(self, property_id: str, value_index: int) -> list[str]:
         """Get the evidence for a given property value."""
-        assert 0 <= value_index < len(self.property_values[property_id]), "Invalid value index."
+        assert 0 <= value_index < len(self.properties[property_id]), "Invalid value index."
 
         prop_evidence = self.evidence_map.get(property_id, [])
         evidence_indices = prop_evidence[value_index] if prop_evidence else []
@@ -271,7 +271,7 @@ class Entity:
         """Convert the entity to a dictionary."""
         return {
             "entity_id": self.entity_id,
-            "property_values": self.property_values,
+            "properties": self.properties,
             "source_ids": self.source_ids,
             "evidence_map": self.evidence_map,
         }
