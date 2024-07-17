@@ -18,7 +18,14 @@ from typing import Any, Self
 
 
 class ValueType(Enum):
-    """Names of value types."""
+    """
+    Names of value types.
+
+    All properties are assumed to be collections of simple values.
+    ValueType represents the element type of this collection.
+    The element type can never be a collection itself (no nested collections).
+    If an element is partially known and has a distribution over it, ValueType is the domain type of that distribution.
+    """
 
     TEXT = "Text"
     NUMERIC = "Numeric"
@@ -26,7 +33,6 @@ class ValueType(Enum):
     BOOLEAN = "Boolean"
     CATEGORY = "Category"
     REFERENCE = "Reference"
-    COLLECTION = "Collection"
 
 
 @dataclass
@@ -37,9 +43,13 @@ class DataType:
     """Unique identifier for the data type."""
 
     value_type: ValueType
+    """Type of the data."""
+
     description: str
+    """Textual description of the data type."""
+
     category_values: list[Any] | None = None
-    element_data_type: Self | None = None
+    """List of possible values for a category data type, if applicable."""
 
     def __post_init__(self):
         """Post-initialisation checks."""
@@ -61,7 +71,6 @@ class DataType:
             "value_type": self.value_type.value,
             "description": self.description,
             "category_values": self.category_values,
-            "element_data_type": self.element_data_type.to_dict(as_reference=True) if self.element_data_type else None,
         }
 
     @classmethod
@@ -84,9 +93,6 @@ class DataType:
             value_type=ValueType(data["value_type"]),
             description=data["description"],
             category_values=data.get("category_values"),
-            element_data_type=(
-                cls.from_dict(data["element_data_type"], data_types) if data.get("element_data_type") else None
-            ),
         )
 
 
@@ -98,8 +104,19 @@ class Property:
     """Unique (within the experiment) identifier for the property."""
 
     data_type: DataType
+    """Data type that the property values must conform to."""
+
     description: str
+    """Textual description of the property."""
+
     display_name: str | None = None
+    """Human-readable name of the property."""
+
+    is_collection: bool = False
+    """
+    Whether the property is interpreted as a collection-valued property.
+    Having `is_collection = True` means that missing values are heavily penalized during evaluation.
+    """
 
     def __post_init__(self):
         """Post-initialisation checks."""
@@ -113,6 +130,7 @@ class Property:
             "data_type_id": self.data_type.data_type_id,
             "description": self.description,
             "display_name": self.display_name,
+            "is_collection": self.is_collection,
         }
 
     @classmethod
@@ -123,16 +141,32 @@ class Property:
             data_type=data_types[data["data_type_id"]],
             description=data["description"],
             display_name=data.get("display_name"),
+            is_collection=data.get("is_collection", False),
         )
 
 
 @dataclass
 class PropertySchema:
-    """A complete specification of all properties and data types available in a given experiment."""
+    """
+    A complete specification of all properties and data types available in a given experiment.
+
+    This is a container for data types and properties and a helper functionality to load and save them.
+    """
 
     name: str  # optional
+    """An optional name of the schema."""
+
     data_types: dict[str, DataType]
+    """
+    Dictionary of data types, indexed by their unique IDs.
+    Always satisfied: data_types[some_id]["data_type_id"] == some_id
+    """
+
     properties: dict[str, Property]
+    """
+    Dictionary of properties, indexed by their unique IDs.
+    Always satisfied: properties[some_id]["property_id"] == some_id
+    """
 
     def __init__(
         self,
@@ -194,19 +228,30 @@ class Entity:
     """Represents an entity with its property values and evidence that supports them."""
 
     entity_id: str
+    """Unique identifier for the entity."""
 
-    property_values: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
-    """Dictionary of property values. Keys are property IDs, values are lists of alternative values."""
+    properties: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
+    """
+    Dictionary of property values. Keys are property IDs, values are the lists of actual values.
+
+    For each property, a list element must be one of 3 things:
+        - An actual value of type given by the ValueType of the property (string, number, etc.).
+        - A set of values (treated as one-of alternatives).
+        - A dictionary mapping values to probabilities.
+    """
 
     source_ids: list[str] = field(default_factory=list)
+    """List of source IDs that contributed to the entity."""
+
     evidence_map: dict[str, list[list[int]]] = field(default_factory=lambda: defaultdict(list))
+    """Map from property ID to a list that maps each value index to a list of evidence indices that support it."""
 
     def __post_init__(self) -> None:
         """Post-initialisation checks."""
         assert self.entity_id, "Entity ID must be provided."
 
-        if self.property_values is None:
-            self.property_values = defaultdict(list)
+        if self.properties is None:
+            self.properties = defaultdict(list)
 
         if self.source_ids is None:
             self.source_ids = []
@@ -216,7 +261,7 @@ class Entity:
 
     def get_evidence_for_property_value(self, property_id: str, value_index: int) -> list[str]:
         """Get the evidence for a given property value."""
-        assert 0 <= value_index < len(self.property_values[property_id]), "Invalid value index."
+        assert 0 <= value_index < len(self.properties[property_id]), "Invalid value index."
 
         prop_evidence = self.evidence_map.get(property_id, [])
         evidence_indices = prop_evidence[value_index] if prop_evidence else []
@@ -226,7 +271,7 @@ class Entity:
         """Convert the entity to a dictionary."""
         return {
             "entity_id": self.entity_id,
-            "property_values": self.property_values,
+            "properties": self.properties,
             "source_ids": self.source_ids,
             "evidence_map": self.evidence_map,
         }

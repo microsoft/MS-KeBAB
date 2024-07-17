@@ -65,17 +65,19 @@ def test_load_property_schema(emails_exp_1_path: pathlib.Path):
     """Test loading a property schema from the emails experiment 1."""
     schema = EntityUtilities.load_schema(emails_exp_1_path / "properties" / "property_schema.json")
     assert schema.name == "email_exp_schema"
-    assert len(schema.data_types) == 2
+    assert len(schema.data_types) == 1
     assert len(schema.properties) == 3
 
     assert schema.properties["name"].display_name == "name"
     assert schema.properties["name"].data_type == schema.data_types["text"]
+    assert schema.properties["name"].is_collection is False
 
     assert schema.properties["email_addresses"].display_name == "email addresses"
-    assert schema.properties["email_addresses"].data_type == schema.data_types["text_collection"]
-    assert schema.properties["email_addresses"].data_type.element_data_type == schema.data_types["text"]
+    assert schema.properties["email_addresses"].data_type == schema.data_types["text"]
+    assert schema.properties["email_addresses"].is_collection is True
 
     assert schema.properties["date_of_birth"].data_type == schema.data_types["text"]
+    assert schema.properties["date_of_birth"].is_collection is False
 
 
 def test_property_schema_to_from_json(emails_exp_1_path: pathlib.Path):
@@ -109,10 +111,10 @@ def test_load_entities(emails_exp_1_path: pathlib.Path):
     entity = entities[0]
 
     name_property_id = [p for p in schema.properties.values() if p.display_name == "name"][0].property_id
-    assert entity.property_values[name_property_id] == ["John Doe"]
+    assert entity.properties[name_property_id] == ["John Doe"]
 
     emails_property_id = [p for p in schema.properties.values() if p.display_name == "email addresses"][0].property_id
-    assert entity.property_values[emails_property_id] == [["john@email.com"]]
+    assert entity.properties[emails_property_id] == ["john@email.com"]
 
 
 def test_entity_to_from_dict(emails_exp_1_path: pathlib.Path):
@@ -124,7 +126,7 @@ def test_entity_to_from_dict(emails_exp_1_path: pathlib.Path):
     new_entity = Entity.from_dict(entity_dict)
 
     assert entity == new_entity
-    assert entity.property_values == new_entity.property_values
+    assert entity.properties == new_entity.properties
 
     evidence = entity.get_evidence_for_property_value("name", 0)
     assert evidence == ["email_1"]

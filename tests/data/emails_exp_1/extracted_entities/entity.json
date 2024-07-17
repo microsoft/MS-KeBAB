@@ -1,13 +1,11 @@
 {
     "entity_id": "john_doe",
-    "property_values": {
+    "properties": {
         "name": [
             "John Doe"
         ],
         "email_addresses": [
-            [
-                "john@email.com"
-            ]
+            "john@email.com"
         ],
         "date_of_birth": [
             "25 April"
