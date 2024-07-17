@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from kebab.dataset import wikidata_utils
+from kebab.dataset.wikidata import wikidata_utils
 
 
 @pytest.fixture
@@ -24,20 +24,17 @@ def temp_output_file(tmp_path: Path) -> Path:
     return tmp_path / "temp_output.json"
 
 
-def test_extract_entities_from_dump(wikidata_records_file_path: Path, temp_output_file: Path) -> None:
+def test_extract_entities_from_dump(wikidata_records_file_path: Path) -> None:
     """Test the extraction of property labels from the Wikidata JSON dump."""
-    wikidata_utils.extract_entities_from_dump(
-        path_to_dump_json=wikidata_records_file_path,
-        output_path=temp_output_file,
+    entities = list(
+        wikidata_utils.extract_simple_entities_from_dump(wikidata_json_dump_path=wikidata_records_file_path)
     )
 
-    with open(temp_output_file, encoding="utf-8") as f:
-        properties = [json.loads(line) for line in f]
-        assert len(properties) == 1
+    assert len(entities) == 1
 
-        p = properties[0]
-        assert p["id"] == "P19"
-        assert p["name"] == "place of birth"
+    p = entities[0]
+    assert p["id"] == "P19"
+    assert p["name"] == "place of birth"
 
 
 def test_query_entity_via_api_and_simplify(wikidata_records_file_path: Path) -> None:

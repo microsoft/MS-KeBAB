@@ -9,9 +9,8 @@ Extract entity fragments from T-REx dataset.
 - Optionally, verify that the Wikidata property keys exist in the Wikidata properties file.
 
 Example output:
-{"entity_id":"Q902","names":["Bangladesh"],"properties":{"P47":["Q668"]},"source_id":"81317a6457106bc3ae89d179d65ec7ed"}
-{"entity_id":"Q837","names":["Nepal"],"properties":{"P47":["Q148","Q668"]},"source_id":"81317a6457106bc3ae89d179d65ec7ed"}
-{"entity_id":"Q148","names":["China"],"properties":{"P47":["Q837","Q668"]},"source_id":"81317a6457106bc3ae89d179d65ec7ed"}
+{"entity_id": "Q25295", "properties": {"names": ["language family"]}, "source_ids": ["81317a6457106bc3ae89d179d65ec7ed", "http://www.wikidata.org/entity/Q33199"], "evidence_map": {}, "entity_types": []}
+{"entity_id": "Q11708", "properties": {"names": ["Southeast Asia"]}, "source_ids": ["81317a6457106bc3ae89d179d65ec7ed", "http://www.wikidata.org/entity/Q33199"], "evidence_map": {}, "entity_types": []}
 """
 
 # ruff: noqa: S101
@@ -25,8 +24,7 @@ import typing
 from collections.abc import Iterable
 from pathlib import Path
 
-from kebab.dataset import wikidata_utils
-from kebab.dataset.trex.entity_fragment import EntityFragment
+from kebab.dataset.t_rex.entity_fragment import EntityFragment
 
 
 class TRexFragmentExtractor:
@@ -37,84 +35,83 @@ class TRexFragmentExtractor:
 
     DATETIME_TYPE_SUFFIX: typing.ClassVar[str] = "^^http://www.w3.org/2001/XMLSchema#dateTime"
 
+    ENTITY_FRAGMENTS_FILENAME: str = "t_rex_entity_fragments.jsonl"
+
+    DEBUG_DUMP_DOC_FILES: bool = False  # whether to dump the original document file records as separate files
+
     def __init__(
         self,
         *,
-        trex_dir: Path,
-        path_to_wikidata_properties: Path,
+        t_rex_dir: Path,
         output_dir: Path,
     ) -> None:
         """
         Initialize the fragment extractor.
 
         Args:
-            trex_dir: Path to the T-REx data directory (will be *.json-globbed against).
-            path_to_wikidata_properties: Path to the Wikidata properties file.
+            t_rex_dir: Path to the T-REx data directory (will be *.json-globbed against).
+            wikidata_properties_path: Path to the Wikidata properties file.
             output_dir: Path to the output directory ("all_entities_fragments.jsonl" will be created there).
         """
         self._logger: logging.Logger = logging.getLogger(__name__)
 
-        self.data_dir: Path = trex_dir
-        self.path_to_wikidata_properties: Path = path_to_wikidata_properties
+        self.t_rex_dir: Path = t_rex_dir
         self.output_dir: Path = output_dir
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.all_ent_fragments_output_path = self.output_dir / "all_entities_fragments.jsonl"
-        assert not self.all_ent_fragments_output_path.exists(), "Output file already exists."
-
-        self.wikidata_properties: dict[str, dict] = {}
+        self.entity_fragments_output_path = self.output_dir / self.ENTITY_FRAGMENTS_FILENAME
+        assert not self.entity_fragments_output_path.exists(), "Output file already exists."
 
     def run(self) -> None:
         """Run the fragment extraction process."""
         # extract entity fragments
         self.extract_entity_fragments()
 
-        # validate entity fragments
-        self.wikidata_properties = wikidata_utils.load_properties(self.path_to_wikidata_properties)
-        self.validate_entity_fragments()
-
-    def extract_entity_fragments(self) -> None:
+    def extract_entity_fragments(self, remove_duplicates: bool = True) -> None:
         """Extract all entity fragments from T-REx data and store as a flat JSON-lines file."""
         err_count = 0
+        seen = set()
 
-        with open(self.all_ent_fragments_output_path, mode="w", encoding="utf-8") as f:
-            for record in self._load_trex_data():
-                entities = self.extract_entity_fragments_from_document(record)
-                for entity in entities.values():
+        with open(self.entity_fragments_output_path, mode="w", encoding="utf-8") as f:
+            for record in self._load_t_rex_data():
+                fragments = self.extract_entity_fragments_from_document(record)
+                for fragment in fragments.values():
+                    if remove_duplicates:
+                        str_repr = fragment.get_hashable_value_repr()
+                        if str_repr in seen:
+                            continue
+
+                        seen.add(str_repr)
+
                     try:
-                        f.write(entity.model_dump_json() + "\n")
-                    except ValueError:  # noqa: PERF203
+                        f.write(fragment.to_json() + "\n")
+                    except ValueError:
                         err_count += 1
+
+                    # dump the original document file as a separate file
+                    if self.DEBUG_DUMP_DOC_FILES:
+                        debug_predicate = len(fragment.names) > 8 and fragment.entity_id == "Q2351189"
+                        if debug_predicate:
+                            f_name = self.output_dir / f"__{fragment.source_id}.json"
+                            if not f_name.exists():
+                                with open(f_name, mode="w", encoding="utf-8") as doc_f:
+                                    json.dump(record, doc_f, ensure_ascii=False, indent=2)
+
+                            return
 
         if err_count:
             self._logger.error(f"Errors while serializing entities: {err_count}")
 
-    def validate_entity_fragments(self) -> None:
-        """Validate entity fragments, e.g. whether the properties used are known to the system."""
-        if not self.wikidata_properties:
-            self._logger.warning("Wikidata properties are not loaded - skipping validation.")
-            return
-
-        unknown_properties = set()
-        with open(self.all_ent_fragments_output_path, encoding="utf-8") as f:
-            for line in f:
-                entity = EntityFragment.model_validate_json(line)
-                for prop_id in entity.properties:
-                    if prop_id not in self.wikidata_properties:
-                        unknown_properties.add(prop_id)
-
-        for prop_id in sorted(unknown_properties):
-            self._logger.warning(f"Unknown property: {prop_id}")
-
     @classmethod
     def extract_entity_fragments_from_document(cls, record: dict, drop_empty: bool = True) -> dict[str, EntityFragment]:
-        """Extract entities and properties from a single T-REx document record."""
-        entities: dict[str, EntityFragment] = {}
+        """Extract entity fragments and properties from a single T-REx document record."""
+        fragments: dict[str, EntityFragment] = {}
 
         # use text + title md5 hash as a global unique source_id
         text = record["title"] + "\n" + record["text"]
         source_id = hashlib.md5(text.encode()).hexdigest()  # noqa: S324
+        doc_id = record["docid"]
 
         invalid_entities = 0
 
@@ -122,21 +119,19 @@ class TRexFragmentExtractor:
         for item in record["entities"]:
             entity_id = cls.get_entity_id_from_uri(item["uri"])
 
-            if not entity_id:
+            if not entity_id or not entity_id.startswith("Q"):
                 invalid_entities += 1
                 continue
 
-            if entity_id in entities:
-                entities[entity_id].names.add(item["surfaceform"])
-                continue
+            if entity_id not in fragments:
+                fragment = EntityFragment(
+                    entity_id=entity_id,
+                    source_ids=[source_id, doc_id],
+                )
 
-            entity = EntityFragment(
-                entity_id=entity_id,
-                names={item["surfaceform"]},
-                source_id=source_id,
-            )
+                fragments[entity_id] = fragment
 
-            entities[entity.entity_id] = entity
+            fragments[entity_id].names.append(item["surfaceform"])
 
         if invalid_entities:
             logging.debug(f"Found {invalid_entities} invalid entities in the document")
@@ -150,8 +145,8 @@ class TRexFragmentExtractor:
             subject_id = cls.get_entity_id_from_uri(item["subject"]["uri"])
 
             # only take triplets where the entity we are creating the properties for is the subject of the triplet
-            if subject_id in entities:
-                entities[subject_id].properties[property_id].add(object_id)
+            if subject_id in fragments:
+                fragments[subject_id].properties[property_id].append(object_id)
             else:
                 not_found_objects += 1
 
@@ -159,9 +154,12 @@ class TRexFragmentExtractor:
             logging.debug(f"Not found {not_found_objects} object entities in the document")
 
         if drop_empty:
-            entities = {k: v for k, v in entities.items() if v.properties}
+            fragments = {k: v for k, v in fragments.items() if v.properties}
 
-        return entities
+        for fragment in fragments.values():
+            fragment.make_property_values_unique()
+
+        return fragments
 
     @classmethod
     def get_entity_id_from_uri(cls, uri: str) -> str | None:
@@ -184,11 +182,11 @@ class TRexFragmentExtractor:
 
         raise ValueError(f"Unknown property URI prefix: {uri}")
 
-    def _load_trex_data(self) -> Iterable[dict]:
+    def _load_t_rex_data(self) -> Iterable[dict]:
         """Load T-REx data from multiple files, iteratively."""
         error_count = 0
         err = None
-        files = list(self.data_dir.glob("*.json"))
+        files = list(self.t_rex_dir.glob("*.json"))
         self._logger.info(f"Found {len(files)} files in the directory.")
 
         for count, file in enumerate(files, start=1):

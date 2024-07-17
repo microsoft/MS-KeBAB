@@ -12,9 +12,21 @@ import logging
 import pathlib
 import time
 from collections.abc import Callable, Iterable
+from enum import Enum
 
 import requests
 from tqdm import tqdm
+
+
+class TypeProperties(Enum):
+    """Enumeration of the Wikidata type related properties."""
+
+    INSTANCE_OF = "P31"
+    SAME_AS = "P460"
+    SUBCLASS_OF = "P279"
+    PART_OF = "P361"
+    FACET_OF = "P1269"
+    SUB_PROPERTY_OF = "P1647"
 
 
 def _query_entities_via_api(wikidata_ids: Iterable[str], english_only: bool = True) -> dict | None:
@@ -44,13 +56,20 @@ def _query_entities_via_api(wikidata_ids: Iterable[str], english_only: bool = Tr
         return None
 
     if response.status_code == 200:
-        entities = response.json()["entities"]
-        assert len(entities) == len(wikidata_ids)
+        result = response.json()
+        if "entities" not in result:
+            logging.error(f"Error querying Wikidata for IDs {wikidata_ids}: {result}")
+            return None
 
-        # NOTE: the below fails due to redirects
-        # for entity_id, entity in entities.items():
-        #     assert entity_id == entity["id"]
-        #     assert entity["id"] in wikidata_ids
+        entities = response.json()["entities"]
+
+        if len(entities) != len(wikidata_ids):
+            logging.warning(f"Error querying Wikidata for IDs {wikidata_ids}: {entities}")
+
+        for entity_id, entity in entities.items():
+            if entity_id != entity["id"]:
+                logging.warning(f"Received redirect for Wikidata ID {entity_id} -> {entity['id']}")
+
         return entities
     else:
         logging.error(f"Error querying Wikidata for IDs {wikidata_ids}: {response.text}")
@@ -99,9 +118,13 @@ def convert_to_simple_entity(
     entity: dict,
     properties: Iterable[str] | None = None,
     prohibited_qualifiers: Iterable[str] | None = None,
+    include_descriptions: bool = True,
 ) -> dict:
     """Convert a Wikidata entity to a simpler representation."""
-    properties = set(properties) if properties else None
+    properties = set(properties) if properties is not None else None
+
+    if properties is not None:
+        properties.add(TypeProperties.INSTANCE_OF.value)
 
     entity_id = entity["id"]
     label = entity.get("labels", {}).get("en", {}).get("value", "")
@@ -139,13 +162,25 @@ def convert_to_simple_entity(
 
         ent_properties[prop] = prop_values
 
+    # store entity types explicitly
+    types = ent_properties.get(TypeProperties.INSTANCE_OF.value, [])
+    ent_properties.pop(TypeProperties.INSTANCE_OF.value, None)
+
     simple_entity = {
         "id": entity_id,
         "name": label,
         "description": description,
-        "aliases": aliases,
+        "aliases": list(set(aliases)),
+        "types": list(set(types)),
         "properties": ent_properties,
     }
+
+    # no need for properties if the request is not to extract them
+    if properties == {TypeProperties.INSTANCE_OF.value}:
+        del simple_entity["properties"]
+
+    if not include_descriptions:
+        del simple_entity["description"]
 
     return simple_entity
 
@@ -218,15 +253,15 @@ def scrape_properties_via_api(
         json.dump(properties, f)
 
 
-def extract_entities_from_dump(
-    path_to_dump_json: pathlib.Path = pathlib.Path.cwd() / "latest-all.json",
-    output_path: pathlib.Path = pathlib.Path.cwd() / "wikidata_extracted_entities.jsonl",
+def extract_simple_entities_from_dump(
+    wikidata_json_dump_path: pathlib.Path = pathlib.Path.cwd() / "latest-all.json",
     properties: Iterable[str] | None = None,
     input_entity_predicate: Callable[[dict], bool] | None = None,
     output_entity_predicate: Callable[[dict], bool] | None = None,
-) -> pathlib.Path:
+    include_descriptions: bool = True,
+) -> Iterable[dict]:
     """Extract all items that match the predicate and their requested properties from the Wikidata JSON dump."""
-    logging.info(f"Extracting entities from {path_to_dump_json}...")
+    logging.info(f"Extracting entities from {wikidata_json_dump_path}...")
 
     processed_count = 0
     error_count = 0
@@ -236,8 +271,8 @@ def extract_entities_from_dump(
     input_entity_predicate = input_entity_predicate or (lambda x: True)
     output_entity_predicate = output_entity_predicate or (lambda x: True)
 
-    with open(output_path, mode="w", encoding="utf-8") as f_out, open(path_to_dump_json, encoding="utf-8") as f_in:
-        for line in f_in:
+    with open(wikidata_json_dump_path, encoding="utf-8") as f:
+        for line in f:
             processed_count += 1
             if processed_count % 500_000 == 0:
                 logging.info(f"Processed {processed_count} records")
@@ -264,13 +299,17 @@ def extract_entities_from_dump(
                     skipped_count += 1
                     continue
 
-                ent = convert_to_simple_entity(entity, properties=properties)
+                simple_entity = convert_to_simple_entity(
+                    entity,
+                    properties=properties,
+                    include_descriptions=include_descriptions,
+                )
 
                 # check if the input predicate applies
-                if not output_entity_predicate(ent):
+                if not output_entity_predicate(simple_entity):
                     continue
 
-                f_out.write(json.dumps(ent) + "\n")
+                yield simple_entity
 
             except json.JSONDecodeError:
                 logging.warning(f"Error parsing line: {line}")
@@ -282,9 +321,8 @@ def extract_entities_from_dump(
     if skipped_count:
         logging.warning(f"Skipped {skipped_count} entities without labels or type")
 
-    return output_path
 
-
+# TODO(pmyshkov): Move this to a dedicated dataset loading class
 def load_properties(path: pathlib.Path) -> dict[str, dict]:
     """Load (previously extracted) Wikidata properties from a JSON file."""
     try:

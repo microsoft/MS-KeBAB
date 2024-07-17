@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Script to run the Wikidata hierarchy extraction steps."""
+"""Script to run the Wikidata simple entity/property extraction steps."""
 
 from __future__ import annotations
 
@@ -10,9 +10,20 @@ import pathlib
 import click
 
 from kebab import utils
-from kebab.dataset.wikidata.wikidata_hierarchy_extractor import WikidataHierarchyExtractor
+from kebab.dataset.wikidata.wikidata_simple_extractor import WikidataSimpleExtractor
 
 
+@click.option(
+    "--run-entity-extraction/--no-run-entity-extraction",
+    # default=False,
+    default=True,
+    help="Whether to run the simple entity extraction step.",
+)
+@click.option(
+    "--run-property-scrape/--no-run-property-scrape",
+    default=False,
+    help="Whether to run the property scraping step.",
+)
 @click.option(
     "--wikidata-json-dump-path",
     type=pathlib.Path,
@@ -25,23 +36,29 @@ from kebab.dataset.wikidata.wikidata_hierarchy_extractor import WikidataHierarch
 @click.option(
     "--output-dir",
     type=pathlib.Path,
-    default=pathlib.Path.cwd() / "output" / "wikidata_hierarchy",
-    help="The directory to save the extracted hierarchy.",
+    default=pathlib.Path.cwd() / "output" / "wikidata",
+    help="The directory to save the extracted data.",
 )
 @click.command()
 def main(
+    run_entity_extraction: bool,
+    run_property_scrape: bool,
     wikidata_json_dump_path: pathlib.Path,
     output_dir: pathlib.Path,
 ):
     """Run Wikidata hierarchy extraction steps."""
     utils.configure_logging()
 
-    extractor = WikidataHierarchyExtractor(
+    extractor = WikidataSimpleExtractor(
         wikidata_json_dump_path=wikidata_json_dump_path,
         output_dir=output_dir,
     )
 
-    extractor.run()
+    if run_entity_extraction:
+        extractor.extract_simple_entities()
+
+    if run_property_scrape:
+        extractor.scrape_properties()
 
 
 if __name__ == "__main__":

@@ -10,40 +10,40 @@ import pathlib
 import click
 
 from kebab import utils
-from kebab.dataset.trex.t_rex_fragment_extractor import TRexFragmentExtractor
+from kebab.dataset.t_rex.t_rex_fragment_extractor import TRexFragmentExtractor
 
 
 @click.option(
-    "--trex-dir",
+    "--t-rex-dir",
     type=pathlib.Path,
-    default=pathlib.Path.cwd() / "data" / "trex_dataset",
+    default=pathlib.Path.home()
+    / "OneDrive - Microsoft"
+    / "Benchmark"
+    / "Datasets"
+    / "T-REx"
+    / "Original Dataset"
+    # / "single",
+    # / "sample",
+    / "full",
     help="Path to the T-REx data directory (will be *.json-globbed against).",
 )
 @click.option(
     "--output-dir",
     type=pathlib.Path,
-    default=pathlib.Path.cwd() / "data" / "trex_fragments",
-    help="Path to the output directory ('all_entities_fragments.jsonl' will be created there).",
-)
-@click.option(
-    "--path-to-wikidata-properties",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "data" / "wikidata" / "wikidata_properties.json",
-    help="Path to the Wikidata properties file (optional).",
+    default=pathlib.Path.cwd() / "output" / "t_rex_fragments",
+    help="Path to the output directory ('t_rex_entity_fragments.jsonl' will be created there).",
 )
 @click.command()
 def main(
-    trex_dir: pathlib.Path,
+    t_rex_dir: pathlib.Path,
     output_dir: pathlib.Path,
-    path_to_wikidata_properties: pathlib.Path,
 ) -> None:
     """Run T-REx fragment extraction steps."""
     utils.configure_logging()
 
     extractor = TRexFragmentExtractor(
-        trex_dir=trex_dir,
+        t_rex_dir=t_rex_dir,
         output_dir=output_dir,
-        path_to_wikidata_properties=path_to_wikidata_properties,
     )
 
     extractor.run()

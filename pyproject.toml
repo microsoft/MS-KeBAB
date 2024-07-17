@@ -15,7 +15,6 @@ license = { text = "MIT" }
 dependencies = [
     "click",
     "numpy",
-    "pydantic",
     "requests",
     "tqdm",
 ]
