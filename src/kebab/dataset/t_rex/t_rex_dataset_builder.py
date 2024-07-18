@@ -53,10 +53,10 @@ class TRexDatasetBuilder:
         self,
         *,
         fragments_path: pathlib.Path,
-        wikidata_simple_entities_path: pathlib.Path | None = None,
-        wikidata_properties_path: pathlib.Path | None,
-        wikidata_type_hierarchy_path: pathlib.Path | None,
-        output_dir: pathlib.Path | None,
+        wikidata_simple_entities_path: pathlib.Path,
+        wikidata_properties_path: pathlib.Path,
+        wikidata_type_hierarchy_path: pathlib.Path,
+        output_dir: pathlib.Path,
         type_ids: list[str] | None = None,
         min_name_count: int = 1,
         min_fragment_property_count: int = 0,
@@ -130,7 +130,7 @@ class TRexDatasetBuilder:
 
     def load_fragments(
         self,
-        fragments_path: str | None = None,
+        fragments_path: pathlib.Path | None = None,
         remove_duplicates: bool = True,
     ) -> dict[str, list[EntityFragment]]:
         """Load entity fragments from file."""
@@ -227,6 +227,11 @@ class TRexDatasetBuilder:
                 self._logger.info(f"Querying {len(required_ids):,} entities via the Wikidata API")
 
                 q_entities = wikidata_utils.query_entities_via_api(required_ids)
+
+                if q_entities is None:
+                    self._logger.error("Failed to query entities via the Wikidata API.")
+                    return entities
+
                 q_entities = {
                     k: wikidata_utils.convert_to_simple_entity(e, properties=[], include_descriptions=False)
                     for k, e in q_entities.items()
@@ -297,7 +302,7 @@ class TRexDatasetBuilder:
             names = (name for name in fragment.names if name not in self.DISALLOWED_NAMES)
 
             # filter out names that are not in Wikidata
-            if filter_to_wikidata_names:
+            if filter_to_wikidata_names and wikidata_entities:
                 wikidata_entity = wikidata_entities[fragment.entity_id]
                 wikidata_names = {wikidata_entity["name"], *wikidata_entity["aliases"]}
                 names = (name for name in names if name in wikidata_names)
@@ -321,7 +326,7 @@ class TRexDatasetBuilder:
             return fragment
 
         for f in entity_fragments:
-            if (filter_to_wikidata_names or type_ids) and f.entity_id not in wikidata_entities:
+            if (filter_to_wikidata_names or type_ids) and wikidata_entities and f.entity_id not in wikidata_entities:
                 continue
 
             fragment = filter_contents(f)
@@ -330,7 +335,7 @@ class TRexDatasetBuilder:
                 if len(fragment.properties) <= 1:
                     continue
 
-                if not self.SUBSTITUTE_ACTUAL_NAME_IF_MISSING:
+                if not self.SUBSTITUTE_ACTUAL_NAME_IF_MISSING or not wikidata_entities:
                     continue
 
                 fragment.names = [wikidata_entities[fragment.entity_id]["name"]]
@@ -341,7 +346,7 @@ class TRexDatasetBuilder:
             if len(fragment.properties) < min_property_count:
                 continue
 
-            if type_ids:
+            if type_ids and wikidata_entities:
                 entity_types = wikidata_entities[fragment.entity_id]["types"]
                 if not any(t in type_ids for t in entity_types):
                     continue
@@ -353,7 +358,7 @@ class TRexDatasetBuilder:
 
     def filter_entities_by_fragment_count(
         self,
-        fragments: dict[str, list[EntityFragment]] | None = None,
+        fragments: dict[str, list[EntityFragment]],
         min_entity_fragment_count: int | None = None,
         max_entity_fragment_count: int | None = None,
     ) -> dict[str, list[EntityFragment]]:

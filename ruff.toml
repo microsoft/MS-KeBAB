@@ -1,6 +1,15 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+exclude = [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/.*", # this covers .venv*
+    "**/venv*",
+    "**/ENV",
+    "**/env",
+]
+
 line-length = 120
 src = ["src", "experiments", "tests", "notebooks"]
 
