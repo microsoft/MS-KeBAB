@@ -44,9 +44,6 @@ class EntityFragment(Entity):
 
     def merge_with(self, other: EntityFragment) -> EntityFragment:
         """Merge the other entity fragment into the current fragment."""
-        if self.entity_id != other.entity_id:
-            raise ValueError("Cannot merge entities with different IDs")
-
         self.names.extend(other.names)
         for prop_id, values in other.properties.items():
             self.properties[prop_id].extend(values)
