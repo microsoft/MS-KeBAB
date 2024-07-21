@@ -11,10 +11,10 @@ The extraction process runs in two steps:
 2. Build the hierarchy of Wikidata type entities, including removing cycles and grandparent links.
 
 Necessary input:
-- Wikidata dump in JSON format (e.g. from https://dumps.wikimedia.org/wikidatawiki/entities/latest-all.json.gz)
+- Wikidata dump in JSON format (e.g. from https://dumps.wikimedia.org/wikidatawiki/entities/latest-all.json.gz).
 
 Example output:
-- `wikidata_concrete_entities.jsonl`, each line like:
+- `wikidata_types_hierarchy.jsonl`, each line like:
 {"id": "Q13442814",
  "merged_ids": ["Q13442814"],
  "name": "scholarly article",
@@ -46,21 +46,10 @@ import pathlib
 import typing
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from enum import Enum
 from typing import Any
 
-from kebab.dataset import wikidata_utils
-
-
-class TypeProperties(Enum):
-    """Enumeration of the Wikidata type related properties."""
-
-    INSTANCE_OF = "P31"
-    SAME_AS = "P460"
-    SUBCLASS_OF = "P279"
-    PART_OF = "P361"
-    FACET_OF = "P1269"
-    SUB_PROPERTY_OF = "P1647"
+from kebab.dataset.wikidata import wikidata_utils
+from kebab.dataset.wikidata.wikidata_utils import TypeProperties
 
 
 class WikidataHierarchyExtractor:
@@ -86,18 +75,18 @@ class WikidataHierarchyExtractor:
     WIKIDATA_TYPE_ENTITIES_FILENAME = "wikidata_type_entities.jsonl"
     WIKIDATA_MERGED_CYCLES_FILENAME = "wikidata_merged_cycles.txt"
     WIKIDATA_REMOVED_GRANDPARENT_LINKS_FILENAME = "wikidata_removed_grandparent_links.txt"
-    WIKIDATA_HIERARCHY_FILENAME = "wikidata_hierarchy.jsonl"
+    WIKIDATA_HIERARCHY_FILENAME = "wikidata_type_hierarchy.jsonl"
 
     def __init__(
         self,
         *,
-        path_to_wikidata_json_dump: pathlib.Path | None = None,
+        wikidata_json_dump_path: pathlib.Path | None = None,
         output_dir: pathlib.Path | None = None,
     ):
         """Initialize the Wikidata hierarchy extractor."""
         self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
 
-        self.path_to_wikidata_dump: pathlib.Path | None = path_to_wikidata_json_dump
+        self.wikidata_dump_path: pathlib.Path | None = wikidata_json_dump_path
         self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
 
         if self.output_dir is not None:
@@ -163,7 +152,7 @@ class WikidataHierarchyExtractor:
 
     def extract_concrete_entities_from_wikidata_dump(
         self,
-        path_to_wikidata_dump: pathlib.Path | None = None,
+        wikidata_dump_path: pathlib.Path | None = None,
         working_dir: pathlib.Path | None = None,
         skip_when_output_exists: bool = True,
     ) -> pathlib.Path:
@@ -176,7 +165,7 @@ class WikidataHierarchyExtractor:
         This is to later extract all type entities (those that are the values of the "instance of" property of other
         entities).
         """
-        input_path = path_to_wikidata_dump or self.path_to_wikidata_dump
+        input_path = wikidata_dump_path or self.wikidata_dump_path
         if input_path is None:
             raise ValueError("Path to the Wikidata dump is not provided.")
 
@@ -187,19 +176,23 @@ class WikidataHierarchyExtractor:
             self._logger.info(f"Skipping extraction of concrete entities, output file exists: {output_path}")
             return output_path
 
-        wikidata_utils.extract_entities_from_dump(
-            path_to_dump_json=input_path,
-            output_path=output_path,
-            properties=[TypeProperties.INSTANCE_OF.value],
-            input_entity_predicate=lambda x: x.get("type") == "item",
-            output_entity_predicate=lambda x: x.get("properties", {}).get(TypeProperties.INSTANCE_OF.value),
-        )
+        with open(output_path, mode="w", encoding="utf-8", newline="\n") as f:
+            entities = wikidata_utils.extract_simple_entities_from_dump(
+                wikidata_json_dump_path=input_path,
+                properties=[TypeProperties.INSTANCE_OF.value],
+                input_entity_predicate=lambda x: x.get("type") == "item",
+                output_entity_predicate=lambda x: len(x["types"]) > 0,
+                include_descriptions=False,
+            )
+
+            for entity in entities:
+                f.write(json.dumps(entity) + "\n")
 
         return output_path
 
     def extract_type_entities_from_concrete_entities(
         self,
-        path_to_concrete_entities: pathlib.Path | None = None,
+        concrete_entities_path: pathlib.Path | None = None,
         working_dir: pathlib.Path | None = None,
         skip_when_output_exists: bool = True,
     ) -> pathlib.Path:
@@ -215,9 +208,7 @@ class WikidataHierarchyExtractor:
         is an "instance of" it (e.g. all entities might be either "human" or another specific type, but not "mammal").
         """
         working_dir = working_dir or self.output_dir
-        path_to_concrete_entities = path_to_concrete_entities or (
-            working_dir / self.WIKIDATA_CONCRETE_ENTITIES_FILENAME
-        )
+        concrete_entities_path = concrete_entities_path or (working_dir / self.WIKIDATA_CONCRETE_ENTITIES_FILENAME)
         output_path = working_dir / self.WIKIDATA_TYPE_ENTITY_IDS_WITH_COUNTS_FILENAME
 
         if skip_when_output_exists and output_path.exists():
@@ -225,10 +216,10 @@ class WikidataHierarchyExtractor:
             return output_path
 
         counter = defaultdict(int)
-        with open(path_to_concrete_entities, encoding="utf-8") as f:
+        with open(concrete_entities_path, encoding="utf-8") as f:
             for line in f:
                 entity = json.loads(line.strip())
-                for value in entity["properties"].get(TypeProperties.INSTANCE_OF.value, []):
+                for value in entity["types"]:
                     counter[value] += 1
 
         with open(output_path, mode="w", encoding="utf-8", newline="\n") as f:
@@ -304,12 +295,20 @@ class WikidataHierarchyExtractor:
         # rebuild the map since the IDs might have changed due to redirects
         type_entities = {e["id"]: e for e in type_entities.values()}
 
-        # TODO(pmyshkov): Store reference-map into merged-ids
+        # attach the redirect map
+        redirect_from_map = defaultdict(list)
+        for k, v in redirect_map.items():
+            if k != v:
+                redirect_from_map[v].append(k)
+
+        for entity in type_entities.values():
+            entity["redirect_from"] = redirect_from_map.get(entity["id"], [])
+
         return type_entities
 
     def construct_wikidata_type_entities(
         self,
-        path_to_entity_ids_with_ref_counts: pathlib.Path | None = None,
+        entity_ids_with_ref_counts_path: pathlib.Path | None = None,
         working_dir: pathlib.Path | None = None,
         skip_when_output_exists: bool = True,
     ) -> pathlib.Path:
@@ -320,7 +319,7 @@ class WikidataHierarchyExtractor:
         recursively querying for the base entities.
         """
         working_dir = working_dir or self.output_dir
-        path_to_entity_ids_with_ref_counts = path_to_entity_ids_with_ref_counts or (
+        entity_ids_with_ref_counts_path = entity_ids_with_ref_counts_path or (
             working_dir / self.WIKIDATA_TYPE_ENTITY_IDS_WITH_COUNTS_FILENAME
         )
 
@@ -330,7 +329,7 @@ class WikidataHierarchyExtractor:
             self._logger.info(f"Skipping construction of type entities, output file exists: {output_path}")
             return output_path
 
-        with open(path_to_entity_ids_with_ref_counts, encoding="utf-8") as f:
+        with open(entity_ids_with_ref_counts_path, encoding="utf-8") as f:
             entity_ids_with_counts = {e["id"]: e["ref_count"] for e in (json.loads(line.strip()) for line in f)}
 
         type_entities = self.query_for_type_entities_via_api(list(entity_ids_with_counts.keys()))
@@ -347,11 +346,11 @@ class WikidataHierarchyExtractor:
 
         return output_path
 
-    def load_type_entities(self, path_to_type_entities: pathlib.Path | None = None) -> dict[str, dict]:
+    def load_type_entities(self, type_entities_path: pathlib.Path | None = None) -> dict[str, dict]:
         """Load the type entities from the file."""
-        path_to_type_entities = path_to_type_entities or (self.output_dir / self.WIKIDATA_TYPE_ENTITIES_FILENAME)
+        type_entities_path = type_entities_path or (self.output_dir / self.WIKIDATA_TYPE_ENTITIES_FILENAME)
 
-        with open(path_to_type_entities, encoding="utf-8") as f:
+        with open(type_entities_path, encoding="utf-8") as f:
             type_entities = [json.loads(line.strip()) for line in f]
 
         # verify consistency
@@ -364,7 +363,7 @@ class WikidataHierarchyExtractor:
 
         type_entities = {e["id"]: e for e in type_entities}
 
-        self._logger.info(f"Loaded {len(type_entities):,} type entities from {path_to_type_entities}")
+        self._logger.info(f"Loaded {len(type_entities):,} type entities from {type_entities_path}")
 
         return type_entities
 
@@ -479,6 +478,9 @@ class WikidataHierarchyExtractor:
                 simple_entity = {
                     "id": entity_id,
                     "merged_ids": list(node["merged_ids"]),
+                    "redirect_from_ids": list(
+                        {n for merged_id in node["merged_ids"] for n in type_entities[merged_id]["redirect_from"]}
+                    ),
                     "name": entity["name"],
                     "descriptions": list({type_entities[merged_id]["description"] for merged_id in node["merged_ids"]}),
                     "aliases": list(
