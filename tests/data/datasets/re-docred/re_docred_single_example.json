@@ -1,0 +1,903 @@
+[
+    {
+        "title": "AirAsia Zest",
+        "vertexSet": [
+            [
+                {
+                    "pos": [
+                        0,
+                        4
+                    ],
+                    "type": "ORG",
+                    "sent_id": 0,
+                    "name": "Zest Airways, Inc.",
+                    "global_pos": [
+                        0,
+                        0
+                    ],
+                    "index": "0_0"
+                },
+                {
+                    "sent_id": 0,
+                    "type": "ORG",
+                    "pos": [
+                        10,
+                        15
+                    ],
+                    "name": "Asian Spirit and Zest Air",
+                    "global_pos": [
+                        10,
+                        10
+                    ],
+                    "index": "0_1"
+                },
+                {
+                    "name": "AirAsia Zest",
+                    "pos": [
+                        6,
+                        8
+                    ],
+                    "sent_id": 0,
+                    "type": "ORG",
+                    "global_pos": [
+                        6,
+                        6
+                    ],
+                    "index": "0_2"
+                },
+                {
+                    "name": "AirAsia Zest",
+                    "pos": [
+                        19,
+                        21
+                    ],
+                    "sent_id": 6,
+                    "type": "ORG",
+                    "global_pos": [
+                        183,
+                        183
+                    ],
+                    "index": "0_3"
+                }
+            ],
+            [
+                {
+                    "name": "Ninoy Aquino International Airport",
+                    "pos": [
+                        4,
+                        8
+                    ],
+                    "sent_id": 3,
+                    "type": "LOC",
+                    "global_pos": [
+                        91,
+                        91
+                    ],
+                    "index": "1_0"
+                },
+                {
+                    "name": "Ninoy Aquino International Airport",
+                    "pos": [
+                        26,
+                        30
+                    ],
+                    "sent_id": 0,
+                    "type": "LOC",
+                    "global_pos": [
+                        26,
+                        26
+                    ],
+                    "index": "1_1"
+                }
+            ],
+            [
+                {
+                    "name": "Pasay City",
+                    "pos": [
+                        31,
+                        33
+                    ],
+                    "sent_id": 0,
+                    "type": "LOC",
+                    "global_pos": [
+                        31,
+                        31
+                    ],
+                    "index": "2_0"
+                }
+            ],
+            [
+                {
+                    "name": "Metro Manila",
+                    "pos": [
+                        34,
+                        36
+                    ],
+                    "sent_id": 0,
+                    "type": "LOC",
+                    "global_pos": [
+                        34,
+                        34
+                    ],
+                    "index": "3_0"
+                }
+            ],
+            [
+                {
+                    "name": "Philippines",
+                    "pos": [
+                        38,
+                        39
+                    ],
+                    "sent_id": 0,
+                    "type": "LOC",
+                    "global_pos": [
+                        38,
+                        38
+                    ],
+                    "index": "4_0"
+                },
+                {
+                    "name": "Philippines",
+                    "pos": [
+                        13,
+                        14
+                    ],
+                    "sent_id": 4,
+                    "type": "LOC",
+                    "global_pos": [
+                        111,
+                        111
+                    ],
+                    "index": "4_1"
+                },
+                {
+                    "sent_id": 5,
+                    "type": "LOC",
+                    "pos": [
+                        25,
+                        29
+                    ],
+                    "name": "Republic of the Philippines",
+                    "global_pos": [
+                        144,
+                        144
+                    ],
+                    "index": "4_2"
+                }
+            ],
+            [
+                {
+                    "name": "Manila",
+                    "pos": [
+                        13,
+                        14
+                    ],
+                    "sent_id": 1,
+                    "type": "LOC",
+                    "global_pos": [
+                        53,
+                        53
+                    ],
+                    "index": "5_0"
+                },
+                {
+                    "name": "Manila",
+                    "pos": [
+                        9,
+                        10
+                    ],
+                    "sent_id": 3,
+                    "type": "LOC",
+                    "global_pos": [
+                        96,
+                        96
+                    ],
+                    "index": "5_1"
+                }
+            ],
+            [
+                {
+                    "name": "Cebu",
+                    "pos": [
+                        15,
+                        16
+                    ],
+                    "sent_id": 1,
+                    "type": "LOC",
+                    "global_pos": [
+                        55,
+                        55
+                    ],
+                    "index": "6_0"
+                }
+            ],
+            [
+                {
+                    "pos": [
+                        17,
+                        18
+                    ],
+                    "type": "NUM",
+                    "sent_id": 1,
+                    "name": "24",
+                    "global_pos": [
+                        57,
+                        57
+                    ],
+                    "index": "7_0"
+                }
+            ],
+            [
+                {
+                    "pos": [
+                        1,
+                        2
+                    ],
+                    "type": "TIME",
+                    "sent_id": 2,
+                    "name": "2013",
+                    "global_pos": [
+                        72,
+                        72
+                    ],
+                    "index": "8_0"
+                },
+                {
+                    "pos": [
+                        1,
+                        5
+                    ],
+                    "type": "TIME",
+                    "sent_id": 5,
+                    "name": "August 16, 2013",
+                    "global_pos": [
+                        120,
+                        120
+                    ],
+                    "index": "8_1"
+                }
+            ],
+            [
+                {
+                    "pos": [
+                        9,
+                        11
+                    ],
+                    "type": "ORG",
+                    "name": "Philippines AirAsia",
+                    "sent_id": 2,
+                    "global_pos": [
+                        80,
+                        80
+                    ],
+                    "index": "9_0"
+                }
+            ],
+            [
+                {
+                    "pos": [
+                        5,
+                        7
+                    ],
+                    "type": "ORG",
+                    "sent_id": 4,
+                    "name": "Asian Spirit",
+                    "global_pos": [
+                        103,
+                        103
+                    ],
+                    "index": "10_0"
+                }
+            ],
+            [
+                {
+                    "pos": [
+                        7,
+                        13
+                    ],
+                    "type": "ORG",
+                    "sent_id": 5,
+                    "name": "Civil Aviation Authority of the Philippines",
+                    "global_pos": [
+                        126,
+                        126
+                    ],
+                    "index": "11_0"
+                },
+                {
+                    "name": "CAAP",
+                    "pos": [
+                        14,
+                        15
+                    ],
+                    "sent_id": 5,
+                    "type": "ORG",
+                    "global_pos": [
+                        133,
+                        133
+                    ],
+                    "index": "11_1"
+                }
+            ],
+            [
+                {
+                    "name": "Zest Air",
+                    "pos": [
+                        34,
+                        36
+                    ],
+                    "sent_id": 5,
+                    "type": "ORG",
+                    "global_pos": [
+                        153,
+                        153
+                    ],
+                    "index": "12_0"
+                },
+                {
+                    "pos": [
+                        7,
+                        9
+                    ],
+                    "type": "ORG",
+                    "sent_id": 6,
+                    "name": "Zest Air",
+                    "global_pos": [
+                        171,
+                        171
+                    ],
+                    "index": "12_1"
+                }
+            ],
+            [
+                {
+                    "sent_id": 6,
+                    "type": "NUM",
+                    "pos": [
+                        2,
+                        4
+                    ],
+                    "name": "a year",
+                    "global_pos": [
+                        166,
+                        166
+                    ],
+                    "index": "13_0"
+                }
+            ],
+            [
+                {
+                    "name": "AirAsia",
+                    "pos": [
+                        5,
+                        6
+                    ],
+                    "sent_id": 6,
+                    "type": "ORG",
+                    "global_pos": [
+                        169,
+                        169
+                    ],
+                    "index": "14_0"
+                }
+            ],
+            [
+                {
+                    "pos": [
+                        5,
+                        7
+                    ],
+                    "type": "ORG",
+                    "name": "AirAsia Philippines",
+                    "sent_id": 7,
+                    "global_pos": [
+                        191,
+                        191
+                    ],
+                    "index": "15_0"
+                }
+            ],
+            [
+                {
+                    "pos": [
+                        8,
+                        10
+                    ],
+                    "type": "TIME",
+                    "sent_id": 7,
+                    "name": "January 2016",
+                    "global_pos": [
+                        194,
+                        194
+                    ],
+                    "index": "16_0"
+                }
+            ]
+        ],
+        "labels": [
+            {
+                "r": "P159",
+                "h": 0,
+                "t": 2,
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "r": "P17",
+                "h": 0,
+                "t": 4,
+                "evidence": [
+                    2,
+                    4,
+                    7
+                ]
+            },
+            {
+                "r": "P17",
+                "h": 12,
+                "t": 4,
+                "evidence": [
+                    6,
+                    7
+                ]
+            },
+            {
+                "r": "P17",
+                "h": 2,
+                "t": 4,
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "r": "P131",
+                "h": 2,
+                "t": 3,
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "r": "P150",
+                "h": 4,
+                "t": 3,
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "r": "P17",
+                "h": 5,
+                "t": 4,
+                "evidence": [
+                    0,
+                    3
+                ]
+            },
+            {
+                "r": "P150",
+                "h": 3,
+                "t": 2,
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "r": "P131",
+                "h": 3,
+                "t": 4,
+                "evidence": [
+                    0,
+                    3
+                ]
+            },
+            {
+                "r": "P17",
+                "h": 3,
+                "t": 4,
+                "evidence": [
+                    0,
+                    3
+                ]
+            },
+            {
+                "r": "P131",
+                "h": 1,
+                "t": 2,
+                "evidence": [
+                    0,
+                    3
+                ]
+            },
+            {
+                "r": "P17",
+                "h": 1,
+                "t": 4,
+                "evidence": [
+                    0,
+                    3
+                ]
+            },
+            {
+                "r": "P17",
+                "h": 10,
+                "t": 4,
+                "evidence": [
+                    4
+                ]
+            },
+            {
+                "h": 12,
+                "t": 16,
+                "r": "P576",
+                "evidence": []
+            },
+            {
+                "h": 9,
+                "t": 4,
+                "r": "P17",
+                "evidence": []
+            },
+            {
+                "h": 4,
+                "t": 5,
+                "r": "P150",
+                "evidence": []
+            },
+            {
+                "h": 6,
+                "t": 4,
+                "r": "P17",
+                "evidence": []
+            },
+            {
+                "h": 15,
+                "t": 4,
+                "r": "P17",
+                "evidence": []
+            },
+            {
+                "h": 3,
+                "t": 5,
+                "r": "P150",
+                "evidence": []
+            },
+            {
+                "h": 11,
+                "t": 4,
+                "r": "P17",
+                "evidence": []
+            },
+            {
+                "h": 12,
+                "t": 2,
+                "r": "P131",
+                "evidence": []
+            },
+            {
+                "h": 5,
+                "t": 3,
+                "r": "P131",
+                "evidence": []
+            },
+            {
+                "h": 14,
+                "t": 15,
+                "r": "P355",
+                "evidence": []
+            },
+            {
+                "h": 15,
+                "t": 14,
+                "r": "P749",
+                "evidence": []
+            },
+            {
+                "h": 0,
+                "t": 4,
+                "r": "P131",
+                "evidence": [
+                    2,
+                    4,
+                    7
+                ]
+            },
+            {
+                "h": 12,
+                "t": 4,
+                "r": "P131",
+                "evidence": [
+                    6,
+                    7
+                ]
+            },
+            {
+                "h": 2,
+                "t": 4,
+                "r": "P131",
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "h": 5,
+                "t": 4,
+                "r": "P131",
+                "evidence": [
+                    0,
+                    3
+                ]
+            },
+            {
+                "h": 1,
+                "t": 4,
+                "r": "P131",
+                "evidence": [
+                    0,
+                    3
+                ]
+            },
+            {
+                "h": 10,
+                "t": 4,
+                "r": "P131",
+                "evidence": [
+                    4
+                ]
+            },
+            {
+                "h": 9,
+                "t": 4,
+                "r": "P131",
+                "evidence": []
+            },
+            {
+                "h": 6,
+                "t": 4,
+                "r": "P131",
+                "evidence": []
+            },
+            {
+                "h": 15,
+                "t": 4,
+                "r": "P131",
+                "evidence": []
+            },
+            {
+                "h": 11,
+                "t": 4,
+                "r": "P131",
+                "evidence": []
+            },
+            {
+                "h": 1,
+                "t": 3,
+                "r": "P131",
+                "evidence": []
+            },
+            {
+                "h": 12,
+                "t": 3,
+                "r": "P131",
+                "evidence": []
+            }
+        ],
+        "sents": [
+            [
+                "Zest",
+                "Airways",
+                ",",
+                "Inc.",
+                "operated",
+                "as",
+                "AirAsia",
+                "Zest",
+                "(",
+                "formerly",
+                "Asian",
+                "Spirit",
+                "and",
+                "Zest",
+                "Air",
+                ")",
+                ",",
+                "was",
+                "a",
+                "low",
+                "-",
+                "cost",
+                "airline",
+                "based",
+                "at",
+                "the",
+                "Ninoy",
+                "Aquino",
+                "International",
+                "Airport",
+                "in",
+                "Pasay",
+                "City",
+                ",",
+                "Metro",
+                "Manila",
+                "in",
+                "the",
+                "Philippines",
+                "."
+            ],
+            [
+                "It",
+                "operated",
+                "scheduled",
+                "domestic",
+                "and",
+                "international",
+                "tourist",
+                "services",
+                ",",
+                "mainly",
+                "feeder",
+                "services",
+                "linking",
+                "Manila",
+                "and",
+                "Cebu",
+                "with",
+                "24",
+                "domestic",
+                "destinations",
+                "in",
+                "support",
+                "of",
+                "the",
+                "trunk",
+                "route",
+                "operations",
+                "of",
+                "other",
+                "airlines",
+                "."
+            ],
+            [
+                "In",
+                "2013",
+                ",",
+                "the",
+                "airline",
+                "became",
+                "an",
+                "affiliate",
+                "of",
+                "Philippines",
+                "AirAsia",
+                "operating",
+                "their",
+                "brand",
+                "separately",
+                "."
+            ],
+            [
+                "Its",
+                "main",
+                "base",
+                "was",
+                "Ninoy",
+                "Aquino",
+                "International",
+                "Airport",
+                ",",
+                "Manila",
+                "."
+            ],
+            [
+                "The",
+                "airline",
+                "was",
+                "founded",
+                "as",
+                "Asian",
+                "Spirit",
+                ",",
+                "the",
+                "first",
+                "airline",
+                "in",
+                "the",
+                "Philippines",
+                "to",
+                "be",
+                "run",
+                "as",
+                "a",
+                "cooperative",
+                "."
+            ],
+            [
+                "On",
+                "August",
+                "16",
+                ",",
+                "2013",
+                ",",
+                "the",
+                "Civil",
+                "Aviation",
+                "Authority",
+                "of",
+                "the",
+                "Philippines",
+                "(",
+                "CAAP",
+                ")",
+                ",",
+                "the",
+                "regulating",
+                "body",
+                "of",
+                "the",
+                "Government",
+                "of",
+                "the",
+                "Republic",
+                "of",
+                "the",
+                "Philippines",
+                "for",
+                "civil",
+                "aviation",
+                ",",
+                "suspended",
+                "Zest",
+                "Air",
+                "flights",
+                "until",
+                "further",
+                "notice",
+                "because",
+                "of",
+                "safety",
+                "issues",
+                "."
+            ],
+            [
+                "Less",
+                "than",
+                "a",
+                "year",
+                "after",
+                "AirAsia",
+                "and",
+                "Zest",
+                "Air",
+                "'s",
+                "strategic",
+                "alliance",
+                ",",
+                "the",
+                "airline",
+                "has",
+                "been",
+                "rebranded",
+                "as",
+                "AirAsia",
+                "Zest",
+                "."
+            ],
+            [
+                "The",
+                "airline",
+                "was",
+                "merged",
+                "into",
+                "AirAsia",
+                "Philippines",
+                "in",
+                "January",
+                "2016",
+                "."
+            ]
+        ]
+    }
+]

@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 import logging
 import typing
-import uuid
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -27,8 +26,30 @@ class ReDocRedDatasetBuilder:
     """Extract text paragraphs and entities from Re-DocRED dataset."""
 
     EXTRACTION_DATASET_FILENAME: str = "re_docred_extraction_dataset.jsonl"
-    PUNCTUATION: typing.ClassVar[set[str]] = {".", ":", "!", ",", ";", "?", "-"}
+    PUNCTUATION: typing.ClassVar[set[str]] = set(".:!,;?-_(){}'")
     PROPERTIES_TO_DROP: typing.ClassVar[set[str]] = {"pos", "global_pos", "index", "sent_id", "properties"}
+    TYPE_MAP: typing.ClassVar[dict[str, str]] = {
+        "PER": "Person",
+        "TIME": "Time",
+        "LOC": "Location",
+        "NUM": "Number",
+        "MISC": "Miscellaneous",
+        "ORG": "Organization",
+        "PERMISC": "Person and Miscellaneous",
+        "ORGMISC": "Organization and Miscellaneous",
+        "ORGLOC": "Organization and Location",
+        "PERLOC": "Person and Location",
+        "PERORG": "Person and Organization",
+        "MISCORG": "Miscellaneous and Organization",
+        "TIMENUM": "Time and Number",
+        "LOCMISC": "Location and Miscellaneous",
+        "NUMMISC": "Number and Miscellaneous",
+        "PERLOCMISC": "Person, Location, and Miscellaneous",
+        "MISCPER": "Miscellaneous and Person",
+        "LOCORG": "Location and Organization",
+        "LOCPER": "Location and Person",
+        "ORGPER": "Organization and Person",
+    }
 
     def __init__(
         self,
@@ -66,7 +87,7 @@ class ReDocRedDatasetBuilder:
             entities = self._extract_entities(entry)
             entities = self._extract_properties(entry, entities, wikidata_properties)
             text = self._get_text(entry)
-            text_id = str(uuid.uuid4())
+            text_id = str(hash(text))
             extraction_dataset.append({"text_id": text_id, "text": text, "entities": entities})
 
         # save the dataset
@@ -95,13 +116,25 @@ class ReDocRedDatasetBuilder:
                 if k not in self.PROPERTIES_TO_DROP:
                     if k not in merged_entities:
                         merged_entities[k] = set()
-                    merged_entities[k].add(v)
+                    elif k == "name":
+                        # Save only first name as a name and everything else as alternative names
+                        if "alternative_names" not in merged_entities:
+                            merged_entities["alternative_names"] = set()
+                        merged_entities["alternative_names"].add(str(v))
+                        continue
+
+                    merged_entities[k].add(str(v))
 
         for k, v in merged_entities.items():
-            if len(v) == 1:
+            if k != "alternative_names" and len(v) == 1:
                 merged_entities[k] = v.pop()
             else:
                 merged_entities[k] = list(v)
+
+            # map the entity type
+            if k == "type":
+                entity_type = "".join(merged_entities[k])
+                merged_entities[k] = self.TYPE_MAP.get(entity_type, entity_type)
 
         return merged_entities
 
@@ -147,16 +180,13 @@ class ReDocRedDatasetBuilder:
         error_count = 0
         err = None
         with open(self.extraction_dataset_output_path, "w", encoding="utf-8") as f:
-            total_count = len(extraction_dataset)
-            for count, entry in enumerate(extraction_dataset, start=1):
+            for entry in extraction_dataset:
                 try:
                     json.dump(entry, f)
                     f.write("\n")
-                except TypeError as e:
+                except TypeError as e:  # noqa: PERF203
                     error_count += 1
                     err = e
-
-                self._logger.info(f"Saved {count}/{total_count} ({100 * count / total_count:.2f}%) files.")
 
         if error_count:
             self._logger.error(f"Errors while saving the dataset: {error_count}, last error: {err}")
