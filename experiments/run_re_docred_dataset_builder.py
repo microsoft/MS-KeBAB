@@ -22,10 +22,11 @@ from kebab.dataset.re_docred.re_docred_dataset_builder import ReDocRedDatasetBui
     / "Datasets"
     / "Re-DocRED"
     / "Original Dataset"
-    / "dev",
+    # / "dev",
     # / "test",
     # / "train",
-    # / "full",
+    / "full",
+    # / "single",
     help="Path to the Re-DocRED data directory (will be *.json-globbed against).",
 )
 @click.option(
