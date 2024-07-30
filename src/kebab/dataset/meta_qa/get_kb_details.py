@@ -286,24 +286,26 @@ if __name__ == "__main__":
             )
             os.makedirs(output_dir_for_split, exist_ok=True)
             ground_truth = hop_function(split)
-            with open(
-                os.path.join(output_dir_for_split, "all_relevant.txt"),
-                "w",
-                encoding="utf-8",
-            ) as f_all:
-                with open(
+            with (
+                open(
+                    os.path.join(output_dir_for_split, "all_relevant.txt"),
+                    "w",
+                    encoding="utf-8",
+                ) as f_all,
+                open(
                     os.path.join(output_dir_for_split, "final_answer.txt"),
                     "w",
                     encoding="utf-8",
-                ) as f_final:
-                    for all_relevant, final_answer in ground_truth:
-                        all_relevant_names = [
-                            kb_list[entity_id]["name"] for entity_id in all_relevant
-                        ]
-                        final_names = [
-                            kb_list[entity_id]["name"] for entity_id in final_answer
-                        ]
-                        f_all.write("|".join(all_relevant_names))
-                        f_all.write("\n")
-                        f_final.write("|".join(final_names))
-                        f_final.write("\n")
+                ) as f_final,
+            ):
+                for all_relevant, final_answer in ground_truth:
+                    all_relevant_names = [
+                        kb_list[entity_id]["name"] for entity_id in all_relevant
+                    ]
+                    final_names = [
+                        kb_list[entity_id]["name"] for entity_id in final_answer
+                    ]
+                    f_all.write("|".join(all_relevant_names))
+                    f_all.write("\n")
+                    f_final.write("|".join(final_names))
+                    f_final.write("\n")
