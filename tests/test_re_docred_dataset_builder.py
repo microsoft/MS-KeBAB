@@ -32,28 +32,30 @@ def test_build_dataset(re_docred_input_file_path: Path) -> None:
         doc_record = json.load(f)[0]
 
     example = ReDocRedDatasetBuilder.extract_example(doc_record, properties_map)
-    assert len(example["entities"]) == 17
-    assert len(example["text"]) == 1108
-    for entity in example["entities"]:
-        assert "name" in entity
-        assert isinstance(entity["name"], str)
-        assert "type" in entity
-        assert isinstance(entity["type"], str)
-        if "alternative_names" in entity:
-            assert isinstance(entity["alternative_names"], list)
-            for name in entity["alternative_names"]:
-                assert isinstance(name, str)
+    assert len(example["entities"]) == 13
+    assert len(example["document"].document_id) == 64
+    assert example["document"].document_id == "a057557c54e7d6eed98de8ba50deecd7de5b224adafa6dbf86e67654d0a2a7fc"
+    assert example["document"].schema.schema_id == "plain_text"
+    assert example["document"].data["title"] == "AirAsia Zest"
+    assert len(example["document"].data["text"]) == 1093
+
+    expected_entity_ids = ["0", "1", "2", "3", "4", "5", "6", "9", "10", "11", "12", "14", "15"]
+    for i, entity in enumerate(example["entities"]):
+        assert entity.entity_id == expected_entity_ids[i]
+        assert "name" in entity.properties
+        assert isinstance(entity.properties["name"], list)
+        assert "type" in entity.properties
+        assert isinstance(entity.properties["type"], list)
 
     entity = example["entities"][0]
-    assert entity["name"] == "Zest Airways, Inc."
-    assert entity["type"] == "Organization"
-    assert len(entity["alternative_names"]) == 2
-    assert len(entity) == 6
-    assert entity.keys() == {
+    assert len(entity.properties["name"]) == 3
+    assert set(entity.properties["name"]) == {"Zest Airways, Inc.", "Asian Spirit and Zest Air", "AirAsia Zest"}
+    assert entity.properties["type"] == ["organization"]
+    assert len(entity.properties) == 5
+    assert entity.properties.keys() == {
         "name",
         "type",
-        "alternative_names",
         "country",
-        "located_in_the_administrative_territorial_entity",
-        "headquarters_location",
+        "located in the administrative territorial entity",
+        "headquarters location",
     }

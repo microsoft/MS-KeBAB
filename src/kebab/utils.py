@@ -2,8 +2,13 @@
 # Licensed under the MIT license.
 
 import datetime
+import json
 import logging
 import pathlib
+from typing import Any
+
+from kebab.document import Document
+from kebab.entity import Entity
 
 
 def configure_logging(
@@ -37,3 +42,14 @@ def configure_logging(
         handlers=handlers,
         level=logging.NOTSET,
     )
+
+
+class CustomEncoder(json.JSONEncoder):
+    """JSON encoder for entities and documents."""
+
+    def default(self, o: Any) -> Any:  # noqa: ANN401, D102
+        if isinstance(o, Entity):
+            return o.to_dict()
+        if isinstance(o, Document):
+            return o.to_json()
+        return super().default(o)

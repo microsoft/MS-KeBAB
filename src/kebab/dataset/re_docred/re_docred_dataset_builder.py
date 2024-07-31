@@ -10,13 +10,18 @@ paragraphs in train set.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import pathlib
 import typing
 from collections.abc import Iterable
 from pathlib import Path
 
 from kebab.dataset.wikidata import wikidata_utils
+from kebab.document import Document, DocumentSchema, DocumentUtilities
+from kebab.entity import Entity
+from kebab.utils import CustomEncoder
 
 
 class ReDocRedDatasetBuilder:
@@ -26,30 +31,34 @@ class ReDocRedDatasetBuilder:
     PUNCTUATION: typing.ClassVar[set[str]] = set(".:!,;?-_(){}'")
     PROPERTIES_TO_DROP: typing.ClassVar[set[str]] = {"pos", "global_pos", "index", "sent_id", "properties"}
     TYPE_MAP: typing.ClassVar[dict[str, str]] = {
-        "PER": "Person",
-        "PERMISC": "Person and Miscellaneous",
-        "PERLOC": "Person and Location",
-        "PERORG": "Person and Organization",
-        "PERLOCMISC": "Person, Location, and Miscellaneous",
-        "TIME": "Time",
-        "TIMENUM": "Time and Number",
-        "LOC": "Location",
-        "LOCMISC": "Location and Miscellaneous",
-        "LOCORG": "Location and Organization",
-        "LOCPER": "Location and Person",
-        "NUM": "Number",
-        "NUMMISC": "Number and Miscellaneous",
-        "ORG": "Organization",
-        "ORGMISC": "Organization and Miscellaneous",
-        "ORGLOC": "Organization and Location",
-        "ORGPER": "Organization and Person",
-        "MISC": "Miscellaneous",
-        "MISCORG": "Miscellaneous and Organization",
-        "MISCPER": "Miscellaneous and Person",
-        "MISCNUM": "Miscellaneous and Number",
-        "MISCPERLOC": "Miscellaneous, Person, and Location",
-        "MISCLOC": "Miscellaneous and Location",
+        "PER": "person",
+        "PERMISC": "person and miscellaneous",
+        "PERLOC": "person and location",
+        "PERORG": "person and organization",
+        "PERLOCMISC": "person, location, and miscellaneous",
+        "TIME": "time",
+        "TIMENUM": "time and number",
+        "LOC": "location",
+        "LOCMISC": "location and miscellaneous",
+        "LOCORG": "location and organization",
+        "LOCPER": "location and person",
+        "NUM": "number",
+        "NUMMISC": "number and miscellaneous",
+        "ORG": "organization",
+        "ORGMISC": "organization and miscellaneous",
+        "ORGLOC": "organization and location",
+        "ORGPER": "organization and person",
+        "MISC": "miscellaneous",
+        "MISCORG": "miscellaneous and organization",
+        "MISCPER": "miscellaneous and person",
+        "MISCNUM": "miscellaneous and number",
+        "MISCPERLOC": "miscellaneous, person, and location",
+        "MISCLOC": "miscellaneous and location",
     }
+
+    SCHEMAS: typing.ClassVar[dict[str, DocumentSchema]] = DocumentUtilities.load_schemas(
+        pathlib.Path(__file__).parent.parent.parent / "schemas"
+    )
 
     def __init__(
         self,
@@ -90,7 +99,7 @@ class ReDocRedDatasetBuilder:
         self._write_dataset(extraction_dataset)
 
     @classmethod
-    def get_text(cls, entry: dict) -> str:
+    def get_document(cls, entry: dict) -> Document:
         """Extract the text from an entry."""
         text = ""
         for sentence in entry["sents"]:
@@ -98,69 +107,73 @@ class ReDocRedDatasetBuilder:
                 if text == "":
                     text += token
                 else:
-                    if token in cls.PUNCTUATION:
+                    if token in cls.PUNCTUATION or token[0] in cls.PUNCTUATION:
                         text += token
                     else:
                         text += " " + token
-        return entry["title"] + "\n\n" + text
+
+        text_id = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        data = {"title": entry["title"], "text": text}
+        schema = cls.SCHEMAS["plain_text"]
+        return Document(text_id, schema, data)
 
     @classmethod
-    def merge_entities(cls, entities: list[dict]) -> dict[str, str | list[str]]:
+    def merge_entities(cls, entities: list[dict]) -> dict[str, list[str]]:
         """Merge the entity names and types into a single entity."""
-        merged_entities = {}
+        merged_entity = {}
         for entity in entities:
             for k, v in entity.items():
                 if k not in cls.PROPERTIES_TO_DROP:
-                    if k not in merged_entities:
-                        merged_entities[k] = set()
-                    elif k == "name":
-                        # Save only first name as a name and everything else as alternative names
-                        if "alternative_names" not in merged_entities:
-                            merged_entities["alternative_names"] = set()
-                        merged_entities["alternative_names"].add(str(v))
-                        continue
+                    if k not in merged_entity:
+                        merged_entity[k] = set()
 
-                    merged_entities[k].add(str(v))
+                    merged_entity[k].add(str(v))
 
-        for k, v in merged_entities.items():
-            if k != "alternative_names" and len(v) == 1:
-                merged_entities[k] = v.pop()
-            else:
-                merged_entities[k] = list(v)
+        for k, v in merged_entity.items():
+            merged_entity[k] = list(v)
 
-            # map the entity type
             if k == "type":
-                entity_type = "".join(merged_entities[k])
-                merged_entities[k] = cls.TYPE_MAP.get(entity_type, entity_type)
+                merged_entity[k] = [cls.TYPE_MAP.get(t, t) for t in merged_entity[k]]
 
-        return merged_entities
+        return merged_entity
 
     @classmethod
-    def extract_entities(cls, entry: dict) -> list[dict[str, str | list[str]]]:
+    def extract_entities(cls, entry: dict) -> list[dict[str, list[str]]]:
         """Extract the names of the entities from an entry."""
-        return [cls.merge_entities(entry) for entry in entry["vertexSet"]]
+        return [cls.merge_entities(value) for value in entry["vertexSet"]]
 
     @classmethod
     def extract_properties(
-        cls, entry: dict, entities: list[dict[str, str | list[str]]], wikidata_properties: dict
-    ) -> list[dict[str, str | list[str]]]:
+        cls, entry: dict, entities: list[dict[str, list[str]]], wikidata_properties: dict
+    ) -> list[dict[str, list[str]]]:
         """Augment the entities with corresponding properties."""
         for prop in entry["labels"]:
             rel_entity_index, entity_index, property_id = prop["t"], prop["h"], prop["r"]
             property_label = wikidata_properties[property_id]["label"]
-            property_label = property_label.replace(" ", "_")
             entities[entity_index][property_label] = entities[rel_entity_index]["name"]
 
         return entities
+
+    @classmethod
+    def filter_small_entities(cls, entities: list[Entity]) -> list[Entity]:
+        """Filter out entities that contain only name and type properties."""
+        filtered_entities = [
+            entity
+            for entity in entities
+            if len(entity.properties["type"]) == 1 and entity.properties["type"][0] not in ("number", "time")
+        ]
+
+        return filtered_entities
 
     @classmethod
     def extract_example(cls, entry: dict, wikidata_properties: dict) -> dict:
         """Extract an example from the Re-DocRED dataset."""
         entities = cls.extract_entities(entry)
         entities = cls.extract_properties(entry, entities, wikidata_properties)
-        text = cls.get_text(entry)
-        text_id = str(hash(text))
-        return {"text_id": text_id, "text": text, "entities": entities}
+        entities = [Entity(str(i), entity) for i, entity in enumerate(entities)]
+        entities = cls.filter_small_entities(entities)
+        document = cls.get_document(entry)
+        return {"document": document, "entities": entities}
 
     def _load_dataset(self) -> Iterable[dict]:
         """Load Re-DocRED data from multiple files, iteratively."""
@@ -189,7 +202,7 @@ class ReDocRedDatasetBuilder:
         with open(self.extraction_dataset_output_path, "w", encoding="utf-8") as f:
             for entry in extraction_dataset:
                 try:
-                    json.dump(entry, f)
+                    json.dump(entry, f, cls=CustomEncoder)
                     f.write("\n")
                 except TypeError as e:  # noqa: PERF203
                     error_count += 1
