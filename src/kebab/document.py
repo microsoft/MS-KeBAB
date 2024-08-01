@@ -82,26 +82,31 @@ class Document:
     data: dict[str, Any]
     """Dictionary that must be serializable to JSON."""
 
+    def to_dict(self) -> dict[str, Any]:
+        """Convert the document to a dictionary."""
+        return {
+            "document_id": self.document_id,
+            "schema_id": self.schema.schema_id,
+            "data": self.data,
+        }
+
     def to_json(self) -> str:
         """Convert the document to a JSON string."""
-        return json.dumps(
-            {
-                "document_id": self.document_id,
-                "schema_id": self.schema.schema_id,
-                "data": self.data,
-            },
-        )
+        return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str, schemas: dict[str, DocumentSchema]) -> Self:
-        """Create a document from a JSON string."""
-        data = json.loads(json_str)
-
+    def from_dict(cls, data: dict[str, Any], schemas: dict[str, DocumentSchema]) -> Self:
+        """Create a document from a dictionary."""
         return cls(
             document_id=data["document_id"],
             schema=schemas[data["schema_id"]],
             data=data["data"],
         )
+
+    @classmethod
+    def from_json(cls, json_str: str, schemas: dict[str, DocumentSchema]) -> Self:
+        """Create a document from a JSON string."""
+        return cls.from_dict(json.loads(json_str), schemas=schemas)
 
 
 class DocumentUtilities:

@@ -51,5 +51,5 @@ class CustomEncoder(json.JSONEncoder):
         if isinstance(o, Entity):
             return o.to_dict()
         if isinstance(o, Document):
-            return o.to_json()
+            return o.to_dict()
         return super().default(o)
