@@ -30,6 +30,7 @@ class ReDocRedDatasetBuilder:
     EXTRACTION_DATASET_FILENAME: str = "re_docred_extraction_dataset.jsonl"
     PUNCTUATION: typing.ClassVar[set[str]] = set(".:!,;?-_(){}'")
     PROPERTIES_TO_DROP: typing.ClassVar[set[str]] = {"pos", "global_pos", "index", "sent_id", "properties"}
+    TYPES_TO_DROP: typing.ClassVar[set[str]] = {"number", "time", "miscellaneous"}
     TYPE_MAP: typing.ClassVar[dict[str, str]] = {
         "PER": "person",
         "PERMISC": "person and miscellaneous",
@@ -55,6 +56,8 @@ class ReDocRedDatasetBuilder:
         "MISCPERLOC": "miscellaneous, person, and location",
         "MISCLOC": "miscellaneous and location",
     }
+
+    MIN_PROPERTY_COUNT: typing.ClassVar[int] = 3
 
     SCHEMAS: typing.ClassVar[dict[str, DocumentSchema]] = DocumentUtilities.load_schemas(
         pathlib.Path(__file__).parent.parent.parent / "schemas"
@@ -157,13 +160,12 @@ class ReDocRedDatasetBuilder:
     @classmethod
     def filter_small_entities(cls, entities: list[Entity]) -> list[Entity]:
         """Filter out entities that contain only name and type properties."""
-        filtered_entities = [
+        return [
             entity
             for entity in entities
-            if len(entity.properties["type"]) == 1 and entity.properties["type"][0] not in ("number", "time")
+            if len(entity.properties) > cls.MIN_PROPERTY_COUNT
+            or any(entity_type not in cls.TYPES_TO_DROP for entity_type in entity.properties["type"])
         ]
-
-        return filtered_entities
 
     @classmethod
     def extract_example(cls, entry: dict, wikidata_properties: dict) -> dict:
