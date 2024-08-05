@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 # pyright: reportReturnType=false, reportOptionalMemberAccess=false
-# ruff: noqa: TRY400, S113, PLR2004, S101, RET505, B008, A001, PLW2901, PLR1714, ARG005
+# ruff: noqa: TRY400, S113, PLR2004, RET505, B008, A001, PLW2901, PLR1714, ARG005
 """Utilities for extracting from Wikidata."""
 
 from __future__ import annotations

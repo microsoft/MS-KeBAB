@@ -1,0 +1,13 @@
+{
+    "schema_id": "plain_text",
+    "fields": [
+        {
+            "field_id": "title",
+            "description": "The title of the document/text"
+        },
+        {
+            "field_id": "text",
+            "description": "The body of the document/text"
+        }
+    ]
+}

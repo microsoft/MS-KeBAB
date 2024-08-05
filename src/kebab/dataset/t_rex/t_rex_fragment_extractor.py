@@ -13,8 +13,6 @@ Example output:
 {"entity_id": "Q11708", "properties": {"names": ["Southeast Asia"]}, "source_ids": ["81317a6457106bc3ae89d179d65ec7ed", "http://www.wikidata.org/entity/Q33199"], "evidence_map": {}, "entity_types": []}
 """
 
-# ruff: noqa: S101
-
 from __future__ import annotations
 
 import hashlib
