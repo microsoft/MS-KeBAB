@@ -14,9 +14,13 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
     "click",
-    "numpy",
+    "numpy==1.26.4",
     "requests",
     "tqdm",
+    "tiktoken",
+    "sentence-transformers",
+    "nltk", # TODO(atorunova): replace with editdistance?
+    "scipy",
 ]
 
 [project.optional-dependencies]
