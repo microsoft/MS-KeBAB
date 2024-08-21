@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import json
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Self
 from . import metrics
@@ -86,5 +87,5 @@ class TaskInstance:
     eval_func = getattr(metrics, "evaluate_{}".format(self.parent_id))
     return eval_func(**kwargs)
 
-def benchmark():
-  return Benchmark.init(os.path.dirname(os.path.abspath(__file__)) + "/config.json")
+def benchmark() -> Benchmark:
+  return Benchmark.init(Path(__file__).parents[0] / "config.json")

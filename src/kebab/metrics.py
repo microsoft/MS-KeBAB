@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-def evaluate_extraction(**kwargs):
+def evaluate_extraction(**kwargs) -> dict[str, float]:
   """Evaluate an output for the extraction task."""
 
   # TODO: Implement actual metric computation
@@ -14,7 +14,7 @@ def evaluate_extraction(**kwargs):
     "secondary_extraction_metric": 0.6
     }
 
-def evaluate_linking(**kwargs):
+def evaluate_linking(**kwargs) -> dict[str, float]:
   """Evaluate an output for the linking task."""
 
   # TODO: Implement actual metric computation

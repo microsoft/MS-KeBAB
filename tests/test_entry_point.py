@@ -7,7 +7,7 @@
 
 import kebab.mskebab as mskebab
 
-def test_entry_point():
+def test_task_interface():
   benchmark = mskebab.benchmark()
 
   tasks = benchmark.tasks
@@ -28,6 +28,3 @@ def test_entry_point():
       metrics = task_instance.evaluate(output="some_output_file", ground_truth=test_ground_truth_file)
       assert metrics["primary_{}_metric".format(task.id)] == 0.8
       assert metrics["secondary_{}_metric".format(task.id)] == 0.6
-
-
-
