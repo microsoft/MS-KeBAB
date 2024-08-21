@@ -9,6 +9,11 @@ log/
 experiments/input
 experiments/output
 
+# visual studio
+.vs/*
+.vscode/*
+TestResults/*
+
 # wandb
 wandb/*
 experiments/wandb/*

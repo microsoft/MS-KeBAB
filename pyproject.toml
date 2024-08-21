@@ -38,6 +38,11 @@ all = ["kebab[dev]"]
 where = ["src"]
 exclude = ["*_test.py", "tests/*", "experiments/*", "configs/*"]
 
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]
+
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
 
