@@ -9,8 +9,10 @@ import os
 import json
 from dataclasses import dataclass
 from typing import Any, Self
+from . import metrics
 
 def safe_merge_list_of_dictionary(dict_list: list[dict[str, Any]]) -> dict[str, Any]:
+  """Merge a list of dictionaries into a single dictionary ensuring no duplicate keys in input."""
   merged_dict = {}
   for d in dict_list:
     for k,v in d.items():
@@ -79,6 +81,10 @@ class TaskInstance:
       parent_id=parent_id,
       data=data
     )
+
+  def evaluate(self, **kwargs):
+    eval_func = getattr(metrics, "evaluate_{}".format(self.parent_id))
+    return eval_func(**kwargs)
 
 def benchmark():
   return Benchmark.init(os.path.dirname(os.path.abspath(__file__)) + "/config.json")
