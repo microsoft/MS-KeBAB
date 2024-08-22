@@ -5,6 +5,7 @@
 
 # ruff: noqa: RUF015, PLR2004
 
+from pathlib import Path
 import kebab.mskebab as mskebab
 
 def test_task_interface():
@@ -28,3 +29,11 @@ def test_task_interface():
       metrics = task_instance.evaluate(output="some_output_file", ground_truth=test_ground_truth_file)
       assert metrics["primary_{}_metric".format(task.id)] == 0.8
       assert metrics["secondary_{}_metric".format(task.id)] == 0.6
+
+def test_cache_manager():
+    cache_dir = Path(".local_cache").resolve()
+    cache = mskebab.cache(cache_dir)
+    cache.clear()
+    assert cache.get_cached_path("http://w3.erss.univ-tlse2.fr/UETAL/2022-2023/sigirfp093-mitra.pdf") == cache_dir / "sigirfp093-mitra.pdf"
+    assert cache.get_cached_path("http://w3.erss.univ-tlse2.fr/UETAL/2022-2023/sigirfp093-mitra.pdf") == cache_dir / "sigirfp093-mitra.pdf"
+    assert cache.get_cached_path("https://www.microsoft.com/en-us/research/wp-content/uploads/2015/08/sigirfp093-mitra.pdf") == cache_dir / "sigirfp093-mitra_1.pdf"

@@ -5,8 +5,10 @@
 
 from __future__ import annotations
 
-import os
 import json
+import shutil
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Self
@@ -87,5 +89,74 @@ class TaskInstance:
     eval_func = getattr(metrics, "evaluate_{}".format(self.parent_id))
     return eval_func(**kwargs)
 
+@dataclass
+class Cache:
+  """The cache manager class"""
+
+  cache_dir: Path
+  file_map_path: Path
+  file_map: dict[str, Path]
+
+  @classmethod
+  def init(cls, cache_dir_path: Path) -> Self:
+    """Load configuration"""
+    file_map_path = cache_dir_path / "map.json"
+    if file_map_path.exists():
+        with open(file_map_path) as f:
+          file_map = {k: Path(v) for k,v in json.load(f).items()}
+    else:
+      file_map = {}
+    obj = cls(
+      cache_dir=cache_dir_path,
+      file_map_path=file_map_path,
+      file_map=file_map
+    )
+    obj.validate_and_save_map()
+    return obj
+
+  def get_cached_path(self, path: str) -> Path:
+    if urllib.parse.urlparse(str(path)).scheme == "": # Is URL
+      return Path(path)
+    if not path in self.file_map or not self.file_map[path].exists():
+      self.file_map[path] = self.cache_file(path)
+      self.validate_and_save_map()
+    return self.file_map[path]
+
+  def cache_file(self, url: str) -> Path:
+    path = Path(url)
+    local_path = self.cache_dir / path.name
+    if not local_path.exists():
+      self.download_file(url, local_path)
+      return local_path
+    i = 1
+    while True:
+      local_path = self.cache_dir / (Path(path.stem + "_" + str(i) + path.suffix))
+      if not local_path.exists():
+        self.download_file(url, local_path)
+        return local_path
+      i += 1
+
+  def download_file(self, url: str, path: Path):
+    with urllib.request.urlopen(url) as response:
+      with open(str(path), 'wb') as out_file:
+        shutil.copyfileobj(response, out_file)
+
+  def clear(self):
+    shutil.rmtree(self.cache_dir)
+    self.file_map.clear()
+    self.validate_and_save_map()
+
+  def validate_and_save_map(self):
+    self.cache_dir.mkdir(parents=True, exist_ok=True)
+    for k,v in self.file_map.items():
+      if not v.exists() or not v.is_file() or v.parents[0] != self.cache_dir:
+        del self.file_map[k]
+    file_map_str_dict = {k: str(v) for k,v in self.file_map.items()}
+    with open(self.file_map_path, 'w') as f:
+      json.dump(file_map_str_dict, f)
+
 def benchmark() -> Benchmark:
   return Benchmark.init(Path(__file__).parents[0] / "config.json")
+
+def cache(cache_dir_path: Path = Path.cwd() / ".cache") -> Cache:
+  return Cache.init(Path(cache_dir_path))
