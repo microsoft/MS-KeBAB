@@ -19,8 +19,16 @@ from . import task_lib
 class Benchmark:
   """The entry point class."""
 
-  tasks: dict[str, task_lib.Task]
-  task_instances: dict[str, task_lib.Task]
+  _tasks: dict[str, task_lib.Task]
+  _task_instances: dict[str, task_lib.Task]
+
+  @property
+  def tasks(self) -> dict[str, task_lib.Task]:
+    return self._tasks
+
+  @property
+  def task_instances(self) -> dict[str, task_lib.Task]:
+    return self._task_instances
 
   @classmethod
   def init(cls, path) -> Self:
@@ -40,8 +48,8 @@ class Benchmark:
       task_instances[instance.name] = instance
       instance.parent.add_instance(instance)
     return cls(
-      tasks=tasks,
-      task_instances=task_instances
+      _tasks=tasks,
+      _task_instances=task_instances
     )
 
 @dataclass
