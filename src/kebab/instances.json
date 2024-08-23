@@ -1,0 +1,60 @@
+{
+  "Extraction-ReDocRED": {
+    "task": "Extraction",
+    "heldout": false,
+    "data": {
+      "train_extracts": "https://some.public/download/link",
+      "train_ground_truth_extracted_entities": "https://some.public/download/link",
+      "dev_extracts": "https://some.public/download/link",
+      "dev_ground_truth_extracted_entities": "https://some.public/download/link",
+      "test_extracts": "https://some.public/download/link",
+      "test_ground_truth_extracted_entities": "https://some.public/download/link"
+    }
+  },
+  "Extraction-Heldout": {
+    "task": "Extraction",
+    "heldout": true,
+    "data": {
+      "train_extracts": "https://some.public/download/link",
+      "train_ground_truth_extracted_entities": "https://some.public/download/link",
+      "dev_extracts": "https://some.public/download/link",
+      "dev_ground_truth_extracted_entities": "https://some.public/download/link",
+      "test_extracts": "https://some.public/download/link"
+    }
+  },
+  "Linking-TREx": {
+    "task": "Linking",
+    "heldout": false,
+    "data": {
+      "train_entity_fragment_pairs": "https://some.public/download/link",
+      "train_ground_truth_boolean": "https://some.public/download/link",
+      "dev_entity_fragment_pairs": "https://some.public/download/link",
+      "dev_ground_truth_boolean": "https://some.public/download/link",
+      "test_entity_fragment_pairs": "https://some.public/download/link",
+      "test_ground_truth_boolean": "https://some.public/download/link"
+    }
+  },
+  "Linking-MAVE": {
+    "task": "Linking",
+    "heldout": false,
+    "data": {
+      "train_entity_fragment_pairs": "https://some.public/download/link",
+      "train_ground_truth_boolean": "https://some.public/download/link",
+      "dev_entity_fragment_pairs": "https://some.public/download/link",
+      "dev_ground_truth_boolean": "https://some.public/download/link",
+      "test_entity_fragment_pairs": "https://some.public/download/link",
+      "test_ground_truth_boolean": "https://some.public/download/link"
+    }
+  },
+  "Linking-Heldout": {
+    "task": "Linking",
+    "heldout": true,
+    "data": {
+      "train_entity_fragment_pairs": "https://some.public/download/link",
+      "train_ground_truth_boolean": "https://some.public/download/link",
+      "dev_entity_fragment_pairs": "https://some.public/download/link",
+      "dev_ground_truth_boolean": "https://some.public/download/link",
+      "test_entity_fragment_pairs": "https://some.public/download/link"
+    }
+  }
+}

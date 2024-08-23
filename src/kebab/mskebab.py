@@ -12,82 +12,37 @@ import urllib.request
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Self
-from . import metrics
-
-def safe_merge_list_of_dictionary(dict_list: list[dict[str, Any]]) -> dict[str, Any]:
-  """Merge a list of dictionaries into a single dictionary ensuring no duplicate keys in input."""
-  merged_dict = {}
-  for d in dict_list:
-    for k,v in d.items():
-      assert k not in merged_dict
-      merged_dict[k] = v
-  return merged_dict
+from . import task_lib
+#from task_lib import Task, ExtractionTask, ExtractionTaskInstance, LinkingTask, LinkingTaskInstance
 
 @dataclass
 class Benchmark:
   """The entry point class."""
 
-  tasks: dict[str, Task]
-  task_instances: dict[str, Task]
+  tasks: dict[str, task_lib.Task]
+  task_instances: dict[str, task_lib.Task]
 
   @classmethod
   def init(cls, path) -> Self:
-    """Load configuration"""
+    """Initialize entry point"""
+    task_list = [task_lib.ExtractionTask(), task_lib.LinkingTask()]
+    tasks = {task.name: task for task in task_list}
+    task_instances = {}
     with open(path) as f:
-      config = json.load(f)
-      tasks = {k: Task.from_dict({**{"id": k}, **v}) for k,v in config["tasks"].items()}
-      task_instances = safe_merge_list_of_dictionary([task.instances for task in tasks.values()])
+      task_instance_config = json.load(f)
+    for instance_name, instance_config in task_instance_config.items():
+      if instance_config["task"] == "Extraction":
+        instance = task_lib.ExtractionTaskInstance(instance_name, instance_config["data"], tasks["Extraction"], instance_config["heldout"])
+      elif instance_config["task"] == "Linking":
+        instance = task_lib.LinkingTaskInstance(instance_name, instance_config["data"], tasks["Linking"], instance_config["heldout"])
+      else:
+        raise ValueError("Unknown task type for task instance")
+      task_instances[instance.name] = instance
+      instance.parent.add_instance(instance)
     return cls(
       tasks=tasks,
       task_instances=task_instances
     )
-
-@dataclass
-class Task:
-  """Represents a benchmark task with its task instances."""
-
-  id: str
-  req_data: list
-  instances: dict
-
-  @classmethod
-  def from_dict(cls, data_dict: dict[str, Any]) -> Self:
-    """Create a task from a dictionary."""
-    task_id=data_dict["id"]
-    req_data=data_dict["req_data"]
-    instances={k: TaskInstance.from_dict({**{"id": k}, **{"parent_id": task_id}, **v}, req_data) for k,v in data_dict["instances"].items()}
-    return cls(
-      id=task_id,
-      req_data=req_data,
-      instances=instances
-    )
-
-@dataclass
-class TaskInstance:
-  """Represents a benchmark task instance with its data files."""
-
-  id: str
-  parent_id: str
-  data: dict
-
-  @classmethod
-  def from_dict(cls, data_dict: dict[str, Any], req_data: list) -> Self:
-    """Create a task instance from a dictionary."""
-    instance_id=data_dict["id"]
-    parent_id=data_dict["parent_id"]
-    data=data_dict["data"]
-    assert len(data) == len(req_data)
-    for k in data.keys():
-      assert k in req_data
-    return cls(
-      id=instance_id,
-      parent_id=parent_id,
-      data=data
-    )
-
-  def evaluate(self, **kwargs):
-    eval_func = getattr(metrics, "evaluate_{}".format(self.parent_id))
-    return eval_func(**kwargs)
 
 @dataclass
 class Cache:
@@ -136,6 +91,8 @@ class Cache:
         return local_path
       i += 1
 
+  # BMitra: This seems to fail when I run from home without VPN
+  # Needs follow up investigation
   def download_file(self, url: str, path: Path):
     with urllib.request.urlopen(url) as response:
       with open(str(path), 'wb') as out_file:
@@ -156,7 +113,7 @@ class Cache:
       json.dump(file_map_str_dict, f)
 
 def benchmark() -> Benchmark:
-  return Benchmark.init(Path(__file__).parents[0] / "config.json")
+  return Benchmark.init(Path(__file__).parents[0] / "instances.json")
 
 def cache(cache_dir_path: Path = Path.cwd() / ".cache") -> Cache:
   return Cache.init(Path(cache_dir_path))
