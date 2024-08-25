@@ -13,7 +13,6 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Self
 from . import task_lib
-#from task_lib import Task, ExtractionTask, ExtractionTaskInstance, LinkingTask, LinkingTaskInstance
 
 @dataclass
 class Benchmark:
@@ -99,8 +98,6 @@ class Cache:
         return local_path
       i += 1
 
-  # BMitra: This seems to fail when I run from home without VPN
-  # Needs follow up investigation
   def download_file(self, url: str, path: Path):
     with urllib.request.urlopen(url) as response:
       with open(str(path), 'wb') as out_file:
