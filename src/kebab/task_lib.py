@@ -28,7 +28,7 @@ class ExtractionTask(Task):
 
   @property
   def instances(self) -> dict[str, ExtractionTaskInstance]:
-    return self._instances
+    return self._instances.copy() # To disallow modifying this dictionary from outside of this class
 
   def __init__(self):
     self._name = "Extraction"
@@ -61,7 +61,7 @@ class LinkingTask(Task):
 
   @property
   def instances(self) -> dict[str, LinkingTaskInstance]:
-    return self._instances
+    return self._instances.copy() # To disallow modifying this dictionary from outside of this class
 
   def __init__(self):
     self._name = "Linking"

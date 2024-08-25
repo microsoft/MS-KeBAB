@@ -23,11 +23,11 @@ class Benchmark:
 
   @property
   def tasks(self) -> dict[str, task_lib.Task]:
-    return self._tasks
+    return self._tasks.copy() # To disallow modifying this dictionary from outside of this class
 
   @property
   def task_instances(self) -> dict[str, task_lib.Task]:
-    return self._task_instances
+    return self._task_instances.copy() # To disallow modifying this dictionary from outside of this class
 
   @classmethod
   def init(cls, path) -> Self:
@@ -55,9 +55,9 @@ class Benchmark:
 class Cache:
   """The cache manager class"""
 
-  cache_dir: Path
-  file_map_path: Path
-  file_map: dict[str, Path]
+  _cache_dir: Path
+  _file_map_path: Path
+  _file_map: dict[str, Path]
 
   @classmethod
   def init(cls, cache_dir_path: Path) -> Self:
@@ -69,9 +69,9 @@ class Cache:
     else:
       file_map = {}
     obj = cls(
-      cache_dir=cache_dir_path,
-      file_map_path=file_map_path,
-      file_map=file_map
+      _cache_dir=cache_dir_path,
+      _file_map_path=file_map_path,
+      _file_map=file_map
     )
     obj.validate_and_save_map()
     return obj
@@ -79,20 +79,20 @@ class Cache:
   def get_cached_path(self, path: str) -> Path:
     if urllib.parse.urlparse(str(path)).scheme == "": # Is URL
       return Path(path)
-    if not path in self.file_map or not self.file_map[path].exists():
-      self.file_map[path] = self.cache_file(path)
+    if not path in self._file_map or not self._file_map[path].exists():
+      self._file_map[path] = self.cache_file(path)
       self.validate_and_save_map()
-    return self.file_map[path]
+    return self._file_map[path]
 
   def cache_file(self, url: str) -> Path:
     path = Path(url)
-    local_path = self.cache_dir / path.name
+    local_path = self._cache_dir / path.name
     if not local_path.exists():
       self.download_file(url, local_path)
       return local_path
     i = 1
     while True:
-      local_path = self.cache_dir / (Path(path.stem + "_" + str(i) + path.suffix))
+      local_path = self._cache_dir / (Path(path.stem + "_" + str(i) + path.suffix))
       if not local_path.exists():
         self.download_file(url, local_path)
         return local_path
@@ -104,17 +104,17 @@ class Cache:
         shutil.copyfileobj(response, out_file)
 
   def clear(self):
-    shutil.rmtree(self.cache_dir)
-    self.file_map.clear()
+    shutil.rmtree(self._cache_dir)
+    self._file_map.clear()
     self.validate_and_save_map()
 
   def validate_and_save_map(self):
-    self.cache_dir.mkdir(parents=True, exist_ok=True)
-    for k,v in self.file_map.items():
-      if not v.exists() or not v.is_file() or v.parents[0] != self.cache_dir:
-        del self.file_map[k]
-    file_map_str_dict = {k: str(v) for k,v in self.file_map.items()}
-    with open(self.file_map_path, 'w') as f:
+    self._cache_dir.mkdir(parents=True, exist_ok=True)
+    for k,v in self._file_map.items():
+      if not v.exists() or not v.is_file() or v.parents[0] != self._cache_dir:
+        del self._file_map[k]
+    file_map_str_dict = {k: str(v) for k,v in self._file_map.items()}
+    with open(self._file_map_path, 'w') as f:
       json.dump(file_map_str_dict, f)
 
 def benchmark() -> Benchmark:
