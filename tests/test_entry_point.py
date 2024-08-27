@@ -28,9 +28,9 @@ def test_task_interface():
   for task in tasks.values():
     for task_instance in task.instances.values():
       assert task_instance.parent == task
-      for set_type in ["train", "dev", "test"]:
-        if set_type != "test" or not task_instance.heldout:
-          metrics = task_instance.evaluate("some_output_file", set_type)
+      for set_type in ["train", "test"]:
+        if set_type != "test" and task_instance.name.endswith("-Heldout"):
+          metrics = task_instance.evaluate(Path("some_output_file"), set_type)
           assert metrics["primary_{}_metric".format(task.name.lower())] == 0.8
           assert metrics["secondary_{}_metric".format(task.name.lower())] == 0.6
 

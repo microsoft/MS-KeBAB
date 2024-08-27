@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Self
 from . import task_lib
 
 @dataclass
@@ -19,29 +19,34 @@ class Benchmark:
   """The entry point class."""
 
   _tasks: dict[str, task_lib.Task]
-  _task_instances: dict[str, task_lib.Task]
+  _task_instances: dict[str, task_lib.TaskInstance]
 
   @property
   def tasks(self) -> dict[str, task_lib.Task]:
     return self._tasks.copy() # To disallow modifying this dictionary from outside of this class
 
   @property
-  def task_instances(self) -> dict[str, task_lib.Task]:
+  def task_instances(self) -> dict[str, task_lib.TaskInstance]:
     return self._task_instances.copy() # To disallow modifying this dictionary from outside of this class
 
   @classmethod
   def init(cls, path) -> Self:
     """Initialize entry point"""
-    task_list = [task_lib.ExtractionTask(), task_lib.LinkingTask()]
-    tasks = {task.name: task for task in task_list}
+    tasks = {}
     task_instances = {}
     with open(path) as f:
       task_instance_config = json.load(f)
     for instance_name, instance_config in task_instance_config.items():
-      if instance_config["task"] == "Extraction":
-        instance = task_lib.ExtractionTaskInstance(instance_name, instance_config["data"], tasks["Extraction"], instance_config["heldout"])
+      task_type = instance_config["task"]
+      if task_type not in tasks:
+        task = task_lib.Task(task_type)
+        tasks[task_type] = task
+      else:
+        task = tasks[task_type]
+      if task_type == "Extraction":
+        instance = task_lib.ExtractionTaskInstance(instance_name, task, **instance_config["data"])
       elif instance_config["task"] == "Linking":
-        instance = task_lib.LinkingTaskInstance(instance_name, instance_config["data"], tasks["Linking"], instance_config["heldout"])
+        instance = task_lib.LinkingTaskInstance(instance_name, task, **instance_config["data"])
       else:
         raise ValueError("Unknown task type for task instance")
       task_instances[instance.name] = instance
