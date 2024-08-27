@@ -9,30 +9,30 @@ from pathlib import Path
 import kebab.mskebab as mskebab
 
 def test_task_interface():
-  benchmark = mskebab.benchmark()
+    benchmark = mskebab.benchmark()
 
-  tasks = benchmark.tasks
-  assert set(tasks.keys()) == set(["Extraction", "Linking"])
-  for task_name, task in tasks.items():
-    assert task_name == task.name
+    tasks = benchmark.tasks
+    assert set(tasks.keys()) == set(["Extraction", "Linking"])
+    for task_name, task in tasks.items():
+        assert task_name == task.name
 
-  task_instances = benchmark.task_instances
-  assert set(task_instances.keys()) == set(["Extraction-ReDocRED",
-                                            "Extraction-Heldout",
-                                            "Linking-TREx",
-                                            "Linking-MAVE",
-                                            "Linking-Heldout"])
-  for task_instance_name, task_instance in task_instances.items():
-    assert task_instance_name == task_instance.name
+    task_instances = benchmark.task_instances
+    assert set(task_instances.keys()) == set(["Extraction-ReDocRED",
+                                              "Extraction-Heldout",
+                                              "Linking-TREx",
+                                              "Linking-MAVE",
+                                              "Linking-Heldout"])
+    for task_instance_name, task_instance in task_instances.items():
+        assert task_instance_name == task_instance.name
 
-  for task in tasks.values():
-    for task_instance in task.instances.values():
-      assert task_instance.parent == task
-      for set_type in ["train", "test"]:
-        if set_type != "test" and task_instance.name.endswith("-Heldout"):
-          metrics = task_instance.evaluate(Path("some_output_file"), set_type)
-          assert metrics["primary_{}_metric".format(task.name.lower())] == 0.8
-          assert metrics["secondary_{}_metric".format(task.name.lower())] == 0.6
+    for task in tasks.values():
+        for task_instance in task.instances.values():
+            assert task_instance.parent == task
+            for set_type in ["train", "test"]:
+                if set_type != "test" and task_instance.name.endswith("-Heldout"):
+                    metrics = task_instance.evaluate(Path("some_output_file"), set_type)
+                    assert metrics["primary_{}_metric".format(task.name.lower())] == 0.8
+                    assert metrics["secondary_{}_metric".format(task.name.lower())] == 0.6
 
 def test_cache_manager():
     cache_dir = Path(".local_cache").resolve()
