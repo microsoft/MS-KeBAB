@@ -118,9 +118,9 @@ class ExtractionTaskInstance(TaskInstance):
     ) -> dict[str, float]:
         """Evaluate an output for the extraction task instance."""
         if set_type == "train":
-            ground_truth_extracted_entities = self.data_train_ground_truth_extracted_entities
+            ground_truth_extracted_entities = self._data_train_ground_truth_extracted_entities
         elif set_type == "test":
-            ground_truth_extracted_entities = self.data_test_ground_truth_extracted_entities  # noqa: F841
+            ground_truth_extracted_entities = self._data_test_ground_truth_extracted_entities  # noqa: F841
         else:
             raise ValueError("Unknown set type")
 
@@ -185,9 +185,9 @@ class LinkingTaskInstance(TaskInstance):
     ) -> dict[str, float]:
         """Evaluate an output for the linking task instance."""
         if set_type == "train":
-            ground_truth_boolean = self.data_train_ground_truth_boolean
+            ground_truth_boolean = self._data_train_ground_truth_boolean
         elif set_type == "test":
-            ground_truth_boolean = self.data_test_ground_truth_boolean  # noqa: F841
+            ground_truth_boolean = self._data_test_ground_truth_boolean  # noqa: F841
         else:
             raise ValueError("Unknown set type")
 
