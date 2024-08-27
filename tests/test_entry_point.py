@@ -5,23 +5,28 @@
 
 # ruff: noqa: RUF015, PLR2004
 
+from __future__ import annotations
+
 from pathlib import Path
-import kebab.mskebab as mskebab
+
+from kebab import mskebab
+
 
 def test_task_interface():
+    """Test task interface."""
     benchmark = mskebab.benchmark()
 
     tasks = benchmark.tasks
-    assert set(tasks.keys()) == set(["Extraction", "Linking"])
+    assert set(tasks.keys()) == {"Extraction", "Linking"}
     for task_name, task in tasks.items():
         assert task_name == task.name
 
     task_instances = benchmark.task_instances
-    assert set(task_instances.keys()) == set(["Extraction-ReDocRED",
-                                              "Extraction-Heldout",
-                                              "Linking-TREx",
-                                              "Linking-MAVE",
-                                              "Linking-Heldout"])
+    assert set(task_instances.keys()) == {"Extraction-ReDocRED",
+                                          "Extraction-Heldout",
+                                          "Linking-TREx",
+                                          "Linking-MAVE",
+                                          "Linking-Heldout"}
     for task_instance_name, task_instance in task_instances.items():
         assert task_instance_name == task_instance.name
 
@@ -31,10 +36,11 @@ def test_task_interface():
             for set_type in ["train", "test"]:
                 if set_type != "test" and task_instance.name.endswith("-Heldout"):
                     metrics = task_instance.evaluate(Path("some_output_file"), set_type)
-                    assert metrics["primary_{}_metric".format(task.name.lower())] == 0.8
-                    assert metrics["secondary_{}_metric".format(task.name.lower())] == 0.6
+                    assert metrics[f"primary_{task.name.lower()}_metric"] == 0.8
+                    assert metrics[f"secondary_{task.name.lower()}_metric"] == 0.6
 
-def test_cache_manager():
+def test_cache():
+    """Test cache."""
     cache_dir = Path(".local_cache").resolve()
     cache = mskebab.cache(cache_dir)
     cache.clear()

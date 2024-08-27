@@ -9,10 +9,12 @@ import json
 import shutil
 import urllib.parse
 import urllib.request
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Self
+
 from . import task_lib
+
 
 @dataclass
 class Benchmark:
@@ -23,15 +25,17 @@ class Benchmark:
 
     @property
     def tasks(self) -> dict[str, task_lib.Task]:
+        """Return copy of task list."""
         return self._tasks.copy() # To disallow modifying this dictionary from outside of this class
 
     @property
     def task_instances(self) -> dict[str, task_lib.TaskInstance]:
+        """Return copy of task instance list."""
         return self._task_instances.copy() # To disallow modifying this dictionary from outside of this class
 
     @classmethod
-    def init(cls, path) -> Self:
-        """Initialize entry point"""
+    def init(cls, path: Path) -> Self:
+        """Initialize entry point."""
         tasks = {}
         task_instances = {}
         with open(path) as f:
@@ -58,7 +62,7 @@ class Benchmark:
 
 @dataclass
 class Cache:
-    """The cache manager class"""
+    """The cache class."""
 
     _cache_dir: Path
     _file_map_path: Path
@@ -66,7 +70,7 @@ class Cache:
 
     @classmethod
     def init(cls, cache_dir_path: Path) -> Self:
-        """Load configuration"""
+        """Initialize cache."""
         file_map_path = cache_dir_path / "map.json"
         if file_map_path.exists():
             with open(file_map_path) as f:
@@ -82,14 +86,16 @@ class Cache:
         return obj
 
     def get_cached_path(self, path: str) -> Path:
+        """Get path to locally cached file."""
         if urllib.parse.urlparse(str(path)).scheme == "": # Is URL
             return Path(path)
-        if not path in self._file_map or not self._file_map[path].exists():
+        if path not in self._file_map or not self._file_map[path].exists():
             self._file_map[path] = self.cache_file(path)
             self.validate_and_save_map()
         return self._file_map[path]
 
     def cache_file(self, url: str) -> Path:
+        """Download file to cache and return local path."""
         path = Path(url)
         local_path = self._cache_dir / path.name
         if not local_path.exists():
@@ -104,26 +110,32 @@ class Cache:
             i += 1
 
     def download_file(self, url: str, path: Path):
-        with urllib.request.urlopen(url) as response:
-          with open(str(path), 'wb') as out_file:
-              shutil.copyfileobj(response, out_file)
+        """Download file to cache."""
+        if not url.startswith(("http:", "https:")):
+            raise ValueError("URL must start with 'http:' or 'https:'")
+        with urllib.request.urlopen(url) as response, open(str(path), "wb") as out_file:
+            shutil.copyfileobj(response, out_file)
 
     def clear(self):
+        """Clear the cache."""
         shutil.rmtree(self._cache_dir)
         self._file_map.clear()
         self.validate_and_save_map()
 
     def validate_and_save_map(self):
+        """Validate and save the cache map."""
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         for k,v in self._file_map.items():
             if not v.exists() or not v.is_file() or v.parents[0] != self._cache_dir:
               del self._file_map[k]
         file_map_str_dict = {k: str(v) for k,v in self._file_map.items()}
-        with open(self._file_map_path, 'w') as f:
+        with open(self._file_map_path, "w") as f:
             json.dump(file_map_str_dict, f)
 
 def benchmark() -> Benchmark:
+    """Initialize and return benchmark object."""
     return Benchmark.init(Path(__file__).parents[0] / "instances.json")
 
-def cache(cache_dir_path: Path = Path.cwd() / ".cache") -> Cache:
+def cache(cache_dir_path: Path = Path(".cache")) -> Cache:
+    """Initialize and return cache object."""
     return Cache.init(Path(cache_dir_path))
