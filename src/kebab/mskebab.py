@@ -99,7 +99,7 @@ class Cache:
         """Download file to cache."""
         if not url.startswith(("http:", "https:")):
             raise ValueError("URL must start with 'http:' or 'https:'")
-        with urllib.request.urlopen(url) as response, open(path, "wb") as out_file:
+        with urllib.request.urlopen(url) as response, open(path, "wb") as out_file:  # noqa: S310
             shutil.copyfileobj(response, out_file)
 
     def clear(self):
