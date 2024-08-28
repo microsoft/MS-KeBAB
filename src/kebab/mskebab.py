@@ -46,23 +46,11 @@ class Benchmark:
             task_instance_config = json.load(f)
         for instance_name, instance_config in task_instance_config.items():
             task_type = instance_config["task"]
-            if task_type not in tasks:
-                task = task_lib.Task(task_type)
-                tasks[task_type] = task
-            else:
-                task = tasks[task_type]
-            if task_type == "Extraction":
-                instance = task_lib.ExtractionTaskInstance(
-                    instance_name, task, **instance_config["data"]
-                )
-            elif instance_config["task"] == "Linking":
-                instance = task_lib.LinkingTaskInstance(
-                    instance_name, task, **instance_config["data"]
-                )
-            else:
-                raise ValueError("Unknown task type for task instance")
+            task, instance = task_lib.TaskInstance.create_task_instance(instance_name,
+                                                                        instance_config,
+                                                                        tasks.get(task_type, None))
+            tasks[task_type] = task
             task_instances[instance.name] = instance
-            instance.parent.add_instance(instance)
         return cls(_tasks=tasks, _task_instances=task_instances)
 
 

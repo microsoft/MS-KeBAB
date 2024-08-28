@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from pathlib import Path
+from typing import Any, Optional, Tuple
 
 
 class Task:
@@ -55,6 +56,24 @@ class TaskInstance:
         """Return parent task."""
         return self._parent
 
+    @classmethod
+    def create_task_instance(cls, instance_name: str, instance_config: dict[str, Any], parent: Task) -> Tuple[Task, TaskInstance]:
+        task_type = instance_config["task"]
+        if parent == None:
+            parent = Task(task_type)
+        if task_type == "Extraction":
+            instance = ExtractionTaskInstance(
+                instance_name, parent, **instance_config["data"]
+            )
+        elif instance_config["task"] == "Linking":
+            instance = LinkingTaskInstance(
+                instance_name, parent, **instance_config["data"]
+            )
+        else:
+            raise ValueError("Unknown task type {task_type}")
+        instance.parent.add_instance(instance)
+        return parent, instance
+
     @abstractmethod
     def evaluate(self, output_to_evaluate: Path, set_type: str) -> dict[str, float]:
         """Evaluate an output for the task instance."""
@@ -96,7 +115,7 @@ class ExtractionTaskInstance(TaskInstance):
         train_extracts: str,
         train_ground_truth_extracted_entities: str,
         test_extracts: str,
-        test_ground_truth_extracted_entities: str = "",
+        test_ground_truth_extracted_entities: Optional[str] = None,
     ):
         """Initialize an extraction task instance."""
         self._name = name
@@ -106,7 +125,7 @@ class ExtractionTaskInstance(TaskInstance):
             train_ground_truth_extracted_entities
         )
         self._data_test_extracts = Path(test_extracts)
-        if len(test_ground_truth_extracted_entities) > 0:
+        if test_ground_truth_extracted_entities != None:
             self._data_test_ground_truth_extracted_entities = Path(
                 test_ground_truth_extracted_entities
             )
@@ -165,7 +184,7 @@ class LinkingTaskInstance(TaskInstance):
         train_entity_fragment_pairs: str,
         train_ground_truth_boolean: str,
         test_entity_fragment_pairs: str,
-        test_ground_truth_boolean: str = "",
+        test_ground_truth_boolean: Optional[str] = None,
     ):
         """Initialize an linking task instance."""
         self._name = name
@@ -173,7 +192,7 @@ class LinkingTaskInstance(TaskInstance):
         self._data_train_entity_fragment_pairs = Path(train_entity_fragment_pairs)
         self._data_train_ground_truth_boolean = Path(train_ground_truth_boolean)
         self._data_test_entity_fragment_pairs = Path(test_entity_fragment_pairs)
-        if len(test_ground_truth_boolean) > 0:
+        if test_ground_truth_boolean != None:
             self._data_test_ground_truth_boolean = Path(test_ground_truth_boolean)
 
     def evaluate(
