@@ -26,16 +26,12 @@ class Benchmark:
     @property
     def tasks(self) -> dict[str, task_lib.Task]:
         """Return copy of task list."""
-        return (
-            self._tasks.copy()
-        )  # To disallow modifying this dictionary from outside of this class
+        return self._tasks.copy()  # To disallow modifying this dictionary from outside of this class
 
     @property
     def task_instances(self) -> dict[str, task_lib.TaskInstance]:
         """Return copy of task instance list."""
-        return (
-            self._task_instances.copy()
-        )  # To disallow modifying this dictionary from outside of this class
+        return self._task_instances.copy()  # To disallow modifying this dictionary from outside of this class
 
     @classmethod
     def init(cls, path: Path) -> Self:
@@ -71,9 +67,7 @@ class Cache:
                 file_map = {k: Path(v) for k, v in json.load(f).items()}
         else:
             file_map = {}
-        obj = cls(
-            _cache_dir=cache_dir_path, _file_map_path=file_map_path, _file_map=file_map
-        )
+        obj = cls(_cache_dir=cache_dir_path, _file_map_path=file_map_path, _file_map=file_map)
         obj.validate_and_save_map()
         return obj
 

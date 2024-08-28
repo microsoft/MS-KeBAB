@@ -24,9 +24,7 @@ class Task:
     @property
     def instances(self) -> dict[str, TaskInstance]:
         """Return task instances."""
-        return (
-            self._instances.copy()
-        )  # To disallow modifying this dictionary from outside of this class
+        return self._instances.copy()  # To disallow modifying this dictionary from outside of this class
 
     def __init__(self, name: str):
         """Initialize a task."""
@@ -65,13 +63,9 @@ class TaskInstance:
         if parent is None:
             parent = Task(task_type)
         if task_type == "Extraction":
-            instance = ExtractionTaskInstance(
-                instance_name, parent, **instance_config["data"]
-            )
+            instance = ExtractionTaskInstance(instance_name, parent, **instance_config["data"])
         elif instance_config["task"] == "Linking":
-            instance = LinkingTaskInstance(
-                instance_name, parent, **instance_config["data"]
-            )
+            instance = LinkingTaskInstance(instance_name, parent, **instance_config["data"])
         else:
             raise ValueError("Unknown task type {task_type}")
         instance.parent.add_instance(instance)
@@ -123,23 +117,19 @@ class ExtractionTaskInstance(TaskInstance):
         self._name = name
         self._parent = parent
         self._data_train_extracts = Path(train_extracts)
-        self._data_train_ground_truth_extracted_entities = Path(
-            train_ground_truth_extracted_entities
-        )
+        self._data_train_ground_truth_extracted_entities = Path(train_ground_truth_extracted_entities)
         self._data_test_extracts = Path(test_extracts)
         if test_ground_truth_extracted_entities is not None:
-            self._data_test_ground_truth_extracted_entities = Path(
-                test_ground_truth_extracted_entities
-            )
+            self._data_test_ground_truth_extracted_entities = Path(test_ground_truth_extracted_entities)
 
     def evaluate(
-        self, output_to_evaluate: Path, set_type: str  # noqa: ARG002
+        self,
+        output_to_evaluate: Path,  # noqa: ARG002
+        set_type: str,
     ) -> dict[str, float]:
         """Evaluate an output for the extraction task instance."""
         if set_type == "train":
-            ground_truth_extracted_entities = (
-                self._data_train_ground_truth_extracted_entities
-            )
+            ground_truth_extracted_entities = self._data_train_ground_truth_extracted_entities
         elif set_type == "test":
             ground_truth_extracted_entities = (  # noqa: F841
                 self._data_test_ground_truth_extracted_entities
@@ -198,7 +188,9 @@ class LinkingTaskInstance(TaskInstance):
             self._data_test_ground_truth_boolean = Path(test_ground_truth_boolean)
 
     def evaluate(
-        self, output_to_evaluate: Path, set_type: str  # noqa: ARG002
+        self,
+        output_to_evaluate: Path,  # noqa: ARG002
+        set_type: str,
     ) -> dict[str, float]:
         """Evaluate an output for the linking task instance."""
         if set_type == "train":

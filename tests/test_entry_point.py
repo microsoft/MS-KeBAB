@@ -49,9 +49,7 @@ def test_cache():
     cache.clear()
 
     assert (
-        cache.get_cached_path(
-            "http://w3.erss.univ-tlse2.fr/UETAL/2022-2023/sigirfp093-mitra.pdf"
-        )
+        cache.get_cached_path("http://w3.erss.univ-tlse2.fr/UETAL/2022-2023/sigirfp093-mitra.pdf")
         == cache_dir / "sigirfp093-mitra.pdf"
     )
 
@@ -59,9 +57,7 @@ def test_cache():
     # the case where the method is called for the same URL multiple times. The second
     # call should directly return the local path to the already downloaded and cached file
     assert (
-        cache.get_cached_path(
-            "http://w3.erss.univ-tlse2.fr/UETAL/2022-2023/sigirfp093-mitra.pdf"
-        )
+        cache.get_cached_path("http://w3.erss.univ-tlse2.fr/UETAL/2022-2023/sigirfp093-mitra.pdf")
         == cache_dir / "sigirfp093-mitra.pdf"
     )
 
