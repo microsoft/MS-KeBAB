@@ -57,7 +57,9 @@ class TaskInstance:
         return self._parent
 
     @classmethod
-    def create_task_instance(cls, instance_name: str, instance_config: dict[str, Any], parent: Task | None) -> tuple[Task, TaskInstance]:
+    def create_task_instance(
+        cls, instance_name: str, instance_config: dict[str, Any], parent: Task | None
+    ) -> tuple[Task, TaskInstance]:
         """Create appropriate task instance and optionally parent task, if not provided."""
         task_type = instance_config["task"]
         if parent is None:

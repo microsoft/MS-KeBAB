@@ -46,9 +46,9 @@ class Benchmark:
             task_instance_config = json.load(f)
         for instance_name, instance_config in task_instance_config.items():
             task_type = instance_config["task"]
-            task, instance = task_lib.TaskInstance.create_task_instance(instance_name,
-                                                                        instance_config,
-                                                                        tasks.get(task_type))
+            task, instance = task_lib.TaskInstance.create_task_instance(
+                instance_name, instance_config, tasks.get(task_type)
+            )
             tasks[task_type] = task
             task_instances[instance.name] = instance
         return cls(_tasks=tasks, _task_instances=task_instances)
@@ -95,9 +95,7 @@ class Cache:
             return local_path
         i = 1
         while True:
-            local_path = self._cache_dir / (
-                Path(f"{path.stem}_{i}{path.suffix}")
-            )
+            local_path = self._cache_dir / (Path(f"{path.stem}_{i}{path.suffix}"))
             if not local_path.exists():
                 self.download_file(url, local_path)
                 return local_path
