@@ -108,7 +108,7 @@ class Cache:
         i = 1
         while True:
             local_path = self._cache_dir / (
-                Path(path.stem + "_" + str(i) + path.suffix)
+                Path(f"{path.stem}_{i}{path.suffix}")
             )
             if not local_path.exists():
                 self.download_file(url, local_path)
@@ -119,7 +119,7 @@ class Cache:
         """Download file to cache."""
         if not url.startswith(("http:", "https:")):
             raise ValueError("URL must start with 'http:' or 'https:'")
-        with urllib.request.urlopen(url) as response, open(str(path), "wb") as out_file:
+        with urllib.request.urlopen(url) as response, open(path, "wb") as out_file:
             shutil.copyfileobj(response, out_file)
 
     def clear(self):

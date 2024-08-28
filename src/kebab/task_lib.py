@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from pathlib import Path
 
 
@@ -33,7 +34,8 @@ class Task:
 
     def add_instance(self, instance: TaskInstance):
         """Add a task instance."""
-        assert instance.name not in self._instances
+        if instance.name in self._instances:
+            raise ValueError(f"Instance with name '{instance.name}' already exists.")
         self._instances[instance.name] = instance
 
 
@@ -41,6 +43,7 @@ class TaskInstance:
     """Represents a benchmark task instance with its data files."""
 
     _name: str
+    _parent: Task
 
     @property
     def name(self) -> str:
@@ -50,26 +53,21 @@ class TaskInstance:
     @property
     def parent(self) -> Task:
         """Return parent task."""
-        raise NotImplementedError
+        return self._parent
 
+    @abstractmethod
     def evaluate(self, output_to_evaluate: Path, set_type: str) -> dict[str, float]:
         """Evaluate an output for the task instance."""
-        raise NotImplementedError
+        pass
 
 
 class ExtractionTaskInstance(TaskInstance):
     """Represents an extraction benchmark task instance with its data files."""
 
-    _parent: Task
     _data_train_extracts: Path
     _data_train_ground_truth_extracted_entities: Path
     _data_test_extracts: Path
     _data_test_ground_truth_extracted_entities: Path
-
-    @property
-    def parent(self) -> Task:
-        """Return parent task."""
-        return self._parent
 
     @property
     def data_train_extracts(self) -> Path:
@@ -126,7 +124,7 @@ class ExtractionTaskInstance(TaskInstance):
                 self._data_test_ground_truth_extracted_entities
             )
         else:
-            raise ValueError("Unknown set type")
+            raise ValueError("Unknown set type: {set_type}")
 
         # TODO(bmitra): Implement actual metric computation
         return {"primary_extraction_metric": 0.8, "secondary_extraction_metric": 0.6}
@@ -135,16 +133,10 @@ class ExtractionTaskInstance(TaskInstance):
 class LinkingTaskInstance(TaskInstance):
     """Represents an linking benchmark task instance with its data files."""
 
-    _parent: Task
     _data_train_entity_fragment_pairs: Path
     _data_train_ground_truth_boolean: Path
     _data_test_entity_fragment_pairs: Path
     _data_test_ground_truth_boolean: Path
-
-    @property
-    def parent(self) -> Task:
-        """Return parent task."""
-        return self._parent
 
     @property
     def data_train_entity_fragment_pairs(self) -> Path:
@@ -193,7 +185,7 @@ class LinkingTaskInstance(TaskInstance):
         elif set_type == "test":
             ground_truth_boolean = self._data_test_ground_truth_boolean  # noqa: F841
         else:
-            raise ValueError("Unknown set type")
+            raise ValueError("Unknown set type: {set_type}")
 
         # TODO(bmitra): Implement actual metric computation
         return {"primary_linking_metric": 0.8, "secondary_linking_metric": 0.6}

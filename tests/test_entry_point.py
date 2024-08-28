@@ -47,18 +47,24 @@ def test_cache():
     cache_dir = Path(".local_cache").resolve()
     cache = mskebab.cache(cache_dir)
     cache.clear()
+
     assert (
         cache.get_cached_path(
             "http://w3.erss.univ-tlse2.fr/UETAL/2022-2023/sigirfp093-mitra.pdf"
         )
         == cache_dir / "sigirfp093-mitra.pdf"
     )
+
+    # The following assert is intentionally the same as the previous one to simulate
+    # the case where the method is called for the same URL multiple times. The second
+    # call should directly return the local path to the already downloaded and cached file
     assert (
         cache.get_cached_path(
             "http://w3.erss.univ-tlse2.fr/UETAL/2022-2023/sigirfp093-mitra.pdf"
         )
         == cache_dir / "sigirfp093-mitra.pdf"
     )
+
     assert (
         cache.get_cached_path(
             "https://www.microsoft.com/en-us/research/wp-content/uploads/2015/08/sigirfp093-mitra.pdf"
