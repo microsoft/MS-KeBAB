@@ -48,7 +48,7 @@ class Benchmark:
             task_type = instance_config["task"]
             task, instance = task_lib.TaskInstance.create_task_instance(instance_name,
                                                                         instance_config,
-                                                                        tasks.get(task_type, None))
+                                                                        tasks.get(task_type))
             tasks[task_type] = task
             task_instances[instance.name] = instance
         return cls(_tasks=tasks, _task_instances=task_instances)
