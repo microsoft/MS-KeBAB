@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from kebab import mskebab
-from kebab.task_lib import SetType, TaskType
+from kebab.task_lib import TaskType
 
 
 def test_task_interface():
@@ -24,9 +24,11 @@ def test_task_interface():
 
     task_instances = benchmark.task_instances
     assert set(task_instances.keys()) == {
-        "Extraction-ReDocRED",
+        "Extraction-ReDocRED-Train",
+        "Extraction-ReDocRED-Test",
         "Extraction-Heldout",
-        "Linking-TREx",
+        "Linking-TREx-Train",
+        "Linking-TREx-Test",
         "Linking-MAVE",
         "Linking-Heldout",
     }
@@ -36,11 +38,10 @@ def test_task_interface():
     for task in tasks.values():
         for task_instance in task.instances.values():
             assert task_instance.parent == task
-            for set_type in SetType:
-                if set_type != SetType.Test and task_instance.name.endswith("-Heldout"):
-                    metrics = task_instance.evaluate(Path("some_output_file"), set_type)
-                    assert metrics[f"primary_{task.task_type.name.lower()}_metric"] == 0.8
-                    assert metrics[f"secondary_{task.task_type.name.lower()}_metric"] == 0.6
+            if task_instance.name.endswith("-Heldout"):
+                metrics = task_instance.evaluate(Path("some_output_file"))
+                assert metrics[f"primary_{task.task_type.name.lower()}_metric"] == 0.8
+                assert metrics[f"secondary_{task.task_type.name.lower()}_metric"] == 0.6
 
 
 def test_cache():
