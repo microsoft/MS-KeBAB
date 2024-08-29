@@ -84,7 +84,9 @@ class TaskInstance(ABC):
         return self.__parent
 
     @classmethod
-    def create_task_instance(cls, instance__name: str, task_type: TaskType, data_dict: dict[str, str], parent: Task) -> TaskInstance:
+    def create_task_instance(
+        cls, instance__name: str, task_type: TaskType, data_dict: dict[str, str], parent: Task
+    ) -> TaskInstance:
         """Create appropriate task instance and optionally parent task, if not provided."""
         match task_type:
             case TaskType.Extraction:
@@ -133,7 +135,7 @@ class ExtractionTaskInstance(TaskInstance):
         train_extracts: str,
         train_ground_truth_extracted_entities: str,
         test_extracts: str,
-        test_ground_truth_extracted_entities: str | None = None
+        test_ground_truth_extracted_entities: str | None = None,
     ):
         """Initialize an extraction task instance."""
         super().__init__(name, parent)
@@ -194,7 +196,7 @@ class LinkingTaskInstance(TaskInstance):
         train_entity_fragment_pairs: str,
         train_ground_truth_boolean: str,
         test_entity_fragment_pairs: str,
-        test_ground_truth_boolean: str | None = None
+        test_ground_truth_boolean: str | None = None,
     ):
         """Initialize an linking task instance."""
         super().__init__(name, parent)
