@@ -13,13 +13,17 @@ from typing import Any, ClassVar, Self
 
 class TaskType(Enum):
     """Allowed task types."""
+
     Extraction = 1
     Linking = 2
 
+
 class SetType(Enum):
     """Allowed set types."""
+
     Train = 1
     Test = 2
+
 
 class Task:
     """Represents a benchmark task with its task instances."""
