@@ -8,7 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, Self
 
 
 class TaskType(Enum):
@@ -24,63 +24,71 @@ class SetType(Enum):
 class Task:
     """Represents a benchmark task with its task instances."""
 
-    _task_type: TaskType
-    _instances: dict[str, TaskInstance]
+    __task_type: TaskType
+    __instances: dict[str, TaskInstance]
+    __created_task_types: ClassVar[set[TaskType]] = set()
 
     @property
     def task_type(self) -> TaskType:
         """Return task type."""
-        return self._task_type
+        return self.__task_type
 
     @property
     def instances(self) -> dict[str, TaskInstance]:
         """Return task instances."""
-        return self._instances.copy()  # To disallow modifying this dictionary from outside of this class
+        return self.__instances.copy()  # To disallow modifying this dictionary from outside of this class
+
+    def __new__(cls, task_type: TaskType) -> Self:
+        """Disallow instantiating multiple Task objects for same task type."""
+        if task_type in cls.__created_task_types:
+            raise ValueError("Not allowed to create multiple task objects of type {task_type}")
+        cls.__created_task_types.add(task_type)
+        return super().__new__(cls)
 
     def __init__(self, task_type: TaskType):
         """Initialize a task."""
-        self._task_type = task_type
-        self._instances = {}
+        self.__task_type = task_type
+        self.__instances = {}
 
     def add_instance(self, instance: TaskInstance):
         """Add a task instance."""
-        if instance.name in self._instances:
+        if instance.name in self.__instances:
             raise ValueError(f"Instance with name '{instance.name}' already exists.")
-        self._instances[instance.name] = instance
+        self.__instances[instance.name] = instance
 
 
 class TaskInstance(ABC):
     """Represents a benchmark task instance with its data files."""
 
-    _name: str
-    _parent: Task
+    __name: str
+    __parent: Task
+
+    def __init__(self, name: str, parent: Task):
+        """Initialize a task instance."""
+        self.__name = name
+        self.__parent = parent
+        self.__parent.add_instance(self)
 
     @property
     def name(self) -> str:
         """Return task instance name."""
-        return self._name
+        return self.__name
 
     @property
     def parent(self) -> Task:
         """Return parent task."""
-        return self._parent
+        return self.__parent
 
     @classmethod
-    def create_task_instance(
-        cls, instance_name: str, instance_config: dict[str, Any], parent: Task | None
-    ) -> tuple[Task, TaskInstance]:
+    def create_task_instance(cls, instance__name: str, instance_config: dict[str, Any], parent: Task) -> TaskInstance:
         """Create appropriate task instance and optionally parent task, if not provided."""
         task_type = TaskType[instance_config["task"]]
-        if parent is None:
-            parent = Task(task_type)
-        if task_type == TaskType.Extraction:
-            instance = ExtractionTaskInstance(instance_name, parent, **instance_config["data"])
-        elif task_type == TaskType.Linking:
-            instance = LinkingTaskInstance(instance_name, parent, **instance_config["data"])
-        else:
-            raise ValueError(f"Unknown task type {task_type}")
-        instance.parent.add_instance(instance)
-        return parent, instance
+        match task_type:
+            case TaskType.Extraction:
+                instance = ExtractionTaskInstance(instance__name, parent, **instance_config["data"])
+            case TaskType.Linking:
+                instance = LinkingTaskInstance(instance__name, parent, **instance_config["data"])
+        return instance
 
     @abstractmethod
     def evaluate(self, output_to_evaluate: Path, set_type: SetType) -> dict[str, float]:
@@ -90,30 +98,30 @@ class TaskInstance(ABC):
 class ExtractionTaskInstance(TaskInstance):
     """Represents an extraction benchmark task instance with its data files."""
 
-    _data_train_extracts: Path
-    _data_train_ground_truth_extracted_entities: Path
-    _data_test_extracts: Path
-    _data_test_ground_truth_extracted_entities: Path
+    __data_train_extracts: Path
+    __data_train_ground_truth_extracted_entities: Path
+    __data_test_extracts: Path
+    __data_test_ground_truth_extracted_entities: Path
 
     @property
     def data_train_extracts(self) -> Path:
         """Return path to train extracts."""
-        return self._data_train_extracts
+        return self.__data_train_extracts
 
     @property
     def data_train_ground_truth_extracted_entities(self) -> Path:
         """Return path to train ground truth extracted entities."""
-        return self._data_train_ground_truth_extracted_entities
+        return self.__data_train_ground_truth_extracted_entities
 
     @property
     def data_test_extracts(self) -> Path:
         """Return path to test extracts."""
-        return self._data_test_extracts
+        return self.__data_test_extracts
 
     @property
     def data_test_ground_truth_extracted_entities(self) -> Path:
         """Return path to test ground truth extracted entities."""
-        return self._data_test_ground_truth_extracted_entities
+        return self.__data_test_ground_truth_extracted_entities
 
     def __init__(
         self,
@@ -122,16 +130,15 @@ class ExtractionTaskInstance(TaskInstance):
         train_extracts: str,
         train_ground_truth_extracted_entities: str,
         test_extracts: str,
-        test_ground_truth_extracted_entities: str | None = None,
+        test_ground_truth_extracted_entities: str | None = None
     ):
         """Initialize an extraction task instance."""
-        self._name = name
-        self._parent = parent
-        self._data_train_extracts = Path(train_extracts)
-        self._data_train_ground_truth_extracted_entities = Path(train_ground_truth_extracted_entities)
-        self._data_test_extracts = Path(test_extracts)
+        super().__init__(name, parent)
+        self.__data_train_extracts = Path(train_extracts)
+        self.__data_train_ground_truth_extracted_entities = Path(train_ground_truth_extracted_entities)
+        self.__data_test_extracts = Path(test_extracts)
         if test_ground_truth_extracted_entities is not None:
-            self._data_test_ground_truth_extracted_entities = Path(test_ground_truth_extracted_entities)
+            self.__data_test_ground_truth_extracted_entities = Path(test_ground_truth_extracted_entities)
 
     def evaluate(
         self,
@@ -139,14 +146,11 @@ class ExtractionTaskInstance(TaskInstance):
         set_type: SetType,
     ) -> dict[str, float]:
         """Evaluate an output for the extraction task instance."""
-        if set_type == SetType.Train:
-            ground_truth_extracted_entities = self._data_train_ground_truth_extracted_entities
-        elif set_type == SetType.Test:
-            ground_truth_extracted_entities = (  # noqa: F841
-                self._data_test_ground_truth_extracted_entities
-            )
-        else:
-            raise ValueError(f"Unknown set type: {set_type}")
+        match set_type:
+            case SetType.Train:
+                ground_truth_extracted_entities = self.__data_train_ground_truth_extracted_entities
+            case SetType.Test:
+                ground_truth_extracted_entities = self.__data_test_ground_truth_extracted_entities  # noqa: F841
 
         # TODO(bmitra): Implement actual metric computation
         return {"primary_extraction_metric": 0.8, "secondary_extraction_metric": 0.6}
@@ -155,30 +159,30 @@ class ExtractionTaskInstance(TaskInstance):
 class LinkingTaskInstance(TaskInstance):
     """Represents an linking benchmark task instance with its data files."""
 
-    _data_train_entity_fragment_pairs: Path
-    _data_train_ground_truth_boolean: Path
-    _data_test_entity_fragment_pairs: Path
-    _data_test_ground_truth_boolean: Path
+    __data_train_entity_fragment_pairs: Path
+    __data_train_ground_truth_boolean: Path
+    __data_test_entity_fragment_pairs: Path
+    __data_test_ground_truth_boolean: Path
 
     @property
     def data_train_entity_fragment_pairs(self) -> Path:
         """Return path to train entity fragment pairs."""
-        return self._data_train_entity_fragment_pairs
+        return self.__data_train_entity_fragment_pairs
 
     @property
     def data_train_ground_truth_boolean(self) -> Path:
         """Return path to train ground truth boolean."""
-        return self._data_train_ground_truth_boolean
+        return self.__data_train_ground_truth_boolean
 
     @property
     def data_test_entity_fragment_pairs(self) -> Path:
         """Return path to test entity fragment pairs."""
-        return self._data_test_entity_fragment_pairs
+        return self.__data_test_entity_fragment_pairs
 
     @property
     def data_test_ground_truth_boolean(self) -> Path:
         """Return path to test ground truth boolean."""
-        return self._data_test_ground_truth_boolean
+        return self.__data_test_ground_truth_boolean
 
     def __init__(
         self,
@@ -187,16 +191,15 @@ class LinkingTaskInstance(TaskInstance):
         train_entity_fragment_pairs: str,
         train_ground_truth_boolean: str,
         test_entity_fragment_pairs: str,
-        test_ground_truth_boolean: str | None = None,
+        test_ground_truth_boolean: str | None = None
     ):
         """Initialize an linking task instance."""
-        self._name = name
-        self._parent = parent
-        self._data_train_entity_fragment_pairs = Path(train_entity_fragment_pairs)
-        self._data_train_ground_truth_boolean = Path(train_ground_truth_boolean)
-        self._data_test_entity_fragment_pairs = Path(test_entity_fragment_pairs)
+        super().__init__(name, parent)
+        self.__data_train_entity_fragment_pairs = Path(train_entity_fragment_pairs)
+        self.__data_train_ground_truth_boolean = Path(train_ground_truth_boolean)
+        self.__data_test_entity_fragment_pairs = Path(test_entity_fragment_pairs)
         if test_ground_truth_boolean is not None:
-            self._data_test_ground_truth_boolean = Path(test_ground_truth_boolean)
+            self.__data_test_ground_truth_boolean = Path(test_ground_truth_boolean)
 
     def evaluate(
         self,
@@ -204,12 +207,11 @@ class LinkingTaskInstance(TaskInstance):
         set_type: SetType,
     ) -> dict[str, float]:
         """Evaluate an output for the linking task instance."""
-        if set_type == SetType.Train:
-            ground_truth_boolean = self._data_train_ground_truth_boolean
-        elif set_type == SetType.Test:
-            ground_truth_boolean = self._data_test_ground_truth_boolean  # noqa: F841
-        else:
-            raise ValueError(f"Unknown set type: {set_type}")
+        match set_type:
+            case SetType.Train:
+                ground_truth_boolean = self.__data_train_ground_truth_boolean
+            case SetType.Test:
+                ground_truth_boolean = self.__data_test_ground_truth_boolean  # noqa: F841
 
         # TODO(bmitra): Implement actual metric computation
         return {"primary_linking_metric": 0.8, "secondary_linking_metric": 0.6}
