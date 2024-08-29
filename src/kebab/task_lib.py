@@ -8,7 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Self
+from typing import ClassVar, Self
 
 
 class TaskType(Enum):
@@ -84,14 +84,13 @@ class TaskInstance(ABC):
         return self.__parent
 
     @classmethod
-    def create_task_instance(cls, instance__name: str, instance_config: dict[str, Any], parent: Task) -> TaskInstance:
+    def create_task_instance(cls, instance__name: str, task_type: TaskType, data_dict: dict[str, str], parent: Task) -> TaskInstance:
         """Create appropriate task instance and optionally parent task, if not provided."""
-        task_type = TaskType[instance_config["task"]]
         match task_type:
             case TaskType.Extraction:
-                instance = ExtractionTaskInstance(instance__name, parent, **instance_config["data"])
+                instance = ExtractionTaskInstance(instance__name, parent, **data_dict)
             case TaskType.Linking:
-                instance = LinkingTaskInstance(instance__name, parent, **instance_config["data"])
+                instance = LinkingTaskInstance(instance__name, parent, **data_dict)
         return instance
 
     @abstractmethod

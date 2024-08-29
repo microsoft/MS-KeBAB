@@ -44,7 +44,7 @@ class Benchmark:
             else:
                 task = self.__tasks[task_type]
             self.__task_instances[instance_name] = task_lib.TaskInstance.create_task_instance(
-                instance_name, instance_config, task
+                instance_name, task_type, instance_config["data"], task
             )
 
 
