@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
@@ -38,7 +38,7 @@ class Task:
         self._instances[instance.name] = instance
 
 
-class TaskInstance:
+class TaskInstance(ABC):
     """Represents a benchmark task instance with its data files."""
 
     _name: str
