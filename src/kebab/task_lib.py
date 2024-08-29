@@ -67,7 +67,7 @@ class TaskInstance(ABC):
         elif instance_config["task"] == "Linking":
             instance = LinkingTaskInstance(instance_name, parent, **instance_config["data"])
         else:
-            raise ValueError("Unknown task type {task_type}")
+            raise ValueError(f"Unknown task type {task_type}")
         instance.parent.add_instance(instance)
         return parent, instance
 
@@ -135,7 +135,7 @@ class ExtractionTaskInstance(TaskInstance):
                 self._data_test_ground_truth_extracted_entities
             )
         else:
-            raise ValueError("Unknown set type: {set_type}")
+            raise ValueError(f"Unknown set type: {set_type}")
 
         # TODO(bmitra): Implement actual metric computation
         return {"primary_extraction_metric": 0.8, "secondary_extraction_metric": 0.6}
@@ -198,7 +198,7 @@ class LinkingTaskInstance(TaskInstance):
         elif set_type == "test":
             ground_truth_boolean = self._data_test_ground_truth_boolean  # noqa: F841
         else:
-            raise ValueError("Unknown set type: {set_type}")
+            raise ValueError(f"Unknown set type: {set_type}")
 
         # TODO(bmitra): Implement actual metric computation
         return {"primary_linking_metric": 0.8, "secondary_linking_metric": 0.6}
