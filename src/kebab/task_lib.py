@@ -6,29 +6,40 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 
+class TaskType(Enum):
+    """Allowed task types."""
+    Extraction = 1
+    Linking = 2
+
+class SetType(Enum):
+    """Allowed set types."""
+    Train = 1
+    Test = 2
+
 class Task:
     """Represents a benchmark task with its task instances."""
 
-    _name: str
+    _task_type: TaskType
     _instances: dict[str, TaskInstance]
 
     @property
-    def name(self) -> str:
-        """Return task name."""
-        return self._name
+    def task_type(self) -> TaskType:
+        """Return task type."""
+        return self._task_type
 
     @property
     def instances(self) -> dict[str, TaskInstance]:
         """Return task instances."""
         return self._instances.copy()  # To disallow modifying this dictionary from outside of this class
 
-    def __init__(self, name: str):
+    def __init__(self, task_type: TaskType):
         """Initialize a task."""
-        self._name = name
+        self._task_type = task_type
         self._instances = {}
 
     def add_instance(self, instance: TaskInstance):
@@ -59,12 +70,12 @@ class TaskInstance(ABC):
         cls, instance_name: str, instance_config: dict[str, Any], parent: Task | None
     ) -> tuple[Task, TaskInstance]:
         """Create appropriate task instance and optionally parent task, if not provided."""
-        task_type = instance_config["task"]
+        task_type = TaskType[instance_config["task"]]
         if parent is None:
             parent = Task(task_type)
-        if task_type == "Extraction":
+        if task_type == TaskType.Extraction:
             instance = ExtractionTaskInstance(instance_name, parent, **instance_config["data"])
-        elif instance_config["task"] == "Linking":
+        elif task_type == TaskType.Linking:
             instance = LinkingTaskInstance(instance_name, parent, **instance_config["data"])
         else:
             raise ValueError(f"Unknown task type {task_type}")
@@ -72,7 +83,7 @@ class TaskInstance(ABC):
         return parent, instance
 
     @abstractmethod
-    def evaluate(self, output_to_evaluate: Path, set_type: str) -> dict[str, float]:
+    def evaluate(self, output_to_evaluate: Path, set_type: SetType) -> dict[str, float]:
         """Evaluate an output for the task instance."""
 
 
@@ -125,12 +136,12 @@ class ExtractionTaskInstance(TaskInstance):
     def evaluate(
         self,
         output_to_evaluate: Path,  # noqa: ARG002
-        set_type: str,
+        set_type: SetType,
     ) -> dict[str, float]:
         """Evaluate an output for the extraction task instance."""
-        if set_type == "train":
+        if set_type == SetType.Train:
             ground_truth_extracted_entities = self._data_train_ground_truth_extracted_entities
-        elif set_type == "test":
+        elif set_type == SetType.Test:
             ground_truth_extracted_entities = (  # noqa: F841
                 self._data_test_ground_truth_extracted_entities
             )
@@ -190,12 +201,12 @@ class LinkingTaskInstance(TaskInstance):
     def evaluate(
         self,
         output_to_evaluate: Path,  # noqa: ARG002
-        set_type: str,
+        set_type: SetType,
     ) -> dict[str, float]:
         """Evaluate an output for the linking task instance."""
-        if set_type == "train":
+        if set_type == SetType.Train:
             ground_truth_boolean = self._data_train_ground_truth_boolean
-        elif set_type == "test":
+        elif set_type == SetType.Test:
             ground_truth_boolean = self._data_test_ground_truth_boolean  # noqa: F841
         else:
             raise ValueError(f"Unknown set type: {set_type}")

@@ -20,11 +20,11 @@ from . import task_lib
 class Benchmark:
     """The entry point class."""
 
-    _tasks: dict[str, task_lib.Task]
+    _tasks: dict[task_lib.TaskType, task_lib.Task]
     _task_instances: dict[str, task_lib.TaskInstance]
 
     @property
-    def tasks(self) -> dict[str, task_lib.Task]:
+    def tasks(self) -> dict[task_lib.TaskType, task_lib.Task]:
         """Return copy of task list."""
         return self._tasks.copy()  # To disallow modifying this dictionary from outside of this class
 
@@ -41,7 +41,7 @@ class Benchmark:
         with open(path) as f:
             task_instance_config = json.load(f)
         for instance_name, instance_config in task_instance_config.items():
-            task_type = instance_config["task"]
+            task_type = task_lib.TaskType[instance_config["task"]]
             task, instance = task_lib.TaskInstance.create_task_instance(
                 instance_name, instance_config, tasks.get(task_type)
             )
@@ -99,6 +99,9 @@ class Cache:
         """Download file to cache."""
         if not url.startswith(("http:", "https:")):
             raise ValueError("URL must start with 'http:' or 'https:'")
+
+        # Suppressing ruff check S310 for the next line of code because of a known issue.
+        # See: https://github.com/astral-sh/ruff/issues/7918
         with urllib.request.urlopen(url) as response, open(path, "wb") as out_file:  # noqa: S310
             shutil.copyfileobj(response, out_file)
 
