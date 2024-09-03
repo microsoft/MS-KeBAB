@@ -58,13 +58,13 @@ class TaskInstance(ABC):
     """Represents a benchmark task instance with its data files."""
 
     __name: str
-    __parent: Task
+    __task: Task
 
-    def __init__(self, name: str, parent: Task):
+    def __init__(self, name: str, task: Task):
         """Initialize a task instance."""
         self.__name = name
-        self.__parent = parent
-        self.__parent.add_instance(self)
+        self.__task = task
+        self.__task.add_instance(self)
 
     @property
     def name(self) -> str:
@@ -72,20 +72,18 @@ class TaskInstance(ABC):
         return self.__name
 
     @property
-    def parent(self) -> Task:
-        """Return parent task."""
-        return self.__parent
+    def task(self) -> Task:
+        """Return task."""
+        return self.__task
 
     @classmethod
-    def create_task_instance(
-        cls, instance__name: str, task_type: TaskType, data_dict: dict[str, str], parent: Task
-    ) -> TaskInstance:
-        """Create appropriate task instance and optionally parent task, if not provided."""
-        match task_type:
+    def create_task_instance(cls, instance__name: str, task: Task, data_dict: dict[str, str]) -> TaskInstance:
+        """Create appropriate task instance."""
+        match task.task_type:
             case TaskType.Extraction:
-                instance = ExtractionTaskInstance(instance__name, parent, **data_dict)
+                instance = ExtractionTaskInstance(instance__name, task, **data_dict)
             case TaskType.Linking:
-                instance = LinkingTaskInstance(instance__name, parent, **data_dict)
+                instance = LinkingTaskInstance(instance__name, task, **data_dict)
         return instance
 
     @abstractmethod
@@ -112,12 +110,12 @@ class ExtractionTaskInstance(TaskInstance):
     def __init__(
         self,
         name: str,
-        parent: Task,
+        task: Task,
         extracts: str,
         ground_truth_extracted_entities: str | None = None,
     ):
         """Initialize an extraction task instance."""
-        super().__init__(name, parent)
+        super().__init__(name, task)
         self.__data_extracts = Path(extracts)
         if ground_truth_extracted_entities is not None:
             self.__data_ground_truth_extracted_entities = Path(ground_truth_extracted_entities)
@@ -153,12 +151,12 @@ class LinkingTaskInstance(TaskInstance):
     def __init__(
         self,
         name: str,
-        parent: Task,
+        task: Task,
         entity_fragment_pairs: str,
         ground_truth_boolean: str | None = None,
     ):
         """Initialize an linking task instance."""
-        super().__init__(name, parent)
+        super().__init__(name, task)
         self.__data_entity_fragment_pairs = Path(entity_fragment_pairs)
         if ground_truth_boolean is not None:
             self.__data_ground_truth_boolean = Path(ground_truth_boolean)

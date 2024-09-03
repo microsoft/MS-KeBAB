@@ -37,7 +37,7 @@ def test_task_interface():
 
     for task in tasks.values():
         for task_instance in task.instances.values():
-            assert task_instance.parent == task
+            assert task_instance.task == task
             if task_instance.name.endswith("-Heldout"):
                 metrics = task_instance.evaluate(Path("some_output_file"))
                 assert metrics[f"primary_{task.task_type.name.lower()}_metric"] == 0.8
