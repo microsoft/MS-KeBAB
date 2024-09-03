@@ -1,0 +1,49 @@
+{
+  "Extraction-ReDocRED-Train": {
+    "task": "Extraction",
+    "data": {
+      "extracts": "https://some.public/download/link",
+      "ground_truth_extracted_entities": "https://some.public/download/link"
+    }
+  },
+  "Extraction-ReDocRED-Test": {
+    "task": "Extraction",
+    "data": {
+      "extracts": "https://some.public/download/link",
+      "ground_truth_extracted_entities": "https://some.public/download/link"
+    }
+  },
+  "Extraction-Heldout": {
+    "task": "Extraction",
+    "data": {
+      "extracts": "https://some.public/download/link"
+    }
+  },
+  "Linking-TREx-Train": {
+    "task": "Linking",
+    "data": {
+      "entity_fragment_pairs": "https://some.public/download/link",
+      "ground_truth_boolean": "https://some.public/download/link"
+    }
+  },
+  "Linking-TREx-Test": {
+    "task": "Linking",
+    "data": {
+      "entity_fragment_pairs": "https://some.public/download/link",
+      "ground_truth_boolean": "https://some.public/download/link"
+    }
+  },
+  "Linking-MAVE": {
+    "task": "Linking",
+    "data": {
+      "entity_fragment_pairs": "https://some.public/download/link",
+      "ground_truth_boolean": "https://some.public/download/link"
+    }
+  },
+  "Linking-Heldout": {
+    "task": "Linking",
+    "data": {
+      "entity_fragment_pairs": "https://some.public/download/link"
+    }
+  }
+}
