@@ -28,7 +28,8 @@ class ReDocRedDatasetBuilder:
     """Extract text paragraphs and entities from Re-DocRED dataset."""
 
     EXTRACTION_DATASET_FILENAME: str = "re_docred_extraction_dataset.jsonl"
-    PUNCTUATION: typing.ClassVar[set[str]] = set(".:!,;?-_(){}'")
+    PUNCTUATION: typing.ClassVar[set[str]] = set(".:!,;?-_)}]'#%@")
+    PUNCTUATION_WO_SPACE: typing.ClassVar[set[str]] = set("-_({['/@$")
     PROPERTIES_TO_DROP: typing.ClassVar[set[str]] = {"pos", "global_pos", "index", "sent_id", "properties"}
     TYPES_TO_DROP: typing.ClassVar[set[str]] = {"number", "time", "miscellaneous"}
     TYPE_MAP: typing.ClassVar[dict[str, str]] = {
@@ -107,13 +108,19 @@ class ReDocRedDatasetBuilder:
         text = ""
         for sentence in entry["sents"]:
             for token in sentence:
+                try:
+                    decoded_token = token.encode().decode("unicode-escape")
+                except UnicodeDecodeError:
+                    decoded_token = token
                 if text == "":
-                    text += token
+                    text += decoded_token
                 else:
-                    if token in cls.PUNCTUATION or token[0] in cls.PUNCTUATION:
-                        text += token
+                    if decoded_token in cls.PUNCTUATION or decoded_token[0] in cls.PUNCTUATION:
+                        text += decoded_token
                     else:
-                        text += " " + token
+                        if text[-1] not in cls.PUNCTUATION_WO_SPACE:
+                            text += " "
+                        text += decoded_token
 
         text_id = hashlib.sha256(text.encode("utf-8")).hexdigest()
         data = {"title": entry["title"], "text": text}
@@ -204,7 +211,7 @@ class ReDocRedDatasetBuilder:
         with open(self.extraction_dataset_output_path, "w", encoding="utf-8") as f:
             for entry in extraction_dataset:
                 try:
-                    json.dump(entry, f, cls=CustomEncoder)
+                    json.dump(entry, f, cls=CustomEncoder, ensure_ascii=False)
                     f.write("\n")
                 except TypeError as e:  # noqa: PERF203
                     error_count += 1
