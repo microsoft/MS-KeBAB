@@ -18,10 +18,10 @@ import typing
 from collections.abc import Iterable
 from pathlib import Path
 
-from kebab.utils.dataset.wikidata import wikidata_utils
 from kebab.contracts.document import Document, DocumentSchema, DocumentUtilities
 from kebab.contracts.entity import Entity
-from kebab.utils.utils import CustomEncoder
+from kebab.utils.dataset.wikidata import wikidata_utils
+from kebab.utils.io import CustomEncoder
 
 
 class ReDocRedDatasetBuilder:
