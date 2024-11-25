@@ -9,7 +9,7 @@ import pathlib
 
 import click
 
-from kebab.utils import utils
+from kebab.utils import logging
 from kebab.utils.dataset.t_rex.t_rex_fragment_extractor import TRexFragmentExtractor
 
 
@@ -39,7 +39,7 @@ def main(
     output_dir: pathlib.Path,
 ) -> None:
     """Run T-REx fragment extraction steps."""
-    utils.configure_logging()
+    logging.configure_logging()
 
     extractor = TRexFragmentExtractor(
         t_rex_dir=t_rex_dir,

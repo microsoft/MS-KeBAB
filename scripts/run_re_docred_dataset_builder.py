@@ -9,7 +9,7 @@ import pathlib
 
 import click
 
-from kebab.utils import utils
+from kebab.utils import logging
 from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedDatasetBuilder
 
 
@@ -55,7 +55,7 @@ def main(
     output_dir: pathlib.Path,
 ) -> None:
     """Run Re-DocRED extraction dataset creation steps."""
-    utils.configure_logging()
+    logging.configure_logging()
 
     builder = ReDocRedDatasetBuilder(
         re_docred_dir=re_docred_dir,

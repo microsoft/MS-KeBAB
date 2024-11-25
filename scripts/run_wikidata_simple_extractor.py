@@ -9,7 +9,7 @@ import pathlib
 
 import click
 
-from kebab.utils import utils
+from kebab.utils import logging
 from kebab.utils.dataset.wikidata.wikidata_simple_extractor import WikidataSimpleExtractor
 
 
@@ -47,7 +47,7 @@ def main(
     output_dir: pathlib.Path,
 ):
     """Run Wikidata hierarchy extraction steps."""
-    utils.configure_logging()
+    logging.configure_logging()
 
     extractor = WikidataSimpleExtractor(
         wikidata_json_dump_path=wikidata_json_dump_path,

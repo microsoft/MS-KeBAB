@@ -9,7 +9,7 @@ import pathlib
 
 import click
 
-from kebab.utils import utils
+from kebab.utils import logging
 from kebab.utils.dataset.t_rex.t_rex_dataset_builder import TRexDatasetBuilder
 
 
@@ -83,7 +83,7 @@ def main(
     output_dir: pathlib.Path,
 ) -> None:
     """Run T-REx entity dataset creation steps."""
-    utils.configure_logging()
+    logging.configure_logging()
 
     builder = TRexDatasetBuilder(
         fragments_path=t_rex_fragments_path,
