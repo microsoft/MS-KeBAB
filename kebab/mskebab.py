@@ -11,22 +11,23 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from . import task_lib
-
+from kebab.contracts.task import Task, TaskInstance, TaskType
+from kebab.tasks.extraction import ExtractionTaskInstance
+from kebab.tasks.linking import LinkingTaskInstance
 
 class Benchmark:
     """The entry point class."""
 
-    __tasks: dict[task_lib.TaskType, task_lib.Task]
-    __task_instances: dict[str, task_lib.TaskInstance]
+    __tasks: dict[TaskType, Task]
+    __task_instances: dict[str, TaskInstance]
 
     @property
-    def tasks(self) -> dict[task_lib.TaskType, task_lib.Task]:
+    def tasks(self) -> dict[TaskType, Task]:
         """Return copy of task list."""
         return self.__tasks.copy()  # To disallow modifying this dictionary from outside of this class
 
     @property
-    def task_instances(self) -> dict[str, task_lib.TaskInstance]:
+    def task_instances(self) -> dict[str, TaskInstance]:
         """Return copy of task instance list."""
         return self.__task_instances.copy()  # To disallow modifying this dictionary from outside of this class
 
@@ -34,18 +35,24 @@ class Benchmark:
         """Initialize entry point."""
         self.__tasks = {}
         self.__task_instances = {}
+        Benchmark.__register_task_types()
         with open(path) as f:
             task_instance_config = json.load(f)
         for instance_name, instance_config in task_instance_config.items():
-            task_type = task_lib.TaskType[instance_config["task"]]
+            task_type = TaskType[instance_config["task"]]
             if task_type not in self.__tasks:
-                task = task_lib.Task(task_type)
+                task = Task(task_type)
                 self.__tasks[task_type] = task
             else:
                 task = self.__tasks[task_type]
-            self.__task_instances[instance_name] = task_lib.TaskInstance.create_task_instance(
+            self.__task_instances[instance_name] = TaskInstance.create_task_instance(
                 instance_name, task, instance_config["data"]
             )
+
+    @staticmethod
+    def __register_task_types():
+        TaskInstance.register_task_type(TaskType.Extraction, ExtractionTaskInstance)
+        TaskInstance.register_task_type(TaskType.Linking, LinkingTaskInstance)
 
 
 class Cache:
@@ -119,7 +126,7 @@ class Cache:
 
 def benchmark() -> Benchmark:
     """Initialize and return benchmark object."""
-    return Benchmark(Path(__file__).parents[0] / "instances.json")
+    return Benchmark(Path(__file__).parents[0] / "configs" / "instances.json")
 
 
 def cache(cache_dir_path: Path = Path(".cache")) -> Cache:

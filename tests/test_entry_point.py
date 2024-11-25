@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from kebab import mskebab
-from kebab.task_lib import TaskType
+from kebab.contracts.task import TaskType
 
 
 def test_task_interface():
