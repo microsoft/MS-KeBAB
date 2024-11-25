@@ -9,8 +9,8 @@ import pathlib
 
 import click
 
-from kebab import utils
-from kebab.dataset.wikidata.wikidata_simple_extractor import WikidataSimpleExtractor
+from kebab.utils import utils
+from kebab.utils.dataset.wikidata.wikidata_simple_extractor import WikidataSimpleExtractor
 
 
 @click.option(

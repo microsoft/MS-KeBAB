@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from kebab.entity import Entity
+from kebab.contracts.entity import Entity
 
 
 @dataclass

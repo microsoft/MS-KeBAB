@@ -24,7 +24,7 @@ import json
 import logging
 import pathlib
 
-from kebab.dataset.wikidata import wikidata_utils
+from kebab.utils.dataset.wikidata import wikidata_utils
 
 
 class WikidataSimpleExtractor:

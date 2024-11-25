@@ -7,8 +7,8 @@ import logging
 import pathlib
 from typing import Any
 
-from kebab.document import Document
-from kebab.entity import Entity
+from kebab.contracts.document import Document
+from kebab.contracts.entity import Entity
 
 
 def configure_logging(

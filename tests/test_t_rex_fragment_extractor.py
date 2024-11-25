@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from kebab.dataset.t_rex.t_rex_fragment_extractor import TRexFragmentExtractor
+from kebab.utils.dataset.t_rex.t_rex_fragment_extractor import TRexFragmentExtractor
 
 
 @pytest.fixture

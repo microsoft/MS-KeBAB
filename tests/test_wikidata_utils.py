@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from kebab.dataset.wikidata import wikidata_utils
+from kebab.utils.dataset.wikidata import wikidata_utils
 
 
 @pytest.fixture

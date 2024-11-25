@@ -47,8 +47,8 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from kebab.dataset.wikidata import wikidata_utils
-from kebab.dataset.wikidata.wikidata_utils import TypeProperties
+from kebab.utils.dataset.wikidata import wikidata_utils
+from kebab.utils.dataset.wikidata.wikidata_utils import TypeProperties
 
 
 class WikidataHierarchyExtractor:

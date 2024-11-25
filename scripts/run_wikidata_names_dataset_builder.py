@@ -10,8 +10,8 @@ import pathlib
 
 import click
 
-from kebab import utils
-from kebab.dataset.wikidata.wikidata_names_dataset_builder import WikidataNamesDatasetBuilder
+from kebab.utils import utils
+from kebab.utils.dataset.wikidata.wikidata_names_dataset_builder import WikidataNamesDatasetBuilder
 
 
 @click.option(

@@ -22,7 +22,7 @@ import typing
 from collections.abc import Iterable
 from pathlib import Path
 
-from kebab.dataset.t_rex.entity_fragment import EntityFragment
+from kebab.utils.dataset.t_rex.entity_fragment import EntityFragment
 
 
 class TRexFragmentExtractor:

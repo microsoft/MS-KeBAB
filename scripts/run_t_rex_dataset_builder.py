@@ -9,8 +9,8 @@ import pathlib
 
 import click
 
-from kebab import utils
-from kebab.dataset.t_rex.t_rex_dataset_builder import TRexDatasetBuilder
+from kebab.utils import utils
+from kebab.utils.dataset.t_rex.t_rex_dataset_builder import TRexDatasetBuilder
 
 
 @click.option(

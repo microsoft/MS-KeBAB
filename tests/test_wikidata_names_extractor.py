@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from kebab.dataset.wikidata.wikidata_names_dataset_builder import WikidataNamesDatasetBuilder
+from kebab.utils.dataset.wikidata.wikidata_names_dataset_builder import WikidataNamesDatasetBuilder
 
 
 @pytest.fixture

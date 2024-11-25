@@ -9,8 +9,8 @@ import pathlib
 
 import click
 
-from kebab import utils
-from kebab.dataset.wikidata.wikidata_hierarchy_extractor import WikidataHierarchyExtractor
+from kebab.utils import utils
+from kebab.utils.dataset.wikidata.wikidata_hierarchy_extractor import WikidataHierarchyExtractor
 
 
 @click.option(

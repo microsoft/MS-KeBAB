@@ -18,10 +18,10 @@ import typing
 from collections.abc import Iterable
 from pathlib import Path
 
-from kebab.dataset.wikidata import wikidata_utils
-from kebab.document import Document, DocumentSchema, DocumentUtilities
-from kebab.entity import Entity
-from kebab.utils import CustomEncoder
+from kebab.utils.dataset.wikidata import wikidata_utils
+from kebab.contracts.document import Document, DocumentSchema, DocumentUtilities
+from kebab.contracts.entity import Entity
+from kebab.utils.utils import CustomEncoder
 
 
 class ReDocRedDatasetBuilder:
@@ -60,7 +60,7 @@ class ReDocRedDatasetBuilder:
     MIN_PROPERTY_COUNT: typing.ClassVar[int] = 3
 
     SCHEMAS: typing.ClassVar[dict[str, DocumentSchema]] = DocumentUtilities.load_schemas(
-        pathlib.Path(__file__).parent.parent.parent / "schemas"
+        pathlib.Path(__file__).parents[3] / "resources" / "schemas"
     )
 
     def __init__(

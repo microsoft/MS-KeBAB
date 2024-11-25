@@ -35,12 +35,12 @@ dev = [
 all = ["kebab[dev]"]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["kebab"]
 exclude = ["*_test.py", "tests/*", "experiments/*", "configs/*"]
 
 [tool.pytest.ini_options]
 pythonpath = [
-    "src"
+    "kebab"
 ]
 
 [tool.setuptools.package-data]

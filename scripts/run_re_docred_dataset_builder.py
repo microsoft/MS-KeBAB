@@ -9,8 +9,8 @@ import pathlib
 
 import click
 
-from kebab import utils
-from kebab.dataset.re_docred.re_docred_dataset_builder import ReDocRedDatasetBuilder
+from kebab.utils import utils
+from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedDatasetBuilder
 
 
 @click.option(

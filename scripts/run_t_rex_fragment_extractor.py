@@ -9,8 +9,8 @@ import pathlib
 
 import click
 
-from kebab import utils
-from kebab.dataset.t_rex.t_rex_fragment_extractor import TRexFragmentExtractor
+from kebab.utils import utils
+from kebab.utils.dataset.t_rex.t_rex_fragment_extractor import TRexFragmentExtractor
 
 
 @click.option(

@@ -30,8 +30,8 @@ import typing
 from collections import defaultdict
 from collections.abc import Iterable
 
-from kebab.dataset.t_rex.entity_fragment import EntityFragment
-from kebab.dataset.wikidata import wikidata_utils
+from kebab.utils.dataset.t_rex.entity_fragment import EntityFragment
+from kebab.utils.dataset.wikidata import wikidata_utils
 
 
 class TRexDatasetBuilder:

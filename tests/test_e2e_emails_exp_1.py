@@ -7,8 +7,8 @@
 
 import pathlib
 
-from kebab.document import Document, DocumentSchema, DocumentUtilities
-from kebab.entity import Entity, EntityUtilities, PropertySchema
+from kebab.contracts.document import Document, DocumentSchema, DocumentUtilities
+from kebab.contracts.entity import Entity, EntityUtilities, PropertySchema
 
 
 def test_load_document_collection(emails_exp_1_path: pathlib.Path):
