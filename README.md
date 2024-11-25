@@ -8,6 +8,16 @@ The recommended way to install the code is to clone the repository and install t
 pip install -e .[all]
 ```
 
+# Structure
+
+The repository is organized to ensure clarity and ease of navigation. Below is a brief overview of the main directories and their purposes:
+
+* build/: Contains configuration files for automated builds.
+* docs/: Documentation resources, including experiment results.
+* kebab/: Contains the core implementation of the project, including all modules, utilities, and primary logic.
+* scripts/: Includes scripts for specific tasks such as data downloading, processing, or running experiments.
+* tests/: Contains tests to ensure the robustness and reliability of the codebase.
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a

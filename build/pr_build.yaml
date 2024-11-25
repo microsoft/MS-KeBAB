@@ -23,5 +23,5 @@ steps:
   displayName: Use python 3.12.x
 
 - bash: |
-    ./build_and_test.sh
+    ./scripts/validation/build_and_test.sh
   displayName: Run tests and checks
