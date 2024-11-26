@@ -50,7 +50,8 @@ class Benchmark:
             )
 
     @staticmethod
-    def __register_task_types():
+    def __register_task_types() -> None:
+        """Register available task types with their corresponding classes."""
         TaskInstance.register_task_type(TaskType.Extraction, ExtractionTaskInstance)
         TaskInstance.register_task_type(TaskType.Linking, LinkingTaskInstance)
 
