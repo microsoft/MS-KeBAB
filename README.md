@@ -14,7 +14,12 @@ The repository is organized to ensure clarity and ease of navigation. Below is a
 
 * build/: Contains configuration files for automated builds.
 * docs/: Documentation resources, including experiment results.
-* kebab/: Contains the core implementation of the project, including all modules, utilities, and primary logic.
+* kebab/: Contains the core implementation of the project, including all modules, utilities, and primary logic. 
+    * configs/: Configuration files for the benchmark.
+    * contracts/: Core interfaces and abstractions that define the project's key contracts and APIs for document, entity, task, etc.
+    * tasks/: Task-specific implementations for various task types, such as extraction, linking, and more.
+    * utils/: Utility functions for common operations across the project, including I/O handling, logging, and data processing.
+    * mskebab.py: Contains the entry point class `Benchmark`.
 * scripts/: Includes scripts for specific tasks such as data downloading, processing, or running experiments.
 * tests/: Contains tests to ensure the robustness and reliability of the codebase.
 
