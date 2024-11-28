@@ -15,6 +15,7 @@ from kebab.contracts.task import Task, TaskInstance, TaskType
 from kebab.tasks.extraction import ExtractionTaskInstance
 from kebab.tasks.linking import LinkingTaskInstance
 
+
 class Benchmark:
     """The entry point class."""
 

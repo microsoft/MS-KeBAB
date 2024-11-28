@@ -9,7 +9,6 @@ from __future__ import annotations
 import pathlib
 
 import click
-
 from kebab.utils import logging
 from kebab.utils.dataset.wikidata.wikidata_names_dataset_builder import WikidataNamesDatasetBuilder
 

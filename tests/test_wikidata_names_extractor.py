@@ -6,7 +6,6 @@
 from pathlib import Path
 
 import pytest
-
 from kebab.utils.dataset.wikidata.wikidata_names_dataset_builder import WikidataNamesDatasetBuilder
 
 

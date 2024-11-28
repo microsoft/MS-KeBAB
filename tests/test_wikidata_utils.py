@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
 from kebab.utils.dataset.wikidata import wikidata_utils
 
 

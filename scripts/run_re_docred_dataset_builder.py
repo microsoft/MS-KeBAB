@@ -8,7 +8,6 @@ from __future__ import annotations
 import pathlib
 
 import click
-
 from kebab.utils import logging
 from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedDatasetBuilder
 

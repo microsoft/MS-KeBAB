@@ -8,7 +8,6 @@ from __future__ import annotations
 import pathlib
 
 import click
-
 from kebab.utils import logging
 from kebab.utils.dataset.wikidata.wikidata_hierarchy_extractor import WikidataHierarchyExtractor
 

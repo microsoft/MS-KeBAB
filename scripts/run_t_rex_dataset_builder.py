@@ -8,7 +8,6 @@ from __future__ import annotations
 import pathlib
 
 import click
-
 from kebab.utils import logging
 from kebab.utils.dataset.t_rex.t_rex_dataset_builder import TRexDatasetBuilder
 
