@@ -59,7 +59,7 @@ class TaskInstance(ABC):
 
     __name: str
     __task: Task
-    __task_type_registry = {}
+    __task_type_registry: ClassVar[dict[TaskType, type[TaskInstance]]] = {}
 
     def __init__(self, name: str, task: Task):
         """Initialize a task instance."""
@@ -78,7 +78,7 @@ class TaskInstance(ABC):
         return self.__task
 
     @classmethod
-    def register_task_type(cls, task_type, task_instance_class):
+    def register_task_type(cls, task_type: TaskType, task_instance_class: type[TaskInstance]):
         """Register a task type with its corresponding class."""
         cls.__task_type_registry[task_type] = task_instance_class
 
