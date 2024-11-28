@@ -9,7 +9,7 @@ from __future__ import annotations
 import pathlib
 
 import click
-from kebab.utils import logging
+from kebab.utils import logging_helpers
 from kebab.utils.dataset.wikidata.wikidata_names_dataset_builder import WikidataNamesDatasetBuilder
 
 
@@ -59,7 +59,7 @@ def main(
     target_type_id: str,
 ):
     """Run Wikidata name extraction steps."""
-    logging.configure_logging()
+    logging_helpers.configure_logging()
 
     extractor = WikidataNamesDatasetBuilder(
         wikidata_simple_entities_path=wikidata_simple_entities_path,

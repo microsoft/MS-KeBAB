@@ -8,7 +8,7 @@ from __future__ import annotations
 import pathlib
 
 import click
-from kebab.utils import logging
+from kebab.utils import logging_helpers
 from kebab.utils.dataset.wikidata.wikidata_simple_extractor import WikidataSimpleExtractor
 
 
@@ -46,7 +46,7 @@ def main(
     output_dir: pathlib.Path,
 ):
     """Run Wikidata hierarchy extraction steps."""
-    logging.configure_logging()
+    logging_helpers.configure_logging()
 
     extractor = WikidataSimpleExtractor(
         wikidata_json_dump_path=wikidata_json_dump_path,

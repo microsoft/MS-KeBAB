@@ -8,7 +8,7 @@ from __future__ import annotations
 import pathlib
 
 import click
-from kebab.utils import logging
+from kebab.utils import logging_helpers
 from kebab.utils.dataset.t_rex.t_rex_fragment_extractor import TRexFragmentExtractor
 
 
@@ -38,7 +38,7 @@ def main(
     output_dir: pathlib.Path,
 ) -> None:
     """Run T-REx fragment extraction steps."""
-    logging.configure_logging()
+    logging_helpers.configure_logging()
 
     extractor = TRexFragmentExtractor(
         t_rex_dir=t_rex_dir,
