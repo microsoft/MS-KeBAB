@@ -11,13 +11,13 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $ruffConfigPath = Join-Path $scriptDir "ruff.toml"
 
 # Style check
-ruff --config $ruffConfigPath format --check
+ruff format --check --config $ruffConfigPath
 
 # Organise imports
-ruff --config $ruffConfigPath check --select I
+ruff check --select I --config $ruffConfigPath
 
 # Lint
-ruff --config $ruffConfigPath check
+ruff check --config $ruffConfigPath
 
 # Type check
 pyright

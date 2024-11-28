@@ -11,13 +11,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUFF_CONFIG="$SCRIPT_DIR/ruff.toml"
 
 # Style check
-ruff --config "$RUFF_CONFIG" format --check
+ruff format --check --config "$RUFF_CONFIG" 
 
 # Organise imports
-ruff --config "$RUFF_CONFIG" check --select I
+ruff check --select I --config "$RUFF_CONFIG" 
 
 # Lint
-ruff --config "$RUFF_CONFIG" check
+ruff check --config "$RUFF_CONFIG"
 
 # Type check
 pyright
