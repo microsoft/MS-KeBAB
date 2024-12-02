@@ -3,7 +3,7 @@
 
 """Tests for the wikidata_hierarchy_WikidataHierarchyExtractor module."""
 
-from kebab.dataset.wikidata.wikidata_hierarchy_extractor import WikidataHierarchyExtractor
+from kebab.utils.dataset.wikidata.wikidata_hierarchy_extractor import WikidataHierarchyExtractor
 
 
 def test_sort_topologically():

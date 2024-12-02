@@ -4,8 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-
-from kebab.dataset.re_docred.re_docred_dataset_builder import ReDocRedDatasetBuilder
+from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedDatasetBuilder
 
 
 properties_map: dict[str, dict[str, str]] = {
