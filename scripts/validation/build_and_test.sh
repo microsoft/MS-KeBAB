@@ -16,6 +16,7 @@ source .venv/bin/activate
 pip install --upgrade pip setuptools wheel
 pip install -e .[dev]
 
+chmod +x $SCRIPT_DIR/test.sh
 $SCRIPT_DIR/test.sh
 
 deactivate
