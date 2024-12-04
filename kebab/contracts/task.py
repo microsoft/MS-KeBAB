@@ -91,5 +91,13 @@ class TaskInstance(ABC):
         return task_class(instance_name, task, **data_dict)
 
     @abstractmethod
-    def evaluate(self, output_to_evaluate: Path) -> dict[str, float]:
-        """Evaluate an output for the task instance."""
+    def evaluate(self, output_to_evaluate: Path | None) -> dict[str, float]:
+        """
+        Evaluate an output for the task instance.
+
+        Args:
+        output_to_evaluate: Optional path to save the evaluation result.
+
+        Returns:
+        dict[str, float]: A dictionary containing the evaluation metrics.
+        """
