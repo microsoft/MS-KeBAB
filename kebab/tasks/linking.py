@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from kebab.contracts.task import Task, TaskInstance
+from kebab.utils.io_helpers import save_to_json
 
 
 class LinkingTaskInstance(TaskInstance):
@@ -39,11 +40,16 @@ class LinkingTaskInstance(TaskInstance):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,  # noqa: ARG002
+        output_to_evaluate: Path | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the linking task instance."""
         if hasattr(self, "__data_ground_truth_boolean"):
             raise ValueError("Can not evaluate on heldout Linking task instance")
 
         # TODO(bmitra): Implement actual metric computation
-        return {"primary_linking_metric": 0.8, "secondary_linking_metric": 0.6}
+        eval_result = {"primary_linking_metric": 0.8, "secondary_linking_metric": 0.6}
+
+        if output_to_evaluate:
+            save_to_json(eval_result, output_to_evaluate)
+
+        return eval_result
