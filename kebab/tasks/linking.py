@@ -40,7 +40,8 @@ class LinkingTaskInstance(TaskInstance):
 
     def evaluate(
         self,
-        output_to_evaluate: Path | None = None,
+        output_to_evaluate: Path,  # noqa: ARG002
+        eval_result_path: Path | None = None
     ) -> dict[str, float]:
         """Evaluate an output for the linking task instance."""
         if hasattr(self, "__data_ground_truth_boolean"):
@@ -49,7 +50,7 @@ class LinkingTaskInstance(TaskInstance):
         # TODO(bmitra): Implement actual metric computation
         eval_result = {"primary_linking_metric": 0.8, "secondary_linking_metric": 0.6}
 
-        if output_to_evaluate:
-            save_to_json(eval_result, output_to_evaluate)
+        if eval_result_path:
+            save_to_json(eval_result, eval_result_path)
 
         return eval_result
