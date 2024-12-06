@@ -31,7 +31,7 @@ class ReDocRedDatasetBuilder:
     PUNCTUATION: typing.ClassVar[set[str]] = set(".:!,;?-_)}]'#%@")
     PUNCTUATION_WO_SPACE: typing.ClassVar[set[str]] = set("-_({['/@$")
     PROPERTIES_TO_DROP: typing.ClassVar[set[str]] = {"pos", "global_pos", "index", "sent_id", "properties"}
-    TYPES_TO_DROP: typing.ClassVar[set[str]] = {"number", "time", "miscellaneous"}
+    TYPES_TO_DROP: typing.ClassVar[set[str]] = {"number"}
     TYPE_MAP: typing.ClassVar[dict[str, str]] = {
         "PER": "person",
         "PERMISC": "person and miscellaneous",
@@ -58,7 +58,7 @@ class ReDocRedDatasetBuilder:
         "MISCLOC": "miscellaneous and location",
     }
 
-    MIN_PROPERTY_COUNT: typing.ClassVar[int] = 3
+    MIN_PROPERTY_COUNT: typing.ClassVar[int] = 2
 
     SCHEMAS: typing.ClassVar[dict[str, DocumentSchema]] = DocumentUtilities.load_schemas(
         pathlib.Path(__file__).parents[3] / "configs" / "schemas"
@@ -128,7 +128,7 @@ class ReDocRedDatasetBuilder:
         return Document(text_id, schema, data)
 
     @classmethod
-    def merge_entities(cls, entities: list[dict]) -> dict[str, list[str]]:
+    def merge_entities(cls, entities: list[dict]) -> dict[str, set[str]]:
         """Merge the entity names and types into a single entity."""
         merged_entity = {}
         for entity in entities:
@@ -140,46 +140,49 @@ class ReDocRedDatasetBuilder:
                     merged_entity[k].add(str(v))
 
         for k, v in merged_entity.items():
-            merged_entity[k] = list(v)
-
             if k == "type":
-                merged_entity[k] = [cls.TYPE_MAP.get(t, t) for t in merged_entity[k]]
+                merged_entity[k] = {cls.TYPE_MAP.get(t, t) for t in merged_entity[k]}
 
         return merged_entity
 
     @classmethod
-    def extract_entities(cls, entry: dict) -> list[dict[str, list[str]]]:
+    def extract_entities(cls, entry: dict) -> list[dict[str, set[str]]]:
         """Extract the names of the entities from an entry."""
         return [cls.merge_entities(value) for value in entry["vertexSet"]]
 
     @classmethod
     def extract_properties(
-        cls, entry: dict, entities: list[dict[str, list[str]]], wikidata_properties: dict
-    ) -> list[dict[str, list[str]]]:
+        cls, entry: dict, entities: list[dict[str, set[str]]], wikidata_properties: dict
+    ) -> list[dict[str, set[str]]]:
         """Augment the entities with corresponding properties."""
         for prop in entry["labels"]:
             rel_entity_index, entity_index, property_id = prop["t"], prop["h"], prop["r"]
             property_label = wikidata_properties[property_id]["label"]
-            entities[entity_index][property_label] = entities[rel_entity_index]["name"]
-
+            if property_label not in entities[entity_index]:
+                entities[entity_index][property_label] = set()
+            entities[entity_index][property_label].update(entities[rel_entity_index]["name"])
         return entities
 
     @classmethod
     def filter_small_entities(cls, entities: list[Entity]) -> list[Entity]:
         """Filter out entities that contain only name and type properties."""
-        return [
-            entity
-            for entity in entities
-            if len(entity.properties) > cls.MIN_PROPERTY_COUNT
-            or any(entity_type not in cls.TYPES_TO_DROP for entity_type in entity.properties["type"])
-        ]
+        filtered_entities = []
+        for entity in entities:
+            if len(entity.properties) < cls.MIN_PROPERTY_COUNT:
+                print(f"filtering {entity.to_json()}: num_properties < {cls.MIN_PROPERTY_COUNT}")
+                continue
+            if any((entity_type in cls.TYPES_TO_DROP) for entity_type in entity.properties["type"]):
+                print(f"filtering {entity.to_json()}: has type in types_to_drop.")
+                continue
+            filtered_entities.append(entity)
+        return filtered_entities
 
     @classmethod
     def extract_example(cls, entry: dict, wikidata_properties: dict) -> dict:
         """Extract an example from the Re-DocRED dataset."""
         entities = cls.extract_entities(entry)
         entities = cls.extract_properties(entry, entities, wikidata_properties)
-        entities = [Entity(str(i), entity) for i, entity in enumerate(entities)]
+        entities = [Entity(str(i), {k: list(v) for k, v in entity.items()}) for i, entity in enumerate(entities)]
         entities = cls.filter_small_entities(entities)
         document = cls.get_document(entry)
         return {"document": document, "entities": entities}
