@@ -8,7 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar, Self
+from typing import Any, ClassVar, Iterable, Self
 
 
 class TaskType(Enum):
@@ -89,6 +89,10 @@ class TaskInstance(ABC):
         if task_class is None:
             raise ValueError(f"No registered class for task type: {task.task_type}.")
         return task_class(instance_name, task, **data_dict)
+
+    @abstractmethod
+    def read_items(self) -> Iterable[Any]:
+        pass
 
     @abstractmethod
     def evaluate(self, output_to_evaluate: Path, eval_result_path: Path | None = None) -> dict[str, float]:
