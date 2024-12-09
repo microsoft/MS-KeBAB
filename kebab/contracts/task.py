@@ -95,6 +95,10 @@ class TaskInstance(ABC):
         pass
 
     @abstractmethod
+    def write_items(self, path: Path, items: Iterable[Any]) -> None:
+        pass
+
+    @abstractmethod
     def evaluate(self, output_to_evaluate: Path, eval_result_path: Path | None = None) -> dict[str, float]:
         """
         Evaluate an output for the task instance.

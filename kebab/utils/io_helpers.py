@@ -29,11 +29,11 @@ def save_to_json(data: Any, file_path: Path) -> None:
         data: The serializable data to save.
         file_path: The path where the data should be saved.
     """
-    with open(file_path, 'w', encoding='utf-8') as file:
+    with open(file_path, "w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 
-DataItemType = TypeVar('DataItemType')
+DataItemType = TypeVar("DataItemType")
 
 
 class ItemReader(ABC, Generic[DataItemType]):
@@ -46,7 +46,7 @@ class ItemReader(ABC, Generic[DataItemType]):
 
 class DocumentJsonlReader(ItemReader[Document]):
     def __init__(self, path: Path):
-        self.schemas = DocumentUtilities.load_schemas(Path(__file__).parent / 'configs' / 'schemas')
+        self.schemas = DocumentUtilities.load_schemas(Path(__file__).parent / "configs" / "schemas")
         self.path = path
 
     def read_items(self) -> Iterable[Document]:
@@ -58,7 +58,7 @@ class EntityListJsonlReader(ItemReader[List[Entity]]):
         self.path = path
 
     def read_items(self) -> Iterable[List[Entity]]:
-        with open(self.path, encoding='utf-8') as file:
+        with open(self.path, encoding="utf-8") as file:
             for line in file:
                 yield [Entity.from_json(entity_json) for entity_json in json.loads(line)]
 
@@ -70,7 +70,7 @@ class EntityPairJsonlReader(ItemReader[Tuple[Entity, Entity]]):
     def read_items(self) -> Iterable[Tuple[Entity, Entity]]:
         for entities in EntityListJsonlReader(self.path).read_items():
             if len(entities) != 2:
-                raise ValueError(f'Expected exactly two entities in line: {entities}')
+                raise ValueError(f"Expected exactly two entities in line: {entities}")
             yield (entities[0], entities[1])
 
 
@@ -79,12 +79,41 @@ class BooleanReader(ItemReader[bool]):
         self.path = path
 
     def read_items(self) -> Iterable[bool]:
-        with open(self.path, encoding='utf-8') as file:
+        with open(self.path, encoding="utf-8") as file:
             for line in file:
                 line = line.strip()
-                if line == '0':
+                if line == "0":
                     yield False
-                elif line == '1':
+                elif line == "1":
                     yield True
                 else:
-                    raise ValueError(f'Invalid line content for BooleanReader: {line}')
+                    raise ValueError(f"Invalid line content for BooleanReader: {line}")
+
+
+class ItemWriter(ABC, Generic[DataItemType]):
+    """Abstract base class for data item writers."""
+
+    @abstractmethod
+    def write_items(self, items: Iterable[DataItemType]) -> None:
+        pass
+
+
+class EntityListJsonlWriter(ItemWriter[List[Entity]]):
+    def __init__(self, path: Path):
+        self.path = path
+
+    def write_items(self, items: Iterable[List[Entity]]) -> None:
+        with open(self.path, "w", encoding="utf-8") as file:
+            for entity_list in items:
+                json_line = json.dumps(entity_list, ensure_ascii=False)
+                file.write(json_line + "\n")
+
+
+class BooleanWriter(ItemWriter[bool]):
+    def __init__(self, path: Path):
+        self.path = path
+
+    def write_items(self, items: Iterable[bool]) -> None:
+        with open(self.path, "w", encoding="utf-8") as file:
+            for item in items:
+                file.write("1\n" if item else "0\n")
