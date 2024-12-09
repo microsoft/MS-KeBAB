@@ -3,18 +3,22 @@
 
 from __future__ import annotations
 
+from itertools import zip_longest
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Callable, Iterable, Tuple
 
+from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskInstance
-from kebab.utils.io_helpers import save_to_json
+from kebab.utils.io_helpers import BooleanReader, BooleanWriter, EntityPairJsonlReader, save_to_json
 
 
 class LinkingTaskInstance(TaskInstance):
     """Represents an linking benchmark task instance with its data files."""
 
     __data_entity_fragment_pairs: Path
-    __data_ground_truth_boolean: Path
+    __data_ground_truth_boolean: Path | None
+    __read_items_fun: Callable[[], Iterable[Tuple[Tuple[Entity, Entity], bool | None]]]
+    __write_items_fun: Callable[[Path, Iterable[bool]], None]
 
     @property
     def data_entity_fragment_pairs(self) -> Path:
@@ -22,7 +26,7 @@ class LinkingTaskInstance(TaskInstance):
         return self.__data_entity_fragment_pairs
 
     @property
-    def data_ground_truth_boolean(self) -> Path:
+    def data_ground_truth_boolean(self) -> Path | None:
         """Return path to ground truth boolean."""
         return self.__data_ground_truth_boolean
 
@@ -32,16 +36,35 @@ class LinkingTaskInstance(TaskInstance):
         task: Task,
         entity_fragment_pairs: str,
         ground_truth_boolean: str | None = None,
+        read_items_fun: Callable[[], Iterable[Tuple[Tuple[Entity, Entity], bool | None]]] | None = None,
+        write_items_fun: Callable[[Path, Iterable[bool]], None] | None = None,
     ):
         """Initialize an linking task instance."""
         super().__init__(name, task)
         self.__data_entity_fragment_pairs = Path(entity_fragment_pairs)
         if ground_truth_boolean is not None:
             self.__data_ground_truth_boolean = Path(ground_truth_boolean)
+        self.__read_items_fun = (
+            read_items_fun if read_items_fun is not None else self._default_read_items
+        )
+        self.__write_items_fun = (
+            write_items_fun if write_items_fun is not None else LinkingTaskInstance.__default_write_items
+        )
 
-    def read_items(self) -> Iterable[Any]:
-        # TODO (allenwang)
-        yield None
+    def _default_read_items(self) -> Iterable[Tuple[Tuple[Entity, Entity], bool | None]]:
+        entity_pairs = EntityPairJsonlReader(self.data_entity_fragment_pairs).read_items()
+        booleans = (
+            BooleanReader(self.data_ground_truth_boolean).read_items()
+            if self.data_ground_truth_boolean is not None
+            else iter([])
+        )
+        return zip_longest(entity_pairs, booleans)
+
+    def read_items(self) -> Iterable[Tuple[Tuple[Entity, Entity], bool | None]]:
+        return self.__read_items_fun()
+
+    def write_items(self, path: Path, items: Iterable[bool]) -> None:
+        self.__write_items_fun(path, items)
 
     def evaluate(
         self,
@@ -59,3 +82,7 @@ class LinkingTaskInstance(TaskInstance):
             save_to_json(eval_result, eval_result_path)
 
         return eval_result
+
+    @staticmethod
+    def __default_write_items(path: Path, items: Iterable[bool]) -> None:
+        BooleanWriter(path).write_items(items)
