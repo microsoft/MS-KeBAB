@@ -92,11 +92,24 @@ class TaskInstance(ABC):
 
     @abstractmethod
     def read_items(self) -> Iterable[Any]:
-        pass
+        """
+        Read data items from a data source.
+
+        Returns:
+        Iterable[Any]: An iterable of items read from the data source. The specific type of items
+        depends on the implementation in derived classes.
+        """
 
     @abstractmethod
     def write_items(self, path: Path, items: Iterable[Any]) -> None:
-        pass
+        """
+        Write output items to a specified file.
+
+        Args:
+        path: The file path where the items should be written.
+        items: An iterable of items to write to the file. The specific type of items depends on the
+        implementation in derived classes.
+        """
 
     @abstractmethod
     def evaluate(self, output_to_evaluate: Path, eval_result_path: Path | None = None) -> dict[str, float]:
