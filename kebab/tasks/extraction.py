@@ -46,13 +46,13 @@ class ExtractionTaskInstance(TaskInstance):
         if ground_truth_extracted_entities is not None:
             self.__data_ground_truth_extracted_entities = Path(ground_truth_extracted_entities)
         self.__read_items_fun = (
-            read_items_fun if read_items_fun is not None else self._default_read_items
+            read_items_fun if read_items_fun is not None else self.__default_read_items
         )
         self.__write_items_fun = (
             write_items_fun if write_items_fun is not None else ExtractionTaskInstance.__default_write_items
         )
 
-    def _default_read_items(self) -> Iterable[Tuple[Document, List[Entity] | None]]:
+    def __default_read_items(self) -> Iterable[Tuple[Document, List[Entity] | None]]:
         extracts = DocumentJsonlReader(self.data_extracts).read_items()
         entity_lists = (
             EntityListJsonlReader(self.data_ground_truth_extracted_entities).read_items()
@@ -62,9 +62,23 @@ class ExtractionTaskInstance(TaskInstance):
         return zip_longest(extracts, entity_lists)
 
     def read_items(self) -> Iterable[Tuple[Document, List[Entity] | None]]:
+        """
+        Read data items, with optional ground-truth extracted entities.
+
+        Returns:
+        Iterable[Tuple[Document, List[Entity] | None]]: An iterable of tuples, each containing a
+        `Document` and an optional list of `Entity` objects.
+        """
         return self.__read_items_fun()
 
     def write_items(self, path: Path, items: Iterable[List[Entity]]) -> None:
+        """
+        Write output items, extracted entities, to the specified path.
+
+        Args:
+        path: The file path where the items should be written.
+        items: An iterable of lists of extracted `Entity` objects to be written to the file.
+        """
         self.__write_items_fun(path, items)
 
     def evaluate(

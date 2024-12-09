@@ -33,18 +33,36 @@ def save_to_json(data: Any, file_path: Path) -> None:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 
+# TODO (allenwang): make sure this is imported before the classes that follow
 DataItemType = TypeVar("DataItemType")
 
 
 class ItemReader(ABC, Generic[DataItemType]):
-    """Abstract base class for data item readers."""
+    """
+    Abstract base class for data item readers.
+
+    Type Parameters:
+    DataItemType: The type of the data items to be read.
+    """
 
     @abstractmethod
     def read_items(self) -> Iterable[DataItemType]:
-        pass
+        """
+        Abstract method to read items.
+
+        Returns:
+        Iterable[DataItemType]: An iterable of data items of the specified type.
+        """
 
 
 class DocumentJsonlReader(ItemReader[Document]):
+    """
+    Reader for JSONL files containing `Document` objects.
+
+    This class reads a JSONL file, where each line represents a serialized `Document`.
+    It uses schemas to parse and validate the fields of the documents.
+    """
+
     def __init__(self, path: Path):
         self.schemas = DocumentUtilities.load_schemas(Path(__file__).parent / "configs" / "schemas")
         self.path = path
@@ -54,6 +72,12 @@ class DocumentJsonlReader(ItemReader[Document]):
 
 
 class EntityListJsonlReader(ItemReader[List[Entity]]):
+    """
+    Reader for JSONL files containing lists of `Entity` objects.
+
+    This class reads a JSONL file, where each line contains a serialized list of `Entity` objects.
+    """
+
     def __init__(self, path: Path):
         self.path = path
 
@@ -64,6 +88,12 @@ class EntityListJsonlReader(ItemReader[List[Entity]]):
 
 
 class EntityPairJsonlReader(ItemReader[Tuple[Entity, Entity]]):
+    """
+    Reader for JSONL files containing pairs of `Entity` objects.
+
+    This class reads a JSONL file, where each line contains exactly two serialized `Entity` objects.
+    """
+
     def __init__(self, path: Path):
         self.path = path
 
@@ -74,7 +104,14 @@ class EntityPairJsonlReader(ItemReader[Tuple[Entity, Entity]]):
             yield (entities[0], entities[1])
 
 
-class BooleanReader(ItemReader[bool]):
+class BooleanFileReader(ItemReader[bool]):
+    """
+    Reader for files containing boolean values.
+
+    This class reads a file where each line contains either "0" or "1", representing
+    `False` and `True` respectively.
+    """
+
     def __init__(self, path: Path):
         self.path = path
 
@@ -91,14 +128,30 @@ class BooleanReader(ItemReader[bool]):
 
 
 class ItemWriter(ABC, Generic[DataItemType]):
-    """Abstract base class for data item writers."""
+    """
+    Abstract base class for output item writers.
+
+    Type Parameters:
+    DataItemType: The type of the output items to be written.
+    """
 
     @abstractmethod
     def write_items(self, items: Iterable[DataItemType]) -> None:
-        pass
+        """
+        Abstract method to write items.
+
+        Args:
+        items (Iterable[DataItemType]): An iterable of output items to be written.
+        """
 
 
 class EntityListJsonlWriter(ItemWriter[List[Entity]]):
+    """
+    Writer for JSONL files containing lists of `Entity` objects.
+
+    This class writes a JSONL file, where each line contains a serialized list of `Entity` objects.
+    """
+
     def __init__(self, path: Path):
         self.path = path
 
@@ -109,7 +162,14 @@ class EntityListJsonlWriter(ItemWriter[List[Entity]]):
                 file.write(json_line + "\n")
 
 
-class BooleanWriter(ItemWriter[bool]):
+class BooleanFileWriter(ItemWriter[bool]):
+    """
+    Writer for files containing boolean values.
+
+    This class writes a file where each line contains "0" or "1", representing
+    `False` and `True` respectively.
+    """
+
     def __init__(self, path: Path):
         self.path = path
 
