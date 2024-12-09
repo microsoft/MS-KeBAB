@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Iterable
 
 from kebab.contracts.task import Task, TaskInstance
 from kebab.utils.io_helpers import save_to_json
@@ -37,6 +38,10 @@ class LinkingTaskInstance(TaskInstance):
         self.__data_entity_fragment_pairs = Path(entity_fragment_pairs)
         if ground_truth_boolean is not None:
             self.__data_ground_truth_boolean = Path(ground_truth_boolean)
+
+    def read_items(self) -> Iterable[Any]:
+        # TODO (allenwang)
+        yield None
 
     def evaluate(
         self,
