@@ -1,10 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from __future__ import annotations
+
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Generic, Iterable, List, Tuple, TypeVar
+from typing import Any, Generic, Iterable, TypeVar
 
 from kebab.contracts.document import Document, DocumentUtilities
 from kebab.contracts.entity import Entity
@@ -21,12 +23,12 @@ class CustomEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def save_to_json(data: Any, file_path: Path) -> None:
+def save_dict_to_json(data: dict, file_path: Path) -> None:
     """
-    Save data to a JSON file.
+    Saves data to a JSON file.
 
     Args:
-        data: The serializable data to save.
+        data: The serializable dict data to save.
         file_path: The path where the data should be saved.
     """
     with open(file_path, "w", encoding="utf-8") as file:
@@ -64,14 +66,26 @@ class DocumentJsonlReader(ItemReader[Document]):
     """
 
     def __init__(self, path: Path):
+        """
+        Initializes the JSONL reader for documents.
+
+        Args:
+            path: The file path to the JSONL file.
+        """
         self.schemas = DocumentUtilities.load_schemas(Path(__file__).parent / "configs" / "schemas")
         self.path = path
 
     def read_items(self) -> Iterable[Document]:
+        """
+        Reads the JSONL file and yields `Document` objects.
+
+        Returns:
+            Iterable[Document]: An iterable of `Document` objects.
+        """
         return DocumentUtilities.load_documents(self.path, self.schemas)
 
 
-class EntityListJsonlReader(ItemReader[List[Entity]]):
+class EntityListJsonlReader(ItemReader[list[Entity]]):
     """
     Reader for JSONL files containing lists of `Entity` objects.
 
@@ -79,15 +93,27 @@ class EntityListJsonlReader(ItemReader[List[Entity]]):
     """
 
     def __init__(self, path: Path):
+        """
+        Initializes the JSONL reader for entity lists.
+
+        Args:
+            path: The file path to the JSONL file.
+        """
         self.path = path
 
-    def read_items(self) -> Iterable[List[Entity]]:
+    def read_items(self) -> Iterable[list[Entity]]:
+        """
+        Reads the JSONL file and yields lists of `Entity` objects.
+
+        Returns:
+            Iterable[list[Entity]]: An iterable of lists of `Entity` objects.
+        """
         with open(self.path, encoding="utf-8") as file:
             for line in file:
                 yield [Entity.from_json(entity_json) for entity_json in json.loads(line)]
 
 
-class EntityPairJsonlReader(ItemReader[Tuple[Entity, Entity]]):
+class EntityPairJsonlReader(ItemReader[tuple[Entity, Entity]]):
     """
     Reader for JSONL files containing pairs of `Entity` objects.
 
@@ -95,11 +121,23 @@ class EntityPairJsonlReader(ItemReader[Tuple[Entity, Entity]]):
     """
 
     def __init__(self, path: Path):
+        """
+        Initializes the JSONL reader for entity pairs.
+
+        Args:
+            path: The file path to the JSONL file.
+        """
         self.path = path
 
-    def read_items(self) -> Iterable[Tuple[Entity, Entity]]:
+    def read_items(self) -> Iterable[tuple[Entity, Entity]]:
+        """
+        Reads the JSONL file and yields pairs of `Entity` objects.
+
+        Returns:
+            Iterable[tuple[Entity, Entity]]: An iterable of pairs of `Entity` objects.
+        """
         for entities in EntityListJsonlReader(self.path).read_items():
-            if len(entities) != 2:
+            if len(entities) != 2:  # noqa: PLR2004 magic-value-comparison
                 raise ValueError(f"Expected exactly two entities in line: {entities}")
             yield (entities[0], entities[1])
 
@@ -113,18 +151,30 @@ class BooleanFileReader(ItemReader[bool]):
     """
 
     def __init__(self, path: Path):
+        """
+        Initializes the reader for files containing boolean values.
+
+        Args:
+            path: The file path.
+        """
         self.path = path
 
     def read_items(self) -> Iterable[bool]:
+        """
+        Reads boolean values from the file.
+
+        Returns:
+            Iterable[bool]: An iterator over boolean values.
+        """
         with open(self.path, encoding="utf-8") as file:
             for line in file:
-                line = line.strip()
-                if line == "0":
+                stripped_line = line.strip()
+                if stripped_line == "0":
                     yield False
-                elif line == "1":
+                elif stripped_line == "1":
                     yield True
                 else:
-                    raise ValueError(f"Invalid line content for BooleanReader: {line}")
+                    raise ValueError(f"Invalid line content for BooleanFileReader: {stripped_line}")
 
 
 class ItemWriter(ABC, Generic[DataItemType]):
@@ -145,7 +195,7 @@ class ItemWriter(ABC, Generic[DataItemType]):
         """
 
 
-class EntityListJsonlWriter(ItemWriter[List[Entity]]):
+class EntityListJsonlWriter(ItemWriter[list[Entity]]):
     """
     Writer for JSONL files containing lists of `Entity` objects.
 
@@ -153,9 +203,21 @@ class EntityListJsonlWriter(ItemWriter[List[Entity]]):
     """
 
     def __init__(self, path: Path):
+        """
+        Initializes the JSONL writer for entity lists.
+
+        Args:
+            path: The file path where the JSONL file will be written.
+        """
         self.path = path
 
-    def write_items(self, items: Iterable[List[Entity]]) -> None:
+    def write_items(self, items: Iterable[list[Entity]]) -> None:
+        """
+        Writes lists of `Entity` objects to a JSONL file.
+
+        Args:
+            items: An iterable of lists of `Entity` objects to be written to the file.
+        """
         with open(self.path, "w", encoding="utf-8") as file:
             for entity_list in items:
                 json_line = json.dumps(entity_list, ensure_ascii=False)
@@ -171,9 +233,21 @@ class BooleanFileWriter(ItemWriter[bool]):
     """
 
     def __init__(self, path: Path):
+        """
+        Initializes the writer for boolean values.
+
+        Args:
+            path: The file path where the boolean values will be written.
+        """
         self.path = path
 
     def write_items(self, items: Iterable[bool]) -> None:
+        """
+        Writes boolean values to a file.
+
+        Args:
+            items: An iterable of boolean values to be written to the file.
+        """
         with open(self.path, "w", encoding="utf-8") as file:
             for item in items:
                 file.write("1\n" if item else "0\n")

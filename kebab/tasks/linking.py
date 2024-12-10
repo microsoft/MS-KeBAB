@@ -5,11 +5,11 @@ from __future__ import annotations
 
 from itertools import zip_longest
 from pathlib import Path
-from typing import Callable, Iterable, Tuple
+from typing import Callable, Iterable
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskInstance
-from kebab.utils.io_helpers import BooleanFileReader, BooleanFileWriter, EntityPairJsonlReader, save_to_json
+from kebab.utils.io_helpers import BooleanFileReader, BooleanFileWriter, EntityPairJsonlReader, save_dict_to_json
 
 
 class LinkingTaskInstance(TaskInstance):
@@ -17,7 +17,7 @@ class LinkingTaskInstance(TaskInstance):
 
     __data_entity_fragment_pairs: Path
     __data_ground_truth_boolean: Path | None
-    __read_items_fun: Callable[[], Iterable[Tuple[Tuple[Entity, Entity], bool | None]]]
+    __read_items_fun: Callable[[], Iterable[tuple[tuple[Entity, Entity], bool | None]]]
     __write_items_fun: Callable[[Path, Iterable[bool]], None]
 
     @property
@@ -36,7 +36,7 @@ class LinkingTaskInstance(TaskInstance):
         task: Task,
         entity_fragment_pairs: str,
         ground_truth_boolean: str | None = None,
-        read_items_fun: Callable[[], Iterable[Tuple[Tuple[Entity, Entity], bool | None]]] | None = None,
+        read_items_fun: Callable[[], Iterable[tuple[tuple[Entity, Entity], bool | None]]] | None = None,
         write_items_fun: Callable[[Path, Iterable[bool]], None] | None = None,
     ):
         """Initialize an linking task instance."""
@@ -51,7 +51,7 @@ class LinkingTaskInstance(TaskInstance):
             write_items_fun if write_items_fun is not None else LinkingTaskInstance.__default_write_items
         )
 
-    def __default_read_items(self) -> Iterable[Tuple[Tuple[Entity, Entity], bool | None]]:
+    def __default_read_items(self) -> Iterable[tuple[tuple[Entity, Entity], bool | None]]:
         entity_pairs = EntityPairJsonlReader(self.data_entity_fragment_pairs).read_items()
         booleans = (
             BooleanFileReader(self.data_ground_truth_boolean).read_items()
@@ -60,7 +60,7 @@ class LinkingTaskInstance(TaskInstance):
         )
         return zip_longest(entity_pairs, booleans)
 
-    def read_items(self) -> Iterable[Tuple[Tuple[Entity, Entity], bool | None]]:
+    def read_items(self) -> Iterable[tuple[tuple[Entity, Entity], bool | None]]:
         """
         Read data items with optional ground-truth entity fragment pairs.
 
@@ -95,7 +95,7 @@ class LinkingTaskInstance(TaskInstance):
         eval_result = {"primary_linking_metric": 0.8, "secondary_linking_metric": 0.6}
 
         if eval_result_path:
-            save_to_json(eval_result, eval_result_path)
+            save_dict_to_json(eval_result, eval_result_path)
 
         return eval_result
 
