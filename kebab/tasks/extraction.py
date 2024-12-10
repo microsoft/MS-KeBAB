@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from itertools import zip_longest
 from pathlib import Path
-from typing import Callable, Iterable, List, Tuple
+from typing import Callable, Iterable
 
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskInstance
-from kebab.utils.io_helpers import DocumentJsonlReader, EntityListJsonlReader, EntityListJsonlWriter, save_to_json
+from kebab.utils.io_helpers import DocumentJsonlReader, EntityListJsonlReader, EntityListJsonlWriter, save_dict_to_json
 
 
 class ExtractionTaskInstance(TaskInstance):
@@ -18,8 +18,8 @@ class ExtractionTaskInstance(TaskInstance):
 
     __data_extracts: Path
     __data_ground_truth_extracted_entities: Path | None
-    __read_items_fun: Callable[[], Iterable[Tuple[Document, List[Entity] | None]]]
-    __write_items_fun: Callable[[Path, Iterable[List[Entity]]], None]
+    __read_items_fun: Callable[[], Iterable[tuple[Document, list[Entity] | None]]]
+    __write_items_fun: Callable[[Path, Iterable[list[Entity]]], None]
 
     @property
     def data_extracts(self) -> Path:
@@ -37,8 +37,8 @@ class ExtractionTaskInstance(TaskInstance):
         task: Task,
         extracts: str,
         ground_truth_extracted_entities: str | None = None,
-        read_items_fun: Callable[[], Iterable[Tuple[Document, List[Entity] | None]] ] | None = None,
-        write_items_fun: Callable[[Path, Iterable[List[Entity]]], None] | None = None,
+        read_items_fun: Callable[[], Iterable[tuple[Document, list[Entity] | None]]] | None = None,
+        write_items_fun: Callable[[Path, Iterable[list[Entity]]], None] | None = None,
     ):
         """Initialize an extraction task instance."""
         super().__init__(name, task)
@@ -52,7 +52,7 @@ class ExtractionTaskInstance(TaskInstance):
             write_items_fun if write_items_fun is not None else ExtractionTaskInstance.__default_write_items
         )
 
-    def __default_read_items(self) -> Iterable[Tuple[Document, List[Entity] | None]]:
+    def __default_read_items(self) -> Iterable[tuple[Document, list[Entity] | None]]:
         extracts = DocumentJsonlReader(self.data_extracts).read_items()
         entity_lists = (
             EntityListJsonlReader(self.data_ground_truth_extracted_entities).read_items()
@@ -61,7 +61,7 @@ class ExtractionTaskInstance(TaskInstance):
         )
         return zip_longest(extracts, entity_lists)
 
-    def read_items(self) -> Iterable[Tuple[Document, List[Entity] | None]]:
+    def read_items(self) -> Iterable[tuple[Document, list[Entity] | None]]:
         """
         Read data items, with optional ground-truth extracted entities.
 
@@ -71,7 +71,7 @@ class ExtractionTaskInstance(TaskInstance):
         """
         return self.__read_items_fun()
 
-    def write_items(self, path: Path, items: Iterable[List[Entity]]) -> None:
+    def write_items(self, path: Path, items: Iterable[list[Entity]]) -> None:
         """
         Write output items, extracted entities, to the specified path.
 
@@ -94,10 +94,10 @@ class ExtractionTaskInstance(TaskInstance):
         eval_result = {"primary_extraction_metric": 0.8, "secondary_extraction_metric": 0.6}
 
         if eval_result_path:
-            save_to_json(eval_result, eval_result_path)
+            save_dict_to_json(eval_result, eval_result_path)
 
         return eval_result
 
     @staticmethod
-    def __default_write_items(path: Path, items: Iterable[List[Entity]]) -> None:
+    def __default_write_items(path: Path, items: Iterable[list[Entity]]) -> None:
         EntityListJsonlWriter(path).write_items(items)
