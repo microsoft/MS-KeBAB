@@ -26,18 +26,25 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
 def test_extraction_read_items() -> None:
     # Arrange
+    items_file_path = Path(__file__).parents[1] / "data" / "extraction" / "plain_text_items.jsonl"
+    extracted_entities_file_path = (
+        Path(__file__).parents[1] / "data" / "extraction" / "plain_text_extracted_entities.jsonl"
+    )
     task_instance = ExtractionTaskInstance(
-        "Extraction-ReDocRED-Train",
+        "Extraction-Alexandria-Train",
         Task(TaskType.Extraction),
-        str(Path(__file__).parents[1] / "data" / "extraction" / "plain_text_items.jsonl"),
-        str(Path(__file__).parents[1] / "data" / "extraction" / "plain_text_extracted_entities.jsonl"),
+        str(items_file_path),
+        str(extracted_entities_file_path),
     )
 
     # Act
     items = list(task_instance.read_items())
     extracted_entity_lists = [entity_list for _, entity_list in items if entity_list is not None]
+    extracted_entities_output_file_path = (
+        Path(__file__).parents[1] / "output" / "extraction" / "plain_text_extracted_entities.jsonl"
+    )
     task_instance.write_items(
-        Path(__file__).parents[1] / "output" / "extraction" / "plain_text_extracted_entities.jsonl",
+        extracted_entities_output_file_path,
         extracted_entity_lists,
     )
 
@@ -53,6 +60,6 @@ def test_extraction_read_items() -> None:
     assert isinstance(first_extracted_entity, Entity)
     assert first_extracted_entity.entity_id == "doc_0_entity_0"
     assert filecmp.cmp(
-        str(Path(__file__).parents[1] / "data" / "extraction" / "plain_text_extracted_entities.jsonl"),
-        str(Path(__file__).parents[1] / "output" / "extraction" / "plain_text_extracted_entities.jsonl"),
+        str(extracted_entities_file_path),
+        str(extracted_entities_output_file_path),
     )
