@@ -20,8 +20,8 @@ from pathlib import Path
 
 from kebab.contracts.document import Document, DocumentSchema, DocumentUtilities
 from kebab.contracts.entity import Entity
+from kebab.utils import io_helpers
 from kebab.utils.dataset.wikidata import wikidata_utils
-from kebab.utils.io_helpers import CustomEncoder
 
 
 class ReDocRedDatasetBuilder:
@@ -139,9 +139,7 @@ class ReDocRedDatasetBuilder:
 
                     merged_entity[k].add(str(v))
 
-        for k, v in merged_entity.items():
-            if k == "type":
-                merged_entity[k] = {cls.TYPE_MAP.get(t, t) for t in merged_entity[k]}
+        merged_entity["type"] = {cls.TYPE_MAP.get(t, t) for t in merged_entity["type"]}
 
         return merged_entity
 
@@ -214,7 +212,7 @@ class ReDocRedDatasetBuilder:
         with open(self.extraction_dataset_output_path, "w", encoding="utf-8") as f:
             for entry in extraction_dataset:
                 try:
-                    json.dump(entry, f, cls=CustomEncoder, ensure_ascii=False)
+                    json.dump(entry, f, cls=io_helpers.CustomEncoder, ensure_ascii=False)
                     f.write("\n")
                 except TypeError as e:  # noqa: PERF203
                     error_count += 1
