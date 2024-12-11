@@ -44,9 +44,7 @@ class LinkingTaskInstance(TaskInstance):
         self.__data_entity_fragment_pairs = Path(entity_fragment_pairs)
         if ground_truth_boolean is not None:
             self.__data_ground_truth_boolean = Path(ground_truth_boolean)
-        self.__read_items_fun = (
-            read_items_fun if read_items_fun is not None else self.__default_read_items
-        )
+        self.__read_items_fun = read_items_fun if read_items_fun is not None else self.__default_read_items
         self.__write_items_fun = (
             write_items_fun if write_items_fun is not None else LinkingTaskInstance.__default_write_items
         )
@@ -85,7 +83,7 @@ class LinkingTaskInstance(TaskInstance):
     def evaluate(
         self,
         output_to_evaluate: Path,  # noqa: ARG002
-        eval_result_path: Path | None = None
+        eval_result_path: Path | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the linking task instance."""
         if hasattr(self, "__data_ground_truth_boolean"):
