@@ -72,7 +72,7 @@ class DocumentJsonlReader(ItemReader[Document]):
         Args:
             path: The file path to the JSONL file.
         """
-        self.schemas = DocumentUtilities.load_schemas(Path(__file__).parent / "configs" / "schemas")
+        self.schemas = DocumentUtilities.load_schemas(Path(__file__).parents[1] / "configs" / "schemas")
         self.path = path
 
     def read_items(self) -> Iterable[Document]:
@@ -110,7 +110,7 @@ class EntityListJsonlReader(ItemReader[list[Entity]]):
         """
         with open(self.path, encoding="utf-8") as file:
             for line in file:
-                yield [Entity.from_json(entity_json) for entity_json in json.loads(line)]
+                yield [Entity.from_dict(entity_dict) for entity_dict in json.loads(line)]
 
 
 class EntityPairJsonlReader(ItemReader[tuple[Entity, Entity]]):

@@ -53,6 +53,11 @@ class Task:
             raise ValueError(f"Instance with name '{instance.name}' already exists.")
         self.__instances[instance.name] = instance
 
+    @classmethod
+    def clear_created_task_types(cls) -> None:
+        """Clear the set of created task types."""
+        cls.__created_task_types.clear()
+
 
 class TaskInstance(ABC):
     """Represents a benchmark task instance with its data files."""
