@@ -174,7 +174,7 @@ class BooleanFileReader(ItemReader[bool]):
                 elif stripped_line == "1":
                     yield True
                 else:
-                    raise ValueError(f"Invalid line content for BooleanFileReader: {stripped_line}")
+                    raise ValueError(f"Invalid line content for {BooleanFileReader.__name__}: {stripped_line}")
 
 
 class ItemWriter(ABC, Generic[DataItemType]):
@@ -220,7 +220,12 @@ class EntityListJsonlWriter(ItemWriter[list[Entity]]):
         """
         with open(self.path, "w", encoding="utf-8") as file:
             for entity_list in items:
-                json_line = json.dumps(entity_list, ensure_ascii=False)
+                json_line = json.dumps(
+                    entity_list,
+                    ensure_ascii=False,
+                    cls=CustomEncoder,
+                    separators=(",", ":"),
+                )
                 file.write(json_line + "\n")
 
 
