@@ -59,4 +59,4 @@ exclude = [
 pythonVersion = "3.12"
 
 [tool.ruff]
-extend = "ruff.toml"
+extend = "scripts/validation/ruff.toml"

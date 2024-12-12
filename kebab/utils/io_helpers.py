@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Generic, Iterable, TypeVar
+from typing import Any
 
 from kebab.contracts.document import Document, DocumentUtilities
 from kebab.contracts.entity import Entity
@@ -35,16 +36,12 @@ def save_dict_to_json(data: dict, file_path: Path) -> None:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 
-# TODO (allenwang): make sure this is imported before the classes that follow
-DataItemType = TypeVar("DataItemType")
-
-
-class ItemReader(ABC, Generic[DataItemType]):
+class ItemReader[DataItemType](ABC):
     """
     Abstract base class for data item readers.
 
     Type Parameters:
-    DataItemType: The type of the data items to be read.
+        DataItemType: The type of the data items to be read.
     """
 
     @abstractmethod
@@ -53,7 +50,7 @@ class ItemReader(ABC, Generic[DataItemType]):
         Abstract method to read items.
 
         Returns:
-        Iterable[DataItemType]: An iterable of data items of the specified type.
+            Iterable[DataItemType]: An iterable of data items of the specified type.
         """
 
 
@@ -177,12 +174,12 @@ class BooleanFileReader(ItemReader[bool]):
                     raise ValueError(f"Invalid line content for {BooleanFileReader.__name__}: {stripped_line}")
 
 
-class ItemWriter(ABC, Generic[DataItemType]):
+class ItemWriter[DataItemType](ABC):
     """
     Abstract base class for output item writers.
 
     Type Parameters:
-    DataItemType: The type of the output items to be written.
+        DataItemType: The type of the output items to be written.
     """
 
     @abstractmethod
@@ -191,7 +188,7 @@ class ItemWriter(ABC, Generic[DataItemType]):
         Abstract method to write items.
 
         Args:
-        items (Iterable[DataItemType]): An iterable of output items to be written.
+            items (Iterable[DataItemType]): An iterable of output items to be written.
         """
 
 
