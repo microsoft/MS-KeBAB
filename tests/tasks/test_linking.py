@@ -25,9 +25,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
 def test_linking_read_items() -> None:
     # Arrange
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
-    boolean_labels_file_path = (
-        Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
-    )
+    boolean_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
     task_instance = LinkingTaskInstance(
         "Linking-Alexandria-Train",
         Task(TaskType.Extraction),
@@ -38,9 +36,7 @@ def test_linking_read_items() -> None:
     # Act
     items = list(task_instance.read_items())
     boolean_labels = [predicted_boolean for _, predicted_boolean in items if predicted_boolean is not None]
-    boolean_labels_output_file_path = (
-        Path(__file__).parents[1] / "output" / "linking" / "boolean_labels.jsonl"
-    )
+    boolean_labels_output_file_path = Path(__file__).parents[1] / "output" / "linking" / "boolean_labels.jsonl"
     task_instance.write_items(
         boolean_labels_output_file_path,
         boolean_labels,
