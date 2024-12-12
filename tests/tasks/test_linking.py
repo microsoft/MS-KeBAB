@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Generator
 
 import pytest
+from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
 from kebab.tasks.linking import LinkingTaskInstance
 
@@ -22,13 +23,13 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
 
 
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
-def test_linking_read_items() -> None:
+def test_linking_read_write_items_roundtrip() -> None:
     # Arrange
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
     boolean_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
     task_instance = LinkingTaskInstance(
         "Linking-Alexandria-Train",
-        Task(TaskType.Extraction),
+        Task(TaskType.Linking),
         str(entity_pairs_file_path),
         str(boolean_labels_file_path),
     )
@@ -43,6 +44,16 @@ def test_linking_read_items() -> None:
     )
 
     # Assert
+    assert len(items) == 2
+    first_entity_pair = items[0][0]
+    assert isinstance(first_entity_pair, tuple)
+    assert len(first_entity_pair) == 2
+    assert all(isinstance(entity, Entity) for entity in first_entity_pair)
+    first_entity = first_entity_pair[0]
+    assert first_entity.entity_id == "doc_0_entity_0"
+    first_boolean_label = items[0][1]
+    assert isinstance(first_boolean_label, bool)
+    assert first_boolean_label
     assert filecmp.cmp(
         str(boolean_labels_file_path),
         str(boolean_labels_output_file_path),

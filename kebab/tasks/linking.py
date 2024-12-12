@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from itertools import zip_longest
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskInstance
@@ -63,10 +64,10 @@ class LinkingTaskInstance(TaskInstance):
         Read data items with optional ground-truth entity fragment pairs.
 
         Returns:
-        Iterable[Tuple[Tuple[Entity, Entity], bool | None]]: An iterable of tuples, where each tuple
-        contains:
-            - A pair of `Entity` objects.
-            - An optional boolean value providing the ground-truth labels.
+            Iterable[Tuple[Tuple[Entity, Entity], bool | None]]: An iterable of tuples, where each
+            tuple contains:
+                - A pair of `Entity` objects.
+                - An optional boolean value providing the ground-truth labels.
         """
         return self.__read_items_fun()
 
@@ -75,8 +76,8 @@ class LinkingTaskInstance(TaskInstance):
         Write items, i.e. boolean labels, to the specified path.
 
         Args:
-        path: The file path where the boolean values should be written.
-        items: An iterable of boolean values to be written to the file.
+            path: The file path where the boolean labels should be written.
+            items: An iterable of boolean labels to be written to the file.
         """
         self.__write_items_fun(path, items)
 

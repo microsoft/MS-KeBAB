@@ -161,7 +161,7 @@ class BooleanFileReader(ItemReader[bool]):
         Reads boolean values from the file.
 
         Returns:
-            Iterable[bool]: An iterator over boolean values.
+            Iterable[bool]: An iterable of boolean values.
         """
         with open(self.path, encoding="utf-8") as file:
             for line in file:

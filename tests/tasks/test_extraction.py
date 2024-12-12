@@ -24,7 +24,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
 
 
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
-def test_extraction_read_items() -> None:
+def test_extraction_read_write_items_roundtrip() -> None:
     # Arrange
     items_file_path = Path(__file__).parents[1] / "data" / "extraction" / "plain_text_items.jsonl"
     extracted_entities_file_path = (

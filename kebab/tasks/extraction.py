@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from itertools import zip_longest
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable
 
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
@@ -64,18 +65,18 @@ class ExtractionTaskInstance(TaskInstance):
         Read data items, with optional ground-truth extracted entities.
 
         Returns:
-        Iterable[Tuple[Document, List[Entity] | None]]: An iterable of tuples, each containing a
-        `Document` and an optional list of `Entity` objects.
+            Iterable[Tuple[Document, List[Entity] | None]]: An iterable of tuples, each containing a
+            `Document` and an optional list of `Entity` objects.
         """
         return self.__read_items_fun()
 
     def write_items(self, path: Path, items: Iterable[list[Entity]]) -> None:
         """
-        Write output items, extracted entities, to the specified path.
+        Write output items, i.e. extracted entities, to the specified path.
 
         Args:
-        path: The file path where the items should be written.
-        items: An iterable of lists of extracted `Entity` objects to be written to the file.
+            path: The file path where the items should be written.
+            items: An iterable of lists of extracted `Entity` objects to be written to the file.
         """
         self.__write_items_fun(path, items)
 

@@ -6,9 +6,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, Self
+from typing import Any, ClassVar, Self
 
 
 class TaskType(Enum):
@@ -101,8 +102,8 @@ class TaskInstance(ABC):
         Read data items from a data source.
 
         Returns:
-        Iterable[Any]: An iterable of items read from the data source. The specific type of items
-        depends on the implementation in derived classes.
+            Iterable[Any]: An iterable of items read from the data source. The specific type of
+            items depends on the implementation in derived classes.
         """
 
     @abstractmethod
@@ -111,9 +112,9 @@ class TaskInstance(ABC):
         Write output items to a specified file.
 
         Args:
-        path: The file path where the items should be written.
-        items: An iterable of items to write to the file. The specific type of items depends on the
-        implementation in derived classes.
+            path: The file path where the items should be written.
+            items: An iterable of items to write to the file. The specific type of items depends on
+            the implementation in derived classes.
         """
 
     @abstractmethod
@@ -122,9 +123,9 @@ class TaskInstance(ABC):
         Evaluate an output for the task instance.
 
         Args:
-        output_to_evaluate: The output that needs to be evaluated.
-        eval_result_path: Optional path to save the evaluation result.
+            output_to_evaluate: The output that needs to be evaluated.
+            eval_result_path: Optional path to save the evaluation result.
 
         Returns:
-        dict[str, float]: A dictionary containing the evaluation metrics.
+            dict[str, float]: A dictionary containing the evaluation metrics.
         """
