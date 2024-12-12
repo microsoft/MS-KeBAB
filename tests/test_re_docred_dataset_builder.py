@@ -31,14 +31,14 @@ def test_build_dataset(re_docred_input_file_path: Path) -> None:
         doc_record = json.load(f)[0]
 
     example = ReDocRedDatasetBuilder.extract_example(doc_record, properties_map)
-    assert len(example["entities"]) == 13
+    assert len(example["entities"]) == 15
     assert len(example["document"].document_id) == 64
-    assert example["document"].document_id == "a057557c54e7d6eed98de8ba50deecd7de5b224adafa6dbf86e67654d0a2a7fc"
+    assert example["document"].document_id == "f5734628a85470a424f1a3d960fe1df2d12159baf43db94f1ae629ad091596bd"
     assert example["document"].schema.schema_id == "plain_text"
     assert example["document"].data["title"] == "AirAsia Zest"
-    assert len(example["document"].data["text"]) == 1093
+    assert len(example["document"].data["text"]) == 1092
 
-    expected_entity_ids = ["0", "1", "2", "3", "4", "5", "6", "9", "10", "11", "12", "14", "15"]
+    expected_entity_ids = ["0", "1", "2", "3", "4", "5", "6", "8", "9", "10", "11", "12", "14", "15", "16"]
     for i, entity in enumerate(example["entities"]):
         assert entity.entity_id == expected_entity_ids[i]
         assert "name" in entity.properties
