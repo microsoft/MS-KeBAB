@@ -51,6 +51,8 @@ class LinkingTaskInstance(TaskInstance):
         )
 
     def __default_read_items(self) -> Iterable[tuple[tuple[Entity, Entity], bool | None]]:
+        # TODO (allenwang): Pass `Cache` into this instance to resolve dataset links to local paths
+        # after instances.json is updated with valid links.
         entity_pairs = EntityPairJsonlReader(self.data_entity_fragment_pairs).read_items()
         booleans = (
             BooleanFileReader(self.data_ground_truth_boolean).read_items()

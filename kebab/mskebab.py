@@ -46,8 +46,6 @@ class Benchmark:
                 self.__tasks[task_type] = task
             else:
                 task = self.__tasks[task_type]
-            # TODO (allenwang): Use `Cache` to resolve datasets links in `instance_config["data"]`
-            # to local paths after instances.json is updated with valid links.
             self.__task_instances[instance_name] = TaskInstance.create_task_instance(
                 instance_name, task, instance_config["data"]
             )

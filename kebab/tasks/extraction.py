@@ -52,6 +52,8 @@ class ExtractionTaskInstance(TaskInstance):
         )
 
     def __default_read_items(self) -> Iterable[tuple[Document, list[Entity] | None]]:
+        # TODO (allenwang): Pass `Cache` into this instance to resolve dataset links to local paths
+        # after instances.json is updated with valid links.
         extracts = DocumentJsonlReader(self.data_extracts).read_items()
         entity_lists = (
             EntityListJsonlReader(self.data_ground_truth_extracted_entities).read_items()
