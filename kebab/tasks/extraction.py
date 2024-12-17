@@ -3,16 +3,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from itertools import zip_longest
 from pathlib import Path
 
+from kebab.contracts.document import Document
+from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskInstance
+from kebab.utils.io_helpers import DocumentJsonlReader, EntityListJsonlReader, EntityListJsonlWriter, save_dict_to_json
 
 
 class ExtractionTaskInstance(TaskInstance):
     """Represents an extraction benchmark task instance with its data files."""
 
     __data_extracts: Path
-    __data_ground_truth_extracted_entities: Path
+    __data_ground_truth_extracted_entities: Path | None
 
     @property
     def data_extracts(self) -> Path:
@@ -20,7 +25,7 @@ class ExtractionTaskInstance(TaskInstance):
         return self.__data_extracts
 
     @property
-    def data_ground_truth_extracted_entities(self) -> Path:
+    def data_ground_truth_extracted_entities(self) -> Path | None:
         """Return path to ground truth extracted entities."""
         return self.__data_ground_truth_extracted_entities
 
@@ -37,13 +42,47 @@ class ExtractionTaskInstance(TaskInstance):
         if ground_truth_extracted_entities is not None:
             self.__data_ground_truth_extracted_entities = Path(ground_truth_extracted_entities)
 
+    def read_items(self) -> Iterable[tuple[Document, list[Entity] | None]]:
+        """
+        Read data items, with optional ground-truth extracted entities.
+
+        Returns:
+            Iterable[Tuple[Document, List[Entity] | None]]: An iterable of tuples, each containing a
+            `Document` and an optional list of `Entity` objects.
+        """
+        # TODO (allenwang): Pass `Cache` into this instance to resolve dataset links to local paths
+        # after instances.json is updated with valid links.
+        extracts = DocumentJsonlReader(self.data_extracts).read_items()
+        entity_lists = (
+            EntityListJsonlReader(self.data_ground_truth_extracted_entities).read_items()
+            if self.data_ground_truth_extracted_entities is not None
+            else iter([])
+        )
+        return zip_longest(extracts, entity_lists)
+
+    def write_items(self, path: Path, items: Iterable[list[Entity]]) -> None:
+        """
+        Write output items, i.e. extracted entities, to the specified path.
+
+        Args:
+            path: The file path where the items should be written.
+            items: An iterable of lists of extracted `Entity` objects to be written to the file.
+        """
+        EntityListJsonlWriter(path).write_items(items)
+
     def evaluate(
         self,
         output_to_evaluate: Path,  # noqa: ARG002
+        eval_result_path: Path | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the extraction task instance."""
         if hasattr(self, "__data_ground_truth_extracted_entities"):
             raise ValueError("Can not evaluate on heldout Extraction task instance")
 
         # TODO(bmitra): Implement actual metric computation
-        return {"primary_extraction_metric": 0.8, "secondary_extraction_metric": 0.6}
+        eval_result = {"primary_extraction_metric": 0.8, "secondary_extraction_metric": 0.6}
+
+        if eval_result_path:
+            save_dict_to_json(eval_result, eval_result_path)
+
+        return eval_result

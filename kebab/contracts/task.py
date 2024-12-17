@@ -6,9 +6,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar, Self
+from typing import Any, ClassVar, Self
 
 
 class TaskType(Enum):
@@ -53,6 +54,11 @@ class Task:
             raise ValueError(f"Instance with name '{instance.name}' already exists.")
         self.__instances[instance.name] = instance
 
+    @classmethod
+    def clear_created_task_types(cls) -> None:
+        """Clear the set of created task types."""
+        cls.__created_task_types.clear()
+
 
 class TaskInstance(ABC):
     """Represents a benchmark task instance with its data files."""
@@ -91,5 +97,35 @@ class TaskInstance(ABC):
         return task_class(instance_name, task, **data_dict)
 
     @abstractmethod
-    def evaluate(self, output_to_evaluate: Path) -> dict[str, float]:
-        """Evaluate an output for the task instance."""
+    def read_items(self) -> Iterable[Any]:
+        """
+        Read data items from a data source.
+
+        Returns:
+            Iterable[Any]: An iterable of items read from the data source. The specific type of
+            items depends on the implementation in derived classes.
+        """
+
+    @abstractmethod
+    def write_items(self, path: Path, items: Iterable[Any]) -> None:
+        """
+        Write output items to a specified file.
+
+        Args:
+            path: The file path where the items should be written.
+            items: An iterable of items to write to the file. The specific type of items depends on
+            the implementation in derived classes.
+        """
+
+    @abstractmethod
+    def evaluate(self, output_to_evaluate: Path, eval_result_path: Path | None = None) -> dict[str, float]:
+        """
+        Evaluate an output for the task instance.
+
+        Args:
+            output_to_evaluate: The output that needs to be evaluated.
+            eval_result_path: Optional path to save the evaluation result.
+
+        Returns:
+            dict[str, float]: A dictionary containing the evaluation metrics.
+        """
