@@ -117,6 +117,16 @@ ignore = [
     "RUF015",  # unnecessary-iterable-allocation-for-first-element - in tests we may create lists to assert their length
     "PLR2004", # magic-value-comparison - we often have constants as expected values in tests
 ]
+"**/*.ipynb" = [
+    "C408",
+    "PD901",
+    "F401",
+    "SIM401",
+    "SIM118",
+    "PLR2004",
+    "E402",
+    "UP015",
+] # These all should be investigatd later
 
 [lint.pydocstyle]
 convention = "google"

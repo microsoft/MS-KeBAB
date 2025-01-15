@@ -3,8 +3,9 @@
 
 import filecmp
 import shutil
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 import pytest
 from kebab.contracts.entity import Entity

@@ -215,7 +215,7 @@ class EntityListJsonlWriter(ItemWriter[list[Entity]]):
         Args:
             items: An iterable of lists of `Entity` objects to be written to the file.
         """
-        with open(self.path, "w", encoding="utf-8") as file:
+        with open(self.path, "w", encoding="utf-8", newline="\n") as file:
             for entity_list in items:
                 json_line = json.dumps(
                     entity_list,
@@ -250,6 +250,6 @@ class BooleanFileWriter(ItemWriter[bool]):
         Args:
             items: An iterable of boolean values to be written to the file.
         """
-        with open(self.path, "w", encoding="utf-8") as file:
+        with open(self.path, "w", encoding="utf-8", newline="\n") as file:
             for item in items:
                 file.write("1\n" if item else "0\n")
