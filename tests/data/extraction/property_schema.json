@@ -1,5 +1,5 @@
 {
-    "name": "exp_schema",
+    "name": "extraction_metrics_test_schema",
     "data_types": [
         {
             "data_type_id": "text",
@@ -7,6 +7,7 @@
             "description": "A generic text or a value stored as a string."
         }
     ],
+
     "properties": [
         {
             "property_id": "name",
@@ -15,10 +16,54 @@
             "display_name": "name"
         },
         {
+            "property_id": "alternative names",
+            "data_type_id": "text",
+            "description": "Alternative names of the entity.",
+            "display_name": "alternative names",
+            "is_collection": true
+        },
+        {
             "property_id": "type",
             "data_type_id": "text",
-            "description": "The type of the entity.",
-            "display_name": "type"
+            "description": "Type of the entity.",
+            "is_collection": true
+        },
+        {
+            "property_id": "definitions",
+            "data_type_id": "text",
+            "description": "Entity definitions.",
+            "display_name": "descriptions",
+            "is_collection": true
+        },
+        {
+            "property_id": "team",
+            "data_type_id": "text",
+            "description": "The team that the entity belongs to.",
+            "is_collection": false
+        },
+        {
+            "property_id": "email",
+            "data_type_id": "text",
+            "description": "Email associated with the entity.",
+            "is_collection": false
+        },
+        {
+            "property_id": "employer",
+            "data_type_id": "text",
+            "description": "Employer of the entity.",
+            "is_collection": false
+        },
+        {
+            "property_id": "job title",
+            "data_type_id": "text",
+            "description": "Job title of the entity.",
+            "is_collection": false
+        },
+        {
+            "property_id": "company",
+            "data_type_id": "text",
+            "description": "Company of the entity.",
+            "is_collection": false
         }
     ]
 }

@@ -256,6 +256,14 @@ class Entity:
         if self.metadata is None:
             self.metadata = {}
 
+    def __getitem__(self, property_: Property) -> list[Any]:
+        """Lookup property values."""
+        return self.properties[property_.property_id]
+
+    def __contains__(self, property_: Property) -> bool:
+        """Check if entity contains property."""
+        return property_.property_id in self.properties
+
     def get_evidence_for_property_value(self, property_id: str, value_index: int) -> list[str]:
         """Get the evidence for a given property value."""
         assert 0 <= value_index < len(self.properties[property_id]), "Invalid value index."
