@@ -9,7 +9,7 @@ from typing import Any
 
 from dateutil.parser import parse as parse_date
 
-from kebab.entity import Property, ValueType
+from kebab.contracts.entity import Property, ValueType
 
 
 def normalize_property_value(value: Any, property_: Property) -> Any:

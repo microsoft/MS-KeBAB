@@ -1,17 +1,16 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-# ruff: noqa: E731
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from sentence_transformers import SentenceTransformer
 
-from kebab.entity import Entity, Property, PropertySchema
-from kebab.extraction.metrics.aesop.distances import (
+from kebab.contracts.entity import Entity, Property, PropertySchema
+from kebab.tasks.extraction.metrics.aesop.distances import (
     BinaryMatchDistance,
     EditDistance,
     EmbeddingDistance,
@@ -21,8 +20,8 @@ from kebab.extraction.metrics.aesop.distances import (
     SingleValuePropertyDistance,
     TokenDistance,
 )
-from kebab.extraction.metrics.aesop.metric_helpers import EntityMatcher, MetricsAccumulator, MetricsComputer
-from kebab.extraction.metrics.calculator import ExtractionOutput, MetricsCalculator
+from kebab.tasks.extraction.metrics.aesop.metric_helpers import EntityMatcher, MetricsAccumulator, MetricsComputer
+from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricsCalculator
 
 
 @dataclass
@@ -46,7 +45,7 @@ class AesopMetricCalculator(MetricsCalculator):
     def run(self, prediction: list[ExtractionOutput], ground_truth: list[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
         metrics_accumulator = MetricsAccumulator()
-        for pred, gt in zip(prediction, ground_truth):
+        for pred, gt in zip(prediction, ground_truth, strict=True):
             entity_matcher = EntityMatcher(gt.entities, pred.entities)
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)
             metrics_computer = MetricsComputer(gt.entities, pred.entities, self.config.property_schema)
@@ -58,19 +57,12 @@ def make_default_aesop_config(
         property_schema: PropertySchema, matching_threshold: float = 1.0,
         embed_model: SentenceTransformer | None = None) -> AesopConfig:
     """Create default aesop metric config."""
-    # Set score functions are used for properties for which we expect multiple values. Purpose is not observed to have multiple values.
-    # This should be updated if we observe multiple values for purpose.
+    # Set score functions are used for properties for which we expect multiple values.
     # Score function always returns a list of scores, even if there is only one value.
     if embed_model is None:
         embed_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
-    # set_token_score = lambda e1, e2, key: get_set_score(e1, e2, key, token_distance)
-    # str_score = lambda e1, e2, key: [1 - binary_match_distance(e1, e2, key)]
-    # embedding_score = lambda e1, e2, key: [1.0 - embedding_distance(e1, e2, key, embed_model)]
-    # set_embedding_distance = lambda e1, e2, key: embedding_distance(e1, e2, key, embed_model)
-    # edit_score = lambda e1, e2, key: [1 - edit_distance(e1, e2, key)]
 
     set_embedding_score = PropertyScore(SetPropertyDistance(EmbeddingDistance()))
-    # set_embedding_distance = SetPropertyDistance(EmbeddingDistance())
     set_token_score = PropertyScore(SetPropertyDistance(TokenDistance()))
     str_score = PropertyScore(SingleValuePropertyDistance(BinaryMatchDistance()))
     edit_score = PropertyScore(SingleValuePropertyDistance(EditDistance()))

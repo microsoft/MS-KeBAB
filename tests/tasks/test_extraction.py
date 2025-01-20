@@ -11,7 +11,7 @@ import pytest
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.tasks.extraction import ExtractionTaskInstance
+from kebab.tasks.extraction.task import ExtractionTaskInstance
 
 
 @pytest.fixture

@@ -1,16 +1,17 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-# ruff: noqa: D107, FA102, D102, E721, D101, C401
+from __future__ import annotations
+
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import min_weight_full_bipartite_matching
 
-from kebab.entity import Entity, Property, PropertySchema
+from kebab.contracts.entity import Entity, Property, PropertySchema
 
 
 @dataclass
@@ -38,12 +39,14 @@ class EntityMatcher:
     """Matches entities in two disjoint sets based on a distance function and a matching score threshold."""
 
     def __init__(self, entities_gt: list[Entity], entities_pred: list[Entity]) -> None:
+        """Initialize the EntityMatcher."""
         self.entities_gt = entities_gt
         self.entities_pred = entities_pred
 
     def match(
         self, distance_function: Callable[[Entity, Entity], float], threshold: float = 1.0
     ) -> MatchedPairInfo:
+        """Match entities based on a distance function and a matching score threshold."""
         distances = self._compute_distances(distance_function)
         print(distances)
         matched_indices = match_items(distances, threshold)
@@ -77,13 +80,14 @@ class EvaluatedPropertyMetrics:
     """
 
     def __init__(self, gt_length: int) -> None:
+        """Initialize EvaluatedPropertyMetrics."""
         self.relevant_pair_scores = defaultdict(lambda : defaultdict(lambda: [0.0]))
         self.property_value_count_gt = [0 for _ in range(gt_length)]
         self.unmatched_count = 0
         self.zero_out_recall = [False for _ in range(gt_length)]
         self.zero_out_prec = [False for _ in range(gt_length)]
 
-    def __repr__(self: "EvaluatedPropertyMetrics") -> str:
+    def __repr__(self: EvaluatedPropertyMetrics) -> str:
         """String representation of EvaluatedPropertyMetrics."""
         return (f"EvaluatedPropertyMetrics(\n"
                 f"relevant_pair_scores={self.relevant_pair_scores},\n"
@@ -98,6 +102,7 @@ class MetricsAccumulator:
     """Accumulates scores for metrics computation across all files."""
 
     def __init__(self) -> None:
+        """Initialize MetricsAccumulator."""
         self.total_scores_per_doc: dict = defaultdict(list)
         self.total_unmatched_counts_per_doc: dict = defaultdict(int)
         self.total_gt_property_value_counts_per_doc: dict = defaultdict(list)
@@ -110,7 +115,8 @@ class MetricsAccumulator:
         self.total_zero_out_recall: dict = defaultdict(list)
         self.total_zero_out_precision: dict = defaultdict(list)
 
-    def update(self, other: "MetricsAccumulator") -> None:
+    def update(self, other: MetricsAccumulator) -> None:
+        """Update the metrics accumulator with the metrics from another accumulator."""
         self.matched_count += other.matched_count
         self.unmatched_extra_gt_count += other.unmatched_extra_gt_count
         self.unmatched_extra_pred_count += other.unmatched_extra_pred_count
@@ -125,6 +131,7 @@ class MetricsAccumulator:
             self.total_zero_out_precision[key].extend(other.total_zero_out_precision[key])
 
     def accumulate_metrics(self) -> dict:
+        """Accumulate metrics across all files."""
         metrics = {
             "property_precision": {},
             "property_recall": {},
@@ -152,7 +159,7 @@ class MetricsAccumulator:
 
         return metrics
 
-    def __repr__(self: "MetricsAccumulator") -> str:
+    def __repr__(self: MetricsAccumulator) -> str:
         """String representation of MetricsAccumulator."""
         return (f"MetricsAccumulator(\n"
                 f"total_scores_per_doc={self.total_scores_per_doc},\n"
@@ -170,6 +177,7 @@ class MetricsAccumulator:
 
 @dataclass
 class MatchedIndices:
+    """Stores the indices of matched items and unmatched items in ground truth and prediction."""
     left_ind: list[int]
     right_ind: list[int]
     left_unmatched: list[int]
@@ -186,6 +194,7 @@ class MatchedEntitiesScorer:
         left_ind: list[int],
         right_ind: list[int],
     ) -> None:
+        """Initialize the MatchedEntitiesScorer."""
         self.entities_gt = entities_gt
         self.entities_pred = entities_pred
 
@@ -202,7 +211,7 @@ class MatchedEntitiesScorer:
         """Compute scores for a given property for matched entities."""
         evaluated_property_metrics = EvaluatedPropertyMetrics(len(self.entities_gt))
 
-        for idx, (gt_idx, pred_idx) in enumerate(zip(self.gt_ind, self.pred_ind)):
+        for idx, (gt_idx, pred_idx) in enumerate(zip(self.gt_ind, self.pred_ind,strict=True)):
             if property_ in self.entities_gt[gt_idx]:
                 if property_ in self.entities_pred[pred_idx]:
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = score_function(
@@ -225,12 +234,15 @@ class MatchedEntitiesScorer:
 
 
 class MetricsComputer:
+    """Computes metrics for a given set of ground truth and prediction entities."""
+
     def __init__(
         self,
         ground_truth: list[Entity],
         predictions: list[Entity],
         property_schema: PropertySchema,
     ) -> None:
+        """Initialize the MetricsComputer."""
         self.ground_truth = ground_truth
         self.predictions = predictions
         self.property_schema = property_schema
@@ -240,6 +252,7 @@ class MetricsComputer:
         matched_pair: MatchedPairInfo,
         keys_to_score: dict[str, Callable[[Entity, Entity, Property], list[float]]],
     ) -> MetricsAccumulator:
+        """Compute provided property scores for the matched entities."""
         metrics_accumulator = MetricsAccumulator()
         metrics_accumulator.matched_count = len(matched_pair.left_ind)
         metrics_accumulator.unmatched_pair_count = len(matched_pair.left_unmatched)
@@ -259,10 +272,8 @@ class MetricsComputer:
 
         for key in properties_union:
             score_func = keys_to_score[key]
-            print("property:", key)
 
             evaluated_property_metrics = entities_scorer.score(score_func, self.property_schema.properties[key])
-            print("evaluated metrics:", evaluated_property_metrics)
 
             metrics_accumulator.total_scores_per_doc[key].extend(
                 [evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx]
@@ -275,8 +286,6 @@ class MetricsComputer:
             )
             metrics_accumulator.total_zero_out_recall[key] += evaluated_property_metrics.zero_out_recall
             metrics_accumulator.total_zero_out_precision[key] += evaluated_property_metrics.zero_out_prec
-
-            print("metrics accumulator:", metrics_accumulator)
 
         return metrics_accumulator
 
@@ -308,6 +317,6 @@ def compute_properties_union(
     matched_pair: MatchedPairInfo,
 ) -> set[str]:
     """Compute the union of the properties of the ground truth and the predictions ignoring properties only present in unmatched entities."""
-    ground_truth_keys = set(key for idx, entity in enumerate(ground_truth) if idx in matched_pair.left_ind for key in entity.properties)
-    predictions_keys = set(key for idx, entity in enumerate(predictions) if idx in matched_pair.right_ind for key in entity.properties)
+    ground_truth_keys = {key for idx, entity in enumerate(ground_truth) if idx in matched_pair.left_ind for key in entity.properties}
+    predictions_keys = {key for idx, entity in enumerate(predictions) if idx in matched_pair.right_ind for key in entity.properties}
     return ground_truth_keys.union(predictions_keys)

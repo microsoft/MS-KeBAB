@@ -12,9 +12,9 @@ import tiktoken
 from scipy.spatial.distance import cosine
 from sentence_transformers import SentenceTransformer
 
-from kebab.entity import Entity, Property, PropertySchema, ValueType
-from kebab.extraction.metrics.aesop.metric_helpers import match_items
-from kebab.extraction.metrics.utils import normalize_property_value, normalize_string
+from kebab.contracts.entity import Entity, Property, PropertySchema, ValueType
+from kebab.tasks.extraction.metrics.aesop.metric_helpers import match_items
+from kebab.tasks.extraction.metrics.utils import normalize_property_value, normalize_string
 
 
 class ElementDistance:
@@ -191,7 +191,7 @@ class EntityDistance:
         distances = np.zeros(len(self.property_to_distance_function))
         for i, (property_id, property_distance) in enumerate(self.property_to_distance_function.items()):
             distances[i] = np.mean(property_distance(gt_entity, pred_entity, self.property_schema.properties[property_id]))
-        return self.weights.dot(distances)
+        return self.weights.dot(distances) # type: ignore
 
 
 #######################################################################################################################

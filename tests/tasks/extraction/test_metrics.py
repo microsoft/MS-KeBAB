@@ -2,20 +2,23 @@
 # Licensed under the MIT license.
 
 # pyright: reportOperatorIssue=false, reportArgumentType=false, reportCallIssue=false
-# ruff: noqa: E731, PLR2004, E711
-"""Tests for the metrics module."""
+# ruff: noqa: PLR2004, D103
+
+"""Tests for the extraction metrics module."""
 from __future__ import annotations
 
 from typing import Any
 
 import numpy as np
 import tiktoken
-from sentence_transformers import SentenceTransformer
-
-from kebab.document import Document, DocumentSchema
-from kebab.entity import Entity
-from kebab.extraction.metrics.aesop.calculator import AesopConfig, AesopMetricCalculator, make_default_aesop_config
-from kebab.extraction.metrics.aesop.distances import (
+from kebab.contracts.document import Document, DocumentSchema
+from kebab.contracts.entity import Entity, PropertySchema
+from kebab.tasks.extraction.metrics.aesop.calculator import (
+    AesopConfig,
+    AesopMetricCalculator,
+    make_default_aesop_config,
+)
+from kebab.tasks.extraction.metrics.aesop.distances import (
     BinaryMatchDistance,
     EditDistance,
     EmbeddingDistance,
@@ -25,15 +28,16 @@ from kebab.extraction.metrics.aesop.distances import (
     SingleValuePropertyDistance,
     TokenDistance,
 )
-from kebab.extraction.metrics.aesop.metric_helpers import (
+from kebab.tasks.extraction.metrics.aesop.metric_helpers import (
     EntityMatcher,
     MatchedEntitiesScorer,
     MetricsAccumulator,
     MetricsComputer,
     compute_properties_union,
 )
-from kebab.extraction.metrics.calculator import ExtractionOutput
-from kebab.extraction.metrics.utils import normalize_string
+from kebab.tasks.extraction.metrics.calculator import ExtractionOutput
+from kebab.tasks.extraction.metrics.utils import normalize_string
+from sentence_transformers import SentenceTransformer
 
 
 embed_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
@@ -44,7 +48,7 @@ str_score = PropertyScore(SingleValuePropertyDistance(BinaryMatchDistance())) # 
 edit_score = PropertyScore(SingleValuePropertyDistance(EditDistance())) # lambda e1, e2, key: 1 - edit_distance(e1, e2, key)
 set_token_score = PropertyScore(SetPropertyDistance(TokenDistance(encoder=encoder))) # lambda e1, e2, key: get_set_score(e1, e2, key, token_distance)
 
-def name_entity_distance(property_schema):
+def name_entity_distance(property_schema: PropertySchema) -> EntityDistance:
     return EntityDistance(property_schema, {"name": SingleValuePropertyDistance(TokenDistance())})
 
 
@@ -55,7 +59,7 @@ def to_entities(properties: list[dict[str, Any]]) -> list[Entity]:
                 property_dict[k] = [v]
     return [Entity.from_dict({"entity_id": str(idx), "properties": property_dict}) for idx, property_dict in enumerate(properties)]
 
-def dummy_doc():
+def dummy_doc() -> Document:
     return Document.from_dict(
         data={
             "document_id": "1",
@@ -79,7 +83,7 @@ def test_normalize_string():
     assert normalize_string("KEBAB\nProject") == "kebab project"
 
 
-def test_match_entities_in_different_order(property_schema):
+def test_match_entities_in_different_order(property_schema: PropertySchema):
     ground_truth = to_entities(
         [{"name": "London"}, {"name": "United Kingdom"}, {"name": "France"}])
 
@@ -97,7 +101,7 @@ def test_match_entities_in_different_order(property_schema):
     np.testing.assert_allclose(matched_pair.right_ind, [1, 2, 0])
 
 
-def test_match_entities_with_larger_ground_truth(property_schema):
+def test_match_entities_with_larger_ground_truth(property_schema: PropertySchema):
     ground_truth = to_entities([
         {"name": "United Kingdom"},
         {"name": "London"},
@@ -115,7 +119,7 @@ def test_match_entities_with_larger_ground_truth(property_schema):
     np.testing.assert_allclose(matched_pair.distances, [[1], [0], [1], [1]])
 
 
-def test_match_entities_with_larger_predictions(property_schema):
+def test_match_entities_with_larger_predictions(property_schema: PropertySchema):
     ground_truth = to_entities([{"name": "London"}])
 
     predictions = to_entities([
@@ -133,7 +137,7 @@ def test_match_entities_with_larger_predictions(property_schema):
     np.testing.assert_allclose(matched_pair.distances, [[1, 0, 1, 1]])
 
 
-def test_match_multiple_different_entities(property_schema):
+def test_match_multiple_different_entities(property_schema: PropertySchema):
     ground_truth = to_entities([{"name": "United Kingdom"}, {"name": "London"}, {"name": "Istanbul"}, {"name": "UK"}])
     predictions = to_entities([{"name": "Paris"}, {"name": "Istanbul"}, {"name": "France"}, {"name": "London"}])
 
@@ -146,7 +150,7 @@ def test_match_multiple_different_entities(property_schema):
     np.testing.assert_allclose(matched_pair.right_unmatched, [2, 0])
 
 
-def test_match_entities_with_no_overlap(property_schema):
+def test_match_entities_with_no_overlap(property_schema: PropertySchema):
     ground_truth = to_entities([{"name": "United Kingdom"}, {"name": "London"}])
     predictions = to_entities([{"name": "France"}, {"name": "Paris"}])
 
@@ -174,7 +178,7 @@ def test_match_entities_with_no_overlap(property_schema):
     # assert not evaluated_property_metrics.num_relevant_gt_entities
 
 
-def test_entity_matches_with_low_matching_scores_should_not_be_evaluated(property_schema):
+def test_entity_matches_with_low_matching_scores_should_not_be_evaluated(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([{"name": "United Kingdom"}, {"name": "London"}, {"name": "Istanbul"}]))
     predictions = to_extraction_output(to_entities([{"name": "France"}, {"name": "Paris"}]))
 
@@ -198,7 +202,7 @@ def test_entity_matches_with_low_matching_scores_should_not_be_evaluated(propert
     assert not metrics.get("property_recall")
 
 
-def test_match_entities_with_different_thresholds(property_schema):
+def test_match_entities_with_different_thresholds(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([
         {"name": "South Korea", "type": "country"},
         {"name": "London"}, {"name": "Istanbul"}]))
@@ -249,7 +253,7 @@ def test_match_entities_with_different_thresholds(property_schema):
     assert metrics["unmatched_fractions"]["extra_pred_entities"] == 0.0
     assert metrics["unmatched_fractions"]["extra_gt_entities"] == 0.0
 
-def assert_score_dicts_close(left, right):
+def assert_score_dicts_close(left: dict, right: dict):
     assert left.keys() == right.keys()
     for key in left:
         assert left[key].keys() == right[key].keys()
@@ -257,7 +261,7 @@ def assert_score_dicts_close(left, right):
             np.testing.assert_allclose(left[key][subkey], right[key][subkey])
 
 
-def test_compute_scores_of_target_entities_with_themselves(property_schema):
+def test_compute_scores_of_target_entities_with_themselves(property_schema: PropertySchema):
     ground_truth = to_entities([{"name": "London", "type": "city", "definitions": "Capital of the United Kindgom."}])
     predictions = ground_truth.copy()
 
@@ -287,7 +291,7 @@ def test_compute_scores_of_target_entities_with_themselves(property_schema):
         #np.testing.assert_allclose(evaluated_property_metrics.num_relevant_gt_entities, 1)
 
 
-def test_evaluate_target_entities_with_themselves(property_schema):
+def test_evaluate_target_entities_with_themselves(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([{"name": "London", "type": "city", "definitions": ["Capital of the United Kindgom."]}]))
     predictions = ground_truth.copy()
 
@@ -299,7 +303,7 @@ def test_evaluate_target_entities_with_themselves(property_schema):
     assert metrics["property_recall"]["name"] == metrics["property_recall"]["type"] == 1.0
 
 
-def test_evaluate_target_entities_with_more_predictions(property_schema):
+def test_evaluate_target_entities_with_more_predictions(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities(
         [{"name": "London"}, {"name": "Istanbul"}]))
 
@@ -327,7 +331,7 @@ def test_evaluate_target_entities_with_more_predictions(property_schema):
     assert metrics["property_recall"]["name"] == 1.0
 
 
-def test_evaluate_target_entities_with_more_ground_truth(property_schema):
+def test_evaluate_target_entities_with_more_ground_truth(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([
         {"name": "United Kindgom"},
         {"name": "London"},
@@ -352,7 +356,7 @@ def test_evaluate_target_entities_with_more_ground_truth(property_schema):
     assert metrics["property_recall"]["name"] == 1.0
 
 
-def test_evaluate_set_properties_with_same_values(property_schema):
+def test_evaluate_set_properties_with_same_values(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([{"name": "London", "type": ["city"]}]))
     predictions = to_extraction_output(to_entities([{"name": "London", "type": ["city"]}]))
 
@@ -366,7 +370,7 @@ def test_evaluate_set_properties_with_same_values(property_schema):
 
 def compute_intermediate_metrics(ground_truth: list[ExtractionOutput], predictions: list[ExtractionOutput], config: AesopConfig) -> MetricsAccumulator:
     metrics_accumulator = MetricsAccumulator()
-    for pred, gt in zip(predictions, ground_truth):
+    for pred, gt in zip(predictions, ground_truth, strict=True):
         entity_matcher = EntityMatcher(gt.entities, pred.entities)
         matched_pairs = entity_matcher.match(config.matching_score_function, config.matching_threshold)
         metrics_computer = MetricsComputer(gt.entities, pred.entities, config.property_schema)
@@ -374,7 +378,7 @@ def compute_intermediate_metrics(ground_truth: list[ExtractionOutput], predictio
     return metrics_accumulator
 
 
-def test_evaluate_set_properties_with_different_values(property_schema):
+def test_evaluate_set_properties_with_different_values(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([{"type": ["project", "team"]}]))
     predictions = to_extraction_output(to_entities([{"type": ["project"]}]))
 
@@ -389,7 +393,7 @@ def test_evaluate_set_properties_with_different_values(property_schema):
     assert metrics["property_recall"]["type"] == 0.5
 
 
-def test_evaluate_set_properties_with_more_predictions(property_schema):
+def test_evaluate_set_properties_with_more_predictions(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([{"type": ["project", "team"]}]))
     predictions = to_extraction_output(to_entities([{"type": ["project", "team", "organization", "company", "location"]}]))
 
@@ -405,7 +409,7 @@ def test_evaluate_set_properties_with_more_predictions(property_schema):
     assert metrics_accumulator.total_unmatched_counts_per_doc["type"] == 3
 
 
-def test_evaluate_set_properties_with_more_ground_truth(property_schema):
+def test_evaluate_set_properties_with_more_ground_truth(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([{"type": ["project", "team", "organization"]}]))
     predictions = to_extraction_output(to_entities([{"type": ["project", "team"]}]))
 
@@ -421,7 +425,7 @@ def test_evaluate_set_properties_with_more_ground_truth(property_schema):
     assert metrics_accumulator.total_unmatched_counts_per_doc["type"] == 0
 
 
-def test_evaluate_set_properties_in_different_order_and_normalized(property_schema):
+def test_evaluate_set_properties_in_different_order_and_normalized(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([
         {"alternative names": ["Microsoft Research", "MSRC", "Microsoft Research Cambridge", "MSR Cambridge"]}
     ]))
@@ -438,7 +442,7 @@ def test_evaluate_set_properties_in_different_order_and_normalized(property_sche
     assert metrics["property_recall"]["alternative names"] == 0.25
 
 
-def test_evaluate_missing_properties_in_prediction(property_schema):
+def test_evaluate_missing_properties_in_prediction(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([{"name": "Steven", "type": "person"}]))
     predictions = to_extraction_output(to_entities([{"name": "Steven"}]))
 
@@ -448,11 +452,11 @@ def test_evaluate_missing_properties_in_prediction(property_schema):
 
     assert metrics["property_precision"]["name"] == 1.0
     assert metrics["property_recall"]["name"] == 1.0
-    assert metrics["property_precision"]["type"] == None
+    assert metrics["property_precision"]["type"] is None
     assert metrics["property_recall"]["type"] == 0
 
 
-def test_evaluate_more_properties_in_prediction(property_schema):
+def test_evaluate_more_properties_in_prediction(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([{"name": "Steven"}]))
     predictions = to_extraction_output(to_entities([{"name": "Steven", "type": "person"}]))
 
@@ -463,16 +467,16 @@ def test_evaluate_more_properties_in_prediction(property_schema):
     assert metrics["property_precision"]["name"] == 1.0
     assert metrics["property_recall"]["name"] == 1.0
     assert metrics["property_precision"]["type"] == 0
-    assert metrics["property_recall"]["type"] == None
+    assert metrics["property_recall"]["type"] is None
 
 
-def test_edit_score(property_schema):
+def test_edit_score(property_schema: PropertySchema):
     ground_truth = to_entities([{"team": "Marketing"}])
     predictions = to_entities([{"team": "Strategic Marketing"}])
     score = edit_score(ground_truth[0], predictions[0], property_schema.properties["team"])
     assert score[0] > 0
 
-def test_aggregate_across_documents_simple(property_schema):
+def test_aggregate_across_documents_simple(property_schema: PropertySchema):
     ground_truth1 = to_extraction_output(to_entities([{"name": "John", "type": "person"}]))
     predictions1 = to_extraction_output(to_entities([{"name": "John"}]))
 
@@ -505,7 +509,7 @@ def test_aggregate_across_documents_simple(property_schema):
     assert metrics["property_recall"]["name"] == 1.0
 
 
-def test_evaluate_entities_with_different_properties(property_schema):
+def test_evaluate_entities_with_different_properties(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([
         {
             "name": "Cliff Meltzer",
@@ -573,7 +577,7 @@ def test_evaluate_entities_with_different_properties(property_schema):
     assert metrics["property_recall"]["team"] == 1.0
 
 
-def test_aggregate_across_documents_with_multiple_property_values(property_schema):
+def test_aggregate_across_documents_with_multiple_property_values(property_schema: PropertySchema):
     ground_truth1 = to_extraction_output(to_entities([{"name": "Alexandria", "type": ["project"], "definitions": ["amazing team"]}]))
     predictions1 = to_extraction_output(to_entities([
         {"name": "Alexandria", "type": ["project", "team"], "definitions": ["great project", "amazing team"]}
@@ -606,7 +610,7 @@ def test_aggregate_across_documents_with_multiple_property_values(property_schem
     np.testing.assert_allclose(metrics["property_precision"]["definitions"], 0.5)
 
 
-def test_aggregate_across_documents_with_multiple_entities(property_schema):
+def test_aggregate_across_documents_with_multiple_entities(property_schema: PropertySchema):
     ground_truth1 = to_extraction_output(to_entities([{"name": "Alexandria", "type": ["project"]}, {"name": "FNKE", "type": ["project"]}]))
     predictions1 = to_extraction_output(to_entities([{"name": "Alexandria", "type": ["project", "team"]}, {"name": "FNKE", "type": ["project"]}]))
 
@@ -647,7 +651,7 @@ def test_aggregate_across_documents_with_multiple_entities(property_schema):
     np.testing.assert_allclose(metrics["property_precision"]["definitions"], 1.0)
 
 
-def test_aggregate_across_documents_with_multiple_entities_and_missing_properties_in_predictions(property_schema):
+def test_aggregate_across_documents_with_multiple_entities_and_missing_properties_in_predictions(property_schema: PropertySchema):
     ground_truth1 = to_extraction_output(to_entities([{"name": "Alexandria", "type": ["project"]}, {"name": "FNKE", "type": ["project"]}]))
     predictions1 = to_extraction_output(to_entities([{"name": "Alexandria"}, {"name": "FNKE"}]))
 
@@ -690,7 +694,7 @@ def test_aggregate_across_documents_with_multiple_entities_and_missing_propertie
     assert metrics["property_recall"]["definitions"] == 0.0
 
 
-def test_aggregate_across_documents_with_multiple_entities_and_missing_properties_in_ground_truth(property_schema):
+def test_aggregate_across_documents_with_multiple_entities_and_missing_properties_in_ground_truth(property_schema: PropertySchema):
     ground_truth1 = to_extraction_output(to_entities([{"name": "Alexandria"}, {"name": "FNKE"}]))
     predictions1 = to_extraction_output(to_entities([{"name": "Alexandria", "type": ["project"]}, {"name": "FNKE", "type": ["project"]}]))
 
@@ -734,7 +738,7 @@ def test_aggregate_across_documents_with_multiple_entities_and_missing_propertie
     assert not metrics["property_recall"]["definitions"]
 
 
-def test_evaluate_same_property_across_documents(property_schema):
+def test_evaluate_same_property_across_documents(property_schema: PropertySchema):
     ground_truth1 = to_extraction_output(to_entities([{"type": ["person", "lead"]}]))
     predictions1 = to_extraction_output(to_entities([{"type": ["person", "lead"]}]))
 
@@ -752,14 +756,9 @@ def test_evaluate_same_property_across_documents(property_schema):
     np.testing.assert_allclose(metrics["property_recall"]["type"], 0.66666666)
 
 
-def test_unmatched_entities_in_predictions_should_not_be_evaluated(property_schema):
+def test_unmatched_entities_in_predictions_should_not_be_evaluated(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}]))
     predictions = to_extraction_output(to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}, {"name": "FNKE", "type": "project"}]))
-
-    # metrics_accumulator = compute_bipartite_metrics(
-    #     ground_truth, predictions, embed_model=embed_model, property_schema=property_schema)
-
-    # property_precision, property_recall = compute_scores_across_documents(metrics_accumulator)
 
     config = make_default_aesop_config(property_schema, embed_model=embed_model)
     aesop_metric_calculator = AesopMetricCalculator(config)
@@ -776,7 +775,7 @@ def test_unmatched_entities_in_predictions_should_not_be_evaluated(property_sche
     assert "type" not in metrics["property_recall"]
 
 
-def test_unmatched_entities_in_gt_should_not_be_evaluated(property_schema):
+def test_unmatched_entities_in_gt_should_not_be_evaluated(property_schema: PropertySchema):
     ground_truth = to_extraction_output(to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}, {"name": "FNKE", "type": "project"}]))
     predictions = to_extraction_output(to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}]))
 
@@ -795,7 +794,7 @@ def test_unmatched_entities_in_gt_should_not_be_evaluated(property_schema):
     assert "type" not in metrics["property_recall"]
 
 
-def test_final_statistics(property_schema):
+def test_final_statistics(property_schema: PropertySchema):
     ground_truth1 = to_extraction_output(to_entities([{"name": "John"}, {"name": "Alexandria"}, {"name": "FNKE"}]))
     predictions1 = to_extraction_output(to_entities([{"name": "James"}]))
     ground_truth2 = to_extraction_output(to_entities([{"name": "Alexandria"}, {"name": "FNKE"}, {"name": "Infer.Net"}, {"name": "Phi3"}]))
@@ -825,14 +824,14 @@ def test_final_statistics(property_schema):
     assert metrics["unmatched_counts"]["pairs"] == 3
 
 
-def test_str_match_score(property_schema):
-    ground_truth = to_entities([{"email": "alexandria@microsoft.com"}])
+def test_str_match_score(property_schema: PropertySchema):
+    ground_truth = to_entities([{"email": "test@microsoft.com"}])
     predictions = ground_truth.copy()
     score = str_score(ground_truth[0], predictions[0], property_schema.properties["email"])
     assert score[0] == 1.0
 
 
-def test_embedding_based_score(property_schema):
+def test_embedding_based_score(property_schema: PropertySchema):
     ground_truth = to_entities([
         {
             "definitions": ["A tool used for extracting topics. It is used in a branch and has been tested for extracting personal topics and for the LLM stuff."]
