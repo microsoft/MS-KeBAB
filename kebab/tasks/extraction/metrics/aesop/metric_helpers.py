@@ -84,17 +84,13 @@ class EvaluatedPropertyMetrics:
         self.relevant_pair_scores = defaultdict(lambda : defaultdict(lambda: [0.0]))
         self.property_value_count_gt = [0 for _ in range(gt_length)]
         self.unmatched_count = 0
-        self.zero_out_recall = [False for _ in range(gt_length)]
-        self.zero_out_prec = [False for _ in range(gt_length)]
 
     def __repr__(self: EvaluatedPropertyMetrics) -> str:
         """String representation of EvaluatedPropertyMetrics."""
         return (f"EvaluatedPropertyMetrics(\n"
                 f"relevant_pair_scores={self.relevant_pair_scores},\n"
                 f"property_value_count_gt={self.property_value_count_gt},\n"
-                f"unmatched_count={self.unmatched_count},\n"
-                f"zero_out_recall={self.zero_out_recall},\n"
-                f"zero_out_precision={self.zero_out_prec})")
+                f"unmatched_count={self.unmatched_count})")
 
 
 @dataclass
@@ -112,8 +108,6 @@ class MetricsAccumulator:
         self.unmatched_extra_gt_count: int = 0
         self.unmatched_extra_pred_count: int = 0
         self.unmatched_pair_count: int = 0
-        self.total_zero_out_recall: dict = defaultdict(list)
-        self.total_zero_out_precision: dict = defaultdict(list)
 
     def update(self, other: MetricsAccumulator) -> None:
         """Update the metrics accumulator with the metrics from another accumulator."""
@@ -127,8 +121,6 @@ class MetricsAccumulator:
             self.total_scores_per_doc[key].extend(other.total_scores_per_doc[key])
             self.total_unmatched_counts_per_doc[key] += other.total_unmatched_counts_per_doc[key]
             self.total_gt_property_value_counts_per_doc[key].extend(other.total_gt_property_value_counts_per_doc[key])
-            self.total_zero_out_recall[key].extend(other.total_zero_out_recall[key])
-            self.total_zero_out_precision[key].extend(other.total_zero_out_precision[key])
 
     def accumulate_metrics(self) -> dict:
         """Accumulate metrics across all files."""
@@ -170,9 +162,7 @@ class MetricsAccumulator:
                 f"matched_count={self.matched_count},\n"
                 f"unmatched_extra_gt_count={self.unmatched_extra_gt_count},\n"
                 f"unmatched_extra_pred_count={self.unmatched_extra_pred_count},\n"
-                f"unmatched_pair_count={self.unmatched_pair_count},\n"
-                f"total_zero_out_recall={self.total_zero_out_recall},\n"
-                f"total_zero_out_precision={self.total_zero_out_precision})")
+                f"unmatched_pair_count={self.unmatched_pair_count})")
 
 
 @dataclass
@@ -223,13 +213,7 @@ class MatchedEntitiesScorer:
                     )
                 else:
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
-                    evaluated_property_metrics.zero_out_recall[idx] = True
                 evaluated_property_metrics.property_value_count_gt[gt_idx] += len(self.entities_gt[gt_idx][property_])
-            elif property_ in self.entities_pred[pred_idx]:
-                evaluated_property_metrics.property_value_count_gt[gt_idx] += 0 # :)
-                evaluated_property_metrics.zero_out_prec[idx] = True
-            else:
-                evaluated_property_metrics.zero_out_prec[idx] = True
         return evaluated_property_metrics
 
 
@@ -284,8 +268,6 @@ class MetricsComputer:
             metrics_accumulator.total_gt_property_value_counts_per_doc[key] += (
                 evaluated_property_metrics.property_value_count_gt
             )
-            metrics_accumulator.total_zero_out_recall[key] += evaluated_property_metrics.zero_out_recall
-            metrics_accumulator.total_zero_out_precision[key] += evaluated_property_metrics.zero_out_prec
 
         return metrics_accumulator
 

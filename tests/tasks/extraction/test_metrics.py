@@ -42,11 +42,11 @@ from sentence_transformers import SentenceTransformer
 
 embed_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
 encoder = tiktoken.get_encoding("cl100k_base")
-token_score = PropertyScore(SingleValuePropertyDistance(TokenDistance(encoder=encoder))) # lambda e1, e2, key: 1 - token_distance(e1, e2, key, encoder=encoder)
-embedding_score = PropertyScore(SetPropertyDistance(EmbeddingDistance(model=embed_model))) # lambda e1, e2, key: 1 - embedding_distance(e1, e2, embed_model, key)
-str_score = PropertyScore(SingleValuePropertyDistance(BinaryMatchDistance())) # lambda e1, e2, key: 1 - binary_match_distance(e1, e2, key)
-edit_score = PropertyScore(SingleValuePropertyDistance(EditDistance())) # lambda e1, e2, key: 1 - edit_distance(e1, e2, key)
-set_token_score = PropertyScore(SetPropertyDistance(TokenDistance(encoder=encoder))) # lambda e1, e2, key: get_set_score(e1, e2, key, token_distance)
+token_score = PropertyScore(SingleValuePropertyDistance(TokenDistance(encoder=encoder)))
+embedding_score = PropertyScore(SetPropertyDistance(EmbeddingDistance(model=embed_model)))
+str_score = PropertyScore(SingleValuePropertyDistance(BinaryMatchDistance()))
+edit_score = PropertyScore(SingleValuePropertyDistance(EditDistance()))
+set_token_score = PropertyScore(SetPropertyDistance(TokenDistance(encoder=encoder)))
 
 def name_entity_distance(property_schema: PropertySchema) -> EntityDistance:
     return EntityDistance(property_schema, {"name": SingleValuePropertyDistance(TokenDistance())})
@@ -287,8 +287,6 @@ def test_compute_scores_of_target_entities_with_themselves(property_schema: Prop
         assert_score_dicts_close(evaluated_property_metrics.relevant_pair_scores, {0: {0: [1.0]}})
         np.testing.assert_allclose(evaluated_property_metrics.unmatched_count, 0)
         np.testing.assert_allclose(evaluated_property_metrics.property_value_count_gt, [1])
-        # np.testing.assert_allclose(evaluated_property_metrics.num_relevant_pred_entities, 1)
-        #np.testing.assert_allclose(evaluated_property_metrics.num_relevant_gt_entities, 1)
 
 
 def test_evaluate_target_entities_with_themselves(property_schema: PropertySchema):
@@ -495,13 +493,11 @@ def test_aggregate_across_documents_simple(property_schema: PropertySchema):
 
     assert len(metrics_accumulator.total_scores_per_doc["name"]) == 2
     assert len(metrics_accumulator.total_gt_property_value_counts_per_doc["name"]) == 2
-    assert len(metrics_accumulator.total_zero_out_recall["name"]) == 2
-    assert len(metrics_accumulator.total_zero_out_precision["name"]) == 2
+    assert metrics_accumulator.total_unmatched_counts_per_doc["name"] == 0
 
     assert len(metrics_accumulator.total_scores_per_doc["type"]) == 1
     assert len(metrics_accumulator.total_gt_property_value_counts_per_doc["type"]) == 1
-    assert len(metrics_accumulator.total_zero_out_recall["type"]) == 1
-    assert len(metrics_accumulator.total_zero_out_precision["type"]) == 1
+    assert metrics_accumulator.total_unmatched_counts_per_doc["type"] == 0
 
     assert not metrics["property_precision"]["type"]
     assert metrics["property_recall"]["type"] == 0.0
@@ -623,24 +619,17 @@ def test_aggregate_across_documents_with_multiple_entities(property_schema: Prop
     metrics_accumulator.update(metrics_accumulator2)
     metrics = metrics_accumulator.accumulate_metrics()
 
-    assert (
-        len(metrics_accumulator.total_scores_per_doc["name"])
-        == len(metrics_accumulator.total_zero_out_recall["name"])
-        == len(metrics_accumulator.total_zero_out_precision["name"])
-        == 2
-    )
-    assert (
-        len(metrics_accumulator.total_scores_per_doc["type"])
-        == len(metrics_accumulator.total_zero_out_recall["type"])
-        == len(metrics_accumulator.total_zero_out_precision["type"])
-        == 3
-    )
-    assert (
-        len(metrics_accumulator.total_scores_per_doc["definitions"])
-        == len(metrics_accumulator.total_zero_out_recall["definitions"])
-        == len(metrics_accumulator.total_zero_out_precision["definitions"])
-        == 1
-    )
+    assert len(metrics_accumulator.total_scores_per_doc["name"]) == 2
+    assert metrics_accumulator.total_gt_property_value_counts_per_doc["name"] == [1, 1]
+    assert metrics_accumulator.total_unmatched_counts_per_doc["name"] == 0
+
+    assert len(metrics_accumulator.total_scores_per_doc["type"]) == 3
+    assert metrics_accumulator.total_gt_property_value_counts_per_doc["type"] == [1, 1, 1]
+    assert metrics_accumulator.total_unmatched_counts_per_doc["type"] == 1
+
+    assert len(metrics_accumulator.total_scores_per_doc["definitions"]) == 1
+    assert metrics_accumulator.total_gt_property_value_counts_per_doc["definitions"] == [1]
+    assert metrics_accumulator.total_unmatched_counts_per_doc["definitions"] == 0
 
     np.testing.assert_allclose(metrics["property_recall"]["name"], 1.0)
     np.testing.assert_allclose(metrics["property_recall"]["type"], 1.0)
@@ -664,24 +653,17 @@ def test_aggregate_across_documents_with_multiple_entities_and_missing_propertie
     metrics_accumulator.update(metrics_accumulator2)
     metrics = metrics_accumulator.accumulate_metrics()
 
-    assert (
-        len(metrics_accumulator.total_scores_per_doc["name"])
-        == len(metrics_accumulator.total_zero_out_recall["name"])
-        == len(metrics_accumulator.total_zero_out_precision["name"])
-        == 3
-    )
-    assert (
-        len(metrics_accumulator.total_scores_per_doc["type"])
-        == len(metrics_accumulator.total_zero_out_recall["type"])
-        == len(metrics_accumulator.total_zero_out_precision["type"])
-        == 2
-    )
-    assert (
-        len(metrics_accumulator.total_scores_per_doc["definitions"])
-        == len(metrics_accumulator.total_zero_out_recall["definitions"])
-        == len(metrics_accumulator.total_zero_out_precision["definitions"])
-        == 1
-    )
+    assert len(metrics_accumulator.total_scores_per_doc["name"]) == 3
+    assert metrics_accumulator.total_gt_property_value_counts_per_doc["name"] == [1, 1, 1]
+    assert metrics_accumulator.total_unmatched_counts_per_doc["name"] == 0
+
+    assert len(metrics_accumulator.total_scores_per_doc["type"]) == 2
+    assert metrics_accumulator.total_gt_property_value_counts_per_doc["type"] == [1, 1]
+    assert metrics_accumulator.total_unmatched_counts_per_doc["type"] == 0
+
+    assert len(metrics_accumulator.total_scores_per_doc["definitions"]) == 1
+    assert metrics_accumulator.total_gt_property_value_counts_per_doc["definitions"] == [1]
+    assert metrics_accumulator.total_unmatched_counts_per_doc["definitions"] == 0
 
     assert metrics["property_precision"]["name"] == 1.0
 
@@ -707,25 +689,17 @@ def test_aggregate_across_documents_with_multiple_entities_and_missing_propertie
     metrics_accumulator.update(metrics_accumulator2)
     metrics = metrics_accumulator.accumulate_metrics()
 
-    assert (
-        len(metrics_accumulator.total_scores_per_doc["name"])
-        == len(metrics_accumulator.total_zero_out_recall["name"])
-        == len(metrics_accumulator.total_zero_out_precision["name"])
-        == 3
-    )
+    assert len(metrics_accumulator.total_scores_per_doc["name"]) == 3
+    assert metrics_accumulator.total_gt_property_value_counts_per_doc["name"] == [1, 1, 1]
+    assert metrics_accumulator.total_unmatched_counts_per_doc["name"] == 0
 
     assert len(metrics_accumulator.total_scores_per_doc["type"]) == 1
-    assert (
-        len(metrics_accumulator.total_zero_out_recall["type"])
-        == len(metrics_accumulator.total_zero_out_precision["type"])
-        == 2
-    )
-    assert (
-        len(metrics_accumulator.total_scores_per_doc["definitions"])
-        == len(metrics_accumulator.total_zero_out_recall["definitions"])
-        == len(metrics_accumulator.total_zero_out_precision["definitions"])
-        == 1
-    )
+    assert metrics_accumulator.total_gt_property_value_counts_per_doc["type"] == [0, 0]
+    assert metrics_accumulator.total_unmatched_counts_per_doc["type"] == 0
+
+    assert len(metrics_accumulator.total_scores_per_doc["definitions"]) == 1
+    assert metrics_accumulator.total_gt_property_value_counts_per_doc["definitions"] == [0]
+    assert metrics_accumulator.total_unmatched_counts_per_doc["definitions"] == 0
 
     assert metrics["property_precision"]["name"] == 1.0
     assert metrics["property_precision"]["type"] == 0.0
