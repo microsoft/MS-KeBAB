@@ -201,7 +201,7 @@ class MatchedEntitiesScorer:
         """Compute scores for a given property for matched entities."""
         evaluated_property_metrics = EvaluatedPropertyMetrics(len(self.entities_gt))
 
-        for idx, (gt_idx, pred_idx) in enumerate(zip(self.gt_ind, self.pred_ind,strict=True)):
+        for gt_idx, pred_idx in zip(self.gt_ind, self.pred_ind,strict=True):
             if property_ in self.entities_gt[gt_idx]:
                 if property_ in self.entities_pred[pred_idx]:
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = score_function(

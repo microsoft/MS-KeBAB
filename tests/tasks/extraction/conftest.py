@@ -6,6 +6,7 @@
 import pathlib
 
 import pytest
+
 from kebab.contracts.entity import PropertySchema
 
 
