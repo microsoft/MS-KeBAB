@@ -35,8 +35,7 @@ dev = [
 all = ["kebab[dev]"]
 
 [tool.setuptools.packages.find]
-where = ["kebab"]
-exclude = ["*_test.py", "tests/*", "experiments/*", "configs/*"]
+exclude = ["tests", "texts.*", "scripts", "scripts.*", "docs", "build"]
 
 [tool.pytest.ini_options]
 pythonpath = [
