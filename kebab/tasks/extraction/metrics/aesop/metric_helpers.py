@@ -213,6 +213,7 @@ class MatchedEntitiesScorer:
                         self.entities_gt[gt_idx][property_]
                     ):
                         # Only count unmatched values if predictions have unmatched values
+                        # equivalent to adding a zero score for each unmatched prediction value (needed for precision computation)
                         evaluated_property_metrics.unmatched_count += len(
                             self.entities_pred[pred_idx][property_]
                         ) - len(self.entities_gt[gt_idx][property_])

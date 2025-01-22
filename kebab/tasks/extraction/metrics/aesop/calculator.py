@@ -87,6 +87,6 @@ def make_default_aesop_config(
     return AesopConfig(
         matching_score_function=EntityDistance(property_schema, {"name": SingleValuePropertyDistance(TokenDistance())}),
         matching_threshold=matching_threshold,
-        property_score_functions=defaultdict(lambda: set_token_score, property_to_score),
+        property_score_functions=property_to_score,
         property_schema=property_schema,
     )
