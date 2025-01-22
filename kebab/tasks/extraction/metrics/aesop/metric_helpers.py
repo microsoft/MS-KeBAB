@@ -43,9 +43,7 @@ class EntityMatcher:
         self.entities_gt = entities_gt
         self.entities_pred = entities_pred
 
-    def match(
-        self, distance_function: Callable[[Entity, Entity], float], threshold: float = 1.0
-    ) -> MatchedPairInfo:
+    def match(self, distance_function: Callable[[Entity, Entity], float], threshold: float = 1.0) -> MatchedPairInfo:
         """Match entities based on a distance function and a matching score threshold."""
         distances = self._compute_distances(distance_function)
         print(distances)
@@ -81,16 +79,18 @@ class EvaluatedPropertyMetrics:
 
     def __init__(self, gt_length: int) -> None:
         """Initialize EvaluatedPropertyMetrics."""
-        self.relevant_pair_scores = defaultdict(lambda : defaultdict(lambda: [0.0]))
+        self.relevant_pair_scores = defaultdict(lambda: defaultdict(lambda: [0.0]))
         self.property_value_count_gt = [0 for _ in range(gt_length)]
         self.unmatched_count = 0
 
     def __repr__(self: EvaluatedPropertyMetrics) -> str:
         """String representation of EvaluatedPropertyMetrics."""
-        return (f"EvaluatedPropertyMetrics(\n"
-                f"relevant_pair_scores={self.relevant_pair_scores},\n"
-                f"property_value_count_gt={self.property_value_count_gt},\n"
-                f"unmatched_count={self.unmatched_count})")
+        return (
+            f"EvaluatedPropertyMetrics(\n"
+            f"relevant_pair_scores={self.relevant_pair_scores},\n"
+            f"property_value_count_gt={self.property_value_count_gt},\n"
+            f"unmatched_count={self.unmatched_count})"
+        )
 
 
 @dataclass
@@ -133,11 +133,11 @@ class MetricsAccumulator:
             total_score = np.sum(scores)
             precision_denominator = len(scores) + np.sum(self.total_unmatched_counts_per_doc[key])
             recall_denominator = np.sum(self.total_gt_property_value_counts_per_doc[key])
-            metrics["property_precision"][key] = total_score / precision_denominator if precision_denominator > 0  else 0
+            metrics["property_precision"][key] = total_score / precision_denominator if precision_denominator > 0 else 0
             metrics["property_recall"][key] = total_score / recall_denominator if recall_denominator > 0 else None
             if len(scores) == 0 and self.total_unmatched_counts_per_doc[key] == 0:
                 metrics["property_precision"][key] = None
-        metrics["matched_count"] = self.matched_count # type: ignore
+        metrics["matched_count"] = self.matched_count  # type: ignore
         metrics["unmatched_counts"] = {
             "extra_gt_entities": self.unmatched_extra_gt_count,
             "extra_pred_entities": self.unmatched_extra_pred_count,
@@ -146,28 +146,31 @@ class MetricsAccumulator:
         metrics["unmatched_fractions"] = {
             "pairs": self.unmatched_pair_count / (self.unmatched_pair_count + self.matched_count),
             "extra_pred_entities": self.unmatched_extra_pred_count / self.total_pred_entities,
-            "extra_gt_entities": self.unmatched_extra_gt_count / self.total_gt_entities
+            "extra_gt_entities": self.unmatched_extra_gt_count / self.total_gt_entities,
         }
 
         return metrics
 
     def __repr__(self: MetricsAccumulator) -> str:
         """String representation of MetricsAccumulator."""
-        return (f"MetricsAccumulator(\n"
-                f"total_scores_per_doc={self.total_scores_per_doc},\n"
-                f"total_unmatched_counts_per_doc={self.total_unmatched_counts_per_doc},\n"
-                f"total_gt_property_value_counts_per_doc={self.total_gt_property_value_counts_per_doc},\n"
-                f"total_gt_entities={self.total_gt_entities},\n"
-                f"total_pred_entities={self.total_pred_entities},\n"
-                f"matched_count={self.matched_count},\n"
-                f"unmatched_extra_gt_count={self.unmatched_extra_gt_count},\n"
-                f"unmatched_extra_pred_count={self.unmatched_extra_pred_count},\n"
-                f"unmatched_pair_count={self.unmatched_pair_count})")
+        return (
+            f"MetricsAccumulator(\n"
+            f"total_scores_per_doc={self.total_scores_per_doc},\n"
+            f"total_unmatched_counts_per_doc={self.total_unmatched_counts_per_doc},\n"
+            f"total_gt_property_value_counts_per_doc={self.total_gt_property_value_counts_per_doc},\n"
+            f"total_gt_entities={self.total_gt_entities},\n"
+            f"total_pred_entities={self.total_pred_entities},\n"
+            f"matched_count={self.matched_count},\n"
+            f"unmatched_extra_gt_count={self.unmatched_extra_gt_count},\n"
+            f"unmatched_extra_pred_count={self.unmatched_extra_pred_count},\n"
+            f"unmatched_pair_count={self.unmatched_pair_count})"
+        )
 
 
 @dataclass
 class MatchedIndices:
     """Stores the indices of matched items and unmatched items in ground truth and prediction."""
+
     left_ind: list[int]
     right_ind: list[int]
     left_unmatched: list[int]
@@ -194,23 +197,25 @@ class MatchedEntitiesScorer:
         self.gt_ind = left_ind
         self.pred_ind = right_ind
 
-
     def score(
         self, score_function: Callable[[Entity, Entity, Property], list[float]], property_: Property
     ) -> EvaluatedPropertyMetrics:
         """Compute scores for a given property for matched entities."""
         evaluated_property_metrics = EvaluatedPropertyMetrics(len(self.entities_gt))
 
-        for gt_idx, pred_idx in zip(self.gt_ind, self.pred_ind,strict=True):
+        for gt_idx, pred_idx in zip(self.gt_ind, self.pred_ind, strict=True):
             if property_ in self.entities_gt[gt_idx]:
                 if property_ in self.entities_pred[pred_idx]:
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = score_function(
-                        self.entities_gt[gt_idx], self.entities_pred[pred_idx], property_)
-                    if property_.is_collection and len(self.entities_pred[pred_idx][property_]) > len(self.entities_gt[gt_idx][property_]):
-                        # Only count unmatched values if predictions have unmatched values
-                        evaluated_property_metrics.unmatched_count += len(self.entities_pred[pred_idx][property_]) - len(
-                        self.entities_gt[gt_idx][property_]
+                        self.entities_gt[gt_idx], self.entities_pred[pred_idx], property_
                     )
+                    if property_.is_collection and len(self.entities_pred[pred_idx][property_]) > len(
+                        self.entities_gt[gt_idx][property_]
+                    ):
+                        # Only count unmatched values if predictions have unmatched values
+                        evaluated_property_metrics.unmatched_count += len(
+                            self.entities_pred[pred_idx][property_]
+                        ) - len(self.entities_gt[gt_idx][property_])
                 else:
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
                 evaluated_property_metrics.property_value_count_gt[gt_idx] += len(self.entities_gt[gt_idx][property_])
@@ -260,9 +265,12 @@ class MetricsComputer:
             evaluated_property_metrics = entities_scorer.score(score_func, self.property_schema.properties[key])
 
             metrics_accumulator.total_scores_per_doc[key].extend(
-                [evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx]
-                 for gt_idx in evaluated_property_metrics.relevant_pair_scores
-                 for pred_idx in evaluated_property_metrics.relevant_pair_scores[gt_idx]] or [[0.0]]
+                [
+                    evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx]
+                    for gt_idx in evaluated_property_metrics.relevant_pair_scores
+                    for pred_idx in evaluated_property_metrics.relevant_pair_scores[gt_idx]
+                ]
+                or [[0.0]]
             )
             metrics_accumulator.total_unmatched_counts_per_doc[key] += evaluated_property_metrics.unmatched_count
             metrics_accumulator.total_gt_property_value_counts_per_doc[key] += (
@@ -299,6 +307,10 @@ def compute_properties_union(
     matched_pair: MatchedPairInfo,
 ) -> set[str]:
     """Compute the union of the properties of the ground truth and the predictions ignoring properties only present in unmatched entities."""
-    ground_truth_keys = {key for idx, entity in enumerate(ground_truth) if idx in matched_pair.left_ind for key in entity.properties}
-    predictions_keys = {key for idx, entity in enumerate(predictions) if idx in matched_pair.right_ind for key in entity.properties}
+    ground_truth_keys = {
+        key for idx, entity in enumerate(ground_truth) if idx in matched_pair.left_ind for key in entity.properties
+    }
+    predictions_keys = {
+        key for idx, entity in enumerate(predictions) if idx in matched_pair.right_ind for key in entity.properties
+    }
     return ground_truth_keys.union(predictions_keys)

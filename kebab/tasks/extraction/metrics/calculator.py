@@ -14,6 +14,7 @@ from kebab.contracts.entity import Entity
 @dataclass
 class ExtractionOutput:
     """Extraction output."""
+
     document: Document
     entities: list[Entity]
 
@@ -22,6 +23,6 @@ class MetricsCalculator(abc.ABC):
     """Extraction metrics calculator."""
 
     @abc.abstractmethod
-    def run(self, prediction: list[ExtractionOutput], ground_truth:list[ExtractionOutput]) -> dict[str, Any]:
+    def run(self, prediction: list[ExtractionOutput], ground_truth: list[ExtractionOutput]) -> dict[str, Any]:
         """Calculate extraction metrics."""
         raise NotImplementedError

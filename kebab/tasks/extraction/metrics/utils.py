@@ -24,6 +24,7 @@ def normalize_property_value(value: Any, property_: Property) -> Any:
         return parse_date(value).isoformat()
     return value
 
+
 def normalize_string(value: str) -> str:
     """Replace all space like symbols to spaces, removes leading and trailing spaces and double spaces."""
     return re.sub(r"\s+", " ", value.strip()).lower()

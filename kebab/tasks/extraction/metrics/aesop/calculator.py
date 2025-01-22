@@ -27,11 +27,11 @@ from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricsC
 @dataclass
 class AesopConfig:
     """AESOP metric configuration."""
+
     matching_score_function: Callable[[Entity, Entity], float]
     matching_threshold: float
     property_score_functions: dict[str, Callable[[Entity, Entity, Property], list[float]]]
     property_schema: PropertySchema
-
 
 
 class AesopMetricCalculator(MetricsCalculator):
@@ -41,7 +41,6 @@ class AesopMetricCalculator(MetricsCalculator):
         """Configure AESOP metric calculator."""
         self.config = config
 
-
     def run(self, prediction: list[ExtractionOutput], ground_truth: list[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
         metrics_accumulator = MetricsAccumulator()
@@ -49,13 +48,15 @@ class AesopMetricCalculator(MetricsCalculator):
             entity_matcher = EntityMatcher(gt.entities, pred.entities)
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)
             metrics_computer = MetricsComputer(gt.entities, pred.entities, self.config.property_schema)
-            metrics_accumulator.update(metrics_computer.compute_bipartite_metrics(matched_pairs, self.config.property_score_functions))
+            metrics_accumulator.update(
+                metrics_computer.compute_bipartite_metrics(matched_pairs, self.config.property_score_functions)
+            )
         return metrics_accumulator.accumulate_metrics()
 
 
 def make_default_aesop_config(
-        property_schema: PropertySchema, matching_threshold: float = 1.0,
-        embed_model: SentenceTransformer | None = None) -> AesopConfig:
+    property_schema: PropertySchema, matching_threshold: float = 1.0, embed_model: SentenceTransformer | None = None
+) -> AesopConfig:
     """Create default aesop metric config."""
     # Set score functions are used for properties for which we expect multiple values.
     # Score function always returns a list of scores, even if there is only one value.
@@ -89,4 +90,3 @@ def make_default_aesop_config(
         property_score_functions=defaultdict(lambda: set_token_score, property_to_score),
         property_schema=property_schema,
     )
-

@@ -48,7 +48,7 @@ class TokenDistance(ElementDistance):
         if property_.data_type.value_type is not ValueType.TEXT:
             raise ValueError("Only ValueType.TEXT properties are supported.")
 
-    def compute(self, value1: Any, value2: Any, property_: Property) -> float: # noqa: ARG002
+    def compute(self, value1: Any, value2: Any, property_: Property) -> float:  # noqa: ARG002
         """Compute token distance between property values of ground truth and prediction entity."""
         return token_distance_between_strings(str(value1), str(value2), self.encoder)
 
@@ -67,7 +67,7 @@ class EmbeddingDistance(ElementDistance):
         if property_.data_type.value_type is not ValueType.TEXT:
             raise ValueError("Only ValueType.TEXT properties are supported.")
 
-    def compute(self, value1: Any, value2: Any, property_: Property) -> float: # noqa: ARG002
+    def compute(self, value1: Any, value2: Any, property_: Property) -> float:  # noqa: ARG002
         """Compute distance between string property values using sentence embeddings."""
         return embeddings_distance_between_strings(str(value1), str(value2), self.model)
 
@@ -75,7 +75,7 @@ class EmbeddingDistance(ElementDistance):
 class BinaryMatchDistance(ElementDistance):
     """Binary match distance class."""
 
-    def check_constraints(self, property_: Property) -> None: # noqa: ARG002
+    def check_constraints(self, property_: Property) -> None:  # noqa: ARG002
         """Check constraints for binary match distance."""
         return None
 
@@ -94,9 +94,10 @@ class EditDistance(ElementDistance):
         if property_.data_type.value_type is not ValueType.TEXT:
             raise ValueError("Only ValueType.TEXT properties are supported.")
 
-    def compute(self, value1: Any, value2: Any, property_: Property) -> float: # noqa: ARG002
+    def compute(self, value1: Any, value2: Any, property_: Property) -> float:  # noqa: ARG002
         """Compute edit distance between two string property values."""
         return normalized_edit_distance(str(value1), str(value2))
+
 
 class PropertyDistance:
     """Property distance class."""
@@ -141,7 +142,7 @@ class SetPropertyDistance(PropertyDistance):
         """Initialize set distance."""
         self.element_distance = element_distance
 
-    def check_constraints(self, property_: Property) -> None: # noqa: ARG002
+    def check_constraints(self, property_: Property) -> None:  # noqa: ARG002
         """Check constraints for set distance."""
         return None
 
@@ -171,13 +172,18 @@ class PropertyScore:
     def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> list[float]:
         """Compute the score for a given property."""
         distances = self.property_distance(gt_entity, pred_entity, property_)
-        return [1.0 - d  for d in distances]
+        return [1.0 - d for d in distances]
 
 
 class EntityDistance:
     """Distance between two entities."""
 
-    def __init__(self, property_schema: PropertySchema, property_to_distance_function: dict[str, PropertyDistance], weights: np.ndarray | None = None):
+    def __init__(
+        self,
+        property_schema: PropertySchema,
+        property_to_distance_function: dict[str, PropertyDistance],
+        weights: np.ndarray | None = None,
+    ):
         """Initialize entity distance."""
         self.property_to_distance_function = property_to_distance_function
         self.property_schema = property_schema
@@ -190,8 +196,10 @@ class EntityDistance:
         """Compute distance between two entities."""
         distances = np.zeros(len(self.property_to_distance_function))
         for i, (property_id, property_distance) in enumerate(self.property_to_distance_function.items()):
-            distances[i] = np.mean(property_distance(gt_entity, pred_entity, self.property_schema.properties[property_id]))
-        return self.weights.dot(distances) # type: ignore
+            distances[i] = np.mean(
+                property_distance(gt_entity, pred_entity, self.property_schema.properties[property_id])
+            )
+        return self.weights.dot(distances)  # type: ignore
 
 
 #######################################################################################################################
@@ -202,6 +210,7 @@ def jaccard_distance(tokens1: list[int], tokens2: list[int]) -> float:
     set1 = set(tokens1)
     set2 = set(tokens2)
     return 1 - len(set1.intersection(set2)) / len(set1.union(set2))
+
 
 def token_distance_between_strings(value1: str, value2: str, encoder: tiktoken.Encoding) -> float:
     """Compute token distance between two string values."""
@@ -214,6 +223,7 @@ def embeddings_distance_between_strings(value1: str, value2: str, model: Sentenc
     """Compute embedding distance between two string values."""
     embeds = model.encode([value1, value2])
     return max(0.0, float(cosine(embeds[0], embeds[1])))
+
 
 def normalized_edit_distance(value1: str, value2: str) -> float:
     """Compute edit distance between 2 strings and normalize it by length of the longest string."""
