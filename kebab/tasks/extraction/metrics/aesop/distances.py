@@ -99,6 +99,10 @@ class EditDistance(ElementDistance):
         return normalized_edit_distance(str(value1), str(value2))
 
 
+PropertyDistanceValue = tuple[list[float], int]
+PropertyScoreValue = tuple[list[float], int]
+
+
 class PropertyDistance:
     """Property distance class."""
 
@@ -106,12 +110,22 @@ class PropertyDistance:
         """Check constraints for property distance."""
         raise NotImplementedError
 
-    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> list[float]:
-        """Compute distance between two entities for a given property id."""
+    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyDistanceValue:
+        """Compute distance between two entities for a given property id.
+
+        Returns:
+            - list of distances between matched property values of ground truth and prediction entity
+            - number of unmatched property values in prediction entity"
+        """
         raise NotImplementedError
 
-    def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> list[float]:
-        """Compute distance between two entities for a given property id."""
+    def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyDistanceValue:
+        """Compute distance between two entities for a given property id.
+
+        Returns:
+            - list of distances between matched property values of ground truth and prediction entity
+            - number of unmatched property values in prediction entity"
+        """
         self.check_constraints(property_)
         return self.compute(gt_entity, pred_entity, property_)
 
@@ -128,11 +142,16 @@ class SingleValuePropertyDistance(PropertyDistance):
         if property_.is_collection:
             raise ValueError("Collection properties are not supported.")
 
-    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> list[float]:
-        """Compute distance between two entities for a given property id."""
+    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyDistanceValue:
+        """Compute distance between two entities for a given property id.
+
+        Returns:
+            - list of distances between matched property values of ground truth and prediction entity
+            - number of unmatched property values in prediction entity (always 0 for single value properties)"
+        """
         if property_ not in gt_entity or property_ not in pred_entity:
-            return [1]
-        return [self.element_distance(gt_entity[property_][0], pred_entity[property_][0], property_)]
+            return [1], 0
+        return [self.element_distance(gt_entity[property_][0], pred_entity[property_][0], property_)], 0
 
 
 class SetPropertyDistance(PropertyDistance):
@@ -146,10 +165,16 @@ class SetPropertyDistance(PropertyDistance):
         """Check constraints for set distance."""
         return None
 
-    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> list[float]:
-        """Compute the average distance between two sets of values for a given property."""
+    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyDistanceValue:
+        """Compute distances between two sets of values for a given property.
+
+        Returns:
+            - list of distances between matched property values of ground truth
+                and prediction entity (needed for aggregation across entities)
+            - number of unmatched property values in prediction entity.
+        """
         if property_ not in gt_entity or property_ not in pred_entity:
-            return [1]
+            return [1], 0
 
         gt_values = gt_entity[property_]
         pred_values = pred_entity[property_]
@@ -159,7 +184,9 @@ class SetPropertyDistance(PropertyDistance):
             for j, value2 in enumerate(pred_values):
                 distances[i, j] = self.element_distance(value1, value2, property_)
         matched_indices = match_items(distances)
-        return list(distances[matched_indices.left_ind, matched_indices.right_ind])
+        matched_scores = list(distances[matched_indices.left_ind, matched_indices.right_ind])
+        unmatched_pred_count = len(pred_values) - len(matched_indices.right_ind)
+        return matched_scores, unmatched_pred_count
 
 
 class PropertyScore:
@@ -169,10 +196,13 @@ class PropertyScore:
         """Initialize property score."""
         self.property_distance = property_distance
 
-    def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> list[float]:
+    def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyScoreValue:
         """Compute the score for a given property."""
-        distances = self.property_distance(gt_entity, pred_entity, property_)
-        return [1.0 - d for d in distances]
+        distances, unmatched_count = self.property_distance(gt_entity, pred_entity, property_)
+        for distance in distances:
+            if distance < 0 or distance > 1:
+                raise ValueError(f"Distance value {distance} is out of range [0, 1].")
+        return [1.0 - d for d in distances], unmatched_count
 
 
 class EntityDistance:
@@ -196,9 +226,8 @@ class EntityDistance:
         """Compute distance between two entities."""
         distances = np.zeros(len(self.property_to_distance_function))
         for i, (property_id, property_distance) in enumerate(self.property_to_distance_function.items()):
-            distances[i] = np.mean(
-                property_distance(gt_entity, pred_entity, self.property_schema.properties[property_id])
-            )
+            value_distances, _ = property_distance(gt_entity, pred_entity, self.property_schema.properties[property_id])
+            distances[i] = np.mean(value_distances)
         return self.weights.dot(distances)  # type: ignore
 
 
@@ -222,7 +251,7 @@ def token_distance_between_strings(value1: str, value2: str, encoder: tiktoken.E
 def embeddings_distance_between_strings(value1: str, value2: str, model: SentenceTransformer) -> float:
     """Compute embedding distance between two string values."""
     embeds = model.encode([value1, value2])
-    return max(0.0, float(cosine(embeds[0], embeds[1])))
+    return 0.5 * float(cosine(embeds[0], embeds[1]))
 
 
 def normalized_edit_distance(value1: str, value2: str) -> float:

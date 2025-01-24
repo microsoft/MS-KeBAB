@@ -14,6 +14,9 @@ from scipy.sparse.csgraph import min_weight_full_bipartite_matching
 from kebab.contracts.entity import Entity, Property, PropertySchema
 
 
+# from kebab.tasks.extraction.metrics.aesop.distances import PropertyScoreValue
+
+
 @dataclass
 class MatchedPairInfo:
     """
@@ -198,7 +201,7 @@ class MatchedEntitiesScorer:
         self.pred_ind = right_ind
 
     def score(
-        self, score_function: Callable[[Entity, Entity, Property], list[float]], property_: Property
+        self, score_function: Callable[[Entity, Entity, Property], PropertyScoreValue], property_: Property
     ) -> EvaluatedPropertyMetrics:
         """Compute scores for a given property for matched entities."""
         evaluated_property_metrics = EvaluatedPropertyMetrics(len(self.entities_gt))
@@ -206,17 +209,11 @@ class MatchedEntitiesScorer:
         for gt_idx, pred_idx in zip(self.gt_ind, self.pred_ind, strict=True):
             if property_ in self.entities_gt[gt_idx]:
                 if property_ in self.entities_pred[pred_idx]:
-                    evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = score_function(
+                    scores, unmatched_pred_count = score_function(
                         self.entities_gt[gt_idx], self.entities_pred[pred_idx], property_
                     )
-                    if property_.is_collection and len(self.entities_pred[pred_idx][property_]) > len(
-                        self.entities_gt[gt_idx][property_]
-                    ):
-                        # Only count unmatched values if predictions have unmatched values
-                        # equivalent to adding a zero score for each unmatched prediction value (needed for precision computation)
-                        evaluated_property_metrics.unmatched_count += len(
-                            self.entities_pred[pred_idx][property_]
-                        ) - len(self.entities_gt[gt_idx][property_])
+                    evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = scores
+                    evaluated_property_metrics.unmatched_count += unmatched_pred_count
                 else:
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
                 evaluated_property_metrics.property_value_count_gt[gt_idx] += len(self.entities_gt[gt_idx][property_])
@@ -240,7 +237,7 @@ class MetricsComputer:
     def compute_bipartite_metrics(
         self,
         matched_pair: MatchedPairInfo,
-        keys_to_score: dict[str, Callable[[Entity, Entity, Property], list[float]]],
+        keys_to_score: dict[str, Callable[[Entity, Entity, Property], tuple[list[float], int]]],
     ) -> MetricsAccumulator:
         """Compute provided property scores for the matched entities."""
         metrics_accumulator = MetricsAccumulator()

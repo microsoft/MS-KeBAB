@@ -16,6 +16,7 @@ from kebab.tasks.extraction.metrics.aesop.distances import (
     EmbeddingDistance,
     EntityDistance,
     PropertyScore,
+    PropertyScoreValue,
     SetPropertyDistance,
     SingleValuePropertyDistance,
     TokenDistance,
@@ -30,12 +31,17 @@ class AesopConfig:
 
     matching_score_function: Callable[[Entity, Entity], float]
     matching_threshold: float
-    property_score_functions: dict[str, Callable[[Entity, Entity, Property], list[float]]]
+    property_score_functions: dict[str, Callable[[Entity, Entity, Property], PropertyScoreValue]]
     property_schema: PropertySchema
 
 
 class AesopMetricCalculator(MetricsCalculator):
-    """AESOP metric calculator."""
+    """AESOP metric calculator.
+    Computes AESOP metric as described in the paper: https://arxiv.org/pdf/2402.04437
+    with the following modification:
+    We don't average property scores on entity level to obtain entity similarities.
+    Instead, we compute property-level similarities across all entities in the set.
+    """
 
     def __init__(self, config: AesopConfig):
         """Configure AESOP metric calculator."""

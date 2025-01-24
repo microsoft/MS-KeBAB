@@ -497,7 +497,7 @@ def test_evaluate_more_properties_in_prediction(property_schema: PropertySchema)
 def test_edit_score(property_schema: PropertySchema):
     ground_truth = to_entities([{"team": "Marketing"}])
     predictions = to_entities([{"team": "Strategic Marketing"}])
-    score = edit_score(ground_truth[0], predictions[0], property_schema.properties["team"])
+    score, _ = edit_score(ground_truth[0], predictions[0], property_schema.properties["team"])
     assert score[0] > 0
 
 
@@ -865,7 +865,7 @@ def test_final_statistics(property_schema: PropertySchema):
 def test_str_match_score(property_schema: PropertySchema):
     ground_truth = to_entities([{"email": "test@microsoft.com"}])
     predictions = ground_truth.copy()
-    score = str_score(ground_truth[0], predictions[0], property_schema.properties["email"])
+    score, _ = str_score(ground_truth[0], predictions[0], property_schema.properties["email"])
     assert score[0] == 1.0
 
 
@@ -888,5 +888,5 @@ def test_embedding_based_score(property_schema: PropertySchema):
             }
         ]
     )
-    score = embedding_score(ground_truth[0], predictions[0], property_schema.properties["definitions"])
+    score, _ = embedding_score(ground_truth[0], predictions[0], property_schema.properties["definitions"])
     assert score[0] > 0.5
