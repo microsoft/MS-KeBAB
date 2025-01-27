@@ -54,7 +54,7 @@ class EntityGenerationTaskInstance(TaskInstance):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,  # noqa: ARG002
+        output_to_evaluate: Path,
         eval_result_path: Path | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the entity generation task instance."""

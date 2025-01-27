@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-import filecmp
 import shutil
 from collections.abc import Generator
 from pathlib import Path
