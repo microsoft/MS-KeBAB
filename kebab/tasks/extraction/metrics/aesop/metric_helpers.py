@@ -14,9 +14,6 @@ from scipy.sparse.csgraph import min_weight_full_bipartite_matching
 from kebab.contracts.entity import Entity, Property, PropertySchema
 
 
-# from kebab.tasks.extraction.metrics.aesop.distances import PropertyScoreValue
-
-
 @dataclass
 class MatchedPairInfo:
     """
@@ -140,6 +137,8 @@ class MetricsAccumulator:
             metrics["property_recall"][key] = total_score / recall_denominator if recall_denominator > 0 else None
             if len(scores) == 0 and self.total_unmatched_counts_per_doc[key] == 0:
                 metrics["property_precision"][key] = None
+        metrics["avg_property_precision"] = np.mean([value for value in metrics["property_precision"].values() if value is not None]) # type: ignore
+        metrics["avg_property_recall"] = np.mean([value for value in metrics["property_recall"].values() if value is not None]) # type: ignore
         metrics["matched_count"] = self.matched_count  # type: ignore
         metrics["unmatched_counts"] = {
             "extra_gt_entities": self.unmatched_extra_gt_count,
@@ -201,7 +200,7 @@ class MatchedEntitiesScorer:
         self.pred_ind = right_ind
 
     def score(
-        self, score_function: Callable[[Entity, Entity, Property], PropertyScoreValue], property_: Property
+        self, score_function: Callable[[Entity, Entity, Property], tuple[list[float], int]], property_: Property
     ) -> EvaluatedPropertyMetrics:
         """Compute scores for a given property for matched entities."""
         evaluated_property_metrics = EvaluatedPropertyMetrics(len(self.entities_gt))

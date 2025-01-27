@@ -12,6 +12,8 @@ from typing import Any
 
 import numpy as np
 import tiktoken
+from sentence_transformers import SentenceTransformer
+
 from kebab.contracts.document import Document, DocumentSchema
 from kebab.contracts.entity import Entity, PropertySchema
 from kebab.tasks.extraction.metrics.aesop.calculator import (
@@ -38,7 +40,6 @@ from kebab.tasks.extraction.metrics.aesop.metric_helpers import (
 )
 from kebab.tasks.extraction.metrics.calculator import ExtractionOutput
 from kebab.tasks.extraction.metrics.utils import normalize_string
-from sentence_transformers import SentenceTransformer
 
 
 embed_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
