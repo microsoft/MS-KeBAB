@@ -3,23 +3,23 @@
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
-      "schema": "https://some.public/download/link",
-      "ground_truth_extracted_entities": "https://some.public/download/link"
+      "ground_truth_extracted_entities": "https://some.public/download/link",
+      "property_schema": "https://some.public/download/link"
     }
   },
   "Extraction-ReDocRED-Test": {
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
-      "schema": "https://some.public/download/link",
-      "ground_truth_extracted_entities": "https://some.public/download/link"
+      "ground_truth_extracted_entities": "https://some.public/download/link",
+      "property_schema": "https://some.public/download/link"
     }
   },
   "Extraction-Heldout": {
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
-      "schema": "https://some.public/download/link"
+      "property_schema": "https://some.public/download/link"
     }
   },
   "Linking-TREx-Train": {
