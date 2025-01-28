@@ -13,7 +13,7 @@ from kebab.utils.io_helpers import BooleanFileReader, BooleanFileWriter, EntityP
 
 
 class LinkingTaskInstance(TaskInstance):
-    """Represents an linking benchmark task instance with its data files."""
+    """Represents a linking benchmark task instance with its data files."""
 
     __data_entity_fragment_pairs: Path
     __data_ground_truth_boolean: Path | None
@@ -35,7 +35,7 @@ class LinkingTaskInstance(TaskInstance):
         entity_fragment_pairs: str,
         ground_truth_boolean: str | None = None,
     ):
-        """Initialize an linking task instance."""
+        """Initialize a linking task instance."""
         super().__init__(name, task)
         self.__data_entity_fragment_pairs = Path(entity_fragment_pairs)
         if ground_truth_boolean is not None:
