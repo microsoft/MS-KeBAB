@@ -132,7 +132,7 @@ class TRexFragmentExtractor:
 
                 fragments[entity_id] = fragment
 
-            fragments[entity_id].names.append(item["surfaceform"])
+            fragments[entity_id].properties["names"].append(item["surfaceform"])
 
         if invalid_entities:
             logging.debug(f"Found {invalid_entities} invalid entities in the document")

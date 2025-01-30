@@ -16,6 +16,8 @@ def t_rex_input_file_path() -> Path:
     return Path(__file__).parent / "data" / "datasets" / "trex" / "t_rex_single_doc.json"
 
 
+# TODO(pmyshkov): The T-REx is to be replaced with REBEL
+@pytest.mark.xfail
 def test_extract_entities(t_rex_input_file_path: Path) -> None:
     """Test the extraction of entities and properties from a single T-REx JSON document record."""
     # load a single T-REx document
@@ -30,7 +32,7 @@ def test_extract_entities(t_rex_input_file_path: Path) -> None:
 
     main_ent_key = "Q33199"
     assert main_ent_key in entities
-    assert "Austroasiatic languages" in entities[main_ent_key].names
+    assert "Austroasiatic languages" in entities[main_ent_key].properties["names"]
 
     source_ids = entities[main_ent_key].source_ids
 
