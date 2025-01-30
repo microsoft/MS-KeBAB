@@ -15,7 +15,7 @@ Example output:
   "description": "president of the United States from 1789 to 1797",
    "aliases": ["Father of the United States", "The American Fabius", "American Fabius"]}...
 
-The workflow of extracting the hierarchy is as follows:
+The workflow of building the dataset is as follows:
 1. Collect all subtypes of the given type.
 2. Filter the simple entities to the ones that have the given type and have the required number of aliases.
 """
