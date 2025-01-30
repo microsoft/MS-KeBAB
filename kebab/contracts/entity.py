@@ -311,7 +311,7 @@ class Entity:
 
         self.source_ids += other.source_ids
 
-        # TODO: Handle evidence correctly instead of the below
+        # TODO(pmyshkov): Handle evidence correctly instead of the below
         self.deduplicate_property_values()
         self.deduplicate_source_ids()
 
