@@ -631,7 +631,7 @@ class WikidataHierarchyExtractor:
         """Merge the entities into a single entity."""
         entity_ids = set(entity_ids)
 
-        merged_entity_id = min(entity_ids)
+        merged_entity_id = min(entity_ids)  # TODO (pmyshkov): perhaps select the one with the most references instead?
         merged_node = graph[merged_entity_id]
         merged_parents = merged_node["parents"]
         merged_children = merged_node["children"]

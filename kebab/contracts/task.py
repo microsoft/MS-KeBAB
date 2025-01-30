@@ -15,8 +15,9 @@ from typing import Any, ClassVar, Self
 class TaskType(Enum):
     """Allowed task types."""
 
-    Extraction = 1
-    Linking = 2
+    EntityGeneration = 1
+    Extraction = 2
+    Linking = 3
 
 
 class Task:
