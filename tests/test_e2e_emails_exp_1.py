@@ -122,11 +122,11 @@ def test_entity_to_from_dict(emails_exp_1_path: pathlib.Path):
     entities = list(EntityUtilities.load_entities(emails_exp_1_path / "extracted_entities"))
     entity = entities[0]
 
+    # test that _eq__ method works (that attributes are created)
     assert entity == entity  # noqa: PLR0124
 
     entity_dict = entity.to_dict()
     new_entity = Entity.from_dict(entity_dict)
-    assert new_entity == new_entity  # noqa: PLR0124
 
     assert entity == new_entity
     assert entity.properties == new_entity.properties
@@ -143,6 +143,9 @@ def test_entity_to_from_dict(emails_exp_1_path: pathlib.Path):
     assert "_original_entity_id" not in entity_dict
     assert "_original_entity_types" not in entity_dict
     assert "_split" not in entity_dict
+
+    entity_without_internals = Entity.from_dict(entity_dict)
+    assert entity != entity_without_internals
 
     entity_dict = entity.to_dict(include_internal=True)
     assert entity_dict["_original_entity_id"] == "test_entity_id"
