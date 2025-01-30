@@ -39,17 +39,17 @@ class ValueType(Enum):
 class DataType:
     """Specification of a data type."""
 
+    # Unique identifier for the data type.
     data_type_id: str
-    """Unique identifier for the data type."""
 
+    # Type of the data.
     value_type: ValueType
-    """Type of the data."""
 
+    # Textual description of the data type.
     description: str
-    """Textual description of the data type."""
 
+    # List of possible values for a category data type, if applicable.
     category_values: list[Any] | None = None
-    """List of possible values for a category data type, if applicable."""
 
     def __post_init__(self):
         """Post-initialisation checks."""
@@ -100,23 +100,21 @@ class DataType:
 class Property:
     """Specification of a single property."""
 
+    # Unique (within the experiment) identifier for the property.
     property_id: str
-    """Unique (within the experiment) identifier for the property."""
 
+    # Data type that the property values must conform to.
     data_type: DataType
-    """Data type that the property values must conform to."""
 
+    # Textual description of the property.
     description: str
-    """Textual description of the property."""
 
+    # Human-readable name of the property.
     display_name: str | None = None
-    """Human-readable name of the property."""
 
+    # Whether the property is interpreted as a collection-valued property.
+    # Having `is_collection = True` means that missing values are heavily penalized during evaluation.
     is_collection: bool = False
-    """
-    Whether the property is interpreted as a collection-valued property.
-    Having `is_collection = True` means that missing values are heavily penalized during evaluation.
-    """
 
     def __post_init__(self):
         """Post-initialisation checks."""
@@ -153,20 +151,16 @@ class PropertySchema:
     This is a container for data types and properties and a helper functionality to load and save them.
     """
 
-    name: str  # optional
-    """An optional name of the schema."""
+    # An optional name of the schema.
+    name: str
 
+    # Dictionary of data types, indexed by their unique IDs.
+    # Always satisfied: data_types[some_id]["data_type_id"] == some_id
     data_types: dict[str, DataType]
-    """
-    Dictionary of data types, indexed by their unique IDs.
-    Always satisfied: data_types[some_id]["data_type_id"] == some_id
-    """
 
+    # Dictionary of properties, indexed by their unique IDs.
+    # Always satisfied: properties[some_id]["property_id"] == some_id
     properties: dict[str, Property]
-    """
-    Dictionary of properties, indexed by their unique IDs.
-    Always satisfied: properties[some_id]["property_id"] == some_id
-    """
 
     def __init__(
         self,
@@ -227,50 +221,38 @@ class PropertySchema:
 class Entity:
     """Represents an entity with its property values and evidence that supports them."""
 
+    # Unique identifier for the entity.
     entity_id: str
-    """Unique identifier for the entity."""
 
+    # Dictionary of property values. Keys are property IDs, values are the lists of actual values.
+    # For each property, a list element must be one of 3 things:
+    #     - An actual value of type given by the ValueType of the property (string, number, etc.).
+    #     - A set of values (treated as one-of alternatives).
+    #     - A dictionary mapping values to probabilities.
     properties: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
-    """
-    Dictionary of property values. Keys are property IDs, values are the lists of actual values.
 
-    For each property, a list element must be one of 3 things:
-        - An actual value of type given by the ValueType of the property (string, number, etc.).
-        - A set of values (treated as one-of alternatives).
-        - A dictionary mapping values to probabilities.
-    """
-
+    # List of source IDs that contributed to the entity.
     source_ids: list[str] = field(default_factory=list)
-    """List of source IDs that contributed to the entity."""
 
+    # Map from property ID to a list that maps each value index to a list of evidence indices that support it.
     evidence_map: dict[str, list[list[int]]] = field(default_factory=lambda: defaultdict(list))
-    """Map from property ID to a list that maps each value index to a list of evidence indices that support it."""
 
+    # Internal use only:
+    # - Should not be included in the final dataset.
+    # - Can be serialised (via "include_internal=True") during the intermediate dataset construction steps.
+    # - Not used in merge operations.
+    # The original ID of the entity in the ground truth KB (e.g. Wikidata).
     _original_entity_id: str | None = field(default=None, init=False, repr=False, metadata={"internal": True})
-    """
-    Internal use only:
-    - Should not be included in the final dataset.
-    - Can be serialised (via "include_internal=True") during the intermediate dataset construction steps.
-    - Not used in merge operations.
 
-    The original ID of the entity in the ground truth KB (e.g. Wikidata).
-    """
-
+    # Internal use only (see `_entity_id`).
+    # The value can be populated from the ground truth KB (e.g. Wikidata) and used to filter the dataset based on
+    # the entity types.
     _original_entity_types: list[str] = field(default_factory=list, init=False, repr=False, metadata={"internal": True})
-    """
-    Internal use only (see `_entity_id`).
-
-    The value can be populated from the ground truth KB (e.g. Wikidata) and used to filter the dataset based on
-    the entity types.
-    """
 
     # TODO(pmyshkov): Remove this once the DiSK refactor PR is merged
+    # Internal use only (see `_entity_id`).
+    # Indicates the split of the dataset (train/val/test) the entity belongs to.
     _split: str | None = field(default=None, init=False, repr=False, metadata={"internal": True})
-    """
-    Internal use only (see `_entity_id`).
-
-    Indicates the split of the dataset (train/val/test) the entity belongs to.
-    """
 
     def __post_init__(self) -> None:
         """Post-initialisation checks."""
