@@ -82,6 +82,34 @@ class DocumentJsonlReader(ItemReader[Document]):
         return DocumentUtilities.load_documents(self.path, self.schemas)
 
 
+class EntityJsonlReader(ItemReader[Entity]):
+    """
+    Reader for JSONL files containing `Entity` objects.
+
+    This class reads a JSONL file, where each line contains a serialized `Entity` object.
+    """
+
+    def __init__(self, path: Path):
+        """
+        Initializes the JSONL reader for entities.
+
+        Args:
+            path: The file path to the JSONL file.
+        """
+        self.path = path
+
+    def read_items(self) -> Iterable[Entity]:
+        """
+        Reads the JSONL file and yields `Entity` objects.
+
+        Returns:
+            Iterable[Entity]: An iterable of `Entity` objects.
+        """
+        with open(self.path, encoding="utf-8") as file:
+            for line in file:
+                yield Entity.from_dict(json.loads(line))
+
+
 class EntityListJsonlReader(ItemReader[list[Entity]]):
     """
     Reader for JSONL files containing lists of `Entity` objects.
@@ -190,6 +218,40 @@ class ItemWriter[DataItemType](ABC):
         Args:
             items (Iterable[DataItemType]): An iterable of output items to be written.
         """
+
+
+class EntityJsonlWriter(ItemWriter[Entity]):
+    """
+    Writer for JSONL files containing `Entity` objects.
+
+    This class writes a JSONL file, where each line contains a serialized `Entity` object.
+    """
+
+    def __init__(self, path: Path):
+        """
+        Initializes the JSONL writer for entities.
+
+        Args:
+            path: The file path where the JSONL file will be written.
+        """
+        self.path = path
+
+    def write_items(self, items: Iterable[Entity]) -> None:
+        """
+        Writes `Entity` objects to a JSONL file.
+
+        Args:
+            items: An iterable of `Entity` objects to be written to the file.
+        """
+        with open(self.path, "w", encoding="utf-8", newline="\n") as file:
+            for entity in items:
+                json_line = json.dumps(
+                    entity,
+                    ensure_ascii=False,
+                    cls=CustomEncoder,
+                    separators=(",", ":"),
+                )
+                file.write(json_line + "\n")
 
 
 class EntityListJsonlWriter(ItemWriter[list[Entity]]):

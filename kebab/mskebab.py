@@ -12,6 +12,7 @@ import urllib.request
 from pathlib import Path
 
 from kebab.contracts.task import Task, TaskInstance, TaskType
+from kebab.tasks.entity_generation import EntityGenerationTaskInstance
 from kebab.tasks.extraction import ExtractionTaskInstance
 from kebab.tasks.linking import LinkingTaskInstance
 
@@ -53,6 +54,7 @@ class Benchmark:
     @staticmethod
     def __register_task_types() -> None:
         """Register available task types with their corresponding classes."""
+        TaskInstance.register_task_type(TaskType.EntityGeneration, EntityGenerationTaskInstance)
         TaskInstance.register_task_type(TaskType.Extraction, ExtractionTaskInstance)
         TaskInstance.register_task_type(TaskType.Linking, LinkingTaskInstance)
 

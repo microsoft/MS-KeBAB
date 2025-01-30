@@ -30,7 +30,7 @@ import typing
 from collections import defaultdict
 from collections.abc import Iterable
 
-from kebab.utils.dataset.t_rex.entity_fragment import EntityFragment
+from kebab.contracts.entity import Entity
 from kebab.utils.dataset.wikidata import wikidata_utils
 
 
@@ -132,7 +132,7 @@ class TRexDatasetBuilder:
         self,
         fragments_path: pathlib.Path | None = None,
         remove_duplicates: bool = True,
-    ) -> dict[str, list[EntityFragment]]:
+    ) -> dict[str, list[Entity]]:
         """Load entity fragments from file."""
         fragments_path = fragments_path or self.fragments_path
 
@@ -142,12 +142,12 @@ class TRexDatasetBuilder:
 
         with open(fragments_path, encoding="utf-8") as f:
             for line in f:
-                fragment = EntityFragment.from_json(line)
+                fragment = Entity.from_json(line)
 
                 if remove_duplicates:
                     values = set()
                     values.add(fragment.entity_id)
-                    values.update(fragment.names)
+                    values.update(fragment.properties["names"])
                     for prop, prop_values in fragment.properties.items():
                         values.add(prop)
                         values.update(prop_values)
@@ -171,7 +171,7 @@ class TRexDatasetBuilder:
 
         return fragments
 
-    def collect_referenced_ids(self, fragments: dict[str, list[EntityFragment]]) -> set[str]:
+    def collect_referenced_ids(self, fragments: dict[str, list[Entity]]) -> set[str]:
         """Collect all distinct entity ids and reference property values."""
         # collect all distinct reference property values
         referenced_ids = set()
@@ -281,7 +281,7 @@ class TRexDatasetBuilder:
 
     def filter_fragments(
         self,
-        entity_fragments: Iterable[EntityFragment],
+        entity_fragments: Iterable[Entity],
         *,
         wikidata_entities: dict[str, dict] | None = None,
         wikidata_properties: dict[str, dict] | None = None,
@@ -289,7 +289,7 @@ class TRexDatasetBuilder:
         min_name_count: int | None = None,
         min_property_count: int | None = None,
         type_ids: list[str] | None = None,
-    ) -> Iterable[EntityFragment]:
+    ) -> Iterable[Entity]:
         """Filter fragments based on the number of properties they have and other criteria."""
         min_property_count = min_property_count if min_property_count is not None else self.min_fragment_property_count
         min_name_count = min_name_count if min_name_count is not None else self.min_name_count
@@ -297,9 +297,9 @@ class TRexDatasetBuilder:
 
         filtered_out_properties = defaultdict(int)
 
-        def filter_contents(fragment: EntityFragment) -> EntityFragment:
+        def filter_contents(fragment: Entity) -> Entity:
             """Filter fragment contents."""
-            names = (name for name in fragment.names if name not in self.DISALLOWED_NAMES)
+            names = (name for name in fragment.properties["names"] if name not in self.DISALLOWED_NAMES)
 
             # filter out names that are not in Wikidata
             if filter_to_wikidata_names and wikidata_entities:
@@ -307,7 +307,7 @@ class TRexDatasetBuilder:
                 wikidata_names = {wikidata_entity["name"], *wikidata_entity["aliases"]}
                 names = (name for name in names if name in wikidata_names)
 
-            fragment.names = list(names)
+            fragment.properties["names"] = list(names)
 
             # filter out properties that are not in the provided properties map
             if wikidata_properties:
@@ -331,16 +331,16 @@ class TRexDatasetBuilder:
 
             fragment = filter_contents(f)
 
-            if not fragment.names:
+            if not fragment.properties["names"]:
                 if len(fragment.properties) <= 1:
                     continue
 
                 if not self.SUBSTITUTE_ACTUAL_NAME_IF_MISSING or not wikidata_entities:
                     continue
 
-                fragment.names = [wikidata_entities[fragment.entity_id]["name"]]
+                fragment.properties["names"] = [wikidata_entities[fragment.entity_id]["name"]]
 
-            if min_name_count and len(fragment.names) < min_name_count:
+            if min_name_count and len(fragment.properties["names"]) < min_name_count:
                 continue
 
             if len(fragment.properties) < min_property_count:
@@ -358,10 +358,10 @@ class TRexDatasetBuilder:
 
     def filter_entities_by_fragment_count(
         self,
-        fragments: dict[str, list[EntityFragment]],
+        fragments: dict[str, list[Entity]],
         min_entity_fragment_count: int | None = None,
         max_entity_fragment_count: int | None = None,
-    ) -> dict[str, list[EntityFragment]]:
+    ) -> dict[str, list[Entity]]:
         """Filter entities by the number of fragments they have."""
         min_entity_fragment_count = (
             min_entity_fragment_count if min_entity_fragment_count is not None else self.min_entity_fragment_count
@@ -386,7 +386,7 @@ class TRexDatasetBuilder:
 
         return fragments
 
-    def write_dataset(self, fragments: dict[str, list[EntityFragment]]) -> None:
+    def write_dataset(self, fragments: dict[str, list[Entity]]) -> None:
         """Write the entity dataset."""
         with open(self.entities_output_path, mode="w", encoding="utf-8") as f:
             for entity_fragments in fragments.values():
@@ -396,7 +396,7 @@ class TRexDatasetBuilder:
 
     def substitute_values(
         self,
-        fragment: EntityFragment,
+        fragment: Entity,
         *,
         wikidata_entities: dict[str, dict],
         wikidata_properties: dict[str, dict],
@@ -404,7 +404,7 @@ class TRexDatasetBuilder:
     ) -> None:
         """Substitute the actual values in the fragment."""
         # add de-referenced property values (excluding names)
-        mapped_properties = {"names": fragment.names}
+        mapped_properties = {"names": fragment.properties["names"]}
 
         for prop, prop_values in fragment.properties.items():
             if prop == "names":
@@ -446,7 +446,7 @@ class TRexDatasetBuilder:
 
         # entity_type_values = list({type_id_to_node[t]["name"] for t in entity_types if t in type_id_to_node})
         # fragment.entity_types = entity_type_values
-        fragment.entity_types = entity_types
+        fragment._original_entity_types = entity_types  # noqa: SLF001
 
     # TODO(pmyshkov): Move this method to a separate dataset access class
     @classmethod
