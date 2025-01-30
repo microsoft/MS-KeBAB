@@ -22,7 +22,10 @@ import typing
 from collections.abc import Iterable
 from pathlib import Path
 
-from kebab.utils.dataset.t_rex.entity_fragment import EntityFragment
+from kebab.contracts.entity import Entity
+
+
+# TODO(pmyshkov): This class is no longer relevant and will be replaced with REBEL extractor.
 
 
 class TRexFragmentExtractor:
@@ -102,9 +105,9 @@ class TRexFragmentExtractor:
             self._logger.error(f"Errors while serializing entities: {err_count}")
 
     @classmethod
-    def extract_entity_fragments_from_document(cls, record: dict, drop_empty: bool = True) -> dict[str, EntityFragment]:
+    def extract_entity_fragments_from_document(cls, record: dict, drop_empty: bool = True) -> dict[str, Entity]:
         """Extract entity fragments and properties from a single T-REx document record."""
-        fragments: dict[str, EntityFragment] = {}
+        fragments: dict[str, Entity] = {}
 
         # use text + title md5 hash as a global unique source_id
         text = record["title"] + "\n" + record["text"]
@@ -122,7 +125,7 @@ class TRexFragmentExtractor:
                 continue
 
             if entity_id not in fragments:
-                fragment = EntityFragment(
+                fragment = Entity(
                     entity_id=entity_id,
                     source_ids=[source_id, doc_id],
                 )
@@ -155,7 +158,7 @@ class TRexFragmentExtractor:
             fragments = {k: v for k, v in fragments.items() if v.properties}
 
         for fragment in fragments.values():
-            fragment.make_property_values_unique()
+            fragment.deduplicate_property_values()
 
         return fragments
 

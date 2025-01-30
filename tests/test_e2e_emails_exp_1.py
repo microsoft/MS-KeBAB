@@ -122,11 +122,29 @@ def test_entity_to_from_dict(emails_exp_1_path: pathlib.Path):
     entities = list(EntityUtilities.load_entities(emails_exp_1_path / "extracted_entities"))
     entity = entities[0]
 
+    assert entity == entity  # noqa: PLR0124
+
     entity_dict = entity.to_dict()
     new_entity = Entity.from_dict(entity_dict)
+    assert new_entity == new_entity  # noqa: PLR0124
 
     assert entity == new_entity
     assert entity.properties == new_entity.properties
 
     evidence = entity.get_evidence_for_property_value("name", 0)
     assert evidence == ["email_1"]
+
+    # test internal fields
+    entity._original_entity_id = "test_entity_id"  # noqa: SLF001
+    entity._original_entity_types = ["test_entity_type"]  # noqa: SLF001
+    entity._split = "test"  # noqa: SLF001
+
+    entity_dict = entity.to_dict()
+    assert "_original_entity_id" not in entity_dict
+    assert "_original_entity_types" not in entity_dict
+    assert "_split" not in entity_dict
+
+    entity_dict = entity.to_dict(include_internal=True)
+    assert entity_dict["_original_entity_id"] == "test_entity_id"
+    assert entity_dict["_original_entity_types"] == ["test_entity_type"]
+    assert entity_dict["_split"] == "test"

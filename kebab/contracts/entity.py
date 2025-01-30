@@ -246,6 +246,31 @@ class Entity:
     evidence_map: dict[str, list[list[int]]] = field(default_factory=lambda: defaultdict(list))
     """Map from property ID to a list that maps each value index to a list of evidence indices that support it."""
 
+    _original_entity_id: str | None = field(default=None, init=False, repr=False, metadata={"internal": True})
+    """
+    Internal use only:
+    - Should not be included in the final dataset.
+    - Can be serialised (via "include_internal=True") during the intermediate dataset construction steps.
+    - Not used in merge operations.
+
+    The original ID of the entity in the ground truth KB (e.g. Wikidata).
+    """
+
+    _original_entity_types: list[str] = field(default_factory=list, init=False, repr=False, metadata={"internal": True})
+    """
+    Internal use only (see `_entity_id`).
+
+    The value can be populated from the ground truth KB (e.g. Wikidata) and used to filter the dataset based on
+    the entity types.
+    """
+
+    _split: str | None = field(default=None, init=False, repr=False, metadata={"internal": True})
+    """
+    Internal use only (see `_entity_id`).
+
+    Indicates the split of the dataset (train/val/test) the entity belongs to.
+    """
+
     def __post_init__(self) -> None:
         """Post-initialisation checks."""
         assert self.entity_id, "Entity ID must be provided."
@@ -259,6 +284,9 @@ class Entity:
         if self.evidence_map is None:
             self.evidence_map = defaultdict(list)
 
+        if self._original_entity_types is None:
+            self._original_entity_types = []
+
     def get_evidence_for_property_value(self, property_id: str, value_index: int) -> list[str]:
         """Get the evidence for a given property value."""
         assert 0 <= value_index < len(self.properties[property_id]), "Invalid value index."
@@ -267,21 +295,79 @@ class Entity:
         evidence_indices = prop_evidence[value_index] if prop_evidence else []
         return [self.source_ids[source_id] for source_id in evidence_indices]
 
-    def to_dict(self) -> dict[str, Any]:
+    def deduplicate_property_values(self) -> None:
+        """Deduplicate values of each property."""
+        for prop_id, values in self.properties.items():
+            self.properties[prop_id] = list(set(values))
+
+    def deduplicate_source_ids(self) -> None:
+        """Deduplicate source IDs."""
+        self.source_ids = list(set(self.source_ids))
+
+    def merge_with(self, other: Entity) -> Entity:
+        """Merge the other entity into this entity."""
+        for prop_id, values in other.properties.items():
+            self.properties[prop_id].extend(values)
+
+        self.source_ids += other.source_ids
+
+        # TODO: Handle evidence correctly instead of the below
+        self.deduplicate_property_values()
+        self.deduplicate_source_ids()
+
+        return self
+
+    def to_dict(self, include_internal: bool = False) -> dict[str, Any]:
         """Convert the entity to a dictionary."""
-        return {
+        obj_dict = {
             "entity_id": self.entity_id,
             "properties": self.properties,
             "source_ids": self.source_ids,
             "evidence_map": self.evidence_map,
         }
 
+        if include_internal:
+            obj_dict["_original_entity_id"] = self._original_entity_id
+            obj_dict["_original_entity_types"] = list(self._original_entity_types)
+            obj_dict["_split"] = self._split
+
+        return obj_dict
+
+    def get_hashable_repr(self) -> str:
+        """Return a hashable representation of the entity."""
+        properties_str = "|".join(
+            f"{prop_id}:{','.join(sorted(values))}" for prop_id, values in sorted(self.properties.items())
+        )
+
+        return f"{self.entity_id} | {properties_str}"
+
+    @classmethod
+    def merge(cls, entities: list[Entity]) -> Entity:
+        """Merge multiple entities into a single entity."""
+        merged = Entity(entity_id=entities[0].entity_id)
+
+        for entity in entities:
+            merged = merged.merge_with(entity)
+
+        return merged
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create an entity from a dictionary."""
-        return cls(**data)
+        entity = cls(**data)
 
-    def to_json(self) -> str:
+        if "_original_entity_id" in data:
+            entity._original_entity_id = data["_original_entity_id"]  # noqa: SLF001
+
+        if "_original_entity_types" in data:
+            entity._original_entity_types = data["_original_entity_types"]  # noqa: SLF001
+
+        if "_split" in data:
+            entity._split = data["_split"]  # noqa: SLF001
+
+        return entity
+
+    def to_json(self, include_internal: bool = False) -> str:
         """Convert the entity to a JSON string."""
 
         def json_serial(obj: Any) -> Any:
@@ -290,7 +376,7 @@ class Entity:
                 return obj.isoformat()
             raise TypeError(f"Type {type(obj)} not serializable")
 
-        return json.dumps(self.to_dict(), default=json_serial)
+        return json.dumps(self.to_dict(include_internal=include_internal), default=json_serial)
 
     @classmethod
     def from_json(cls, json_str: str) -> Self:
