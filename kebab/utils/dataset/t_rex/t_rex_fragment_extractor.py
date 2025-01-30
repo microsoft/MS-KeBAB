@@ -79,7 +79,7 @@ class TRexFragmentExtractor:
                 fragments = self.extract_entity_fragments_from_document(record)
                 for fragment in fragments.values():
                     if remove_duplicates:
-                        str_repr = fragment.get_hashable_value_repr()
+                        str_repr = fragment.get_hashable_repr()
                         if str_repr in seen:
                             continue
 
