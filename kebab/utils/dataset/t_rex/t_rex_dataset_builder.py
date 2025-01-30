@@ -446,7 +446,7 @@ class TRexDatasetBuilder:
 
         # entity_type_values = list({type_id_to_node[t]["name"] for t in entity_types if t in type_id_to_node})
         # fragment.entity_types = entity_type_values
-        fragment.entity_types = entity_types
+        fragment._entity_types = entity_types  # noqa: SLF001
 
     # TODO(pmyshkov): Move this method to a separate dataset access class
     @classmethod
