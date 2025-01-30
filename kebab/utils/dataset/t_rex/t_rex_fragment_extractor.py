@@ -92,7 +92,7 @@ class TRexFragmentExtractor:
 
                     # dump the original document file as a separate file
                     if self.DEBUG_DUMP_DOC_FILES:
-                        debug_predicate = len(fragment.names) > 8 and fragment.entity_id == "Q2351189"  # noqa: PLR2004
+                        debug_predicate = len(fragment.properties["names"]) > 8 and fragment.entity_id == "Q2351189"  # noqa: PLR2004
                         if debug_predicate:
                             f_name = self.output_dir / f"__{fragment.source_ids[0]}.json"
                             if not f_name.exists():
