@@ -264,6 +264,7 @@ class Entity:
     the entity types.
     """
 
+    # TODO(pmyshkov): Remove this once the DiSK refactor PR is merged
     _split: str | None = field(default=None, init=False, repr=False, metadata={"internal": True})
     """
     Internal use only (see `_entity_id`).
