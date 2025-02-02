@@ -1,0 +1,24 @@
+{
+    "name": "exp_schema",
+    "data_types": [
+        {
+            "data_type_id": "text",
+            "value_type": "Text",
+            "description": "A generic text or a value stored as a string."
+        }
+    ],
+    "properties": [
+        {
+            "property_id": "name",
+            "data_type_id": "text",
+            "description": "The name of the entity.",
+            "display_name": "name"
+        },
+        {
+            "property_id": "type",
+            "data_type_id": "text",
+            "description": "The type of the entity.",
+            "display_name": "type"
+        }
+    ]
+}
