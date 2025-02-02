@@ -33,10 +33,11 @@ class LinkingTaskInstance(TaskInstance):
         name: str,
         task: Task,
         entity_fragment_pairs: str,
+        schema: str,
         ground_truth_boolean: str | None = None,
     ):
         """Initialize a linking task instance."""
-        super().__init__(name, task)
+        super().__init__(name, task, schema)
         self.__data_entity_fragment_pairs = Path(entity_fragment_pairs)
         if ground_truth_boolean is not None:
             self.__data_ground_truth_boolean = Path(ground_truth_boolean)

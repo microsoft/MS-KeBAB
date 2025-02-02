@@ -34,10 +34,11 @@ class ExtractionTaskInstance(TaskInstance):
         name: str,
         task: Task,
         extracts: str,
+        schema: str,
         ground_truth_extracted_entities: str | None = None,
     ):
         """Initialize an extraction task instance."""
-        super().__init__(name, task)
+        super().__init__(name, task, schema)
         self.__data_extracts = Path(extracts)
         if ground_truth_extracted_entities is not None:
             self.__data_ground_truth_extracted_entities = Path(ground_truth_extracted_entities)

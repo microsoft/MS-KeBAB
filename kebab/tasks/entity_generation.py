@@ -27,9 +27,10 @@ class EntityGenerationTaskInstance(TaskInstance):
         name: str,
         task: Task,
         entities: str,
+        schema: str,
     ):
         """Initialize an entity generation task instance."""
-        super().__init__(name, task)
+        super().__init__(name, task, schema)
         self.__data_entities = Path(entities)
 
     def read_items(self) -> Iterable[Entity]:

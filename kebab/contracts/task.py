@@ -11,6 +11,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar, Self
 
+from kebab.contracts.entity import PropertySchema
+
 
 class TaskType(Enum):
     """Allowed task types."""
@@ -66,12 +68,14 @@ class TaskInstance(ABC):
 
     __name: str
     __task: Task
+    __schema: Path
     __task_type_registry: ClassVar[dict[TaskType, type[TaskInstance]]] = {}
 
-    def __init__(self, name: str, task: Task):
+    def __init__(self, name: str, task: Task, schema: str):
         """Initialize a task instance."""
         self.__name = name
         self.__task = task
+        self.__schema = Path(schema)
         self.__task.add_instance(self)
 
     @property
@@ -130,3 +134,13 @@ class TaskInstance(ABC):
         Returns:
             dict[str, float]: A dictionary containing the evaluation metrics.
         """
+
+    def read_schema(self) -> PropertySchema:
+        """
+        Read property schema read from a file.
+
+        Returns:
+            PropertySchema: A PropertySchema read from a file.
+        """
+        schema = PropertySchema.from_file(self.__schema)
+        return schema
