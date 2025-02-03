@@ -7,12 +7,11 @@
 # ANN401: typing.Any
 from __future__ import annotations
 
-import datetime
 import json
 import pathlib
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Self
 
@@ -237,22 +236,9 @@ class Entity:
     # Map from property ID to a list that maps each value index to a list of evidence indices that support it.
     evidence_map: dict[str, list[list[int]]] = field(default_factory=lambda: defaultdict(list))
 
-    # Internal use only:
-    # - Should not be included in the final dataset.
-    # - Can be serialised (via "include_internal=True") during the intermediate dataset construction steps.
-    # - Not used in merge operations.
-    # The original ID of the entity in the ground truth KB (e.g. Wikidata).
-    _original_entity_id: str | None = field(default=None, init=False, repr=False, metadata={"internal": True})
-
-    # Internal use only (see `_entity_id`).
-    # The value can be populated from the ground truth KB (e.g. Wikidata) and used to filter the dataset based on
-    # the entity types.
-    _original_entity_types: list[str] = field(default_factory=list, init=False, repr=False, metadata={"internal": True})
-
-    # TODO(pmyshkov): Remove this once the DiSK refactor PR is merged
-    # Internal use only (see `_entity_id`).
-    # Indicates the split of the dataset (train/val/test) the entity belongs to.
-    _split: str | None = field(default=None, init=False, repr=False, metadata={"internal": True})
+    # Additional metadata associated with the entity.
+    # This is used for dataset creation only and should be empty for any benchmark task.
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Post-initialisation checks."""
@@ -267,8 +253,8 @@ class Entity:
         if self.evidence_map is None:
             self.evidence_map = defaultdict(list)
 
-        if self._original_entity_types is None:
-            self._original_entity_types = []
+        if self.metadata is None:
+            self.metadata = {}
 
     def get_evidence_for_property_value(self, property_id: str, value_index: int) -> list[str]:
         """Get the evidence for a given property value."""
@@ -287,7 +273,7 @@ class Entity:
         """Deduplicate source IDs."""
         self.source_ids = list(set(self.source_ids))
 
-    def merge_with(self, other: Entity) -> Entity:
+    def merge_with(self, other: Self) -> Self:
         """Merge the other entity into this entity."""
         for prop_id, values in other.properties.items():
             self.properties[prop_id].extend(values)
@@ -300,21 +286,9 @@ class Entity:
 
         return self
 
-    def to_dict(self, include_internal: bool = False) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the entity to a dictionary."""
-        obj_dict = {
-            "entity_id": self.entity_id,
-            "properties": self.properties,
-            "source_ids": self.source_ids,
-            "evidence_map": self.evidence_map,
-        }
-
-        if include_internal:
-            obj_dict["_original_entity_id"] = self._original_entity_id
-            obj_dict["_original_entity_types"] = list(self._original_entity_types)
-            obj_dict["_split"] = self._split
-
-        return obj_dict
+        return asdict(self)
 
     def get_hashable_repr(self) -> str:
         """Return a hashable representation of the entity."""
@@ -324,10 +298,16 @@ class Entity:
 
         return f"{self.entity_id} | {properties_str}"
 
+    def without_metadata(self) -> Self:
+        """Return a new entity without metadata."""
+        entity = self.__class__.from_dict(self.to_dict())
+        entity.metadata = {}
+        return entity
+
     @classmethod
-    def merge(cls, entities: list[Entity]) -> Entity:
+    def merge(cls, entities: list[Self]) -> Self:
         """Merge multiple entities into a single entity."""
-        merged = Entity(entity_id=entities[0].entity_id)
+        merged = cls(entity_id=entities[0].entity_id)
 
         for entity in entities:
             merged = merged.merge_with(entity)
@@ -337,29 +317,11 @@ class Entity:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create an entity from a dictionary."""
-        entity = cls(**data)
+        return cls(**data)
 
-        if "_original_entity_id" in data:
-            entity._original_entity_id = data["_original_entity_id"]  # noqa: SLF001
-
-        if "_original_entity_types" in data:
-            entity._original_entity_types = data["_original_entity_types"]  # noqa: SLF001
-
-        if "_split" in data:
-            entity._split = data["_split"]  # noqa: SLF001
-
-        return entity
-
-    def to_json(self, include_internal: bool = False) -> str:
+    def to_json(self) -> str:
         """Convert the entity to a JSON string."""
-
-        def json_serial(obj: Any) -> Any:
-            """JSON serializer for objects not serializable by default json code."""
-            if isinstance(obj, datetime.datetime | datetime.date):
-                return obj.isoformat()
-            raise TypeError(f"Type {type(obj)} not serializable")
-
-        return json.dumps(self.to_dict(include_internal=include_internal), default=json_serial)
+        return json.dumps(self.to_dict())
 
     @classmethod
     def from_json(cls, json_str: str) -> Self:
