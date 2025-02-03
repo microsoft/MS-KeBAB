@@ -288,7 +288,13 @@ class Entity:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the entity to a dictionary."""
-        return asdict(self)
+        entity_dict = asdict(self)
+
+        # remove metadata if empty
+        if not entity_dict["metadata"]:
+            del entity_dict["metadata"]
+
+        return entity_dict
 
     def get_hashable_repr(self) -> str:
         """Return a hashable representation of the entity."""
