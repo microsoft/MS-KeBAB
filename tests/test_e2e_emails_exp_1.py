@@ -117,6 +117,17 @@ def test_load_entities(emails_exp_1_path: pathlib.Path):
     assert entity.properties[emails_property_id] == ["john@email.com"]
 
 
+def test_entity_without_metadata(emails_exp_1_path: pathlib.Path):
+    """Test metadata clearing."""
+    entities = list(EntityUtilities.load_entities(emails_exp_1_path / "extracted_entities"))
+    assert len(entities) == 1
+
+    entity = entities[0]
+    entity.metadata = {"test": "test"}
+    entity_without_metadata = entity.without_metadata()
+    assert entity_without_metadata.metadata == {}
+
+
 def test_entity_to_from_dict(emails_exp_1_path: pathlib.Path):
     """Test converting an entity to and from a dictionary."""
     entities = list(EntityUtilities.load_entities(emails_exp_1_path / "extracted_entities"))
@@ -134,20 +145,13 @@ def test_entity_to_from_dict(emails_exp_1_path: pathlib.Path):
     evidence = entity.get_evidence_for_property_value("name", 0)
     assert evidence == ["email_1"]
 
-    # test internal fields
-    entity._original_entity_id = "test_entity_id"  # noqa: SLF001
-    entity._original_entity_types = ["test_entity_type"]  # noqa: SLF001
-    entity._split = "test"  # noqa: SLF001
+    # test metadata
+    entity.metadata["entity_id"] = "test_entity_id"
+    entity.metadata["types"] = ["test_entity_type_1", "test_entity_type_2"]
+    entity.metadata["split"] = "train"
 
-    entity_dict = entity.to_dict()
-    assert "_original_entity_id" not in entity_dict
-    assert "_original_entity_types" not in entity_dict
-    assert "_split" not in entity_dict
+    new_entity = Entity.from_json(entity.to_json())
+    assert entity == new_entity
 
-    entity_without_internals = Entity.from_dict(entity_dict)
-    assert entity != entity_without_internals
-
-    entity_dict = entity.to_dict(include_internal=True)
-    assert entity_dict["_original_entity_id"] == "test_entity_id"
-    assert entity_dict["_original_entity_types"] == ["test_entity_type"]
-    assert entity_dict["_split"] == "test"
+    new_entity_without_metadata = new_entity.without_metadata()
+    assert new_entity_without_metadata.metadata == {}

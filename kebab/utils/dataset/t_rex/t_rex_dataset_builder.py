@@ -445,8 +445,7 @@ class TRexDatasetBuilder:
         entity_types = wikidata_entities.get(fragment.entity_id, {}).get("types", [])
 
         # entity_type_values = list({type_id_to_node[t]["name"] for t in entity_types if t in type_id_to_node})
-        # fragment.entity_types = entity_type_values
-        fragment._original_entity_types = entity_types  # noqa: SLF001
+        fragment.metadata["entity_types"] = entity_types
 
     # TODO(pmyshkov): Move this method to a separate dataset access class
     @classmethod
