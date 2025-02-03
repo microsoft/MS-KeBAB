@@ -28,10 +28,12 @@ def test_linking_read_write_items_roundtrip() -> None:
     # Arrange
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
     boolean_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
+    schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "propert_schema.json"
     task_instance = LinkingTaskInstance(
         "Linking-Alexandria-Train",
         Task(TaskType.Linking),
         str(entity_pairs_file_path),
+        str(schema_file_path),
         str(boolean_labels_file_path),
     )
 

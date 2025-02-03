@@ -26,10 +26,12 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
 def test_entity_generation_read_write_items_roundtrip() -> None:
     # Arrange
     entities_file_path = Path(__file__).parents[1] / "data" / "entity_generation" / "entities.jsonl"
+    schema_file_path = Path(__file__).parents[1] / "data" / "entity_generation" / "propert_schema.json"
     task_instance = EntityGenerationTaskInstance(
         "EntityGeneration-Alexandria-Train",
         Task(TaskType.EntityGeneration),
         str(entities_file_path),
+        str(schema_file_path),
     )
 
     # Act

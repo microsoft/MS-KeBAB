@@ -3,6 +3,7 @@
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
+      "schema": "https://some.public/download/link",
       "ground_truth_extracted_entities": "https://some.public/download/link"
     }
   },
@@ -10,19 +11,22 @@
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
+      "schema": "https://some.public/download/link",
       "ground_truth_extracted_entities": "https://some.public/download/link"
     }
   },
   "Extraction-Heldout": {
     "task": "Extraction",
     "data": {
-      "extracts": "https://some.public/download/link"
+      "extracts": "https://some.public/download/link",
+      "schema": "https://some.public/download/link"
     }
   },
   "Linking-TREx-Train": {
     "task": "Linking",
     "data": {
       "entity_fragment_pairs": "https://some.public/download/link",
+      "schema": "https://some.public/download/link",
       "ground_truth_boolean": "https://some.public/download/link"
     }
   },
@@ -30,6 +34,7 @@
     "task": "Linking",
     "data": {
       "entity_fragment_pairs": "https://some.public/download/link",
+      "schema": "https://some.public/download/link",
       "ground_truth_boolean": "https://some.public/download/link"
     }
   },
@@ -37,13 +42,22 @@
     "task": "Linking",
     "data": {
       "entity_fragment_pairs": "https://some.public/download/link",
+      "schema": "https://some.public/download/link",
       "ground_truth_boolean": "https://some.public/download/link"
     }
   },
   "Linking-Heldout": {
     "task": "Linking",
     "data": {
-      "entity_fragment_pairs": "https://some.public/download/link"
+      "entity_fragment_pairs": "https://some.public/download/link",
+      "schema": "https://some.public/download/link"
+    }
+  },
+  "Entity-Generation-REBEL": {
+    "task": "EntityGeneration",
+    "data": {
+      "entities": "https://some.public/download/link",
+      "schema": "https://some.public/download/link"
     }
   }
 }

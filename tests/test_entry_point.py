@@ -18,7 +18,7 @@ def test_task_interface():
     benchmark = mskebab.benchmark()
 
     tasks = benchmark.tasks
-    assert set(tasks.keys()) == {TaskType.Extraction, TaskType.Linking}
+    assert set(tasks.keys()) == {TaskType.Extraction, TaskType.Linking, TaskType.EntityGeneration}
     for task_type, task in tasks.items():
         assert task_type == task.task_type
 
@@ -31,6 +31,7 @@ def test_task_interface():
         "Linking-TREx-Test",
         "Linking-MAVE",
         "Linking-Heldout",
+        "Entity-Generation-REBEL",
     }
     for task_instance_name, task_instance in task_instances.items():
         assert task_instance_name == task_instance.name
