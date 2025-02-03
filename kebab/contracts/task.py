@@ -137,7 +137,7 @@ class TaskInstance(ABC):
 
     def read_schema(self) -> PropertySchema:
         """
-        Read property schema read from a file.
+        Read property schema from a file.
 
         Returns:
             PropertySchema: A PropertySchema read from a file.
