@@ -308,7 +308,7 @@ def embeddings_distance_between_strings(value1: str, value2: str, model: Sentenc
     Distance value is between 0 and 1.
     """
     embeds = model.encode([value1, value2])
-    return 0.5 * float(cosine(embeds[0], embeds[1])) # scipy.spatial.distance.cosine is between 0 and 2
+    return 0.5 * float(cosine(embeds[0], embeds[1]))  # scipy.spatial.distance.cosine is between 0 and 2
 
 
 def normalized_edit_distance(value1: str, value2: str) -> float:
