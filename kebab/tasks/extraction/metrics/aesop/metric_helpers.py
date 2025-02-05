@@ -46,7 +46,6 @@ class EntityMatcher:
     def match(self, distance_function: Callable[[Entity, Entity], float], threshold: float = 1.0) -> MatchedPairInfo:
         """Match entities based on a distance function and a matching score threshold."""
         distances = self._compute_distances(distance_function)
-        print(distances)
         matched_indices = match_items(distances, threshold)
         return MatchedPairInfo(
             matched_indices.left_ind,
@@ -252,6 +251,7 @@ class MetricsComputer:
             metrics_accumulator.unmatched_extra_pred_count = -diff
 
         properties_union = compute_properties_union(self.ground_truth, self.predictions, matched_pair)
+        properties_union = properties_union.intersection(self.property_schema.properties.keys())
         entities_scorer = MatchedEntitiesScorer(
             self.ground_truth, self.predictions, matched_pair.left_ind, matched_pair.right_ind
         )

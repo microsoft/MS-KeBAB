@@ -4,6 +4,7 @@
 # ruff: noqa: ANN401
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 import nltk
@@ -33,14 +34,21 @@ class ElementDistance:
         self.check_constraints(property_)
         return self.compute(value1, value2, property_)
 
+    @classmethod
+    def from_dict(cls, config: dict[str, Any]) -> ElementDistance:
+        """Create element distance from dictionary."""
+        raise NotImplementedError
+
 
 class TokenDistance(ElementDistance):
     """Token distance class."""
 
+    __default_encoding: str = "cl100k_base"
+
     def __init__(self, encoder: tiktoken.Encoding | None = None):
         """Initialize token distance."""
         if encoder is None:
-            encoder = tiktoken.get_encoding("cl100k_base")
+            encoder = tiktoken.get_encoding(self.__default_encoding)
         self.encoder = encoder
 
     def check_constraints(self, property_: Property) -> None:
@@ -52,14 +60,21 @@ class TokenDistance(ElementDistance):
         """Compute token distance between property values of ground truth and prediction entity."""
         return token_distance_between_strings(str(value1), str(value2), self.encoder)
 
+    @classmethod
+    def from_dict(cls, config: dict[str, str]) -> TokenDistance:
+        """Create token distance from dictionary."""
+        return TokenDistance(encoder=tiktoken.get_encoding(config.get("encoding", cls.__default_encoding)))
+
 
 class EmbeddingDistance(ElementDistance):
     """Embedding distance class."""
 
+    __default_model: str = "paraphrase-MiniLM-L6-v2"
+
     def __init__(self, model: SentenceTransformer | None = None):
         """Initialize embedding distance."""
         if model is None:
-            model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
+            model = SentenceTransformer(self.__default_model)
         self.model = model
 
     def check_constraints(self, property_: Property) -> None:
@@ -70,6 +85,11 @@ class EmbeddingDistance(ElementDistance):
     def compute(self, value1: Any, value2: Any, property_: Property) -> float:  # noqa: ARG002
         """Compute distance between string property values using sentence embeddings."""
         return embeddings_distance_between_strings(str(value1), str(value2), self.model)
+
+    @classmethod
+    def from_dict(cls, config: dict[str, str]) -> EmbeddingDistance:
+        """Create embedding distance from dictionary."""
+        return EmbeddingDistance(model=SentenceTransformer(config.get("model", cls.__default_model)))
 
 
 class BinaryMatchDistance(ElementDistance):
@@ -85,6 +105,11 @@ class BinaryMatchDistance(ElementDistance):
         value2 = normalize_property_value(value2, property_)
         return 0 if value1 == value2 else 1
 
+    @classmethod
+    def from_dict(cls, config: dict[str, Any]) -> BinaryMatchDistance: # noqa: ARG003
+        """Create binary match distance from dictionary."""
+        return BinaryMatchDistance()
+
 
 class EditDistance(ElementDistance):
     """Edit distance class."""
@@ -97,6 +122,11 @@ class EditDistance(ElementDistance):
     def compute(self, value1: Any, value2: Any, property_: Property) -> float:  # noqa: ARG002
         """Compute edit distance between two string property values."""
         return normalized_edit_distance(str(value1), str(value2))
+
+    @classmethod
+    def from_dict(cls, config: dict[str, Any]) -> EditDistance:  # noqa: ARG003
+        """Create edit distance from dictionary."""
+        return EditDistance()
 
 
 PropertyDistanceValue = tuple[list[float], int]
@@ -211,24 +241,39 @@ class EntityDistance:
     def __init__(
         self,
         property_schema: PropertySchema,
-        property_to_distance_function: dict[str, PropertyDistance],
-        weights: np.ndarray | None = None,
+        property_to_distance_function_and_weight: dict[str, tuple[PropertyDistance, float]],
     ):
         """Initialize entity distance."""
-        self.property_to_distance_function = property_to_distance_function
+        self.property_to_distance_function_and_weight = property_to_distance_function_and_weight
         self.property_schema = property_schema
-        if weights is None:
-            weights = np.ones(len(property_to_distance_function))
-            weights /= weights.sum()
-        self.weights = weights
 
     def __call__(self, gt_entity: Entity, pred_entity: Entity) -> float:
         """Compute distance between two entities."""
-        distances = np.zeros(len(self.property_to_distance_function))
-        for i, (property_id, property_distance) in enumerate(self.property_to_distance_function.items()):
+        distance = 0.0
+        for property_id, (property_distance, weight) in self.property_to_distance_function_and_weight.items():
             value_distances, _ = property_distance(gt_entity, pred_entity, self.property_schema.properties[property_id])
-            distances[i] = np.mean(value_distances)
-        return self.weights.dot(distances)  # type: ignore
+            distance += float(np.mean(value_distances)) * weight
+        return distance
+
+    @classmethod
+    def from_dict(cls, config: dict[str, Any]) -> EntityDistance:
+        """Create entity distance from dictionary."""
+        property_schema = PropertySchema.from_file(config["property_schema"])
+        property_to_distance_function_and_weight = {}
+        num_properties = len(config["entity_distance"])
+        num_missing_weights = sum("weight" not in params for params in config["entity_distance"].values())
+        default_weight = 1.0 / (num_properties - num_missing_weights) if num_missing_weights < num_properties else 1.0
+        for property_id, params in config["entity_distance"].items():
+            element_distance = getattr(sys.modules[__name__], params["distance_function"]["name"]).from_dict(params["distance_function"].get("params", {}))
+            property_distance = SetPropertyDistance(element_distance) if property_schema.properties[property_id].is_collection else SingleValuePropertyDistance(element_distance)
+            property_to_distance_function_and_weight[property_id] = (
+                property_distance,
+                params.get("weight", default_weight)
+            )
+        return EntityDistance(
+            property_schema,
+            property_to_distance_function_and_weight
+        )
 
 
 #######################################################################################################################

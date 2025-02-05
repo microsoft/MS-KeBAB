@@ -6,22 +6,32 @@ from __future__ import annotations
 from collections.abc import Iterable
 from itertools import zip_longest
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import ClassVar
 
-from kebab.contracts.entity import Entity, PropertySchema
+from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskInstance
-from kebab.tasks.extraction.metrics.aesop.calculator import AesopMetricCalculator, make_default_aesop_config
-from kebab.tasks.extraction.metrics.calculator import ExtractionOutput
-from kebab.utils.io_helpers import DocumentJsonlReader, EntityListJsonlReader, EntityListJsonlWriter, save_dict_to_json
+from kebab.tasks.extraction.metrics.aesop.calculator import AesopConfig, AesopMetricCalculator
+from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricCalculator, MetricConfig
+from kebab.utils.io_helpers import (
+    DocumentJsonlReader,
+    EntityListJsonlReader,
+    EntityListJsonlWriter,
+    load_dict_from_json,
+    save_dict_to_json,
+)
 
 
 class ExtractionTaskInstance(TaskInstance):
     """Represents an extraction benchmark task instance with its data files."""
 
     __data_extracts: Path
-    __data_ground_truth_extracted_entities: Path | None
-    __metric_calculator_cls: ClassVar[dict[str, Any]] = {
+    __data_ground_truth_extracted_entities: Path | None = None
+    __default_metrics_config_path: Path = Path(__file__).parent.parent.parent / "configs" / "extraction" / "default_metrics_config.json"
+    __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {
         "aesop": AesopMetricCalculator
+    }
+    __metric_config_cls: ClassVar[dict[str, type[MetricConfig]]] = {
+        "aesop": AesopConfig
     }
 
     @property
@@ -39,17 +49,15 @@ class ExtractionTaskInstance(TaskInstance):
         name: str,
         task: Task,
         extracts: str,
-        property_schema: str,
         ground_truth_extracted_entities: str | None = None,
-        metric_configs: dict[str, Any] | None = None,
+        metrics_config: str | None = None,
     ):
         """Initialize an extraction task instance."""
         super().__init__(name, task, property_schema)
         self.__data_extracts = Path(extracts)
         if ground_truth_extracted_entities is not None:
             self.__data_ground_truth_extracted_entities = Path(ground_truth_extracted_entities)
-        self.property_schema = property_schema
-        self.metric_configs = metric_configs
+        self.metrics_config = load_dict_from_json(Path(metrics_config or self.__default_metrics_config_path))
 
 
     def read_items(self) -> Iterable[ExtractionOutput]:
@@ -89,11 +97,6 @@ class ExtractionTaskInstance(TaskInstance):
         if hasattr(self, "__data_ground_truth_extracted_entities"):
             raise ValueError("Can not evaluate on heldout Extraction task instance")
 
-        if self.metric_configs is None:
-            self.metric_configs = {
-                "aesop": make_default_aesop_config(PropertySchema.from_file(Path(self.property_schema)), matching_threshold=0.5)
-            }
-
         pred_entity_lists = EntityListJsonlReader(output_to_evaluate).read_items()
 
         gt_extractions = list(self.read_items())
@@ -104,8 +107,10 @@ class ExtractionTaskInstance(TaskInstance):
 
         metrics = {}
 
-        for metric_name, metric_config in self.metric_configs.items():
-            metric_results = self.__metric_calculator_cls[metric_name](metric_config).run(pred_extractions, gt_extractions)
+        for metric_name, metric_config_dict in self.metrics_config.items():
+            metric_calculator_cls = self.__metric_calculator_cls[metric_name]
+            metric_config = self.__metric_config_cls[metric_name].from_dict(metric_config_dict)
+            metric_results = metric_calculator_cls(metric_config).run(pred_extractions, gt_extractions)
             metrics[metric_name] = metric_results
         if eval_result_path:
             save_dict_to_json(metrics, eval_result_path)

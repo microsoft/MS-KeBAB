@@ -19,8 +19,18 @@ class ExtractionOutput:
     entities: list[Entity]
 
 
-class MetricsCalculator(abc.ABC):
-    """Extraction metrics calculator."""
+class MetricConfig:
+    """Metric configuration."""
+
+    @staticmethod
+    @abc.abstractmethod
+    def from_dict(config: dict[str, Any]) -> MetricConfig:
+        """Create metric configuration from dictionary."""
+        raise NotImplementedError
+
+
+class MetricCalculator(abc.ABC):
+    """Extraction metric calculator."""
 
     @abc.abstractmethod
     def run(self, prediction: list[ExtractionOutput], ground_truth: list[ExtractionOutput]) -> dict[str, Any]:

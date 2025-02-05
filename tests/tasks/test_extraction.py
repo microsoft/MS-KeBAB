@@ -32,13 +32,13 @@ def test_extraction_read_write_items_roundtrip() -> None:
     extracted_entities_file_path = (
         Path(__file__).parents[1] / "data" / "extraction" / "plain_text_extracted_entities.jsonl"
     )
-    property_schema_file_path = Path(__file__).parents[1] / "data" / "extraction" / "property_schema.json"
+    metrics_config_file_path = Path(__file__).parents[1] / "data" / "extraction" / "metrics_config.json"
     task_instance = ExtractionTaskInstance(
         "Extraction-Alexandria-Train",
         Task(TaskType.Extraction),
         str(items_file_path),
-        str(property_schema_file_path),
         str(extracted_entities_file_path),
+        str(metrics_config_file_path)
     )
 
     # Act

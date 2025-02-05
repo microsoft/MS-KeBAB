@@ -6,13 +6,16 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from sentence_transformers import SentenceTransformer
 
+import kebab.tasks.extraction.metrics.aesop.distances as distances
 from kebab.contracts.entity import Entity, Property, PropertySchema
 from kebab.tasks.extraction.metrics.aesop.distances import (
     BinaryMatchDistance,
     EditDistance,
+    ElementDistance,
     EmbeddingDistance,
     EntityDistance,
     PropertyScore,
@@ -22,11 +25,11 @@ from kebab.tasks.extraction.metrics.aesop.distances import (
     TokenDistance,
 )
 from kebab.tasks.extraction.metrics.aesop.metric_helpers import EntityMatcher, MetricsAccumulator, MetricsComputer
-from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricsCalculator
+from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricCalculator, MetricConfig
 
 
 @dataclass
-class AesopConfig:
+class AesopConfig(MetricConfig):
     """AESOP metric configuration."""
 
     matching_score_function: Callable[[Entity, Entity], float]
@@ -34,8 +37,32 @@ class AesopConfig:
     property_score_functions: dict[str, Callable[[Entity, Entity, Property], PropertyScoreValue]]
     property_schema: PropertySchema
 
+    @staticmethod
+    def from_dict(config: dict[str, Any]) -> AesopConfig:
+        """Create AESOP metric configuration from dictionary."""
+        property_schema = PropertySchema.from_file(config["property_schema"])
 
-class AesopMetricCalculator(MetricsCalculator):
+        def get_element_distance(element_distance_params: dict[str, Any]) -> ElementDistance:
+            """Get element distance function from parameters."""
+            element_distance_cls_name = element_distance_params["name"]
+            return getattr(distances, element_distance_cls_name).from_dict(element_distance_params.get("params", {}))
+
+        default_property_score = PropertyScore(SetPropertyDistance(get_element_distance(config["default_property_distance"])))
+
+        property_score_functions = defaultdict(lambda: default_property_score)
+        for property_name, score_config in config["property_distance_functions"].items():
+            property_score_functions[property_name] = PropertyScore(
+                SetPropertyDistance(get_element_distance(score_config))
+            )
+        return AesopConfig(
+            matching_score_function=EntityDistance.from_dict(config),
+            matching_threshold=config["matching_threshold"],
+            property_score_functions=property_score_functions,
+            property_schema=property_schema,
+        )
+
+
+class AesopMetricCalculator(MetricCalculator):
     """AESOP metric calculator.
     Computes AESOP metric as described in the paper: https://arxiv.org/pdf/2402.04437
     with the following modification:
@@ -72,7 +99,7 @@ def make_default_aesop_config(
     set_embedding_score = PropertyScore(SetPropertyDistance(EmbeddingDistance()))
     set_token_score = PropertyScore(SetPropertyDistance(TokenDistance()))
     str_score = PropertyScore(SingleValuePropertyDistance(BinaryMatchDistance()))
-    edit_score = PropertyScore(SingleValuePropertyDistance(EditDistance()))
+    edit_score = PropertyScore(SetPropertyDistance(EditDistance()))
     embedding_score = PropertyScore(SingleValuePropertyDistance(EmbeddingDistance(model=embed_model)))
 
     property_to_score = defaultdict(lambda: set_token_score)
@@ -91,7 +118,7 @@ def make_default_aesop_config(
     )
 
     return AesopConfig(
-        matching_score_function=EntityDistance(property_schema, {"name": SingleValuePropertyDistance(TokenDistance())}),
+        matching_score_function=EntityDistance(property_schema, {"name": (SetPropertyDistance(TokenDistance()), 1.0)}),
         matching_threshold=matching_threshold,
         property_score_functions=property_to_score,
         property_schema=property_schema,
