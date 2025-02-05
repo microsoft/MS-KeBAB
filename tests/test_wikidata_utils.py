@@ -32,8 +32,8 @@ def test_extract_entities_from_dump(wikidata_records_file_path: Path) -> None:
     assert len(entities) == 1
 
     p = entities[0]
-    assert p["id"] == "P19"
-    assert p["name"] == "place of birth"
+    assert p.id == "P19"
+    assert p.name == "place of birth"
 
 
 def test_query_entity_via_api_and_simplify(wikidata_records_file_path: Path) -> None:

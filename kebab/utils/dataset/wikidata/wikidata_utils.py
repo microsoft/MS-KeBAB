@@ -10,12 +10,17 @@ from __future__ import annotations
 import json
 import logging
 import pathlib
+import re
 import time
 from collections.abc import Callable, Iterable
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 
 import requests
 from tqdm import tqdm
+
+
+REFERENCE_REGEX_PATTERN: re.Pattern = re.compile(r"Q\d+")
 
 
 class TypeProperties(Enum):
@@ -27,6 +32,107 @@ class TypeProperties(Enum):
     PART_OF = "P361"
     FACET_OF = "P1269"
     SUB_PROPERTY_OF = "P1647"
+
+
+@dataclass
+class SimpleEntity:
+    """A simple representation of a Wikidata entity."""
+
+    id: str
+    name: str
+    description: str | None = None
+    aliases: list[str] = field(default_factory=list)
+    types: list[str] = field(default_factory=list)
+    properties: dict[str, list[str]] = field(default_factory=dict)
+
+    def to_dict(self, minimal: bool = True) -> dict:
+        """Convert the SimpleEntity to a dictionary."""
+        d = asdict(self)
+        if minimal:
+            for p in ["description", "aliases", "types", "properties"]:
+                if not d[p]:
+                    del d[p]
+
+        return d
+
+    @classmethod
+    def from_dict(cls, data: dict) -> SimpleEntity:
+        """Create a SimpleEntity from a dictionary."""
+        return SimpleEntity(**data)
+
+    def to_json(self, minimal: bool = True) -> str:
+        """Convert the SimpleEntity to a JSON string."""
+        return json.dumps(self.to_dict(minimal=minimal), ensure_ascii=False)
+
+    @classmethod
+    def from_json(cls, data: str) -> SimpleEntity:
+        """Create a SimpleEntity from a JSON string."""
+        return SimpleEntity.from_dict(json.loads(data))
+
+    @classmethod
+    def from_wikidata_entity(
+        cls,
+        entity: dict,
+        allowed_properties: Iterable[str] | None = None,
+        prohibited_qualifiers: Iterable[str] | None = None,
+        include_descriptions: bool = True,
+    ) -> SimpleEntity:
+        """Convert a Wikidata entity to a simpler representation."""
+        allowed_properties = set(allowed_properties) if allowed_properties is not None else None
+
+        if allowed_properties is not None:
+            allowed_properties.add(TypeProperties.INSTANCE_OF.value)
+
+        entity_id = entity["id"]
+        label = entity.get("labels", {}).get("en", {}).get("value", "")
+
+        description = entity.get("descriptions", {}).get("en", {}).get("value", "")
+        aliases = [v["value"] for v in entity.get("aliases", {}).get("en", {})]
+
+        # extract properties
+        claims = entity.get("claims", {})
+        keys = set(claims.keys())
+        if allowed_properties is not None:
+            keys &= allowed_properties
+
+        ent_properties = {}
+
+        for prop in keys:
+            prop_claims = claims.get(prop, [])
+            prop_values = []
+
+            for claim in prop_claims:
+                if prohibited_qualifiers:
+                    qualifiers = claim.get("qualifiers", {})
+                    if any(q in qualifiers for q in prohibited_qualifiers):
+                        continue
+
+                mainsnak = claim.get("mainsnak", {})
+                if mainsnak.get("rank") == "deprecated":
+                    continue
+
+                if mainsnak.get("snaktype") == "value":
+                    try:
+                        prop_values.append(mainsnak.get("datavalue", {}).get("value", {}).get("id"))
+                    except AttributeError:
+                        prop_values.append(mainsnak.get("datavalue", {}).get("value"))
+
+            ent_properties[prop] = prop_values
+
+        # store entity types explicitly
+        types = ent_properties.get(TypeProperties.INSTANCE_OF.value, [])
+        ent_properties.pop(TypeProperties.INSTANCE_OF.value, None)
+
+        simple_entity = SimpleEntity(
+            id=entity_id,
+            name=label,
+            description=description if include_descriptions else None,
+            aliases=list(set(aliases)),
+            types=list(set(types)),
+            properties=ent_properties,
+        )
+
+        return simple_entity
 
 
 def _query_entities_via_api(wikidata_ids: Iterable[str], english_only: bool = True) -> dict | None:
@@ -114,77 +220,6 @@ def query_single_entity_via_api(wikidata_id: str, english_only: bool = True) -> 
     return entities.get(wikidata_id) if entities else None
 
 
-def convert_to_simple_entity(
-    entity: dict,
-    properties: Iterable[str] | None = None,
-    prohibited_qualifiers: Iterable[str] | None = None,
-    include_descriptions: bool = True,
-) -> dict:
-    """Convert a Wikidata entity to a simpler representation."""
-    properties = set(properties) if properties is not None else None
-
-    if properties is not None:
-        properties.add(TypeProperties.INSTANCE_OF.value)
-
-    entity_id = entity["id"]
-    label = entity.get("labels", {}).get("en", {}).get("value", "")
-
-    description = entity.get("descriptions", {}).get("en", {}).get("value", "")
-    aliases = [v["value"] for v in entity.get("aliases", {}).get("en", {})]
-
-    # extract properties
-    claims = entity.get("claims", {})
-    keys = set(claims.keys())
-    if properties is not None:
-        keys &= properties
-
-    ent_properties = {}
-
-    for prop in keys:
-        prop_claims = claims.get(prop, [])
-        prop_values = []
-
-        for claim in prop_claims:
-            if prohibited_qualifiers:
-                qualifiers = claim.get("qualifiers", {})
-                if any(q in qualifiers for q in prohibited_qualifiers):
-                    continue
-
-            mainsnak = claim.get("mainsnak", {})
-            if mainsnak.get("rank") == "deprecated":
-                continue
-
-            if mainsnak.get("snaktype") == "value":
-                try:
-                    prop_values.append(mainsnak.get("datavalue", {}).get("value", {}).get("id"))
-                except AttributeError:
-                    prop_values.append(mainsnak.get("datavalue", {}).get("value"))
-
-        ent_properties[prop] = prop_values
-
-    # store entity types explicitly
-    types = ent_properties.get(TypeProperties.INSTANCE_OF.value, [])
-    ent_properties.pop(TypeProperties.INSTANCE_OF.value, None)
-
-    simple_entity = {
-        "id": entity_id,
-        "name": label,
-        "description": description,
-        "aliases": list(set(aliases)),
-        "types": list(set(types)),
-        "properties": ent_properties,
-    }
-
-    # no need for properties if the request is not to extract them
-    if properties == {TypeProperties.INSTANCE_OF.value}:
-        del simple_entity["properties"]
-
-    if not include_descriptions:
-        del simple_entity["description"]
-
-    return simple_entity
-
-
 def scrape_properties_via_api(
     start: int = 1,
     end: int = 15_000,
@@ -259,7 +294,7 @@ def extract_simple_entities_from_dump(
     input_entity_predicate: Callable[[dict], bool] | None = None,
     output_entity_predicate: Callable[[dict], bool] | None = None,
     include_descriptions: bool = True,
-) -> Iterable[dict]:
+) -> Iterable[SimpleEntity]:
     """Extract all items that match the predicate and their requested properties from the Wikidata JSON dump."""
     logging.info(f"Extracting entities from {wikidata_json_dump_path}...")
 
@@ -299,9 +334,9 @@ def extract_simple_entities_from_dump(
                     skipped_count += 1
                     continue
 
-                simple_entity = convert_to_simple_entity(
+                simple_entity = SimpleEntity.from_wikidata_entity(
                     entity,
-                    properties=properties,
+                    allowed_properties=properties,
                     include_descriptions=include_descriptions,
                 )
 
@@ -322,13 +357,131 @@ def extract_simple_entities_from_dump(
         logging.warning(f"Skipped {skipped_count} entities without labels or type")
 
 
-# TODO(pmyshkov): Move this to a dedicated dataset loading class
 def load_properties(path: pathlib.Path) -> dict[str, dict]:
     """Load (previously extracted) Wikidata properties from a JSON file."""
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        logging.error(f"File not found: {path}")
-    except json.JSONDecodeError:
-        logging.error(f"Error while decoding JSON: {path}")
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_type_hierarchy(type_hierarchy_path: pathlib.Path | None = None) -> tuple[dict[str, dict], dict[str, dict]]:
+    """Load the hierarchy of Wikidata types."""
+    logging.info("Loading the hierarchy of Wikidata types.")
+    graph = {}
+    type_id_to_node = {}
+
+    with open(type_hierarchy_path, encoding="utf-8") as f:
+        for line in f:
+            node = json.loads(line.strip())
+            graph[node["id"]] = node
+            for node_id in node["merged_ids"]:
+                type_id_to_node[node_id] = node
+
+            for node_id in node["redirect_from_ids"]:
+                type_id_to_node[node_id] = node
+
+    logging.info(f"Type hierarchy contains {len(graph):,d} nodes")
+
+    return graph, type_id_to_node
+
+
+def load_simple_entities(simple_entities_path: pathlib.Path | None) -> Iterable[dict]:
+    """Load the list of simple entities extracted from Wikidata."""
+    count = 0
+    with open(simple_entities_path, encoding="utf-8") as f:
+        for line in f:
+            entity = json.loads(line.strip())
+            count += 1
+            yield entity
+
+    logging.info(f"Read {count:,d} entities")
+
+
+def collect_all_subtypes(graph: dict[str, dict], type_id: str) -> set[str]:
+    """Collect all subtypes of the given type from the type hierarhcy."""
+    type_id_to_node = {}
+    for node in graph.values():
+        for node_id in node["merged_ids"]:
+            type_id_to_node[node_id] = node
+
+        for node_id in node["redirect_from_ids"]:
+            type_id_to_node[node_id] = node
+
+    type_id = type_id_to_node[type_id]["id"]
+
+    subtypes = set()
+    stack = [type_id]
+    while stack:
+        current_type_id = stack.pop()
+
+        if current_type_id not in graph:
+            logging.warning(f"Type {current_type_id} not found in the graph")
+            continue
+
+        for merged_id in graph[current_type_id]["merged_ids"]:
+            subtypes.add(merged_id)
+
+        for redirect_id in graph[current_type_id]["redirect_from_ids"]:
+            subtypes.add(redirect_id)
+
+        logging.info(f"Added {current_type_id} ({graph[current_type_id]['name']}) to the subtypes")
+
+        for child_id in graph[current_type_id]["children"]:
+            stack.append(child_id)  # noqa: PERF402
+
+    return subtypes
+
+
+def collect_wikidata_simple_entities(
+    ids_to_include: set[str],
+    wikidata_simple_entities_path: pathlib.Path | None = None,
+    query_api: bool = False,
+    append_to_file: bool = False,
+    include_properties: bool = False,
+    include_descriptions: bool = False,
+) -> dict[str, SimpleEntity]:
+    """Get Wikidata simplified entities for the specified IDs from a file and query API for any missing entities ."""
+    logging.info(f"Loading Wikidata simple entities from {wikidata_simple_entities_path}")
+
+    required_ids = set(ids_to_include)
+    entities = {}
+    with open(wikidata_simple_entities_path, encoding="utf-8") as f:
+        for line in f:
+            entity = json.loads(line)
+
+            if entity["id"] not in required_ids:
+                continue
+
+            entities[entity["id"]] = entity
+            required_ids.remove(entity["id"])
+
+    if required_ids:
+        if query_api:
+            logging.info(f"Querying {len(required_ids):,} entities via the Wikidata API")
+
+            q_entities = query_entities_via_api(required_ids)
+
+            if q_entities is None:
+                logging.error("Failed to query entities via the Wikidata API.")
+                return entities
+
+            q_entities = {
+                k: SimpleEntity.from_wikidata_entity(
+                    e, allowed_properties=[] if include_properties else None, include_descriptions=include_descriptions
+                )
+                for k, e in q_entities.items()
+                if e is not None
+            }
+
+            if append_to_file:
+                with open(wikidata_simple_entities_path, mode="a", encoding="utf-8") as f:
+                    for entity in q_entities.values():
+                        f.write(json.dumps(entity, ensure_ascii=False) + "\n")
+                logging.info(f"Appended {len(q_entities):,} entities to {wikidata_simple_entities_path}")
+
+            entities.update(q_entities)
+        else:
+            logging.warning(f"Failed to find {len(required_ids):,} entities in the list of simple entities")
+
+    logging.info(f"Found {len(entities):,} Wikidata entities.")
+
+    return entities
