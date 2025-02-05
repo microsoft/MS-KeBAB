@@ -106,7 +106,7 @@ class BinaryMatchDistance(ElementDistance):
         return 0 if value1 == value2 else 1
 
     @classmethod
-    def from_dict(cls, config: dict[str, Any]) -> BinaryMatchDistance: # noqa: ARG003
+    def from_dict(cls, config: dict[str, Any]) -> BinaryMatchDistance:  # noqa: ARG003
         """Create binary match distance from dictionary."""
         return BinaryMatchDistance()
 
@@ -264,16 +264,19 @@ class EntityDistance:
         num_missing_weights = sum("weight" not in params for params in config["entity_distance"].values())
         default_weight = 1.0 / (num_properties - num_missing_weights) if num_missing_weights < num_properties else 1.0
         for property_id, params in config["entity_distance"].items():
-            element_distance = getattr(sys.modules[__name__], params["distance_function"]["name"]).from_dict(params["distance_function"].get("params", {}))
-            property_distance = SetPropertyDistance(element_distance) if property_schema.properties[property_id].is_collection else SingleValuePropertyDistance(element_distance)
+            element_distance = getattr(sys.modules[__name__], params["distance_function"]["name"]).from_dict(
+                params["distance_function"].get("params", {})
+            )
+            property_distance = (
+                SetPropertyDistance(element_distance)
+                if property_schema.properties[property_id].is_collection
+                else SingleValuePropertyDistance(element_distance)
+            )
             property_to_distance_function_and_weight[property_id] = (
                 property_distance,
-                params.get("weight", default_weight)
+                params.get("weight", default_weight),
             )
-        return EntityDistance(
-            property_schema,
-            property_to_distance_function_and_weight
-        )
+        return EntityDistance(property_schema, property_to_distance_function_and_weight)
 
 
 #######################################################################################################################

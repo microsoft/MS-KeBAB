@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from pathlib import Path
+
 import click
 from kebab.utils import logging_helpers
 from kebab.utils.io_helpers import generate_draft_property_schema_from_data
@@ -25,6 +26,7 @@ def main(path: Iterable[Path], output: Path) -> None:
     logging_helpers.configure_logging()
     filenames = [p / "entities.jsonl" for p in path]
     generate_draft_property_schema_from_data(filenames, output)
+
 
 if __name__ == "__main__":
     main()

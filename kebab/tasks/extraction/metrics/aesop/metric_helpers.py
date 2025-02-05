@@ -136,8 +136,12 @@ class MetricsAccumulator:
             metrics["property_recall"][key] = total_score / recall_denominator if recall_denominator > 0 else None
             if len(scores) == 0 and self.total_unmatched_counts_per_doc[key] == 0:
                 metrics["property_precision"][key] = None
-        metrics["avg_property_precision"] = np.mean([value for value in metrics["property_precision"].values() if value is not None]) # type: ignore
-        metrics["avg_property_recall"] = np.mean([value for value in metrics["property_recall"].values() if value is not None]) # type: ignore
+        metrics["avg_property_precision"] = np.mean( # type: ignore
+            [value for value in metrics["property_precision"].values() if value is not None]
+        )
+        metrics["avg_property_recall"] = np.mean( # type: ignore
+            [value for value in metrics["property_recall"].values() if value is not None]
+        )
         metrics["matched_count"] = self.matched_count  # type: ignore
         metrics["unmatched_counts"] = {
             "extra_gt_entities": self.unmatched_extra_gt_count,

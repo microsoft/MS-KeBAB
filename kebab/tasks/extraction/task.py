@@ -26,13 +26,11 @@ class ExtractionTaskInstance(TaskInstance):
 
     __data_extracts: Path
     __data_ground_truth_extracted_entities: Path | None = None
-    __default_metrics_config_path: Path = Path(__file__).parent.parent.parent / "configs" / "extraction" / "default_metrics_config.json"
-    __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {
-        "aesop": AesopMetricCalculator
-    }
-    __metric_config_cls: ClassVar[dict[str, type[MetricConfig]]] = {
-        "aesop": AesopConfig
-    }
+    __default_metrics_config_path: Path = (
+        Path(__file__).parent.parent.parent / "configs" / "extraction" / "default_metrics_config.json"
+    )
+    __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {"aesop": AesopMetricCalculator}
+    __metric_config_cls: ClassVar[dict[str, type[MetricConfig]]] = {"aesop": AesopConfig}
 
     @property
     def data_extracts(self) -> Path:
@@ -59,7 +57,6 @@ class ExtractionTaskInstance(TaskInstance):
             self.__data_ground_truth_extracted_entities = Path(ground_truth_extracted_entities)
         self.metrics_config = load_dict_from_json(Path(metrics_config or self.__default_metrics_config_path))
 
-
     def read_items(self) -> Iterable[ExtractionOutput]:
         """
         Read data items, with optional ground-truth extracted entities.
@@ -76,7 +73,10 @@ class ExtractionTaskInstance(TaskInstance):
             if self.data_ground_truth_extracted_entities is not None
             else iter([])
         )
-        return (ExtractionOutput(document=extract, entities=entity_list) for extract, entity_list in zip_longest(extracts, entity_lists))
+        return (
+            ExtractionOutput(document=extract, entities=entity_list)
+            for extract, entity_list in zip_longest(extracts, entity_lists)
+        )
 
     def write_items(self, path: Path, items: Iterable[list[Entity]]) -> None:
         """
@@ -103,14 +103,15 @@ class ExtractionTaskInstance(TaskInstance):
 
         pred_extractions = [
             ExtractionOutput(document=document, entities=entity_list)
-            for document, entity_list in zip((item.document for item in gt_extractions), pred_entity_lists, strict=True)]
+            for document, entity_list in zip((item.document for item in gt_extractions), pred_entity_lists, strict=True)
+        ]
 
         metrics = {}
 
         for metric_name, metric_config_dict in self.metrics_config.items():
             metric_calculator_cls = self.__metric_calculator_cls[metric_name]
             metric_config = self.__metric_config_cls[metric_name].from_dict(metric_config_dict)
-            metric_results = metric_calculator_cls(metric_config).run(pred_extractions, gt_extractions)
+            metric_results = metric_calculator_cls(metric_config).run(pred_extractions, gt_extractions)  # type: ignore
             metrics[metric_name] = metric_results
         if eval_result_path:
             save_dict_to_json(metrics, eval_result_path)

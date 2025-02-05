@@ -13,7 +13,7 @@ from kebab import mskebab
 from kebab.contracts.task import TaskType
 
 
-def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float =1e-6):
+def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
     """Assert that two dictionaries are equal."""
     assert dict1.keys() == dict2.keys()
     for key, value1 in dict1.items():
@@ -63,28 +63,18 @@ def test_task_interface():
                         "name": 0.72,
                         "type": 0.0,
                     },
-                    "unmatched_counts": {
-                        "extra_gt_entities": 47,
-                        "extra_pred_entities": 0,
-                        "pairs": 0
-                    },
-                    "unmatched_fractions": {
-                        "extra_gt_entities": 0.854,
-                        "extra_pred_entities": 0.0,
-                        "pairs": 0.0
-                    }
+                    "unmatched_counts": {"extra_gt_entities": 47, "extra_pred_entities": 0, "pairs": 0},
+                    "unmatched_fractions": {"extra_gt_entities": 0.854, "extra_pred_entities": 0.0, "pairs": 0.0},
                 }
-
-
-            }
+            },
         },
         "Linking-Heldout": {
             "predictions": "some_output_file",
             "metrics": {
                 "primary_linking_metric": 0.8,
                 "secondary_linking_metric": 0.6,
-            }
-        }
+            },
+        },
     }
     for task in tasks.values():
         for task_instance in task.instances.values():

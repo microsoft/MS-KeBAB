@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
@@ -38,7 +37,7 @@ def test_extraction_read_write_items_roundtrip() -> None:
         Task(TaskType.Extraction),
         str(items_file_path),
         str(extracted_entities_file_path),
-        str(metrics_config_file_path)
+        str(metrics_config_file_path),
     )
 
     # Act

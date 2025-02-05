@@ -10,8 +10,8 @@ from typing import Any
 
 from sentence_transformers import SentenceTransformer
 
-import kebab.tasks.extraction.metrics.aesop.distances as distances
 from kebab.contracts.entity import Entity, Property, PropertySchema
+from kebab.tasks.extraction.metrics.aesop import distances
 from kebab.tasks.extraction.metrics.aesop.distances import (
     BinaryMatchDistance,
     EditDistance,
@@ -47,7 +47,9 @@ class AesopConfig(MetricConfig):
             element_distance_cls_name = element_distance_params["name"]
             return getattr(distances, element_distance_cls_name).from_dict(element_distance_params.get("params", {}))
 
-        default_property_score = PropertyScore(SetPropertyDistance(get_element_distance(config["default_property_distance"])))
+        default_property_score = PropertyScore(
+            SetPropertyDistance(get_element_distance(config["default_property_distance"]))
+        )
 
         property_score_functions = defaultdict(lambda: default_property_score)
         for property_name, score_config in config["property_distance_functions"].items():

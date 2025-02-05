@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from kebab.contracts.document import Document, DocumentUtilities
-from kebab.contracts.entity import DataType, Entity, ValueType, Property, PropertySchema
+from kebab.contracts.entity import DataType, Entity, Property, PropertySchema, ValueType
 
 
 class CustomEncoder(json.JSONEncoder):
@@ -341,6 +341,7 @@ def generate_draft_property_schema_from_data(paths: Iterable[Path], output_path:
     """
     properties = {}
     data_types = {}
+
     def get_value_type(values: list[Any]) -> ValueType:
         if len(values) == 0:
             return ValueType.TEXT
@@ -361,13 +362,30 @@ def generate_draft_property_schema_from_data(paths: Iterable[Path], output_path:
                     data_type_id = value_type.name.lower()
                     is_collection = len(values) > 1
                     if data_type_id not in data_types:
-                        data_types[data_type_id] = DataType.from_dict({"data_type_id": data_type_id, "value_type": value_type.value, "description": data_type_id})
+                        data_types[data_type_id] = DataType.from_dict(
+                            {"data_type_id": data_type_id, "value_type": value_type.value, "description": data_type_id}
+                        )
                     if key not in properties:
                         properties[key] = Property.from_dict(
-                            {"property_id": key, "data_type_id": data_type_id, "description": key, "is_collection": is_collection}, data_types)
+                            {
+                                "property_id": key,
+                                "data_type_id": data_type_id,
+                                "description": key,
+                                "is_collection": is_collection,
+                            },
+                            data_types,
+                        )
                     elif properties[key].data_type.data_type_id != data_type_id:
-                        raise ValueError(f"Data type mismatch for property id '{key}': found '{data_type_id}' in entity '{entity.entity_id}', expected '{properties[key].data_type_id}'.")
+                        raise ValueError(
+                            f"Data type mismatch for property id '{key}': found '{data_type_id}' in entity '{entity.entity_id}', expected '{properties[key].data_type_id}'."
+                        )
                     else:
                         properties[key].is_collection = properties[key].is_collection or is_collection
-    property_schema = PropertySchema.from_dict({"name": "schema", "properties": [prop.to_dict() for prop in properties.values()], "data_types": [x.to_dict() for x in data_types.values()]})
+    property_schema = PropertySchema.from_dict(
+        {
+            "name": "schema",
+            "properties": [prop.to_dict() for prop in properties.values()],
+            "data_types": [x.to_dict() for x in data_types.values()],
+        }
+    )
     property_schema.to_file(output_path)
