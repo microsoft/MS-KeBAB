@@ -87,10 +87,12 @@ class TRexDatasetBuilder:
 
         # load wikidata properties and type hierarchy
         wikidata_properties = wikidata_utils.load_properties(self.wikidata_properties_path)
-        _, type_id_to_node = wikidata_utils.load_type_hierarchy()
+        _, type_id_to_node = wikidata_utils.load_type_hierarchy(self.wikidata_type_hierarchy_path)
 
         # get wikidata entities, properties, and type hierarchy
-        wikidata_entities = wikidata_utils.collect_wikidata_simple_entities(referenced_ids)
+        wikidata_entities = wikidata_utils.collect_wikidata_simple_entities(
+            referenced_ids, self.wikidata_simple_entities_path
+        )
 
         # filter fragment contents
         filtered_fragments = self.filter_fragments(
@@ -300,6 +302,7 @@ class TRexDatasetBuilder:
                     line = fragment.to_json()
                     f.write(line + "\n")
 
+    # TODO(pmyshkov): use resolver instead
     def substitute_values(
         self,
         fragment: Entity,
@@ -347,8 +350,7 @@ class TRexDatasetBuilder:
                 mapped_properties[prop_name] = values
 
         fragment.properties = mapped_properties
-
-        entity_types = wikidata_entities.get(fragment.entity_id, {}).get("types", [])
+        entity_types = wikidata_entities[fragment.entity_id].types if fragment.entity_id in wikidata_entities else []
 
         # entity_type_values = list({type_id_to_node[t]["name"] for t in entity_types if t in type_id_to_node})
         fragment.metadata["entity_types"] = entity_types

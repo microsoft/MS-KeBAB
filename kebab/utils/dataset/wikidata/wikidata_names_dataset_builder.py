@@ -38,8 +38,8 @@ class WikidataNamesDatasetBuilder:
     def __init__(
         self,
         *,
-        wikidata_simple_entities_path: pathlib.Path | None = None,
-        wikidata_type_hierarchy_path: pathlib.Path | None = None,
+        wikidata_simple_entities_path: pathlib.Path,
+        wikidata_type_hierarchy_path: pathlib.Path,
         output_dir: pathlib.Path | None = None,
         type_ids: list[str] | None = None,
         min_aliases: int = 2,
@@ -47,8 +47,8 @@ class WikidataNamesDatasetBuilder:
         """Initialize the WikidataNamesDatasetBuilder."""
         self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
 
-        self.wikidata_simple_entities_path: pathlib.Path | None = wikidata_simple_entities_path
-        self.wikidata_type_hierarchy_path: pathlib.Path | None = wikidata_type_hierarchy_path
+        self.wikidata_simple_entities_path: pathlib.Path = wikidata_simple_entities_path
+        self.wikidata_type_hierarchy_path: pathlib.Path = wikidata_type_hierarchy_path
         self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
 
         if self.output_dir is not None:

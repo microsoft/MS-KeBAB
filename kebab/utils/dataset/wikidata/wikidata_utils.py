@@ -292,7 +292,7 @@ def extract_simple_entities_from_dump(
     wikidata_json_dump_path: pathlib.Path = pathlib.Path.cwd() / "latest-all.json",
     properties: Iterable[str] | None = None,
     input_entity_predicate: Callable[[dict], bool] | None = None,
-    output_entity_predicate: Callable[[dict], bool] | None = None,
+    output_entity_predicate: Callable[[SimpleEntity], bool] | None = None,
     include_descriptions: bool = True,
 ) -> Iterable[SimpleEntity]:
     """Extract all items that match the predicate and their requested properties from the Wikidata JSON dump."""
@@ -363,7 +363,7 @@ def load_properties(path: pathlib.Path) -> dict[str, dict]:
         return json.load(f)
 
 
-def load_type_hierarchy(type_hierarchy_path: pathlib.Path | None = None) -> tuple[dict[str, dict], dict[str, dict]]:
+def load_type_hierarchy(type_hierarchy_path: pathlib.Path) -> tuple[dict[str, dict], dict[str, dict]]:
     """Load the hierarchy of Wikidata types."""
     logging.info("Loading the hierarchy of Wikidata types.")
     graph = {}
@@ -384,7 +384,7 @@ def load_type_hierarchy(type_hierarchy_path: pathlib.Path | None = None) -> tupl
     return graph, type_id_to_node
 
 
-def load_simple_entities(simple_entities_path: pathlib.Path | None) -> Iterable[dict]:
+def load_simple_entities(simple_entities_path: pathlib.Path) -> Iterable[dict]:
     """Load the list of simple entities extracted from Wikidata."""
     count = 0
     with open(simple_entities_path, encoding="utf-8") as f:
@@ -433,7 +433,7 @@ def collect_all_subtypes(graph: dict[str, dict], type_id: str) -> set[str]:
 
 def collect_wikidata_simple_entities(
     ids_to_include: set[str],
-    wikidata_simple_entities_path: pathlib.Path | None = None,
+    wikidata_simple_entities_path: pathlib.Path,
     query_api: bool = False,
     append_to_file: bool = False,
     include_properties: bool = False,

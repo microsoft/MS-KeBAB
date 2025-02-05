@@ -209,12 +209,12 @@ class WikidataResolver:
             entity.properties = mapped_properties
 
         if self.attach_types:
-            entity_types = wikidata_entities.get(entity.entity_id, {}).get("types", [])
+            entity_types = wikidata_entities[entity.entity_id].types if entity.entity_id in wikidata_entities else []
 
             if self.resolves_types:
                 entity_types = [type_id_to_node[t]["name"] if t in type_id_to_node else t for t in entity_types]
 
-            entity.entity_types = entity_types
+            entity.metadata["types"] = entity_types
 
         for prop, count in sorted(unknown_properties.items(), key=lambda x: x[1], reverse=True):
             self._logger.warning(f"Unknown values for property {prop}: {count:,}")
