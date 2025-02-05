@@ -19,7 +19,9 @@ from kebab.tasks.extraction.metrics.utils import normalize_property_value, norma
 
 
 class ElementDistance:
-    """Element distance class."""
+    """Element distance class.
+    Element distance values should be between 0 and 1.
+    """
 
     def check_constraints(self, property_: Property) -> None:
         """Check constraints for element distance."""
@@ -236,7 +238,10 @@ class PropertyScore:
 
 
 class EntityDistance:
-    """Distance between two entities."""
+    """Distance between two entities.
+
+    Computed as a weighted sum of distances between properties.
+    """
 
     def __init__(
         self,
@@ -290,16 +295,20 @@ def jaccard_distance(tokens1: list[int], tokens2: list[int]) -> float:
 
 
 def token_distance_between_strings(value1: str, value2: str, encoder: tiktoken.Encoding) -> float:
-    """Compute token distance between two string values."""
+    """Compute token distance between two string values.
+    Distance value is between 0 and 1.
+    """
     tokens1 = encoder.encode(normalize_string(value1))
     tokens2 = encoder.encode(normalize_string(value2))
     return jaccard_distance(tokens1, tokens2)
 
 
 def embeddings_distance_between_strings(value1: str, value2: str, model: SentenceTransformer) -> float:
-    """Compute embedding distance between two string values."""
+    """Compute embedding distance between two string values.
+    Distance value is between 0 and 1.
+    """
     embeds = model.encode([value1, value2])
-    return 0.5 * float(cosine(embeds[0], embeds[1]))
+    return 0.5 * float(cosine(embeds[0], embeds[1])) # scipy.spatial.distance.cosine is between 0 and 2
 
 
 def normalized_edit_distance(value1: str, value2: str) -> float:

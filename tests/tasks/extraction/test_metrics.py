@@ -15,9 +15,9 @@ import tiktoken
 from kebab.contracts.document import Document, DocumentSchema
 from kebab.contracts.entity import Entity, PropertySchema
 from kebab.tasks.extraction.metrics.aesop.calculator import (
-    AesopConfig,
-    AesopMetricCalculator,
-    make_default_aesop_config,
+    ValueAveragedAesopConfig,
+    ValueAveragedAesopMetricCalculator,
+    make_default_value_averaged_aesop_config,
 )
 from kebab.tasks.extraction.metrics.aesop.distances import (
     BinaryMatchDistance,
@@ -187,8 +187,8 @@ def test_entity_matches_with_low_matching_scores_should_not_be_evaluated(propert
     )
     predictions = to_extraction_output(to_entities([{"name": "France"}, {"name": "Paris"}]))
 
-    config = make_default_aesop_config(property_schema, matching_threshold=0.5, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=0.5, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     # no entities are matched
@@ -222,8 +222,8 @@ def test_match_entities_with_different_thresholds(property_schema: PropertySchem
     )
 
     # threshold 1.0
-    config = make_default_aesop_config(property_schema, matching_threshold=1.0, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=1.0, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     # no extra entities in the ground truth or predictions
@@ -238,8 +238,8 @@ def test_match_entities_with_different_thresholds(property_schema: PropertySchem
     assert metrics["unmatched_fractions"]["pairs"] == 0
 
     # threshold 0.5
-    config = make_default_aesop_config(property_schema, matching_threshold=0.5, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=0.5, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     # with a threshold of 0.5, the first two entities are matched
@@ -250,8 +250,8 @@ def test_match_entities_with_different_thresholds(property_schema: PropertySchem
     assert metrics["unmatched_fractions"]["extra_gt_entities"] == 0.0
 
     # threshold 0.0
-    config = make_default_aesop_config(property_schema, matching_threshold=0.0, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=0.0, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     # with a threshold of 0, one entity is matched
@@ -265,10 +265,10 @@ def test_match_entities_with_different_thresholds(property_schema: PropertySchem
 
 def assert_score_dicts_close(left: dict, right: dict):
     assert left.keys() == right.keys()
-    for key in left:
-        assert left[key].keys() == right[key].keys()
-        for subkey in left[key]:
-            np.testing.assert_allclose(left[key][subkey], right[key][subkey])
+    for key, value in left.items():
+        assert value.keys() == right[key].keys()
+        for subkey in value:
+            np.testing.assert_allclose(value[subkey], right[key][subkey])
 
 
 def test_compute_scores_of_target_entities_with_themselves(property_schema: PropertySchema):
@@ -305,8 +305,8 @@ def test_evaluate_target_entities_with_themselves(property_schema: PropertySchem
     )
     predictions = ground_truth.copy()
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     assert metrics["property_precision"]["name"] == metrics["property_precision"]["type"] == 1.0
@@ -327,8 +327,8 @@ def test_evaluate_target_entities_with_more_predictions(property_schema: Propert
         )
     )
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     assert metrics["matched_count"] == 2
@@ -356,8 +356,8 @@ def test_evaluate_target_entities_with_more_ground_truth(property_schema: Proper
 
     predictions = to_extraction_output(to_entities([{"name": "London"}, {"name": "Istanbul"}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     assert metrics["matched_count"] == 2
@@ -375,8 +375,8 @@ def test_evaluate_set_properties_with_same_values(property_schema: PropertySchem
     ground_truth = to_extraction_output(to_entities([{"name": "London", "type": ["city"]}]))
     predictions = to_extraction_output(to_entities([{"name": "London", "type": ["city"]}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     assert metrics["property_precision"]["name"] == metrics["property_precision"]["type"] == 1.0
@@ -384,7 +384,7 @@ def test_evaluate_set_properties_with_same_values(property_schema: PropertySchem
 
 
 def compute_intermediate_metrics(
-    ground_truth: list[ExtractionOutput], predictions: list[ExtractionOutput], config: AesopConfig
+    ground_truth: list[ExtractionOutput], predictions: list[ExtractionOutput], config: ValueAveragedAesopConfig
 ) -> MetricsAccumulator:
     metrics_accumulator = MetricsAccumulator()
     for pred, gt in zip(predictions, ground_truth, strict=True):
@@ -401,7 +401,7 @@ def test_evaluate_set_properties_with_different_values(property_schema: Property
     ground_truth = to_extraction_output(to_entities([{"type": ["project", "team"]}]))
     predictions = to_extraction_output(to_entities([{"type": ["project"]}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
 
     metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, config)
 
@@ -418,7 +418,7 @@ def test_evaluate_set_properties_with_more_predictions(property_schema: Property
         to_entities([{"type": ["project", "team", "organization", "company", "location"]}])
     )
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
 
     metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, config)
 
@@ -434,7 +434,7 @@ def test_evaluate_set_properties_with_more_ground_truth(property_schema: Propert
     ground_truth = to_extraction_output(to_entities([{"type": ["project", "team", "organization"]}]))
     predictions = to_extraction_output(to_entities([{"type": ["project", "team"]}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
 
     metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, config)
 
@@ -454,7 +454,7 @@ def test_evaluate_set_properties_in_different_order_and_normalized(property_sche
     )
     predictions = to_extraction_output(to_entities([{"alternative names": ["microsoft research cambridge"]}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
 
     metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, config)
 
@@ -469,8 +469,8 @@ def test_evaluate_missing_properties_in_prediction(property_schema: PropertySche
     ground_truth = to_extraction_output(to_entities([{"name": "Steven", "type": "person"}]))
     predictions = to_extraction_output(to_entities([{"name": "Steven"}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     assert metrics["property_precision"]["name"] == 1.0
@@ -483,8 +483,8 @@ def test_evaluate_more_properties_in_prediction(property_schema: PropertySchema)
     ground_truth = to_extraction_output(to_entities([{"name": "Steven"}]))
     predictions = to_extraction_output(to_entities([{"name": "Steven", "type": "person"}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     assert metrics["property_precision"]["name"] == 1.0
@@ -507,7 +507,7 @@ def test_aggregate_across_documents_simple(property_schema: PropertySchema):
     ground_truth2 = to_extraction_output(to_entities([{"name": "London"}]))
     predictions2 = to_extraction_output(to_entities([{"name": "London"}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
 
     metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
 
@@ -587,8 +587,8 @@ def test_evaluate_entities_with_different_properties(property_schema: PropertySc
         )
     )
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     assert not metrics["property_precision"]["employer"]
@@ -632,7 +632,7 @@ def test_aggregate_across_documents_with_multiple_property_values(property_schem
         )
     )
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
     metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
     metrics_accumulator.update(metrics_accumulator2)
@@ -661,7 +661,7 @@ def test_aggregate_across_documents_with_multiple_entities(property_schema: Prop
     ground_truth2 = to_extraction_output(to_entities([{"type": ["software"], "definitions": ["software definition"]}]))
     predictions2 = to_extraction_output(to_entities([{"type": ["software"], "definitions": ["software definition"]}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
     metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
     metrics_accumulator.update(metrics_accumulator2)
@@ -699,7 +699,7 @@ def test_aggregate_across_documents_with_multiple_entities_and_missing_propertie
     ground_truth2 = to_extraction_output(to_entities([{"name": "Phi2", "definitions": ["small language model"]}]))
     predictions2 = to_extraction_output(to_entities([{"name": "Phi2"}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
     metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
     metrics_accumulator.update(metrics_accumulator2)
@@ -739,7 +739,7 @@ def test_aggregate_across_documents_with_multiple_entities_and_missing_propertie
     ground_truth2 = to_extraction_output(to_entities([{"name": "Phi2"}]))
     predictions2 = to_extraction_output(to_entities([{"name": "Phi2", "definitions": ["small language model"]}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
     metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
     metrics_accumulator.update(metrics_accumulator2)
@@ -775,7 +775,7 @@ def test_evaluate_same_property_across_documents(property_schema: PropertySchema
     ground_truth2 = to_extraction_output(to_entities([{"type": ["organization"]}]))
     predictions2 = to_extraction_output(to_entities([{"type": ["company"]}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
     metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
     metrics_accumulator.update(metrics_accumulator2)
@@ -791,8 +791,8 @@ def test_unmatched_entities_in_predictions_should_not_be_evaluated(property_sche
         to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}, {"name": "FNKE", "type": "project"}])
     )
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     assert metrics["matched_count"] == 2
@@ -812,8 +812,8 @@ def test_unmatched_entities_in_gt_should_not_be_evaluated(property_schema: Prope
     )
     predictions = to_extraction_output(to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = AesopMetricCalculator(config)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)
 
     assert metrics["matched_count"] == 2
@@ -841,7 +841,7 @@ def test_final_statistics(property_schema: PropertySchema):
     ground_truth4 = to_extraction_output(to_entities([{"name": "Alexandria"}]))
     predictions4 = to_extraction_output(to_entities([{"name": "Alexandria"}, {"name": "New Alexandria"}]))
 
-    config = make_default_aesop_config(property_schema, embed_model=embed_model, matching_threshold=0.5)
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model, matching_threshold=0.5)
     metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
     metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
     metrics_accumulator.update(metrics_accumulator2)

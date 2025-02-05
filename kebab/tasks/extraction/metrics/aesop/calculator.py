@@ -29,8 +29,8 @@ from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricCa
 
 
 @dataclass
-class AesopConfig(MetricConfig):
-    """AESOP metric configuration."""
+class ValueAveragedAesopConfig(MetricConfig):
+    """Value-averaged-AESOP metric configuration."""
 
     matching_score_function: Callable[[Entity, Entity], float]
     matching_threshold: float
@@ -38,8 +38,8 @@ class AesopConfig(MetricConfig):
     property_schema: PropertySchema
 
     @staticmethod
-    def from_dict(config: dict[str, Any]) -> AesopConfig:
-        """Create AESOP metric configuration from dictionary."""
+    def from_dict(config: dict[str, Any]) -> ValueAveragedAesopConfig:
+        """Create value-averaged-AESOP metric configuration from dictionary."""
         property_schema = PropertySchema.from_file(config["property_schema"])
 
         def get_element_distance(element_distance_params: dict[str, Any]) -> ElementDistance:
@@ -56,7 +56,7 @@ class AesopConfig(MetricConfig):
             property_score_functions[property_name] = PropertyScore(
                 SetPropertyDistance(get_element_distance(score_config))
             )
-        return AesopConfig(
+        return ValueAveragedAesopConfig(
             matching_score_function=EntityDistance.from_dict(config),
             matching_threshold=config["matching_threshold"],
             property_score_functions=property_score_functions,
@@ -64,16 +64,19 @@ class AesopConfig(MetricConfig):
         )
 
 
-class AesopMetricCalculator(MetricCalculator):
-    """AESOP metric calculator.
+class ValueAveragedAesopMetricCalculator(MetricCalculator):
+    """Value-averaged-AESOP metric calculator.
     Computes AESOP metric as described in the paper: https://arxiv.org/pdf/2402.04437
     with the following modification:
     We don't average property scores on entity level to obtain entity similarities.
-    Instead, we compute property-level similarities across all entities in the set.
+    Instead, we compute similarity scores for each pair of matched values of that property in the dataset.
+    Then, we average these scores to obtain precision for the property.
+    Finally, we average precision scores for all properties to obtain the average precision.
+    Similarly, we compute recall scores for each property and average them to obtain the average recall.
     """
 
-    def __init__(self, config: AesopConfig):
-        """Configure AESOP metric calculator."""
+    def __init__(self, config: ValueAveragedAesopConfig):
+        """Configure value-averaged-AESOP metric calculator."""
         self.config = config
 
     def run(self, prediction: list[ExtractionOutput], ground_truth: list[ExtractionOutput]) -> dict:
@@ -89,10 +92,10 @@ class AesopMetricCalculator(MetricCalculator):
         return metrics_accumulator.accumulate_metrics()
 
 
-def make_default_aesop_config(
+def make_default_value_averaged_aesop_config(
     property_schema: PropertySchema, matching_threshold: float = 1.0, embed_model: SentenceTransformer | None = None
-) -> AesopConfig:
-    """Create default aesop metric config."""
+) -> ValueAveragedAesopConfig:
+    """Create default value-averaged-AESOP metric config."""
     # Set score functions are used for properties for which we expect multiple values.
     # Score function always returns a list of scores, even if there is only one value.
     if embed_model is None:
@@ -119,7 +122,7 @@ def make_default_aesop_config(
         }
     )
 
-    return AesopConfig(
+    return ValueAveragedAesopConfig(
         matching_score_function=EntityDistance(property_schema, {"name": (SetPropertyDistance(TokenDistance()), 1.0)}),
         matching_threshold=matching_threshold,
         property_score_functions=property_to_score,
