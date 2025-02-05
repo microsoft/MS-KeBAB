@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from kebab.contracts.document import Document
-from kebab.contracts.entity import Entity
+from kebab.contracts.entity import Entity, PropertySchema
 
 
 @dataclass
@@ -24,7 +24,7 @@ class MetricConfig:
 
     @staticmethod
     @abc.abstractmethod
-    def from_dict(config: dict[str, Any]) -> MetricConfig:
+    def from_dict(config: dict[str, Any], property_schema: PropertySchema) -> MetricConfig:
         """Create metric configuration from dictionary."""
         raise NotImplementedError
 

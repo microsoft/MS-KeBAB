@@ -3,6 +3,7 @@
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
+      "schema": "./kebab/configs/extraction/default_property_schema.json",
       "ground_truth_extracted_entities": "https://some.public/download/link",
       "metrics_config": "./kebab/configs/extraction/default_metrics_config.json"
     }
@@ -11,6 +12,7 @@
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
+      "schema": "./kebab/configs/extraction/default_property_schema.json",
       "ground_truth_extracted_entities": "https://some.public/download/link",
       "metrics_config": "./kebab/configs/extraction/default_metrics_config.json"
     }
@@ -19,6 +21,7 @@
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
+      "schema": "./kebab/configs/extraction/default_property_schema.json",
       "metrics_config": "./kebab/configs/extraction/default_metrics_config.json"
     }
   },

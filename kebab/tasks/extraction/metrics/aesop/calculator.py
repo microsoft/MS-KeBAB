@@ -38,9 +38,8 @@ class ValueAveragedAesopConfig(MetricConfig):
     property_schema: PropertySchema
 
     @staticmethod
-    def from_dict(config: dict[str, Any]) -> ValueAveragedAesopConfig:
+    def from_dict(config: dict[str, Any], property_schema: PropertySchema) -> ValueAveragedAesopConfig:
         """Create value-averaged-AESOP metric configuration from dictionary."""
-        property_schema = PropertySchema.from_file(config["property_schema"])
 
         def get_element_distance(element_distance_params: dict[str, Any]) -> ElementDistance:
             """Get element distance function from parameters."""

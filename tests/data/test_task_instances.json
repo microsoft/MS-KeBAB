@@ -3,6 +3,7 @@
       "task": "Extraction",
       "data": {
         "extracts": "./tests/data/datasets/re-docred/train_small/extracts.jsonl",
+        "schema": "./tests/data/extraction/property_schema.json",
         "ground_truth_extracted_entities": "./tests/data/datasets/re-docred/train_small/entities.jsonl",
         "metrics_config": "./tests/data/extraction/metrics_config.json"
       }
@@ -11,6 +12,7 @@
       "task": "Extraction",
       "data": {
         "extracts": "./tests/data/datasets/re-docred/test_small/extracts.jsonl",
+        "schema": "./tests/data/extraction/property_schema.json",
         "ground_truth_extracted_entities": "./tests/data/datasets/re-docred/test_small/entities.jsonl",
         "metrics_config": "./tests/data/extraction/metrics_config.json"
       }
@@ -19,6 +21,7 @@
       "task": "Extraction",
       "data": {
         "extracts": "./tests/data/datasets/re-docred/dev_small/extracts.jsonl",
+        "schema": "./tests/data/extraction/property_schema.json",
         "ground_truth_extracted_entities": "./tests/data/datasets/re-docred/dev_small/entities.jsonl",
         "metrics_config": "./tests/data/extraction/metrics_config.json"
       }
@@ -27,6 +30,7 @@
       "task": "Linking",
       "data": {
         "entity_fragment_pairs": "https://some.public/download/link",
+        "schema": "https://some.public/download/link",
         "ground_truth_boolean": "https://some.public/download/link"
       }
     },
@@ -34,6 +38,7 @@
       "task": "Linking",
       "data": {
         "entity_fragment_pairs": "https://some.public/download/link",
+        "schema": "https://some.public/download/link",
         "ground_truth_boolean": "https://some.public/download/link"
       }
     },
@@ -41,14 +46,22 @@
       "task": "Linking",
       "data": {
         "entity_fragment_pairs": "https://some.public/download/link",
+        "schema": "https://some.public/download/link",
         "ground_truth_boolean": "https://some.public/download/link"
       }
     },
     "Linking-Heldout": {
       "task": "Linking",
       "data": {
-        "entity_fragment_pairs": "https://some.public/download/link"
+        "entity_fragment_pairs": "https://some.public/download/link",
+        "schema": "https://some.public/download/link"
+      }
+    },
+    "Entity-Generation-REBEL": {
+      "task": "EntityGeneration",
+      "data": {
+        "entities": "https://some.public/download/link",
+        "schema": "https://some.public/download/link"
       }
     }
   }
-  

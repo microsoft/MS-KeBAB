@@ -64,7 +64,6 @@
             "password": {
                 "name": "BinaryMatchDistance"
             }
-        },
-        "property_schema": "./kebab/configs/extraction/default_property_schema.json"
+        }
     }
 }
