@@ -44,8 +44,8 @@ from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedData
 @click.option(
     "--output-dir",
     type=pathlib.Path,
-    default=pathlib.Path.cwd() / "output" / "re_docred_extractions",
-    help="Path to the output directory ('re_docred_extractions_dataset.jsonl' will be created there).",
+    default=pathlib.Path.cwd() / "output" / "re_docred_extractions" / "full",
+    help="Path to the output directory ('extracts.jsonl' and 'entities.jsonl' will be created there).",
 )
 @click.command()
 def main(

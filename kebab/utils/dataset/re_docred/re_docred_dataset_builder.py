@@ -27,7 +27,8 @@ from kebab.utils.dataset.wikidata import wikidata_utils
 class ReDocRedDatasetBuilder:
     """Extract text paragraphs and entities from Re-DocRED dataset."""
 
-    EXTRACTION_DATASET_FILENAME: str = "re_docred_extraction_dataset.jsonl"
+    EXTRACTS_FILENAME: str = "extracts.jsonl"
+    ENTITIES_FILENAME: str = "entities.jsonl"
     PUNCTUATION: typing.ClassVar[set[str]] = set(".:!,;?-_)}]'#%@")
     PUNCTUATION_WO_SPACE: typing.ClassVar[set[str]] = set("-_({['/@$")
     PROPERTIES_TO_DROP: typing.ClassVar[set[str]] = {"pos", "global_pos", "index", "sent_id", "properties"}
@@ -87,8 +88,10 @@ class ReDocRedDatasetBuilder:
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.extraction_dataset_output_path = self.output_dir / self.EXTRACTION_DATASET_FILENAME
-        assert not self.extraction_dataset_output_path.exists(), "Output file already exists."
+        self.extracts_output_path = self.output_dir / self.EXTRACTS_FILENAME
+        self.entities_output_path = self.output_dir / self.ENTITIES_FILENAME
+        assert not self.extracts_output_path.exists(), "Extracts output file already exists."
+        assert not self.entities_output_path.exists(), "Entities output file already exists."
 
     def run(self) -> None:
         """Run the dataset creation process."""
@@ -209,14 +212,23 @@ class ReDocRedDatasetBuilder:
         """Write the extraction dataset to disk."""
         error_count = 0
         err = None
-        with open(self.extraction_dataset_output_path, "w", encoding="utf-8") as f:
+        with (
+            open(self.entities_output_path, "w", encoding="utf-8") as entities_file,
+            open(self.extracts_output_path, "w", encoding="utf-8") as extracts_file,
+        ):
             for entry in extraction_dataset:
+                current_pos_extracts = extracts_file.tell()
+                current_pos_entities = entities_file.tell()
                 try:
-                    json.dump(entry, f, cls=io_helpers.CustomEncoder, ensure_ascii=False)
-                    f.write("\n")
-                except TypeError as e:  # noqa: PERF203
+                    json.dump(entry["document"], extracts_file, cls=io_helpers.CustomEncoder, ensure_ascii=False)
+                    extracts_file.write("\n")
+                    json.dump(entry["entities"], entities_file, cls=io_helpers.CustomEncoder, ensure_ascii=False)
+                    entities_file.write("\n")
+                except TypeError as e:
                     error_count += 1
                     err = e
+                    extracts_file.seek(current_pos_extracts)
+                    entities_file.seek(current_pos_entities)
 
         if error_count:
             self._logger.error(f"Errors while saving the dataset: {error_count}, last error: {err}")
