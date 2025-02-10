@@ -13,7 +13,7 @@ import pathlib
 import re
 import time
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 import requests
@@ -40,16 +40,44 @@ class TypeProperties(Enum):
 class WikidataEntity(Entity):
     """A simplified representation of a Wikidata entity."""
 
-    name: str | None = None
-    description: str | None = None
-    aliases: list[str] = field(default_factory=list)
+    @property
+    def name(self) -> str:
+        """Return the name of the entity."""
+        return self.properties["name"][0] if ("name" in self.properties and len(self.properties["name"]) > 0) else ""
 
-    def __post_init__(self):
-        """Initialize the WikidataEntity."""
-        super().__post_init__()
+    @property
+    def names(self) -> list[str]:
+        """Return the names of the entity."""
+        return self.properties["name"]
 
-        if not self.aliases:
-            self.aliases = []
+    @names.setter
+    def names(self, value: list[str]) -> None:
+        """Set the names of the entity."""
+        self.properties["name"] = value
+
+    @property
+    def aliases(self) -> list[str]:
+        """Return the aliases of the entity."""
+        return (
+            self.properties["names"][1:] if ("names" in self.properties and len(self.properties["names"]) > 1) else []
+        )
+
+    @aliases.setter
+    def aliases(self, value: list[str]) -> None:
+        """Set the aliases of the entity."""
+        self.properties["names"] = (
+            [self.name, *value] if "name" in self.properties and len(self.properties["name"]) > 0 else value
+        )
+
+    @property
+    def description(self) -> str:
+        """Return the description of the entity."""
+        return self.metadata.get("description", "")
+
+    @description.setter
+    def description(self, value: str) -> None:
+        """Set the description of the entity."""
+        self.metadata["description"] = value
 
     @property
     def types(self) -> list[str]:
@@ -81,6 +109,18 @@ class WikidataEntity(Entity):
 
         if "types" in data:
             data["properties"] = {TypeProperties.INSTANCE_OF.value: data.pop("types")}
+
+        if "name" in data:
+            data["properties"]["names"] = [data.pop("name")]
+
+        if not data["properties"]["names"]:
+            data["properties"]["names"] = []
+
+        if "aliases" in data:
+            data["properties"]["names"].extend(data.pop("aliases"))
+
+        if "description" in data:
+            data["metadata"] = {"description": data.pop("description")}
 
         return WikidataEntity(**data)
 
@@ -136,11 +176,13 @@ class WikidataEntity(Entity):
 
         wikidata_entity = WikidataEntity(
             entity_id=entity_id,
-            name=label,
-            description=description if include_descriptions else None,
-            aliases=list(set(aliases)),
             properties=ent_properties,
         )
+
+        if include_descriptions:
+            wikidata_entity.description = description
+
+        wikidata_entity.names = [label, *aliases]
 
         return wikidata_entity
 
