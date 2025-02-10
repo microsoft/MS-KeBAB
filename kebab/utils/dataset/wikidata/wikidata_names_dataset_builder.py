@@ -38,7 +38,7 @@ class WikidataNamesDatasetBuilder:
     def __init__(
         self,
         *,
-        wikidata_simple_entities_path: pathlib.Path,
+        wikidata_entities_path: pathlib.Path,
         wikidata_type_hierarchy_path: pathlib.Path,
         output_dir: pathlib.Path | None = None,
         type_ids: list[str] | None = None,
@@ -47,7 +47,7 @@ class WikidataNamesDatasetBuilder:
         """Initialize the WikidataNamesDatasetBuilder."""
         self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
 
-        self.wikidata_simple_entities_path: pathlib.Path = wikidata_simple_entities_path
+        self.wikidata_entities_path: pathlib.Path = wikidata_entities_path
         self.wikidata_type_hierarchy_path: pathlib.Path = wikidata_type_hierarchy_path
         self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
 
@@ -68,9 +68,9 @@ class WikidataNamesDatasetBuilder:
 
         with open(self.output_dir / self.WIKIDATA_NAMES_OUTPUT_FILENAME, "w", encoding="utf-8") as f:
             for entity in self.filter_entities(
-                wikidata_utils.load_simple_entities(self.wikidata_simple_entities_path), all_subtypes
+                wikidata_utils.load_wikidata_entities(self.wikidata_entities_path), all_subtypes
             ):
-                f.write(json.dumps(entity, ensure_ascii=False) + "\n")
+                f.write(entity.to_json() + "\n")
 
     def load_hierarchy(self, type_hierarchy_path: pathlib.Path | None) -> dict[str, dict]:
         """Load the hierarchy of Wikidata types."""
@@ -92,19 +92,18 @@ class WikidataNamesDatasetBuilder:
 
     def filter_entities(
         self,
-        entities: Iterable[dict],
+        entities: Iterable[wikidata_utils.WikidataEntity],
         type_ids: set[str],
         min_aliases: int | None = None,
-    ) -> Iterable[dict]:
+    ) -> Iterable[wikidata_utils.WikidataEntity]:
         """Filter entities by type IDs."""
         min_aliases = min_aliases or self.min_aliases
         skipped = 0
         count = 0
 
         for entity in entities:
-            types = entity["types"]
-
-            aliases = entity.get("aliases", {})
+            types = entity.types
+            aliases = entity.aliases
             if len(aliases) < min_aliases:
                 skipped += 1
                 continue

@@ -286,13 +286,18 @@ class Entity:
 
         return self
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, minimal_repr: bool = False) -> dict[str, Any]:
         """Convert the entity to a dictionary."""
         entity_dict = asdict(self)
 
         # remove metadata if empty
         if not entity_dict["metadata"]:
             del entity_dict["metadata"]
+
+        if minimal_repr:
+            for key in ["properties", "source_ids", "evidence_map"]:
+                if not entity_dict[key]:
+                    del entity_dict[key]
 
         return entity_dict
 
@@ -325,9 +330,9 @@ class Entity:
         """Create an entity from a dictionary."""
         return cls(**data)
 
-    def to_json(self) -> str:
+    def to_json(self, minimal_repr: bool = False) -> str:
         """Convert the entity to a JSON string."""
-        return json.dumps(self.to_dict())
+        return json.dumps(self.to_dict(minimal_repr=minimal_repr))
 
     @classmethod
     def from_json(cls, json_str: str) -> Self:

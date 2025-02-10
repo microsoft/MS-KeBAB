@@ -26,7 +26,7 @@ def test_extract_names(
 ) -> None:
     """Test the extraction of names from Wikidata."""
     builder = WikidataNamesDatasetBuilder(
-        wikidata_simple_entities_path=wikidata_simple_entities_input_file_path,
+        wikidata_entities_path=wikidata_simple_entities_input_file_path,
         wikidata_type_hierarchy_path=wikidata_hierarchy_input_file_path,
         output_dir=tmp_path,
         type_ids=["Q154954"],
@@ -43,4 +43,4 @@ def test_extract_names(
         lines = f.readlines()
 
     assert len(lines) == 1
-    assert lines[0].strip().startswith('{"id": "Q23"')
+    assert lines[0].strip().startswith('{"entity_id": "Q23"')

@@ -90,8 +90,8 @@ class WikidataResolver:
 
         # load and query wikidata entities, properties, and type hierarchy
         self._logger.info("Loading Wikidata simple entities")
-        wikidata_entities = wikidata_utils.collect_wikidata_simple_entities(
-            referenced_ids, wikidata_simple_entities_path=self.wikidata_simple_entities_path, query_api=self.query_api
+        wikidata_entities = wikidata_utils.collect_wikidata_entities(
+            referenced_ids, wikidata_entities_path=self.wikidata_simple_entities_path, query_api=self.query_api
         )
 
         # substitute all properties and values
@@ -116,7 +116,7 @@ class WikidataResolver:
 
                 for prop_values in entity.properties.values():
                     for value in prop_values:
-                        if wikidata_utils.REFERENCE_REGEX_PATTERN.match(value):
+                        if wikidata_utils.ENTITY_REFERENCE_REGEX_PATTERN.match(value):
                             referenced_ids.add(value)
 
         self._logger.info(f"Total distinct referenced IDs: {len(referenced_ids):,}")
@@ -125,7 +125,7 @@ class WikidataResolver:
     def substitute_values(
         self,
         entities_path: pathlib.Path,
-        wikidata_entities: dict[str, wikidata_utils.SimpleEntity],
+        wikidata_entities: dict[str, wikidata_utils.WikidataEntity],
         wikidata_properties: dict[str, dict],
         type_id_to_node: dict[str, dict],
         output_path: pathlib.Path,
@@ -154,7 +154,7 @@ class WikidataResolver:
         self,
         entity: Entity,
         *,
-        wikidata_entities: dict[str, wikidata_utils.SimpleEntity],
+        wikidata_entities: dict[str, wikidata_utils.WikidataEntity],
         wikidata_properties: dict[str, dict],
         type_id_to_node: dict[str, dict],
     ) -> None:
@@ -187,7 +187,7 @@ class WikidataResolver:
                         if entity_type is not None:
                             value = entity_type.get("name")
 
-                    if value is None and not wikidata_utils.REFERENCE_REGEX_PATTERN.match(ref_value):
+                    if value is None and not wikidata_utils.ENTITY_REFERENCE_REGEX_PATTERN.match(ref_value):
                         value = ref_value
 
                     if value is not None:

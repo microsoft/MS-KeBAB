@@ -58,7 +58,7 @@ class WikidataSimpleExtractor:
 
         self._logger.info(f"Extracting simple entities from {self.wikidata_dump_path} to {output_path}...")
 
-        entities = wikidata_utils.extract_simple_entities_from_dump(
+        entities = wikidata_utils.extract_wikidata_entities_from_dump(
             wikidata_json_dump_path=input_path,
             properties=[wikidata_utils.TypeProperties.INSTANCE_OF.value],
             input_entity_predicate=lambda x: x.get("type") == "item",

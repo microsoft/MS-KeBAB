@@ -90,9 +90,7 @@ class TRexDatasetBuilder:
         _, type_id_to_node = wikidata_utils.load_type_hierarchy(self.wikidata_type_hierarchy_path)
 
         # get wikidata entities, properties, and type hierarchy
-        wikidata_entities = wikidata_utils.collect_wikidata_simple_entities(
-            referenced_ids, self.wikidata_simple_entities_path
-        )
+        wikidata_entities = wikidata_utils.collect_wikidata_entities(referenced_ids, self.wikidata_simple_entities_path)
 
         # filter fragment contents
         filtered_fragments = self.filter_fragments(
@@ -180,7 +178,7 @@ class TRexDatasetBuilder:
             for fragment in entity_fragments:
                 for prop_values in fragment.properties.values():
                     for value in prop_values:
-                        if wikidata_utils.REFERENCE_REGEX_PATTERN.match(value):
+                        if wikidata_utils.ENTITY_REFERENCE_REGEX_PATTERN.match(value):
                             referenced_ids.add(value)
 
         self._logger.info(f"Total distinct referenced IDs: {len(referenced_ids):,}")
@@ -191,7 +189,7 @@ class TRexDatasetBuilder:
         self,
         entity_fragments: Iterable[Entity],
         *,
-        wikidata_entities: dict[str, wikidata_utils.SimpleEntity] | None = None,
+        wikidata_entities: dict[str, wikidata_utils.WikidataEntity] | None = None,
         wikidata_properties: dict[str, dict] | None = None,
         filter_to_wikidata_names: bool = True,
         min_name_count: int | None = None,
@@ -307,7 +305,7 @@ class TRexDatasetBuilder:
         self,
         fragment: Entity,
         *,
-        wikidata_entities: dict[str, wikidata_utils.SimpleEntity],
+        wikidata_entities: dict[str, wikidata_utils.WikidataEntity],
         wikidata_properties: dict[str, dict],
         type_id_to_node: dict[str, dict],
     ) -> None:
@@ -338,7 +336,7 @@ class TRexDatasetBuilder:
                     if entity_type is not None:
                         value = entity_type.get("name")
 
-                if value is None and not wikidata_utils.REFERENCE_REGEX_PATTERN.match(ref_value):
+                if value is None and not wikidata_utils.ENTITY_REFERENCE_REGEX_PATTERN.match(ref_value):
                     value = ref_value
 
                 if value is not None:

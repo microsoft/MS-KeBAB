@@ -26,13 +26,13 @@ def temp_output_file(tmp_path: Path) -> Path:
 def test_extract_entities_from_dump(wikidata_records_file_path: Path) -> None:
     """Test the extraction of property labels from the Wikidata JSON dump."""
     entities = list(
-        wikidata_utils.extract_simple_entities_from_dump(wikidata_json_dump_path=wikidata_records_file_path)
+        wikidata_utils.extract_wikidata_entities_from_dump(wikidata_json_dump_path=wikidata_records_file_path)
     )
 
     assert len(entities) == 1
 
     p = entities[0]
-    assert p.id == "P19"
+    assert p.entity_id == "P19"
     assert p.name == "place of birth"
 
 
