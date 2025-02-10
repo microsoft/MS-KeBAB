@@ -212,21 +212,23 @@ class ReDocRedDatasetBuilder:
         """Write the extraction dataset to disk."""
         error_count = 0
         err = None
-        with open(self.entities_output_path, "w", encoding="utf-8") as entities_file, \
-             open(self.extracts_output_path, "w", encoding="utf-8") as extracts_file:
-               for entry in extraction_dataset:
-                    current_pos_extracts = extracts_file.tell()
-                    current_pos_entities = entities_file.tell()
-                    try:
-                        json.dump(entry["document"], extracts_file , cls=io_helpers.CustomEncoder, ensure_ascii=False)
-                        extracts_file.write("\n")
-                        json.dump(entry["entities"], entities_file, cls=io_helpers.CustomEncoder, ensure_ascii=False)
-                        entities_file.write("\n")
-                    except TypeError as e:
-                        error_count += 1
-                        err = e
-                        extracts_file.seek(current_pos_extracts)
-                        entities_file.seek(current_pos_entities)
+        with (
+            open(self.entities_output_path, "w", encoding="utf-8") as entities_file,
+            open(self.extracts_output_path, "w", encoding="utf-8") as extracts_file,
+        ):
+            for entry in extraction_dataset:
+                current_pos_extracts = extracts_file.tell()
+                current_pos_entities = entities_file.tell()
+                try:
+                    json.dump(entry["document"], extracts_file, cls=io_helpers.CustomEncoder, ensure_ascii=False)
+                    extracts_file.write("\n")
+                    json.dump(entry["entities"], entities_file, cls=io_helpers.CustomEncoder, ensure_ascii=False)
+                    entities_file.write("\n")
+                except TypeError as e:
+                    error_count += 1
+                    err = e
+                    extracts_file.seek(current_pos_extracts)
+                    entities_file.seek(current_pos_entities)
 
         if error_count:
             self._logger.error(f"Errors while saving the dataset: {error_count}, last error: {err}")
