@@ -13,5 +13,5 @@ from kebab.contracts.entity import PropertySchema
 def property_schema() -> PropertySchema:
     """Load extraction PropertySchema for testing."""
     return PropertySchema.from_file(
-        pathlib.Path(__file__).parent.parent.parent / "data" / "extraction" / "property_schema.json"
+        pathlib.Path(__file__).parents[2] / "data" / "extraction" / "property_schema.json"
     )

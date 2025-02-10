@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -78,7 +78,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         """Configure value-averaged-AESOP metric calculator."""
         self.config = config
 
-    def run(self, prediction: list[ExtractionOutput], ground_truth: list[ExtractionOutput]) -> dict:
+    def run(self, prediction: Iterable[ExtractionOutput], ground_truth: Iterable[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
         metrics_accumulator = MetricsAccumulator()
         for pred, gt in zip(prediction, ground_truth, strict=True):

@@ -178,7 +178,6 @@ def test_match_entities_with_no_overlap(property_schema: PropertySchema):
     assert not evaluated_property_metrics.relevant_pair_scores
     assert not evaluated_property_metrics.unmatched_count
     np.testing.assert_allclose(evaluated_property_metrics.property_value_count_gt, [0, 0])
-    # assert not evaluated_property_metrics.num_relevant_gt_entities
 
 
 def test_entity_matches_with_low_matching_scores_should_not_be_evaluated(property_schema: PropertySchema):

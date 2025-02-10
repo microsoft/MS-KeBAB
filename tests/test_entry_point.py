@@ -81,7 +81,6 @@ def test_task_interface():
             assert task_instance.task == task
             if task_instance.name.endswith("-Heldout"):
                 metrics = task_instance.evaluate(Path(task_instance_data[task_instance.name]["predictions"]))
-                print(metrics)
                 assert_dicts_equal(task_instance_data[task_instance.name]["metrics"], metrics, epsilon=1e-3)
 
 

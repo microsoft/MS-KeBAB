@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import abc
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -33,6 +34,6 @@ class MetricCalculator(abc.ABC):
     """Extraction metric calculator."""
 
     @abc.abstractmethod
-    def run(self, prediction: list[ExtractionOutput], ground_truth: list[ExtractionOutput]) -> dict[str, Any]:
+    def run(self, prediction: Iterable[ExtractionOutput], ground_truth: Iterable[ExtractionOutput]) -> dict[str, Any]:
         """Calculate extraction metrics."""
         raise NotImplementedError

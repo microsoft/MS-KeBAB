@@ -27,7 +27,7 @@ class ExtractionTaskInstance(TaskInstance):
     __data_extracts: Path
     __data_ground_truth_extracted_entities: Path | None = None
     __default_metrics_config_path: Path = (
-        Path(__file__).parent.parent.parent / "configs" / "extraction" / "default_metrics_config.json"
+        Path(__file__).parents[2] / "configs" / "extraction" / "default_metrics_config.json"
     )
     __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {"aesop": ValueAveragedAesopMetricCalculator}
     __metric_config_cls: ClassVar[dict[str, type[MetricConfig]]] = {"aesop": ValueAveragedAesopConfig}
@@ -99,21 +99,19 @@ class ExtractionTaskInstance(TaskInstance):
         if hasattr(self, "__data_ground_truth_extracted_entities"):
             raise ValueError("Can not evaluate on heldout Extraction task instance")
 
-        pred_entity_lists = EntityListJsonlReader(output_to_evaluate).read_items()
 
-        gt_extractions = list(self.read_items())
-
-        pred_extractions = [
+        pred_extractions = (
             ExtractionOutput(document=document, entities=entity_list)
-            for document, entity_list in zip((item.document for item in gt_extractions), pred_entity_lists, strict=True)
-        ]
+            for document, entity_list in zip((item.document for item in self.read_items()),
+                                             EntityListJsonlReader(output_to_evaluate).read_items(), strict=True)
+        )
 
         metrics = {}
 
         for metric_name, metric_config_dict in self.metrics_config.items():
             metric_calculator_cls = self.__metric_calculator_cls[metric_name]
             metric_config = self.__metric_config_cls[metric_name].from_dict(metric_config_dict, self.property_schema)
-            metric_results = metric_calculator_cls(metric_config).run(pred_extractions, gt_extractions)  # type: ignore
+            metric_results = metric_calculator_cls(metric_config).run(pred_extractions, self.read_items())  # type: ignore
             metrics[metric_name] = metric_results
         if eval_result_path:
             save_dict_to_json(metrics, eval_result_path)

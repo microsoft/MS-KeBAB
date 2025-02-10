@@ -4,6 +4,7 @@
 # ruff: noqa: ANN401
 from __future__ import annotations
 
+import abc
 import sys
 from typing import Any
 
@@ -18,15 +19,17 @@ from kebab.tasks.extraction.metrics.aesop.metric_helpers import match_items
 from kebab.tasks.extraction.metrics.utils import normalize_property_value, normalize_string
 
 
-class ElementDistance:
+class ElementDistance(abc.ABC):
     """Element distance class.
     Element distance values should be between 0 and 1.
     """
 
+    @abc.abstractmethod
     def check_constraints(self, property_: Property) -> None:
         """Check constraints for element distance."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def compute(self, value1: Any, value2: Any, property_: Property) -> float:
         """Compute distance between property values of ground truth and prediction entity."""
         raise NotImplementedError
@@ -135,13 +138,15 @@ PropertyDistanceValue = tuple[list[float], int]
 PropertyScoreValue = tuple[list[float], int]
 
 
-class PropertyDistance:
+class PropertyDistance(abc.ABC):
     """Property distance class."""
 
+    @abc.abstractmethod
     def check_constraints(self, property_: Property) -> None:
         """Check constraints for property distance."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyDistanceValue:
         """Compute distance between two entities for a given property id.
 
