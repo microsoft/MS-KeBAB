@@ -222,7 +222,7 @@ class ReDocRedDatasetBuilder:
                         extracts_file.write("\n")
                         json.dump(entry["entities"], entities_file, cls=io_helpers.CustomEncoder, ensure_ascii=False)
                         entities_file.write("\n")
-                    except TypeError as e:  # noqa: PERF203
+                    except TypeError as e:
                         error_count += 1
                         err = e
                         extracts_file.seek(current_pos_extracts)
