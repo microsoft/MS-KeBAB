@@ -1,0 +1,33 @@
+{
+    "name": "extraction_metrics_test_schema",
+    "data_types": [
+        {
+            "data_type_id": "text",
+            "value_type": "Text",
+            "description": "A generic text or a value stored as a string."
+        }
+    ],
+
+    "properties": [
+        {
+            "property_id": "name",
+            "data_type_id": "text",
+            "description": "The name of the entity.",
+            "display_name": "name",
+            "is_collection": true
+        },
+        {
+            "property_id": "type",
+            "data_type_id": "text",
+            "description": "Type of the entity.",
+            "is_collection": true
+        },
+        {
+            "property_id": "definitions",
+            "data_type_id": "text",
+            "description": "Entity definitions.",
+            "display_name": "definitions",
+            "is_collection": true
+        }
+    ]
+}

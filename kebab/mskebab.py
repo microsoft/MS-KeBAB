@@ -13,7 +13,7 @@ from pathlib import Path
 
 from kebab.contracts.task import Task, TaskInstance, TaskType
 from kebab.tasks.entity_generation import EntityGenerationTaskInstance
-from kebab.tasks.extraction import ExtractionTaskInstance
+from kebab.tasks.extraction.task import ExtractionTaskInstance
 from kebab.tasks.linking import LinkingTaskInstance
 
 

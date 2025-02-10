@@ -1,0 +1,45 @@
+{
+    "aesop": {
+        "entity_distance": {
+            "name": {
+                "distance_function": {
+                    "name": "EmbeddingDistance"
+                },
+                "weight": 1.0
+            }
+        },
+        "matching_threshold": 0.5,
+        "default_property_distance": {
+            "name": "TokenDistance"
+        },
+        "property_distance_functions": {
+            "name": {
+                "name": "EmbeddingDistance"
+            },
+            "descriptions": {
+                "name": "EmbeddingDistance"
+            },
+            "definitions": {
+                "name": "EmbeddingDistance"
+            },
+            "objectives": {
+                "name": "EmbeddingDistance"
+            },
+            "risks": {
+                "name": "EmbeddingDistance"
+            },
+            "purpose": {
+                "name": "EmbeddingDistance"
+            },
+            "url": {
+                "name": "BinaryMatchDistance"
+            },
+            "email": {
+                "name": "BinaryMatchDistance"
+            },
+            "password": {
+                "name": "BinaryMatchDistance"
+            }
+        }
+    }
+}

@@ -3,23 +3,26 @@
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
-      "schema": "https://some.public/download/link",
-      "ground_truth_extracted_entities": "https://some.public/download/link"
+      "schema": "./kebab/configs/extraction/default_property_schema.json",
+      "ground_truth_extracted_entities": "https://some.public/download/link",
+      "metrics_config": "./kebab/configs/extraction/default_metrics_config.json"
     }
   },
   "Extraction-ReDocRED-Test": {
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
-      "schema": "https://some.public/download/link",
-      "ground_truth_extracted_entities": "https://some.public/download/link"
+      "schema": "./kebab/configs/extraction/default_property_schema.json",
+      "ground_truth_extracted_entities": "https://some.public/download/link",
+      "metrics_config": "./kebab/configs/extraction/default_metrics_config.json"
     }
   },
   "Extraction-Heldout": {
     "task": "Extraction",
     "data": {
       "extracts": "https://some.public/download/link",
-      "schema": "https://some.public/download/link"
+      "schema": "./kebab/configs/extraction/default_property_schema.json",
+      "metrics_config": "./kebab/configs/extraction/default_metrics_config.json"
     }
   },
   "Linking-TREx-Train": {

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from kebab.contracts.document import Document, DocumentUtilities
-from kebab.contracts.entity import Entity
+from kebab.contracts.entity import DataType, Entity, Property, PropertySchema, ValueType
 
 
 class CustomEncoder(json.JSONEncoder):
@@ -34,6 +34,20 @@ def save_dict_to_json(data: dict, file_path: Path) -> None:
     """
     with open(file_path, "w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
+
+
+def load_dict_from_json(file_path: Path) -> dict:
+    """
+    Loads data from a JSON file.
+
+    Args:
+        file_path: The path to the JSON file.
+
+    Returns:
+        dict: The deserialized data.
+    """
+    with open(file_path, encoding="utf-8") as file:
+        return json.load(file)
 
 
 class ItemReader[DataItemType](ABC):
@@ -315,3 +329,63 @@ class BooleanFileWriter(ItemWriter[bool]):
         with open(self.path, "w", encoding="utf-8", newline="\n") as file:
             for item in items:
                 file.write("1\n" if item else "0\n")
+
+
+def generate_draft_property_schema_from_data(paths: Iterable[Path], output_path: Path) -> None:
+    """
+    Generates a property schema from data.
+
+    Args:
+        paths: paths to files with entities
+        output_path: path to save the generated property schema
+    """
+    properties = {}
+    data_types = {}
+
+    def get_value_type(values: list[Any]) -> ValueType:
+        if len(values) == 0:
+            return ValueType.TEXT
+        if isinstance(values[0], bool):
+            return ValueType.BOOLEAN
+        if isinstance(values[0], int | float):
+            return ValueType.NUMERIC
+        if isinstance(values[0], str) and ("date" in key or "time" in key):
+            return ValueType.DATE
+        return ValueType.TEXT
+
+    for path in paths:
+        entities = EntityListJsonlReader(path).read_items()
+        for entity_list in entities:
+            for entity in entity_list:
+                for key, values in entity.properties.items():
+                    value_type = get_value_type(values)
+                    data_type_id = value_type.name.lower()
+                    is_collection = len(values) > 1
+                    if data_type_id not in data_types:
+                        data_types[data_type_id] = DataType.from_dict(
+                            {"data_type_id": data_type_id, "value_type": value_type.value, "description": data_type_id}
+                        )
+                    if key not in properties:
+                        properties[key] = Property.from_dict(
+                            {
+                                "property_id": key,
+                                "data_type_id": data_type_id,
+                                "description": key,
+                                "is_collection": is_collection,
+                            },
+                            data_types,
+                        )
+                    elif properties[key].data_type.data_type_id != data_type_id:
+                        raise ValueError(
+                            f"Data type mismatch for property id '{key}': found '{data_type_id}' in entity '{entity.entity_id}', expected '{properties[key].data_type_id}'."
+                        )
+                    else:
+                        properties[key].is_collection = properties[key].is_collection or is_collection
+    property_schema = PropertySchema.from_dict(
+        {
+            "name": "schema",
+            "properties": [prop.to_dict() for prop in properties.values()],
+            "data_types": [x.to_dict() for x in data_types.values()],
+        }
+    )
+    property_schema.to_file(output_path)

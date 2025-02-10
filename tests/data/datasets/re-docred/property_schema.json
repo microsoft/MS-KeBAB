@@ -1,0 +1,271 @@
+{
+  "name": "re-docred schema",
+  "data_types": [
+    {
+      "data_type_id": "text",
+      "value_type": "Text",
+      "description": "text",
+      "category_values": []
+    },
+    {
+      "data_type_id": "date",
+      "value_type": "Date",
+      "description": "date",
+      "category_values": []
+    }
+  ],
+  "properties": [
+    {
+      "property_id": "name",
+      "data_type_id": "text",
+      "description": "name",
+      "display_name": "name",
+      "is_collection": true
+    },
+    {
+      "property_id": "type",
+      "data_type_id": "text",
+      "description": "type",
+      "display_name": "type",
+      "is_collection": true
+    },
+    {
+      "property_id": "descriptions",
+      "data_type_id": "text",
+      "description": "descriptions",
+      "display_name": "descriptions",
+      "is_collection": true
+    },
+    {
+      "property_id": "headquarters location",
+      "data_type_id": "text",
+      "description": "headquarters location",
+      "display_name": "headquarters location",
+      "is_collection": false
+    },
+    {
+      "property_id": "country",
+      "data_type_id": "text",
+      "description": "country",
+      "display_name": "country",
+      "is_collection": true
+    },
+    {
+      "property_id": "located in the administrative territorial entity",
+      "data_type_id": "text",
+      "description": "located in the administrative territorial entity",
+      "display_name": "located in the administrative territorial entity",
+      "is_collection": true
+    },
+    {
+      "property_id": "contains the administrative territorial entity",
+      "data_type_id": "text",
+      "description": "contains the administrative territorial entity",
+      "display_name": "contains the administrative territorial entity",
+      "is_collection": true
+    },
+    {
+      "property_id": "dissolved, abolished or demolished date",
+      "data_type_id": "date",
+      "description": "dissolved, abolished or demolished date",
+      "display_name": "dissolved, abolished or demolished date",
+      "is_collection": false
+    },
+    {
+      "property_id": "has subsidiary",
+      "data_type_id": "text",
+      "description": "has subsidiary",
+      "display_name": "has subsidiary",
+      "is_collection": false
+    },
+    {
+      "property_id": "parent organization",
+      "data_type_id": "text",
+      "description": "parent organization",
+      "display_name": "parent organization",
+      "is_collection": false
+    },
+    {
+      "property_id": "has part(s)",
+      "data_type_id": "text",
+      "description": "has part(s)",
+      "display_name": "has part(s)",
+      "is_collection": true
+    },
+    {
+      "property_id": "part of",
+      "data_type_id": "text",
+      "description": "part of",
+      "display_name": "part of",
+      "is_collection": true
+    },
+    {
+      "property_id": "publication date",
+      "data_type_id": "date",
+      "description": "publication date",
+      "display_name": "publication date",
+      "is_collection": true
+    },
+    {
+      "property_id": "performer",
+      "data_type_id": "text",
+      "description": "performer",
+      "display_name": "performer",
+      "is_collection": false
+    },
+    {
+      "property_id": "country of citizenship",
+      "data_type_id": "text",
+      "description": "country of citizenship",
+      "display_name": "country of citizenship",
+      "is_collection": true
+    },
+    {
+      "property_id": "notable work",
+      "data_type_id": "text",
+      "description": "notable work",
+      "display_name": "notable work",
+      "is_collection": true
+    },
+    {
+      "property_id": "continent",
+      "data_type_id": "text",
+      "description": "continent",
+      "display_name": "continent",
+      "is_collection": false
+    },
+    {
+      "property_id": "educated at",
+      "data_type_id": "text",
+      "description": "educated at",
+      "display_name": "educated at",
+      "is_collection": true
+    },
+    {
+      "property_id": "date of death",
+      "data_type_id": "date",
+      "description": "date of death",
+      "display_name": "date of death",
+      "is_collection": true
+    },
+    {
+      "property_id": "place of birth",
+      "data_type_id": "text",
+      "description": "place of birth",
+      "display_name": "place of birth",
+      "is_collection": true
+    },
+    {
+      "property_id": "date of birth",
+      "data_type_id": "date",
+      "description": "date of birth",
+      "display_name": "date of birth",
+      "is_collection": false
+    },
+    {
+      "property_id": "military branch",
+      "data_type_id": "text",
+      "description": "military branch",
+      "display_name": "military branch",
+      "is_collection": true
+    },
+    {
+      "property_id": "operator",
+      "data_type_id": "text",
+      "description": "operator",
+      "display_name": "operator",
+      "is_collection": false
+    },
+    {
+      "property_id": "participant in",
+      "data_type_id": "text",
+      "description": "participant in",
+      "display_name": "participant in",
+      "is_collection": true
+    },
+    {
+      "property_id": "participant",
+      "data_type_id": "text",
+      "description": "participant",
+      "display_name": "participant",
+      "is_collection": true
+    },
+    {
+      "property_id": "start time",
+      "data_type_id": "date",
+      "description": "start time",
+      "display_name": "start time",
+      "is_collection": false
+    },
+    {
+      "property_id": "end time",
+      "data_type_id": "date",
+      "description": "end time",
+      "display_name": "end time",
+      "is_collection": false
+    },
+    {
+      "property_id": "location",
+      "data_type_id": "text",
+      "description": "location",
+      "display_name": "location",
+      "is_collection": false
+    },
+    {
+      "property_id": "followed by",
+      "data_type_id": "text",
+      "description": "followed by",
+      "display_name": "followed by",
+      "is_collection": false
+    },
+    {
+      "property_id": "follows",
+      "data_type_id": "text",
+      "description": "follows",
+      "display_name": "follows",
+      "is_collection": false
+    },
+    {
+      "property_id": "sibling",
+      "data_type_id": "text",
+      "description": "sibling",
+      "display_name": "sibling",
+      "is_collection": true
+    },
+    {
+      "property_id": "conflict",
+      "data_type_id": "text",
+      "description": "conflict",
+      "display_name": "conflict",
+      "is_collection": false
+    },
+    {
+      "property_id": "applies to jurisdiction",
+      "data_type_id": "text",
+      "description": "applies to jurisdiction",
+      "display_name": "applies to jurisdiction",
+      "is_collection": false
+    },
+    {
+      "property_id": "legislative body",
+      "data_type_id": "text",
+      "description": "legislative body",
+      "display_name": "legislative body",
+      "is_collection": false
+    },
+    {
+      "property_id": "head of government",
+      "data_type_id": "text",
+      "description": "head of government",
+      "display_name": "head of government",
+      "is_collection": true
+    },
+    {
+      "property_id": "instance of",
+      "data_type_id": "text",
+      "description": "instance of",
+      "display_name": "instance of",
+      "is_collection": false
+    }
+  ]
+}

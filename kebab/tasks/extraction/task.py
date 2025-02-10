@@ -6,18 +6,31 @@ from __future__ import annotations
 from collections.abc import Iterable
 from itertools import zip_longest
 from pathlib import Path
+from typing import ClassVar
 
-from kebab.contracts.document import Document
-from kebab.contracts.entity import Entity
+from kebab.contracts.entity import Entity, PropertySchema
 from kebab.contracts.task import Task, TaskInstance
-from kebab.utils.io_helpers import DocumentJsonlReader, EntityListJsonlReader, EntityListJsonlWriter, save_dict_to_json
+from kebab.tasks.extraction.metrics.aesop.calculator import ValueAveragedAesopConfig, ValueAveragedAesopMetricCalculator
+from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricCalculator, MetricConfig
+from kebab.utils.io_helpers import (
+    DocumentJsonlReader,
+    EntityListJsonlReader,
+    EntityListJsonlWriter,
+    load_dict_from_json,
+    save_dict_to_json,
+)
 
 
 class ExtractionTaskInstance(TaskInstance):
     """Represents an extraction benchmark task instance with its data files."""
 
     __data_extracts: Path
-    __data_ground_truth_extracted_entities: Path | None
+    __data_ground_truth_extracted_entities: Path | None = None
+    __default_metrics_config_path: Path = (
+        Path(__file__).parents[2] / "configs" / "extraction" / "default_metrics_config.json"
+    )
+    __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {"aesop": ValueAveragedAesopMetricCalculator}
+    __metric_config_cls: ClassVar[dict[str, type[MetricConfig]]] = {"aesop": ValueAveragedAesopConfig}
 
     @property
     def data_extracts(self) -> Path:
@@ -36,19 +49,22 @@ class ExtractionTaskInstance(TaskInstance):
         extracts: str,
         schema: str,
         ground_truth_extracted_entities: str | None = None,
+        metrics_config: str | None = None,
     ):
         """Initialize an extraction task instance."""
         super().__init__(name, task, schema)
         self.__data_extracts = Path(extracts)
         if ground_truth_extracted_entities is not None:
             self.__data_ground_truth_extracted_entities = Path(ground_truth_extracted_entities)
+        self.metrics_config = load_dict_from_json(Path(metrics_config or self.__default_metrics_config_path))
+        self.property_schema = PropertySchema.from_file(Path(schema))
 
-    def read_items(self) -> Iterable[tuple[Document, list[Entity] | None]]:
+    def read_items(self) -> Iterable[ExtractionOutput]:
         """
         Read data items, with optional ground-truth extracted entities.
 
         Returns:
-            Iterable[Tuple[Document, List[Entity] | None]]: An iterable of tuples, each containing a
+            Iterable[ExtractionOutputs]: An iterable of ExtractionOutput, each containing a
             `Document` and an optional list of `Entity` objects.
         """
         # TODO (allenwang): Pass `Cache` into this instance to resolve dataset links to local paths
@@ -59,7 +75,10 @@ class ExtractionTaskInstance(TaskInstance):
             if self.data_ground_truth_extracted_entities is not None
             else iter([])
         )
-        return zip_longest(extracts, entity_lists)
+        return (
+            ExtractionOutput(document=extract, entities=entity_list)
+            for extract, entity_list in zip_longest(extracts, entity_lists)
+        )
 
     def write_items(self, path: Path, items: Iterable[list[Entity]]) -> None:
         """
@@ -73,17 +92,30 @@ class ExtractionTaskInstance(TaskInstance):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,  # noqa: ARG002
+        output_to_evaluate: Path,
         eval_result_path: Path | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the extraction task instance."""
         if hasattr(self, "__data_ground_truth_extracted_entities"):
             raise ValueError("Can not evaluate on heldout Extraction task instance")
 
-        # TODO(bmitra): Implement actual metric computation
-        eval_result = {"primary_extraction_metric": 0.8, "secondary_extraction_metric": 0.6}
+        pred_extractions = (
+            ExtractionOutput(document=document, entities=entity_list)
+            for document, entity_list in zip(
+                (item.document for item in self.read_items()),
+                EntityListJsonlReader(output_to_evaluate).read_items(),
+                strict=True,
+            )
+        )
 
+        metrics = {}
+
+        for metric_name, metric_config_dict in self.metrics_config.items():
+            metric_calculator_cls = self.__metric_calculator_cls[metric_name]
+            metric_config = self.__metric_config_cls[metric_name].from_dict(metric_config_dict, self.property_schema)
+            metric_results = metric_calculator_cls(metric_config).run(pred_extractions, self.read_items())  # type: ignore
+            metrics[metric_name] = metric_results
         if eval_result_path:
-            save_dict_to_json(eval_result, eval_result_path)
+            save_dict_to_json(metrics, eval_result_path)
 
-        return eval_result
+        return metrics

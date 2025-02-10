@@ -13,9 +13,21 @@ from kebab import mskebab
 from kebab.contracts.task import TaskType
 
 
+def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
+    """Assert that two dictionaries are equal."""
+    assert dict1.keys() == dict2.keys()
+    for key, value1 in dict1.items():
+        if isinstance(value1, dict):
+            assert_dicts_equal(value1, dict2[key], epsilon)
+        elif isinstance(value1, float):
+            assert abs(value1 - dict2[key]) < epsilon
+        else:
+            assert value1 == dict2[key]
+
+
 def test_task_interface():
     """Test task interface."""
-    benchmark = mskebab.benchmark()
+    benchmark = mskebab.Benchmark(Path(__file__).parent / "data" / "test_task_instances.json")
 
     tasks = benchmark.tasks
     assert set(tasks.keys()) == {TaskType.Extraction, TaskType.Linking, TaskType.EntityGeneration}
@@ -35,14 +47,41 @@ def test_task_interface():
     }
     for task_instance_name, task_instance in task_instances.items():
         assert task_instance_name == task_instance.name
-
+    task_instance_data = {
+        "Extraction-Heldout": {
+            "predictions": "tests/data/extraction/re_docred_dev_extracted_entities.jsonl",
+            "metrics": {
+                "aesop": {
+                    "avg_property_precision": 0.022,
+                    "avg_property_recall": 0.36,
+                    "matched_count": 8,
+                    "property_precision": {
+                        "name": 0.044,
+                        "type": 0.0,
+                    },
+                    "property_recall": {
+                        "name": 0.72,
+                        "type": 0.0,
+                    },
+                    "unmatched_counts": {"extra_gt_entities": 47, "extra_pred_entities": 0, "pairs": 0},
+                    "unmatched_fractions": {"extra_gt_entities": 0.854, "extra_pred_entities": 0.0, "pairs": 0.0},
+                }
+            },
+        },
+        "Linking-Heldout": {
+            "predictions": "some_output_file",
+            "metrics": {
+                "primary_linking_metric": 0.8,
+                "secondary_linking_metric": 0.6,
+            },
+        },
+    }
     for task in tasks.values():
         for task_instance in task.instances.values():
             assert task_instance.task == task
             if task_instance.name.endswith("-Heldout"):
-                metrics = task_instance.evaluate(Path("some_output_file"))
-                assert metrics[f"primary_{task.task_type.name.lower()}_metric"] == 0.8
-                assert metrics[f"secondary_{task.task_type.name.lower()}_metric"] == 0.6
+                metrics = task_instance.evaluate(Path(task_instance_data[task_instance.name]["predictions"]))
+                assert_dicts_equal(task_instance_data[task_instance.name]["metrics"], metrics, epsilon=1e-3)
 
 
 def test_cache():
