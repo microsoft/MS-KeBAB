@@ -3,57 +3,33 @@
         "entity_distance": {
             "name": {
                 "distance_function": {
-                    "name": "EmbeddingDistance",
-                    "params": {
-                        "model": "paraphrase-MiniLM-L6-v2"
-                    }
+                    "name": "EmbeddingDistance"
                 },
                 "weight": 1.0
             }
         },
         "matching_threshold": 0.5,
         "default_property_distance": {
-            "name": "TokenDistance",
-            "params": {
-                "encoding": "cl100k_base"
-            }
+            "name": "TokenDistance"
         },
         "property_distance_functions": {
             "name": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
+                "name": "EmbeddingDistance"
             },
             "descriptions": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
+                "name": "EmbeddingDistance"
             },
             "definitions": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
+                "name": "EmbeddingDistance"
             },
             "objectives": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
+                "name": "EmbeddingDistance"
             },
             "risks": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
+                "name": "EmbeddingDistance"
             },
             "purpose": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
+                "name": "EmbeddingDistance"
             },
             "url": {
                 "name": "BinaryMatchDistance"
