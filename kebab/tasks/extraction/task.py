@@ -99,11 +99,13 @@ class ExtractionTaskInstance(TaskInstance):
         if hasattr(self, "__data_ground_truth_extracted_entities"):
             raise ValueError("Can not evaluate on heldout Extraction task instance")
 
-
         pred_extractions = (
             ExtractionOutput(document=document, entities=entity_list)
-            for document, entity_list in zip((item.document for item in self.read_items()),
-                                             EntityListJsonlReader(output_to_evaluate).read_items(), strict=True)
+            for document, entity_list in zip(
+                (item.document for item in self.read_items()),
+                EntityListJsonlReader(output_to_evaluate).read_items(),
+                strict=True,
+            )
         )
 
         metrics = {}
