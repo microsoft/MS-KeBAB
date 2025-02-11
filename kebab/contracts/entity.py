@@ -296,7 +296,7 @@ class Entity:
 
         if minimal_repr:
             for key in ["properties", "source_ids", "evidence_map"]:
-                if not entity_dict[key]:
+                if key in entity_dict and not entity_dict[key]:
                     del entity_dict[key]
 
         return entity_dict
