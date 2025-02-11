@@ -15,6 +15,7 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Self
 
 import requests
 from tqdm import tqdm
@@ -38,7 +39,12 @@ class TypeProperties(Enum):
 
 @dataclass
 class WikidataEntity(Entity):
-    """A simplified representation of a Wikidata entity."""
+    """
+    A simplified representation of a Wikidata entity.
+    - Name+Aliases are stored in the "name" property.
+    - Description and Wikipedia title are stored in the "metadata" property.
+    - Contains a property for easier access the types of the entity (which are stored in the properties under P31 key).
+    """
 
     @property
     def name(self) -> str:
@@ -46,26 +52,14 @@ class WikidataEntity(Entity):
         return self.properties["name"][0] if ("name" in self.properties and len(self.properties["name"]) > 0) else ""
 
     @property
-    def names(self) -> list[str]:
-        """Return the names of the entity."""
-        return self.properties["name"]
-
-    @names.setter
-    def names(self, value: list[str]) -> None:
-        """Set the names of the entity."""
-        self.properties["name"] = value
-
-    @property
     def aliases(self) -> list[str]:
         """Return the aliases of the entity."""
-        return (
-            self.properties["names"][1:] if ("names" in self.properties and len(self.properties["names"]) > 1) else []
-        )
+        return self.properties["name"][1:] if ("name" in self.properties and len(self.properties["name"]) > 1) else []
 
     @aliases.setter
     def aliases(self, value: list[str]) -> None:
         """Set the aliases of the entity."""
-        self.properties["names"] = (
+        self.properties["name"] = (
             [self.name, *value] if "name" in self.properties and len(self.properties["name"]) > 0 else value
         )
 
@@ -80,6 +74,16 @@ class WikidataEntity(Entity):
         self.metadata["description"] = value
 
     @property
+    def wikipedia(self) -> str:
+        """Return the Wikipedia title of the entity."""
+        return self.metadata.get("wikipedia", "")
+
+    @wikipedia.setter
+    def wikipedia(self, value: str) -> None:
+        """Set the Wikipedia title of the entity."""
+        self.metadata["wikipedia"] = value
+
+    @property
     def types(self) -> list[str]:
         """Return the types of the entity."""
         return self.properties[TypeProperties.INSTANCE_OF.value]
@@ -90,19 +94,23 @@ class WikidataEntity(Entity):
         self.properties[TypeProperties.INSTANCE_OF.value] = value
 
     def to_dict(self, minimal_repr: bool = False) -> dict:
-        """Convert the SimpleEntity to a dictionary."""
+        """Convert the WikidataEntity to a dictionary."""
         entity_dict = super().to_dict(minimal_repr=minimal_repr)
 
-        if minimal_repr:
-            for key in ["description", "aliases"]:
-                if not entity_dict[key]:
-                    del entity_dict[key]
+        if minimal_repr and "metadata" in entity_dict:
+            metadata_dict = entity_dict["metadata"]
+            for key in ["description", "wikipedia"]:  # keep this way anticipating more keys in the future
+                if key in metadata_dict and not metadata_dict[key]:
+                    del metadata_dict[key]
+
+            if not entity_dict["metadata"]:
+                del entity_dict["metadata"]
 
         return entity_dict
 
     @classmethod
-    def from_dict(cls, data: dict) -> WikidataEntity:
-        """Create a SimpleEntity from a dictionary."""
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        """Create a WikidataEntity from a dictionary."""
         # TODO(pmyshkov): remove this hacks after the data is re-generated
         if "id" in data:
             data["entity_id"] = data.pop("id")
@@ -111,16 +119,22 @@ class WikidataEntity(Entity):
             data["properties"] = {TypeProperties.INSTANCE_OF.value: data.pop("types")}
 
         if "name" in data:
-            data["properties"]["names"] = [data.pop("name")]
+            data["properties"]["name"] = [data.pop("name")]
 
-        if not data["properties"]["names"]:
-            data["properties"]["names"] = []
+        if not data["properties"]["name"]:
+            data["properties"]["name"] = []
 
         if "aliases" in data:
-            data["properties"]["names"].extend(data.pop("aliases"))
+            data["properties"]["name"].extend(data.pop("aliases"))
+
+        if "metadata" not in data:
+            data["metadata"] = {}
 
         if "description" in data:
             data["metadata"] = {"description": data.pop("description")}
+
+        if "wikipedia" in data:
+            data["metadata"]["wikipedia"] = data.pop("wikipedia")
 
         return WikidataEntity(**data)
 
@@ -131,7 +145,7 @@ class WikidataEntity(Entity):
         allowed_properties: Iterable[str] | None = None,
         prohibited_qualifiers: Iterable[str] | None = None,
         include_descriptions: bool = True,
-    ) -> WikidataEntity:
+    ) -> Self:
         """Convert a Wikidata entity to a simpler representation."""
         allowed_properties = set(allowed_properties) if allowed_properties is not None else None
 
@@ -182,7 +196,7 @@ class WikidataEntity(Entity):
         if include_descriptions:
             wikidata_entity.description = description
 
-        wikidata_entity.names = [label, *aliases]
+        wikidata_entity.properties["name"] = [label, *aliases]
 
         return wikidata_entity
 
