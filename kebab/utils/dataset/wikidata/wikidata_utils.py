@@ -99,7 +99,7 @@ class WikidataEntity(Entity):
 
         if minimal_repr and "metadata" in entity_dict:
             metadata_dict = entity_dict["metadata"]
-            for key in ["description", "wikipedia"]:  # keep this way anticipating more keys in the future
+            for key in ["description", "wikipedia"]:
                 if key in metadata_dict and not metadata_dict[key]:
                     del metadata_dict[key]
 
