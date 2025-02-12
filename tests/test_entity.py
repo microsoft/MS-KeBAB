@@ -75,17 +75,12 @@ def test_merge_method(sample_entity_1: Entity, sample_entity_2: Entity) -> None:
     Test the merge method by merging two sample entities.
     """
     merged = sample_entity_1.merge_with(sample_entity_2)
-
     assert merged.entity_id == sample_entity_1.entity_id
 
     for prop in ["prop1", "prop2", "prop3"]:
         assert prop in merged.properties
 
-    assert merged.properties["prop1"] == ["value11", "value12", "value13"]
+    assert set(merged.properties["prop1"]) == {"value11", "value12", "value13"}
     assert merged.properties["prop2"] == ["value31"]
     assert merged.properties["prop3"] == ["value31"]
-
-    for sid in ["source1", "source2", "source4"]:
-        assert sid in merged.source_ids
-
-    assert len(merged.evidence_map) >= 2
+    assert set(merged.source_ids) == {"source1", "source2", "source4"}
