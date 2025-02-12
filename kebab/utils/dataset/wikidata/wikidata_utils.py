@@ -131,7 +131,7 @@ class WikidataEntity(Entity):
             data["metadata"] = {}
 
         if "description" in data:
-            data["metadata"] = {"description": data.pop("description")}
+            data["metadata"]["description"] = data.pop("description")
 
         if "wikipedia" in data:
             data["metadata"]["wikipedia"] = data.pop("wikipedia")
