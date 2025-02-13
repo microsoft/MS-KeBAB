@@ -14,7 +14,7 @@ from kebab.utils.dataset.wikidata import wikidata_utils
 @pytest.fixture
 def wikidata_dump_sample_prop_records_file_path() -> Path:
     """Return the path to a JSON file with a single Wikidata record that is a property definition."""
-    return Path(__file__).parent / "data" / "datasets" / "wikidata" / "sample" / "wikidata_prop_records.json"
+    return Path(__file__).parent / "data" / "datasets" / "wikidata" / "sample" / "wikidata_dump_prop_records.json"
 
 
 @pytest.fixture
@@ -50,9 +50,9 @@ def test_extract_properties_from_dump(wikidata_dump_sample_prop_records_file_pat
     assert p.name == "place of birth"
 
 
-def test_query_entity_via_api_and_simplify(wikidata_sample_precords_file_path: Path) -> None:
+def test_query_entity_via_api_and_simplify(wikidata_dump_sample_prop_records_file_path: Path) -> None:
     """Test the querying of a Wikidata entity via the API and simplification of the response."""
-    with open(wikidata_sample_precords_file_path, encoding="utf-8") as f:
+    with open(wikidata_dump_sample_prop_records_file_path, encoding="utf-8") as f:
         entities = json.loads(f.read())
 
     entities_dict = {entity["id"]: entity for entity in entities}

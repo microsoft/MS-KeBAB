@@ -37,16 +37,29 @@ class WikidataSimpleExtractor:
         self,
         *,
         wikidata_json_dump_path: pathlib.Path | None = None,
+        run_entity_extraction: bool,
+        run_property_scrape: bool,
         output_dir: pathlib.Path | None = None,
     ):
         """Initialize the extractor."""
         self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
 
         self.wikidata_dump_path: pathlib.Path | None = wikidata_json_dump_path
+        self.run_entity_extraction: bool = run_entity_extraction
+        self.run_property_scrape: bool = run_property_scrape
+
         self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
 
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def run(self) -> None:
+        """Run the extraction steps."""
+        if self.run_entity_extraction:
+            self.extract_simple_entities()
+
+        if self.run_property_scrape:
+            self.scrape_properties()
 
     def extract_simple_entities(self, wikidata_dump_path: pathlib.Path | None = None) -> pathlib.Path:
         """Extract simple entities (ID + names + types) from Wikidata."""
@@ -67,7 +80,7 @@ class WikidataSimpleExtractor:
 
         with open(output_path, "w", encoding="utf-8", newline="\n") as output_file:
             for entity in entities:
-                output_file.write(json.dumps(entity) + "\n")
+                output_file.write(entity.to_json(minimal_repr=True) + "\n")
 
         return output_path
 
