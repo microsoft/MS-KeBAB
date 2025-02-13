@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 import pytest
 from kebab.utils.dataset.wikidata.wikidata_utils import TypeProperties, WikidataEntity
 

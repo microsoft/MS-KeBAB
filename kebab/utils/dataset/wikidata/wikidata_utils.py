@@ -433,21 +433,21 @@ def load_type_hierarchy(type_hierarchy_path: pathlib.Path) -> tuple[dict[str, di
     """Load the hierarchy of Wikidata types."""
     logging.info("Loading the hierarchy of Wikidata types.")
     graph = {}
-    type_id_to_node = {}
+    type_id_to_node_map = {}
 
     with open(type_hierarchy_path, encoding="utf-8") as f:
         for line in f:
             node = json.loads(line.strip())
             graph[node["id"]] = node
             for node_id in node["merged_ids"]:
-                type_id_to_node[node_id] = node
+                type_id_to_node_map[node_id] = node
 
             for node_id in node["redirect_from_ids"]:
-                type_id_to_node[node_id] = node
+                type_id_to_node_map[node_id] = node
 
     logging.info(f"Type hierarchy contains {len(graph):,d} nodes")
 
-    return graph, type_id_to_node
+    return graph, type_id_to_node_map
 
 
 def load_wikidata_entities(wikidata_entities_path: pathlib.Path) -> Iterable[WikidataEntity]:
