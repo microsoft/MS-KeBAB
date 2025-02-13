@@ -185,7 +185,7 @@ class WikidataDatasetBuilder:
             properties=property_ids,
             input_entity_predicate=lambda x: x.get("type") == "item",
             include_descriptions=False,
-            output_entity_predicate=lambda x: (x.types is not None and any(t in type_ids for t in x.types)),
+            output_entity_predicate=lambda x: (x.type is not None and any(t in type_ids for t in x.type)),
         )
 
         return entities
@@ -216,7 +216,7 @@ class WikidataDatasetBuilder:
         type_id_to_node: dict[str, dict],
     ) -> None:
         """Substitute the actual values in the entity."""
-        entity.types = [type_id_to_node[t]["name"] for t in entity.types if t in type_id_to_node]
+        entity.type = [type_id_to_node[t]["name"] for t in entity.type if t in type_id_to_node]
 
         mapped_properties = {}
 

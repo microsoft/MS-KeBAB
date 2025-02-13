@@ -209,7 +209,7 @@ class WikidataResolver:
             entity.properties = mapped_properties
 
         if self.attach_types:
-            entity_types = wikidata_entities[entity.entity_id].types if entity.entity_id in wikidata_entities else []
+            entity_types = wikidata_entities[entity.entity_id].type if entity.entity_id in wikidata_entities else []
 
             if self.resolves_types:
                 entity_types = [type_id_to_node[t]["name"] if t in type_id_to_node else t for t in entity_types]

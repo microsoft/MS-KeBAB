@@ -253,7 +253,7 @@ class TRexDatasetBuilder:
                 continue
 
             if type_ids and wikidata_entities:
-                entity_types = wikidata_entities[fragment.entity_id].types
+                entity_types = wikidata_entities[fragment.entity_id].type
                 if not any(t in type_ids for t in entity_types):
                     continue
 
@@ -348,7 +348,7 @@ class TRexDatasetBuilder:
                 mapped_properties[prop_name] = values
 
         fragment.properties = mapped_properties
-        entity_types = wikidata_entities[fragment.entity_id].types if fragment.entity_id in wikidata_entities else []
+        entity_types = wikidata_entities[fragment.entity_id].type if fragment.entity_id in wikidata_entities else []
 
         # entity_type_values = list({type_id_to_node[t]["name"] for t in entity_types if t in type_id_to_node})
         fragment.metadata["entity_types"] = entity_types

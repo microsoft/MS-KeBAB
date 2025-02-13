@@ -84,12 +84,12 @@ class WikidataEntity(Entity):
         self.metadata["wikipedia"] = value
 
     @property
-    def types(self) -> list[str]:
+    def type(self) -> list[str]:
         """Return the types of the entity."""
         return self.properties[TypeProperties.INSTANCE_OF.value]
 
-    @types.setter
-    def types(self, value: list[str]) -> None:
+    @type.setter
+    def type(self, value: list[str]) -> None:
         """Set the types of the entity."""
         self.properties[TypeProperties.INSTANCE_OF.value] = value
 

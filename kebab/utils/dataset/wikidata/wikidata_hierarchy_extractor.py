@@ -180,7 +180,7 @@ class WikidataHierarchyExtractor:
                 wikidata_json_dump_path=input_path,
                 properties=[TypeProperties.INSTANCE_OF.value],
                 input_entity_predicate=lambda x: x.get("type") == "item",
-                output_entity_predicate=lambda x: len(x.types) > 0,
+                output_entity_predicate=lambda x: len(x.type) > 0,
                 include_descriptions=False,
             )
 
