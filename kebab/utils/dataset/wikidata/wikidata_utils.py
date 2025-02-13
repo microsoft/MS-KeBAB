@@ -74,14 +74,14 @@ class WikidataEntity(Entity):
         self.metadata["description"] = value
 
     @property
-    def wikipedia(self) -> str:
+    def wikipedia_title(self) -> str:
         """Return the Wikipedia title of the entity."""
-        return self.metadata.get("wikipedia", "")
+        return self.metadata.get("wikipedia_title", "")
 
-    @wikipedia.setter
-    def wikipedia(self, value: str) -> None:
+    @wikipedia_title.setter
+    def wikipedia_title(self, value: str) -> None:
         """Set the Wikipedia title of the entity."""
-        self.metadata["wikipedia"] = value
+        self.metadata["wikipedia_title"] = value
 
     @property
     def type(self) -> list[str]:
@@ -99,7 +99,7 @@ class WikidataEntity(Entity):
 
         if minimal_repr and "metadata" in entity_dict:
             metadata_dict = entity_dict["metadata"]
-            for key in ["description", "wikipedia"]:
+            for key in ["description", "wikipedia_title"]:
                 if key in metadata_dict and not metadata_dict[key]:
                     del metadata_dict[key]
 
@@ -134,7 +134,7 @@ class WikidataEntity(Entity):
             data["metadata"]["description"] = data.pop("description")
 
         if "wikipedia" in data:
-            data["metadata"]["wikipedia"] = data.pop("wikipedia")
+            data["metadata"]["wikipedia_title"] = data.pop("wikipedia")
 
         return WikidataEntity(**data)
 
