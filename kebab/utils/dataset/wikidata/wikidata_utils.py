@@ -11,14 +11,12 @@ import json
 import logging
 import pathlib
 import re
-import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Self
 
 import requests
-from tqdm import tqdm
 
 from kebab.contracts.entity import Entity
 
@@ -289,8 +287,6 @@ def query_single_entity_via_api(wikidata_id: str, english_only: bool = True) -> 
 def scrape_properties_via_api(
     start: int = 1,
     end: int = 15_000,
-    stop_after_contiguous_errors: int = 5,
-    save_every: int = 1000,
     output_path: pathlib.Path | None = None,
 ) -> None:
     """
@@ -308,40 +304,26 @@ def scrape_properties_via_api(
 
     properties = {}
     error_count = 0
-    cont_error_count = 0
 
-    for i in tqdm(range(start, end + 1)):
-        item = query_entities_via_api(f"P{i}")
+    entity_ids = [f"P{i}" for i in range(start, end + 1)]
+    entities = query_entities_via_api(entity_ids)
 
-        if not item:
-            logging.warning(f"Error querying Wikidata for ID P{i}, retrying...")
-            time.sleep(60)
-            item = query_single_entity_via_api(f"P{i}")
+    for prop_id, entity in entities.items():
+        if entity:
+            assert prop_id == entity["id"]
 
-        if item:
-            cont_error_count = 0
-            property = {
-                "label": item.get("labels", {}).get("en", {}).get("value", ""),
-                "description": item.get("descriptions", {}).get("en", {}).get("value", ""),
-                "aliases": [v["value"] for v in item.get("aliases", {}).get("en", [])],
+            prop_record = {
+                "label": entity.get("labels", {}).get("en", {}).get("value", ""),
+                "description": entity.get("descriptions", {}).get("en", {}).get("value", ""),
+                "aliases": [v["value"] for v in entity.get("aliases", {}).get("en", [])],
             }
 
-            if not property["label"]:
+            if not prop_record["label"]:
                 continue
 
-            properties[f"P{i}"] = property
+            properties[prop_id] = prop_record
         else:
-            logging.warning(f"Error querying Wikidata for ID P{i}")
             error_count += 1
-            cont_error_count += 1
-
-        if cont_error_count >= stop_after_contiguous_errors:
-            logging.error(f"Stopping after {stop_after_contiguous_errors} contiguous errors")
-            break
-
-        if save_every > 0 and i % save_every == 0:
-            with open(output_path, mode="w", encoding="utf-8") as f:
-                json.dump(properties, f)
 
     if error_count:
         logging.warning(f"Encountered {error_count} errors while querying Wikidata")
@@ -362,7 +344,7 @@ def extract_wikidata_entities_from_dump(
     include_descriptions: bool = True,
 ) -> Iterable[WikidataEntity]:
     """Extract all entities that match the predicate and their requested properties from the Wikidata JSON dump."""
-    logging.info(f"Extracting entities from {wikidata_json_dump_path}...")
+    logging.info(f"Reading {wikidata_json_dump_path}...")
 
     processed_count = 0
     error_count = 0
@@ -376,7 +358,7 @@ def extract_wikidata_entities_from_dump(
         for line in f:
             processed_count += 1
             if processed_count % 500_000 == 0:
-                logging.info(f"Processed {processed_count} records")
+                logging.info(f"Read {processed_count:,} records")
 
             # the json is a single array, not json-lines, but we are loading it line by line
             line = line.strip()

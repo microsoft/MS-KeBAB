@@ -11,11 +11,8 @@ Inputs:
 
 Example outputs:
 - `wikidata_simple_entities.jsonl`, each line like:
-{"id": "Q13442814",
- "name": "scholarly article",
-  "aliases": ["article", "academic paper", "research paper", ...],
- "types": ["Q591041", "Q191067", "Q55915575"],
-...
+{"entity_id": "Q31", "properties": {"P31": ["Q3624078", "Q43702", "Q6256", "Q20181813", "Q1250464"], "name": ["Belgium", "Kingdom of Belgium", "BEL", "be", "\ud83c\udde7\ud83c\uddea", "BE"]}}
+{"entity_id": "Q8", "properties": {"P31": ["Q331769", "Q60539479"], "name": ["happiness", "joy", "happy"]}}
 """
 
 from __future__ import annotations
@@ -78,9 +75,14 @@ class WikidataSimpleExtractor:
             include_descriptions=False,
         )
 
+        done = 0
         with open(output_path, "w", encoding="utf-8", newline="\n") as output_file:
             for entity in entities:
                 output_file.write(entity.to_json(minimal_repr=True) + "\n")
+
+                done += 1
+                if done % 100_000 == 0:
+                    self._logger.info(f"Saved {done:,} entities")
 
         return output_path
 
