@@ -176,11 +176,11 @@ class WikidataHierarchyExtractor:
             return output_path
 
         with open(output_path, mode="w", encoding="utf-8", newline="\n") as f:
-            entities = wikidata_utils.extract_simple_entities_from_dump(
+            entities = wikidata_utils.extract_wikidata_entities_from_dump(
                 wikidata_json_dump_path=input_path,
                 properties=[TypeProperties.INSTANCE_OF.value],
                 input_entity_predicate=lambda x: x.get("type") == "item",
-                output_entity_predicate=lambda x: len(x["types"]) > 0,
+                output_entity_predicate=lambda x: len(x.type) > 0,
                 include_descriptions=False,
             )
 
@@ -257,23 +257,22 @@ class WikidataHierarchyExtractor:
             # query the entities
             new_entities = wikidata_utils.query_entities_via_api(to_query) or {}
             new_entities = {
-                k: wikidata_utils.convert_to_simple_entity(
-                    e, properties=properties, prohibited_qualifiers=prohibited_qualifiers
+                k: wikidata_utils.WikidataEntity.from_wikidata_record(
+                    e, allowed_properties=properties, prohibited_qualifiers=prohibited_qualifiers
                 )
                 for k, e in new_entities.items()
             }
 
             # update the redirect map
-            new_redirect_map = {k: e["id"] for k, e in new_entities.items()}
+            new_redirect_map = {k: e.entity_id for k, e in new_entities.items()}
             redirect_map.update(new_redirect_map)
-
             type_entities.update(new_entities)
 
             # collect the parent type entities and same-as entities
             to_query = set()
             for entity in new_entities.values():
-                to_query.update(entity.get("properties", {}).get(TypeProperties.SUBCLASS_OF.value, []))
-                to_query.update(entity.get("properties", {}).get(TypeProperties.SAME_AS.value, []))
+                to_query.update(entity.properties.get(TypeProperties.SUBCLASS_OF.value, []))
+                to_query.update(entity.properties.get(TypeProperties.SAME_AS.value, []))
 
             # filter out the entities that we already have
             to_query -= set(type_entities.keys())
