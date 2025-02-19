@@ -9,10 +9,9 @@ This can be run on T-REx dataset as well.
 - Attach a unique source ID to each entity fragment.
 - Optionally, verify that the Wikidata property keys exist in the Wikidata properties file.
 
-TODO(pmyshkov): Update after the data is available.
 Example output:
-{"entity_id": "Q25295", "properties": {"names": ["language family"]}, "source_ids": ["81317a6457106bc3ae89d179d65ec7ed", "http://www.wikidata.org/entity/Q33199"], "evidence_map": {}, "entity_types": []}
-{"entity_id": "Q11708", "properties": {"names": ["Southeast Asia"]}, "source_ids": ["81317a6457106bc3ae89d179d65ec7ed", "http://www.wikidata.org/entity/Q33199"], "evidence_map": {}, "entity_types": []}
+{"entity_id": "Q33298", "properties": {"name": ["Filipino"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "0"}}
+{"entity_id": "Q918448", "properties": {"name": ["denomination"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "1"}}
 """
 
 # ruff: noqa: S101
@@ -108,8 +107,11 @@ class RebelFragmentExtractor:
                             seen.add(str_repr)
 
                         try:
-                            f.write(fragment.to_json() + "\n")
+                            f.write(fragment.to_json(minimal_repr=True) + "\n")
                             frag_count += 1
+
+                            if frag_count % 100_000 == 0:
+                                self._logger.info(f"Wrote {frag_count:,} entity fragments.")
                         except ValueError:
                             err_count += 1
 
