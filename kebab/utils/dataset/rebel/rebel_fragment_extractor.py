@@ -149,7 +149,7 @@ class RebelFragmentExtractor:
                 return {}
 
             # skip short text documents
-            if len(record["text"]) < 100:
+            if len(record["text"]) < 100:  # noqa: PLR2004
                 stats["short_text_documents"] += 1
                 return {}
 
