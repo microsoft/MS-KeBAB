@@ -581,3 +581,113 @@ def collect_wikidata_entities(
     logging.info(f"Found {len(entities):,} Wikidata entities.")
 
     return entities
+
+
+def get_wikipedia_titles(wikidata_ids: list[str]) -> Iterable[tuple[str, str]]:
+    """Get Wikipedia titles for a list of Wikidata IDs."""
+
+    def get_wikipedia_titles_batch(wikidata_ids: list[str]) -> dict[str, str]:
+        """Get Wikipedia titles for a list of Wikidata IDs."""
+        url = "https://www.wikidata.org/w/api.php"
+        headers = {"User-Agent": "MyWikipediaBot/1.0 (myemail@example.com)"}
+        params = {
+            "action": "wbgetentities",
+            "format": "json",
+            "ids": "|".join(wikidata_ids),
+            "props": "sitelinks",
+            "sitefilter": "enwiki",
+        }
+
+        response = requests.get(url, params=params, headers=headers)
+        data = response.json()
+
+        titles = {}
+        for wikidata_id, entity in data.get("entities", {}).items():
+            if "sitelinks" in entity and "enwiki" in entity["sitelinks"]:
+                titles[wikidata_id] = entity["sitelinks"]["enwiki"]["title"]
+            else:
+                titles[wikidata_id] = None
+
+        return titles
+
+    def chunked_list(lst: list, n: int) -> Iterable[list]:
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i : i + n]
+
+    for chunk in chunked_list(wikidata_ids, 50):
+        try:
+            results = get_wikipedia_titles_batch(chunk)
+        except ValueError as e:
+            logging.error(f"Error getting Wikipedia titles: {e}")
+            continue
+
+        yield from results.items()
+
+
+def get_wikipedia_intros(wikidata_ids: list[str]) -> Iterable[tuple[str, str]]:
+    """Get Wikipedia intros for a list of Wikidata IDs."""
+
+    def get_wikipedia_intro_batch(titles: list[str]) -> dict[str, str]:
+        """Get Wikipedia intros for a list of Wikidata IDs."""
+        wiki_url = "https://en.wikipedia.org/w/api.php"
+        headers = {"User-Agent": "MyWikipediaBot/1.0 (myemail@example.com)"}
+        params = {
+            "action": "query",
+            "format": "json",
+            "titles": "|".join(titles),
+            "prop": "extracts",
+            "explaintext": True,
+            "exintro": True,  # Retrieve only the introduction
+        }
+
+        response = requests.get(wiki_url, params=params, headers=headers)
+        data = response.json()
+
+        results = {}
+        pages = data["query"]["pages"]
+        for page_info in pages.values():
+            results[page_info["title"]] = page_info.get("extract", "No content found.")
+
+        return results
+
+    def chunked_list(lst: list, n: int) -> Iterable[list]:
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i : i + n]
+
+    done = 0
+    skipped = 0
+
+    for chunk in chunked_list(wikidata_ids, 10):
+        done += len(chunk)
+
+        try:
+            titles = get_wikipedia_titles(chunk)
+            titles = {k: v for k, v in titles if v is not None}
+            skipped += len(chunk) - len(titles)
+        except ValueError as e:
+            logging.error(f"Error getting Wikipedia titles: {e}")
+            skipped += len(chunk)
+            continue
+
+        try:
+            texts = get_wikipedia_intro_batch(list(titles.values()))
+        except ValueError as e:
+            logging.error(f"Error getting Wikipedia intros: {e}")
+            skipped += len(titles)
+            continue
+
+        with_pages = 0
+        for wikidata_id, title in titles.items():
+            text = texts.get(title, "")
+            if text:
+                with_pages += 1
+                yield wikidata_id, text
+
+        skipped += len(titles) - with_pages
+
+        if done % 1000 == 0:
+            logging.info(
+                f"Processed {done} entities, skipped {skipped} ({skipped / done:.2f}) without Wikipedia titles/pages"
+            )
