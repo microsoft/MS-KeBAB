@@ -29,7 +29,7 @@ dev = [
     "matplotlib",
     "pandas",
     "plotly",
-    "pyright==1.1.393",
+    "pyright==1.1.394",
     "pytest",
     "pytest-cov",
     "pytest-mock",
