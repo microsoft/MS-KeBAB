@@ -9,7 +9,7 @@ This can be run on T-REx dataset as well.
 - Attach a unique source ID to each entity fragment.
 - Optionally, verify that the Wikidata property keys exist in the Wikidata properties file.
 
-TODO: Update
+TODO(pmyshkov): Update after the data is available.
 Example output:
 {"entity_id": "Q25295", "properties": {"names": ["language family"]}, "source_ids": ["81317a6457106bc3ae89d179d65ec7ed", "http://www.wikidata.org/entity/Q33199"], "evidence_map": {}, "entity_types": []}
 {"entity_id": "Q11708", "properties": {"names": ["Southeast Asia"]}, "source_ids": ["81317a6457106bc3ae89d179d65ec7ed", "http://www.wikidata.org/entity/Q33199"], "evidence_map": {}, "entity_types": []}
