@@ -13,12 +13,6 @@ from kebab.utils.dataset.wikidata.wikidata_utils import WikidataEntity
 
 
 @pytest.fixture
-def wikidata_dump_sample_input_file_path() -> Path:
-    """Return the path to the input file with a subset of the Wikidata dump."""
-    return Path(__file__).parent / "data" / "datasets" / "wikidata" / "sample" / "wikidata_dump_sample_records.json"
-
-
-@pytest.fixture
 def wikidata_hierarchy_input_file_path() -> Path:
     """Return the path to the input file with a subset Wikidata type hierarchy."""
     return Path(__file__).parent / "data" / "datasets" / "wikidata" / "wikidata_type_hierarchy.jsonl"
@@ -30,16 +24,16 @@ def wikidata_simple_entities_input_file_path() -> Path:
     return Path(__file__).parent / "data" / "datasets" / "wikidata" / "sample" / "wikidata_simple_entities.jsonl"
 
 
-def test_wikidata_simple_extractor(wikidata_dump_sample_input_file_path: Path, tmp_path: Path) -> None:
+def test_wikidata_simple_extractor(wikidata_dump_sample_10_records_input_file_path: Path, tmp_path: Path) -> None:
     """Test the extraction of simple entities from Wikidata."""
     extractor = WikidataSimpleExtractor(
-        wikidata_json_dump_path=wikidata_dump_sample_input_file_path,
+        wikidata_json_dump_path=wikidata_dump_sample_10_records_input_file_path,
         run_entity_extraction=True,
         run_property_scrape=False,
         output_dir=tmp_path,
     )
 
-    extractor.extract_simple_entities()
+    extractor.run()
 
     output_file_path = tmp_path / WikidataSimpleExtractor.WIKIDATA_SIMPLE_ENTITIES_FILENAME
     assert output_file_path.exists()

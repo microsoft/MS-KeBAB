@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 """
-Extract type hierarchy from Wikidata.
+Extract the type hierarchy from Wikidata.
 
 The extraction process runs in two steps:
 1. Collect all Wikidata type entities and their reference counts by looking through the dump and then querying
@@ -48,10 +48,10 @@ from collections.abc import Callable, Iterable
 from typing import Any
 
 from kebab.utils.dataset.wikidata import wikidata_utils
-from kebab.utils.dataset.wikidata.wikidata_utils import TypeProperties
+from kebab.utils.dataset.wikidata.wikidata_utils import TypeProperties, WikidataEntity
 
 
-class WikidataHierarchyExtractor:
+class WikidataTypeHierarchyExtractor:
     """Extract type hierarchy from Wikidata."""
 
     # TODO(pmyshkov): These parameters should eventually be removed and only one workflow should be used.
@@ -181,11 +181,10 @@ class WikidataHierarchyExtractor:
                 properties=[TypeProperties.INSTANCE_OF.value],
                 input_entity_predicate=lambda x: x.get("type") == "item",
                 output_entity_predicate=lambda x: len(x.type) > 0,
-                include_descriptions=False,
             )
 
             for entity in entities:
-                f.write(json.dumps(entity) + "\n")
+                f.write(entity.to_json() + "\n")
 
         return output_path
 
@@ -217,8 +216,8 @@ class WikidataHierarchyExtractor:
         counter = defaultdict(int)
         with open(concrete_entities_path, encoding="utf-8") as f:
             for line in f:
-                entity = json.loads(line.strip())
-                for value in entity["types"]:
+                entity = WikidataEntity.from_json(line.strip())
+                for value in entity.type:
                     counter[value] += 1
 
         with open(output_path, mode="w", encoding="utf-8", newline="\n") as f:
@@ -229,7 +228,7 @@ class WikidataHierarchyExtractor:
 
         return output_path
 
-    def query_for_type_entities_via_api(self, known_type_entity_ids: list[str]) -> dict[str, dict]:
+    def query_for_type_entities_via_api(self, known_type_entity_ids: list[str]) -> dict[str, WikidataEntity]:
         """
         Query the Wikidata API for the full information on all the type entities available.
 
@@ -256,6 +255,7 @@ class WikidataHierarchyExtractor:
         while to_query:
             # query the entities
             new_entities = wikidata_utils.query_entities_via_api(to_query) or {}
+
             new_entities = {
                 k: wikidata_utils.WikidataEntity.from_wikidata_record(
                     e, allowed_properties=properties, prohibited_qualifiers=prohibited_qualifiers
@@ -287,11 +287,11 @@ class WikidataHierarchyExtractor:
 
         # apply the redirect map - update the parent links
         for entity in type_entities.values():
-            parents = entity.get("properties", {}).get(TypeProperties.SUBCLASS_OF.value, [])
-            entity["properties"][TypeProperties.SUBCLASS_OF.value] = [redirect_map.get(p, p) for p in parents]
+            parents = entity.properties[TypeProperties.SUBCLASS_OF.value]
+            entity.properties[TypeProperties.SUBCLASS_OF.value] = [redirect_map.get(p, p) for p in parents]
 
         # rebuild the map since the IDs might have changed due to redirects
-        type_entities = {e["id"]: e for e in type_entities.values()}
+        type_entities = {e.entity_id: e for e in type_entities.values()}
 
         # attach the redirect map
         redirect_from_map = defaultdict(list)
@@ -300,7 +300,7 @@ class WikidataHierarchyExtractor:
                 redirect_from_map[v].append(k)
 
         for entity in type_entities.values():
-            entity["redirect_from"] = redirect_from_map.get(entity["id"], [])
+            entity.metadata["redirect_from"] = redirect_from_map.get(entity.entity_id, [])
 
         return type_entities
 
@@ -334,32 +334,32 @@ class WikidataHierarchyExtractor:
 
         # attach ref counts
         for entity_id, entity in type_entities.items():
-            entity["ref_count"] = entity_ids_with_counts.get(entity_id, 0)
+            entity.metadata["ref_count"] = entity_ids_with_counts.get(entity_id, 0)
 
         with open(output_path, mode="w", encoding="utf-8", newline="\n") as f:
-            for entity in sorted(type_entities.values(), key=lambda x: x["ref_count"], reverse=True):
-                f.write(json.dumps(entity) + "\n")
+            for entity in sorted(type_entities.values(), key=lambda x: x.metadata["ref_count"], reverse=True):
+                f.write(entity.to_json() + "\n")
 
         self._logger.info(f"Saved {len(type_entities):,} Wikidata type entities to {output_path}")
 
         return output_path
 
-    def load_type_entities(self, type_entities_path: pathlib.Path | None = None) -> dict[str, dict]:
+    def load_type_entities(self, type_entities_path: pathlib.Path | None = None) -> dict[str, WikidataEntity]:
         """Load the type entities from the file."""
         type_entities_path = type_entities_path or (self.output_dir / self.WIKIDATA_TYPE_ENTITIES_FILENAME)
 
         with open(type_entities_path, encoding="utf-8") as f:
-            type_entities = [json.loads(line.strip()) for line in f]
+            type_entities = [WikidataEntity.from_json(line.strip()) for line in f]
 
         # verify consistency
-        keys = {e["id"] for e in type_entities}
+        keys = {e.entity_id for e in type_entities}
         assert len(keys) == len(type_entities), "Duplicate entity IDs found."
 
         for entity in type_entities:
-            parents = entity.get("properties", {}).get(TypeProperties.SUBCLASS_OF.value, [])
-            assert all(p in keys for p in parents), f"Invalid parent entity ID found in entity {entity['id']}."
+            parents = entity.properties[TypeProperties.SUBCLASS_OF.value]
+            assert all(p in keys for p in parents), f"Invalid parent entity ID found in entity {entity.entity_id}."
 
-        type_entities = {e["id"]: e for e in type_entities}
+        type_entities = {e.entity_id: e for e in type_entities}
 
         self._logger.info(f"Loaded {len(type_entities):,} type entities from {type_entities_path}")
 
@@ -367,7 +367,7 @@ class WikidataHierarchyExtractor:
 
     def build_type_entities_graph(
         self,
-        entities: dict[str, dict],
+        entities: dict[str, WikidataEntity],
         allowed_ids: Iterable[str] | None = None,
     ) -> dict[str, dict]:
         """
@@ -379,11 +379,12 @@ class WikidataHierarchyExtractor:
             allowed_ids: the allow-list of IDs of the entities to include in the graph, ignored if None or empty
         """
         # TODO(pmyshkov): Once we're settled on the workflow, switch to using networkx for the graph operations.
+        # TODO(pmyshkov): Create a dataclass for the node, DO NOT inherit from Entity.
         graph = {
-            entity["id"]: {
-                "entity_id": entity["id"],
-                "parents": set(entity.get("properties", {}).get(TypeProperties.SUBCLASS_OF.value, [])),
-                "merged_ids": {entity["id"]},
+            entity.entity_id: {
+                "entity_id": entity.entity_id,
+                "parents": set(entity.properties[TypeProperties.SUBCLASS_OF.value]),
+                "merged_ids": {entity.entity_id},
             }
             for entity in entities.values()
         }
@@ -393,15 +394,16 @@ class WikidataHierarchyExtractor:
             same_as_count = 0
             same_as_skipped_count = 0
             for entity_id in graph:
-                same_as = entities[entity_id].get("properties", {}).get(TypeProperties.SAME_AS.value, [])
+                same_as = entities[entity_id].properties[TypeProperties.SAME_AS.value]
                 for same_as_id in same_as:
                     merge = True
 
                     if same_as_id in graph:
                         # disallow asymmetric
-                        if self.MERGE_ON_SAME_AS_ONLY_WITH_SHARED_PARENT and entity_id not in entities[same_as_id].get(
-                            "properties", {}
-                        ).get(TypeProperties.SAME_AS.value, []):
+                        if (
+                            self.MERGE_ON_SAME_AS_ONLY_WITH_SHARED_PARENT
+                            and entity_id not in entities[same_as_id].properties[TypeProperties.SAME_AS.value]
+                        ):
                             merge = False
 
                         # disallow those without a common parent
@@ -463,37 +465,45 @@ class WikidataHierarchyExtractor:
     def write_wikidata_hierarchy(
         self,
         graph: dict[str, dict],
-        type_entities: dict[str, dict],
+        type_entities: dict[str, WikidataEntity],
         output_path: pathlib.Path | None = None,
     ) -> None:
         """Write the Wikidata hierarchy to a file."""
         output_path = output_path or (self.output_dir / self.WIKIDATA_HIERARCHY_FILENAME)
 
         with open(output_path, mode="w", encoding="utf-8", newline="\n") as f:
-            for node in sorted(graph.values(), key=lambda n: type_entities[n["entity_id"]]["ref_count"], reverse=True):
+            for node in sorted(
+                graph.values(), key=lambda n: type_entities[n["entity_id"]].metadata["ref_count"], reverse=True
+            ):
                 entity_id = node["entity_id"]
                 entity = type_entities[entity_id]
-                simple_entity = {
+                node_entity = {
                     "id": entity_id,
                     "merged_ids": list(node["merged_ids"]),
                     "redirect_from_ids": list(
-                        {n for merged_id in node["merged_ids"] for n in type_entities[merged_id]["redirect_from"]}
+                        {
+                            n
+                            for merged_id in node["merged_ids"]
+                            for n in type_entities[merged_id].metadata["redirect_from"]
+                        }
                     ),
-                    "name": entity["name"],
-                    "descriptions": list({type_entities[merged_id]["description"] for merged_id in node["merged_ids"]}),
+                    "name": entity.name,
+                    "descriptions": list({type_entities[merged_id].description for merged_id in node["merged_ids"]}),
                     "aliases": list(
-                        {a for merged_id in node["merged_ids"] for a in type_entities[merged_id]["aliases"]}
-                        | {type_entities[merged_id]["name"] for merged_id in node["merged_ids"]}
+                        {a for merged_id in node["merged_ids"] for a in type_entities[merged_id].aliases}
+                        | {type_entities[merged_id].name for merged_id in node["merged_ids"]}
                     ),
                     "parents": list(node["parents"]),
                     "children": list(node["children"]),
-                    "ref_count": sum(type_entities[merged_id]["ref_count"] for merged_id in node["merged_ids"]),
+                    "ref_count": sum(
+                        type_entities[merged_id].metadata["ref_count"] for merged_id in node["merged_ids"]
+                    ),
                     "subgraph_size": node["subgraph_size"],
                     "subgraph_height": node["subgraph_height"],
                     "subgraph_ref_count": node["subgraph_ref_count"],
                 }
 
-                f.write(json.dumps(simple_entity) + "\n")
+                f.write(json.dumps(node_entity) + "\n")
 
         self._logger.info(f"Saved the Wikidata hierarchy to {output_path}.")
 
@@ -723,7 +733,7 @@ class WikidataHierarchyExtractor:
         return grandparent_links_removed
 
     @classmethod
-    def add_subgraph_sizes(cls, graph: dict[str, dict], entities: dict[str, dict] | None = None) -> None:
+    def add_subgraph_sizes(cls, graph: dict[str, dict], entities: dict[str, WikidataEntity] | None = None) -> None:
         """Add the sizes of the sub-graphs to the nodes."""
         descendants_cache = {}
         visited = set()
@@ -761,7 +771,7 @@ class WikidataHierarchyExtractor:
             node["subgraph_ref_count"] = None
 
             if entities is not None:
-                node["ref_count"] = sum(entities[merged_id]["ref_count"] for merged_id in node["merged_ids"])
+                node["ref_count"] = sum(entities[merged_id].metadata["ref_count"] for merged_id in node["merged_ids"])
             else:
                 node["ref_count"] = 0
 
@@ -772,7 +782,7 @@ class WikidataHierarchyExtractor:
     def write_node_sequences(
         cls,
         sequences: Iterable[Iterable[str]],
-        entities: dict[str, dict],
+        entities: dict[str, WikidataEntity],
         path: pathlib.Path,
         sort_by_len: bool = False,
     ) -> None:
@@ -781,7 +791,7 @@ class WikidataHierarchyExtractor:
 
         def present_node(node_id: str) -> str:
             """Get the name of the entity."""
-            return f"{node_id} ({entities[node_id]['name']})"
+            return f"{node_id} ({entities[node_id].name})"
 
         sequences_ = sorted(sequences_, key=len, reverse=True) if sort_by_len else sequences_
 

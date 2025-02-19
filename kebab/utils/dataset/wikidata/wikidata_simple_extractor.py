@@ -25,7 +25,7 @@ from kebab.utils.dataset.wikidata import wikidata_utils
 
 
 class WikidataSimpleExtractor:
-    """Scrape all simple entities, all properties, etc. from Wikidata."""
+    """Scrape simplified entities (WikidataEntity) from Wikidata."""
 
     WIKIDATA_SIMPLE_ENTITIES_FILENAME = "wikidata_simple_entities.jsonl"
     WIKIDATA_PROPERTIES_FILENAME = "wikidata_properties.json"
@@ -72,7 +72,6 @@ class WikidataSimpleExtractor:
             wikidata_json_dump_path=input_path,
             properties=[wikidata_utils.TypeProperties.INSTANCE_OF.value],
             input_entity_predicate=lambda x: x.get("type") == "item",
-            include_descriptions=False,
         )
 
         done = 0

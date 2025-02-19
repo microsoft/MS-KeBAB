@@ -5,10 +5,10 @@
 
 import json
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from kebab.utils.dataset.wikidata import wikidata_utils
+from pytest_mock import MockerFixture
 
 
 @pytest.fixture
@@ -39,7 +39,9 @@ def test_extract_properties_from_dump(wikidata_dump_sample_prop_records_file_pat
     """Test the extraction of property labels from the Wikidata JSON dump."""
     entities = list(
         wikidata_utils.extract_wikidata_entities_from_dump(
-            wikidata_json_dump_path=wikidata_dump_sample_prop_records_file_path
+            wikidata_json_dump_path=wikidata_dump_sample_prop_records_file_path,
+            include_descriptions=True,
+            include_wikipedia_title=True,
         )
     )
 
@@ -48,19 +50,22 @@ def test_extract_properties_from_dump(wikidata_dump_sample_prop_records_file_pat
     p = entities[0]
     assert p.entity_id == "P19"
     assert p.name == "place of birth"
+    assert p.wikipedia_title == ""
+    assert p.description.startswith("most specific known")
 
 
-def test_query_entity_via_api_and_simplify(wikidata_dump_sample_prop_records_file_path: Path) -> None:
+def test_query_entity_via_api_and_simplify(
+    wikidata_dump_sample_prop_records_file_path: Path, mocker: MockerFixture
+) -> None:
     """Test the querying of a Wikidata entity via the API and simplification of the response."""
     with open(wikidata_dump_sample_prop_records_file_path, encoding="utf-8") as f:
         entities = json.loads(f.read())
 
     entities_dict = {entity["id"]: entity for entity in entities}
-
     query_func = wikidata_utils._query_entities_via_api  # noqa: SLF001
-    with patch(f"{query_func.__module__}.{query_func.__qualname__}") as mock_query_entity_via_api:
-        mock_query_entity_via_api.return_value = entities_dict
-        queried_entity = wikidata_utils.query_single_entity_via_api("P19")
+    mocker.patch(f"{query_func.__module__}.{query_func.__qualname__}", return_value=entities_dict)
+
+    queried_entity = wikidata_utils.query_single_entity_via_api("P19")
 
     assert queried_entity == entities[0]
 

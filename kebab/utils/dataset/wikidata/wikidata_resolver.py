@@ -1,7 +1,7 @@
 """
 Given a collection of entities, substitute the actual values for properties, replace property ids with property names,
 and attach types to the entities. The values are resolved from the Wikidata dump of simple entities, followed by
-quries to the Wikidata API for missing information.
+queries to the Wikidata API for missing information.
 
 Required inputs:
 - Entities to resolve

@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Script to run the Wikidata hierarchy extraction steps."""
+"""Script to run the Wikidata type hierarchy extraction steps."""
 
 from __future__ import annotations
 
@@ -9,17 +9,14 @@ import pathlib
 
 import click
 from kebab.utils import logging_helpers
-from kebab.utils.dataset.wikidata.wikidata_hierarchy_extractor import WikidataHierarchyExtractor
+from kebab.utils.dataset.wikidata.wikidata_type_hierarchy_extractor import WikidataTypeHierarchyExtractor
 
 
 @click.option(
     "--wikidata-json-dump-path",
     type=pathlib.Path,
-    # default=pathlib.Path.cwd() / "data" / "wikidata" / "latest-all.json",
-    default=pathlib.Path(
-        r"C:\Users\pmyshkov\OneDrive - Microsoft\Benchmark\Datasets\Wikidata\Dump\Sample 10k\2024-06-27\sample_10k.json"
-    ),
-    help="The path to the Wikidata JSON dump file.",
+    default=pathlib.Path.home() / "latest-all.json",
+    help="The path to the standard Wikidata JSON dump file.",
 )
 @click.option(
     "--output-dir",
@@ -35,7 +32,7 @@ def main(
     """Run Wikidata hierarchy extraction steps."""
     logging_helpers.configure_logging()
 
-    extractor = WikidataHierarchyExtractor(
+    extractor = WikidataTypeHierarchyExtractor(
         wikidata_json_dump_path=wikidata_json_dump_path,
         output_dir=output_dir,
     )
