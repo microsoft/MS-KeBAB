@@ -8,7 +8,7 @@ log/
 # data
 experiments/input
 experiments/output
-.local_cache/*
+.local_cache
 
 # visual studio
 .vs/*
