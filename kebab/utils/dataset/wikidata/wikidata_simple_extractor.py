@@ -11,11 +11,8 @@ Inputs:
 
 Example outputs:
 - `wikidata_simple_entities.jsonl`, each line like:
-{"id": "Q13442814",
- "name": "scholarly article",
-  "aliases": ["article", "academic paper", "research paper", ...],
- "types": ["Q591041", "Q191067", "Q55915575"],
-...
+{"entity_id": "Q31", "properties": {"P31": ["Q3624078", "Q43702", "Q6256", "Q20181813", "Q1250464"], "name": ["Belgium", "Kingdom of Belgium", "BEL", "be", "\ud83c\udde7\ud83c\uddea", "BE"]}}
+{"entity_id": "Q8", "properties": {"P31": ["Q331769", "Q60539479"], "name": ["happiness", "joy", "happy"]}}
 """
 
 from __future__ import annotations
@@ -37,16 +34,29 @@ class WikidataSimpleExtractor:
         self,
         *,
         wikidata_json_dump_path: pathlib.Path | None = None,
+        run_entity_extraction: bool,
+        run_property_scrape: bool,
         output_dir: pathlib.Path | None = None,
     ):
         """Initialize the extractor."""
         self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
 
         self.wikidata_dump_path: pathlib.Path | None = wikidata_json_dump_path
+        self.run_entity_extraction: bool = run_entity_extraction
+        self.run_property_scrape: bool = run_property_scrape
+
         self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
 
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def run(self) -> None:
+        """Run the extraction steps."""
+        if self.run_entity_extraction:
+            self.extract_simple_entities()
+
+        if self.run_property_scrape:
+            self.scrape_properties()
 
     def extract_simple_entities(self, wikidata_dump_path: pathlib.Path | None = None) -> pathlib.Path:
         """Extract simple entities (ID + names + types) from Wikidata."""
@@ -58,16 +68,21 @@ class WikidataSimpleExtractor:
 
         self._logger.info(f"Extracting simple entities from {self.wikidata_dump_path} to {output_path}...")
 
-        entities = wikidata_utils.extract_simple_entities_from_dump(
+        entities = wikidata_utils.extract_wikidata_entities_from_dump(
             wikidata_json_dump_path=input_path,
             properties=[wikidata_utils.TypeProperties.INSTANCE_OF.value],
             input_entity_predicate=lambda x: x.get("type") == "item",
             include_descriptions=False,
         )
 
+        done = 0
         with open(output_path, "w", encoding="utf-8", newline="\n") as output_file:
             for entity in entities:
-                output_file.write(json.dumps(entity) + "\n")
+                output_file.write(entity.to_json(minimal_repr=True) + "\n")
+
+                done += 1
+                if done % 100_000 == 0:
+                    self._logger.info(f"Saved {done:,} entities")
 
         return output_path
 

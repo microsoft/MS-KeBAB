@@ -27,6 +27,8 @@ import logging
 import pathlib
 from collections.abc import Iterable
 
+from kebab.utils.dataset.wikidata import wikidata_utils
+
 
 class WikidataNamesDatasetBuilder:
     """Build a dataset of names and aliases of entities of a particular type (and its subtypes) from Wikidata."""
@@ -36,8 +38,8 @@ class WikidataNamesDatasetBuilder:
     def __init__(
         self,
         *,
-        wikidata_simple_entities_path: pathlib.Path | None = None,
-        wikidata_type_hierarchy_path: pathlib.Path | None = None,
+        wikidata_entities_path: pathlib.Path,
+        wikidata_type_hierarchy_path: pathlib.Path,
         output_dir: pathlib.Path | None = None,
         type_ids: list[str] | None = None,
         min_aliases: int = 2,
@@ -45,8 +47,8 @@ class WikidataNamesDatasetBuilder:
         """Initialize the WikidataNamesDatasetBuilder."""
         self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
 
-        self.wikidata_simple_entities_path: pathlib.Path | None = wikidata_simple_entities_path
-        self.wikidata_type_hierarchy_path: pathlib.Path | None = wikidata_type_hierarchy_path
+        self.wikidata_entities_path: pathlib.Path = wikidata_entities_path
+        self.wikidata_type_hierarchy_path: pathlib.Path = wikidata_type_hierarchy_path
         self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
 
         if self.output_dir is not None:
@@ -60,15 +62,15 @@ class WikidataNamesDatasetBuilder:
         self._logger.info("Extracting names of entities from Wikidata.")
 
         graph = self.load_hierarchy(self.wikidata_type_hierarchy_path)
-        all_subtypes = {st for t in self.type_ids for st in self.collect_all_subtypes(t, graph)}
+        all_subtypes = {st for t in self.type_ids for st in wikidata_utils.collect_all_subtypes(graph, t)}
 
         self._logger.info(f"Extracting names for {len(all_subtypes):,d} subtypes")
 
         with open(self.output_dir / self.WIKIDATA_NAMES_OUTPUT_FILENAME, "w", encoding="utf-8") as f:
             for entity in self.filter_entities(
-                self.load_simple_entities(self.wikidata_simple_entities_path), all_subtypes
+                wikidata_utils.load_wikidata_entities(self.wikidata_entities_path), all_subtypes
             ):
-                f.write(json.dumps(entity, ensure_ascii=False) + "\n")
+                f.write(entity.to_json() + "\n")
 
     def load_hierarchy(self, type_hierarchy_path: pathlib.Path | None) -> dict[str, dict]:
         """Load the hierarchy of Wikidata types."""
@@ -88,37 +90,20 @@ class WikidataNamesDatasetBuilder:
 
         return graph
 
-    def load_simple_entities(self, simple_entities_path: pathlib.Path | None) -> Iterable[dict]:
-        """Load the list of simple entities extracted from Wikidata."""
-        input_path = simple_entities_path or self.wikidata_simple_entities_path
-
-        if input_path is None:
-            raise ValueError("Path to the list of simple entities is not provided.")
-
-        count = 0
-        with open(input_path, encoding="utf-8") as f:
-            for line in f:
-                entity = json.loads(line.strip())
-                count += 1
-                yield entity
-
-        self._logger.info(f"Read {count:,d} entities")
-
     def filter_entities(
         self,
-        entities: Iterable[dict],
+        entities: Iterable[wikidata_utils.WikidataEntity],
         type_ids: set[str],
         min_aliases: int | None = None,
-    ) -> Iterable[dict]:
+    ) -> Iterable[wikidata_utils.WikidataEntity]:
         """Filter entities by type IDs."""
         min_aliases = min_aliases or self.min_aliases
         skipped = 0
         count = 0
 
         for entity in entities:
-            types = entity["types"]
-
-            aliases = entity.get("aliases", {})
+            types = entity.type
+            aliases = entity.aliases
             if len(aliases) < min_aliases:
                 skipped += 1
                 continue
@@ -128,28 +113,3 @@ class WikidataNamesDatasetBuilder:
                 yield entity
 
         self._logger.info(f"Extracted {count:,d} entities, skipped {skipped:,d} entities")
-
-    @classmethod
-    def collect_all_subtypes(cls, type_id: str, graph: dict[str, dict]) -> set[str]:
-        """Collect all subtypes of the given type."""
-        subtypes = set()
-        stack = [type_id]
-        while stack:
-            current_type_id = stack.pop()
-
-            if current_type_id not in graph:
-                logging.warning(f"Type {current_type_id} not found in the graph")
-                continue
-
-            for merged_id in graph[current_type_id]["merged_ids"]:
-                subtypes.add(merged_id)
-
-            for redirect_id in graph[current_type_id]["redirect_from_ids"]:
-                subtypes.add(redirect_id)
-
-            logging.info(f"Added {current_type_id} ({graph[current_type_id]['name']}) to the subtypes")
-
-            for child_id in graph[current_type_id]["children"]:
-                stack.append(child_id)  # noqa: PERF402
-
-        return subtypes

@@ -22,10 +22,8 @@ Example output:
 from __future__ import annotations
 
 import gc
-import json
 import logging
 import pathlib
-import re
 import typing
 from collections import defaultdict
 from collections.abc import Iterable
@@ -43,8 +41,6 @@ class TRexDatasetBuilder:
     DISALLOWED_NAMES: typing.ClassVar[set[str]] = {"", "It", "He", "She", "They"}
 
     SUBSTITUTE_ACTUAL_NAME_IF_MISSING: bool = True
-
-    WIKIDATA_REFERENCE_REGEX_PATTERN: re.Pattern = re.compile(r"Q\d+")
 
     # For measuring properties negatively affected by dereferencing
     _DEBUG_UNKNOWN_PROPERTIES: typing.ClassVar[dict[str, int]] = defaultdict(int)
@@ -91,10 +87,10 @@ class TRexDatasetBuilder:
 
         # load wikidata properties and type hierarchy
         wikidata_properties = wikidata_utils.load_properties(self.wikidata_properties_path)
-        _, type_id_to_node = self.load_type_hierarchy()
+        _, type_id_to_node = wikidata_utils.load_type_hierarchy(self.wikidata_type_hierarchy_path)
 
         # get wikidata entities, properties, and type hierarchy
-        wikidata_entities = self.get_wikidata_simple_entities(referenced_ids)
+        wikidata_entities = wikidata_utils.collect_wikidata_entities(referenced_ids, self.wikidata_simple_entities_path)
 
         # filter fragment contents
         filtered_fragments = self.filter_fragments(
@@ -182,108 +178,18 @@ class TRexDatasetBuilder:
             for fragment in entity_fragments:
                 for prop_values in fragment.properties.values():
                     for value in prop_values:
-                        if self.WIKIDATA_REFERENCE_REGEX_PATTERN.match(value):
+                        if wikidata_utils.ENTITY_REFERENCE_REGEX_PATTERN.match(value):
                             referenced_ids.add(value)
 
         self._logger.info(f"Total distinct referenced IDs: {len(referenced_ids):,}")
 
         return referenced_ids
 
-    def get_wikidata_simple_entities(
-        self,
-        ids_to_include: set[str],
-        wikidata_simple_entities_path: pathlib.Path | None = None,
-        query_api: bool = False,
-        append_to_file: bool = False,
-    ) -> dict[str, dict]:
-        """
-        Load a list of simple entities from a file.
-        These are then used to de-reference entity-valued properties in the dataset, and to attach entity types.
-        """
-        wikidata_simple_entities_path = wikidata_simple_entities_path or self.wikidata_simple_entities_path
-
-        if wikidata_simple_entities_path is None:
-            raise ValueError("Path to the list of simple entities is not provided.")
-
-        self._logger.info(f"Loading Wikidata simple entities from {wikidata_simple_entities_path}")
-
-        required_ids = set(ids_to_include)
-        entities = {}
-        with open(wikidata_simple_entities_path, encoding="utf-8") as f:
-            for line in f:
-                entity = json.loads(line)
-
-                if entity["id"] not in required_ids:
-                    continue
-
-                entities[entity["id"]] = entity
-                required_ids.remove(entity["id"])
-
-                # if len(entities) > 1000:
-                #     break
-
-        if required_ids:
-            if query_api:
-                self._logger.info(f"Querying {len(required_ids):,} entities via the Wikidata API")
-
-                q_entities = wikidata_utils.query_entities_via_api(required_ids)
-
-                if q_entities is None:
-                    self._logger.error("Failed to query entities via the Wikidata API.")
-                    return entities
-
-                q_entities = {
-                    k: wikidata_utils.convert_to_simple_entity(e, properties=[], include_descriptions=False)
-                    for k, e in q_entities.items()
-                    if e is not None
-                }
-
-                if append_to_file:
-                    with open(wikidata_simple_entities_path, mode="a", encoding="utf-8") as f:
-                        for entity in q_entities.values():
-                            f.write(json.dumps(entity, ensure_ascii=False) + "\n")
-                    self._logger.info(f"Appended {len(q_entities):,} entities to {wikidata_simple_entities_path}")
-
-                entities.update(q_entities)
-            else:
-                self._logger.warning(f"Failed to find {len(required_ids):,} entities in the list of simple entities")
-
-        self._logger.info(f"Found {len(entities):,} Wikidata entities.")
-
-        return entities
-
-    def load_type_hierarchy(
-        self, type_hierarchy_path: pathlib.Path | None = None
-    ) -> tuple[dict[str, dict], dict[str, dict]]:
-        """Load the hierarchy of Wikidata types."""
-        self._logger.info("Loading the hierarchy of Wikidata types.")
-        input_path = type_hierarchy_path or self.wikidata_type_hierarchy_path
-
-        if input_path is None:
-            raise ValueError("Path to the hierarchy of Wikidata types is not provided.")
-
-        graph = {}
-        type_id_to_node = {}
-
-        with open(input_path, encoding="utf-8") as f:
-            for line in f:
-                node = json.loads(line.strip())
-                graph[node["id"]] = node
-                for node_id in node["merged_ids"]:
-                    type_id_to_node[node_id] = node
-
-                for node_id in node["redirect_from_ids"]:
-                    type_id_to_node[node_id] = node
-
-        self._logger.info(f"Type hierarchy contains {len(graph):,d} nodes")
-
-        return graph, type_id_to_node
-
     def filter_fragments(
         self,
         entity_fragments: Iterable[Entity],
         *,
-        wikidata_entities: dict[str, dict] | None = None,
+        wikidata_entities: dict[str, wikidata_utils.WikidataEntity] | None = None,
         wikidata_properties: dict[str, dict] | None = None,
         filter_to_wikidata_names: bool = True,
         min_name_count: int | None = None,
@@ -304,7 +210,7 @@ class TRexDatasetBuilder:
             # filter out names that are not in Wikidata
             if filter_to_wikidata_names and wikidata_entities:
                 wikidata_entity = wikidata_entities[fragment.entity_id]
-                wikidata_names = {wikidata_entity["name"], *wikidata_entity["aliases"]}
+                wikidata_names = {wikidata_entity.name, *wikidata_entity.aliases}
                 names = (name for name in names if name in wikidata_names)
 
             fragment.properties["names"] = list(names)
@@ -338,7 +244,7 @@ class TRexDatasetBuilder:
                 if not self.SUBSTITUTE_ACTUAL_NAME_IF_MISSING or not wikidata_entities:
                     continue
 
-                fragment.properties["names"] = [wikidata_entities[fragment.entity_id]["name"]]
+                fragment.properties["names"] = [wikidata_entities[fragment.entity_id].name]
 
             if min_name_count and len(fragment.properties["names"]) < min_name_count:
                 continue
@@ -347,7 +253,7 @@ class TRexDatasetBuilder:
                 continue
 
             if type_ids and wikidata_entities:
-                entity_types = wikidata_entities[fragment.entity_id]["types"]
+                entity_types = wikidata_entities[fragment.entity_id].type
                 if not any(t in type_ids for t in entity_types):
                     continue
 
@@ -394,11 +300,12 @@ class TRexDatasetBuilder:
                     line = fragment.to_json()
                     f.write(line + "\n")
 
+    # TODO(pmyshkov): use resolver instead
     def substitute_values(
         self,
         fragment: Entity,
         *,
-        wikidata_entities: dict[str, dict],
+        wikidata_entities: dict[str, wikidata_utils.WikidataEntity],
         wikidata_properties: dict[str, dict],
         type_id_to_node: dict[str, dict],
     ) -> None:
@@ -423,13 +330,13 @@ class TRexDatasetBuilder:
                 if prop != wikidata_utils.TypeProperties.INSTANCE_OF.value:
                     entity = wikidata_entities.get(ref_value)
                     if entity is not None:
-                        value = entity["name"]
+                        value = entity.name
                 else:
                     entity_type = type_id_to_node.get(ref_value)
                     if entity_type is not None:
                         value = entity_type.get("name")
 
-                if value is None and not self.WIKIDATA_REFERENCE_REGEX_PATTERN.match(ref_value):
+                if value is None and not wikidata_utils.ENTITY_REFERENCE_REGEX_PATTERN.match(ref_value):
                     value = ref_value
 
                 if value is not None:
@@ -441,44 +348,7 @@ class TRexDatasetBuilder:
                 mapped_properties[prop_name] = values
 
         fragment.properties = mapped_properties
-
-        entity_types = wikidata_entities.get(fragment.entity_id, {}).get("types", [])
+        entity_types = wikidata_entities[fragment.entity_id].type if fragment.entity_id in wikidata_entities else []
 
         # entity_type_values = list({type_id_to_node[t]["name"] for t in entity_types if t in type_id_to_node})
         fragment.metadata["entity_types"] = entity_types
-
-    # TODO(pmyshkov): Move this method to a separate dataset access class
-    @classmethod
-    def collect_all_subtypes(cls, graph: dict[str, dict], type_id: str) -> set[str]:
-        """Collect all subtypes of the given type."""
-        type_id_to_node = {}
-        for node in graph.values():
-            for node_id in node["merged_ids"]:
-                type_id_to_node[node_id] = node
-
-            for node_id in node["redirect_from_ids"]:
-                type_id_to_node[node_id] = node
-
-        type_id = type_id_to_node[type_id]["id"]
-
-        subtypes = set()
-        stack = [type_id]
-        while stack:
-            current_type_id = stack.pop()
-
-            if current_type_id not in graph:
-                logging.warning(f"Type {current_type_id} not found in the graph")
-                continue
-
-            for merged_id in graph[current_type_id]["merged_ids"]:
-                subtypes.add(merged_id)
-
-            for redirect_id in graph[current_type_id]["redirect_from_ids"]:
-                subtypes.add(redirect_id)
-
-            logging.info(f"Added {current_type_id} ({graph[current_type_id]['name']}) to the subtypes")
-
-            for child_id in graph[current_type_id]["children"]:
-                stack.append(child_id)  # noqa: PERF402
-
-        return subtypes
