@@ -31,7 +31,7 @@ from kebab.utils.dataset.wikidata.wikidata_simple_extractor import WikidataSimpl
     / "Datasets"
     / "Wikidata"
     / "Dump"
-    / "2025-01-29"
+    / "2025-01-30"
     / "latest-all.json",
     help="The path to the standard Wikidata JSON dump file.",
 )

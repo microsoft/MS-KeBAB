@@ -184,7 +184,6 @@ class WikidataDatasetBuilder:
             wikidata_json_dump_path=input_path,
             properties=property_ids,
             input_entity_predicate=lambda x: x.get("type") == "item",
-            include_descriptions=False,
             output_entity_predicate=lambda x: (x.type is not None and any(t in type_ids for t in x.type)),
         )
 

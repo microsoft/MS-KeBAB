@@ -247,11 +247,18 @@ class Entity:
         if self.properties is None:
             self.properties = defaultdict(list)
 
+        # ensure properties is a defaultdict (won't be if e.g. loaded from JSON)
+        if not isinstance(self.properties, defaultdict):
+            self.properties = defaultdict(list, self.properties)
+
         if self.source_ids is None:
             self.source_ids = []
 
         if self.evidence_map is None:
             self.evidence_map = defaultdict(list)
+
+        if not isinstance(self.evidence_map, defaultdict):
+            self.evidence_map = defaultdict(list, self.evidence_map)
 
         if self.metadata is None:
             self.metadata = {}

@@ -143,6 +143,7 @@ class WikidataEntity(Entity):
         allowed_properties: Iterable[str] | None = None,
         prohibited_qualifiers: Iterable[str] | None = None,
         include_descriptions: bool = True,
+        include_wikipedia_title: bool = True,
     ) -> Self:
         """Convert a Wikidata entity to a simpler representation."""
         allowed_properties = set(allowed_properties) if allowed_properties is not None else None
@@ -179,10 +180,16 @@ class WikidataEntity(Entity):
                     continue
 
                 if mainsnak.get("snaktype") == "value":
-                    try:
-                        prop_values.append(mainsnak.get("datavalue", {}).get("value", {}).get("id"))
-                    except AttributeError:
-                        prop_values.append(mainsnak.get("datavalue", {}).get("value"))
+                    if mainsnak.get("datatype", None) == "quantity":
+                        prop_values.append(mainsnak.get("datavalue", {}).get("value", {}).get("amount", None))
+                    else:
+                        try:
+                            prop_values.append(mainsnak.get("datavalue", {}).get("value", {}).get("id"))
+                        except AttributeError:
+                            prop_values.append(mainsnak.get("datavalue", {}).get("value"))
+
+                if mainsnak.get("snaktype") == "quantity":
+                    prop_values.append(mainsnak.get("datavalue", {}).get("value", {}).get("amount", None))
 
             ent_properties[prop] = prop_values
 
@@ -194,12 +201,15 @@ class WikidataEntity(Entity):
         if include_descriptions:
             wikidata_entity.description = description
 
+        if include_wikipedia_title and "sitelinks" in entity and "enwiki" in entity["sitelinks"]:
+            wikidata_entity.wikipedia_title = entity["sitelinks"]["enwiki"]["title"]
+
         wikidata_entity.properties["name"] = [label, *aliases]
 
         return wikidata_entity
 
 
-def _query_entities_via_api(wikidata_ids: Iterable[str], english_only: bool = True) -> dict | None:
+def _query_entities_via_api(wikidata_ids: Iterable[str], english_only: bool = True) -> dict[str, dict] | None:
     """
     Query Wikidata API for a given list of IDs and return the dictionary of the corresponding objects.
 
@@ -250,7 +260,7 @@ def query_entities_via_api(
     wikidata_ids: Iterable[str],
     english_only: bool = True,
     batch_size: int = 50,
-) -> dict | None:
+) -> dict[str, dict] | None:
     """
     Query Wikidata API for a given list of IDs and return the dictionary of the corresponding objects.
 
@@ -321,6 +331,12 @@ def scrape_properties_via_api(
             if not prop_record["label"]:
                 continue
 
+            # collect parent properties (P1647)
+            parent_properties = entity.get("claims", {}).get("P1647", [])
+            parent_properties = [claim["mainsnak"]["datavalue"]["value"]["id"] for claim in parent_properties]
+
+            prop_record["subproperty_of"] = parent_properties
+
             properties[prop_id] = prop_record
         else:
             error_count += 1
@@ -341,7 +357,8 @@ def extract_wikidata_entities_from_dump(
     properties: Iterable[str] | None = None,
     input_entity_predicate: Callable[[dict], bool] | None = None,
     output_entity_predicate: Callable[[WikidataEntity], bool] | None = None,
-    include_descriptions: bool = True,
+    include_descriptions: bool = False,
+    include_wikipedia_title: bool = False,
 ) -> Iterable[WikidataEntity]:
     """Extract all entities that match the predicate and their requested properties from the Wikidata JSON dump."""
     logging.info(f"Reading {wikidata_json_dump_path}...")
@@ -386,6 +403,7 @@ def extract_wikidata_entities_from_dump(
                     entity,
                     allowed_properties=properties,
                     include_descriptions=include_descriptions,
+                    include_wikipedia_title=include_wikipedia_title,
                 )
 
                 # check if the input predicate applies

@@ -3,12 +3,34 @@
 
 """Shared fixtures for tests using the data directory."""
 
-import pathlib
+from pathlib import Path
 
 import pytest
+from kebab.utils.dataset.wikidata.wikidata_utils import WikidataEntity
 
 
 @pytest.fixture
-def emails_exp_1_path() -> pathlib.Path:
+def wikidata_entity() -> WikidataEntity:
+    """Get a Wikidata entity for testing."""
+    entity_dict = {
+        "entity_id": "Q31",
+        "properties": {
+            "name": ["Belgium", "BE", "be", "BEL", "Kingdom of Belgium"],
+            "P31": ["Q6256", "Q20181813", "Q185441", "Q1250464", "Q3624078", "Q43702"],
+        },
+        "metadata": {"wikipedia": "Belgium"},
+    }
+
+    return WikidataEntity.from_dict(entity_dict)
+
+
+@pytest.fixture
+def wikidata_dump_sample_10_records_input_file_path() -> Path:
+    """Return the path to the input file with a small subset of the Wikidata dump."""
+    return Path(__file__).parent / "data" / "datasets" / "wikidata" / "sample" / "wikidata_dump_10_records.json"
+
+
+@pytest.fixture
+def emails_exp_1_path() -> Path:
     """Get the path to the emails experiment 1 directory."""
-    return pathlib.Path(__file__).parent / "data" / "emails_exp_1"
+    return Path(__file__).parent / "data" / "emails_exp_1"
