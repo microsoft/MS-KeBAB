@@ -14,7 +14,7 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
     "click",
-    "numpy==1.26.4",
+    "numpy==2.2.3",
     "requests",
     "tqdm",
     "tiktoken",
@@ -29,11 +29,11 @@ dev = [
     "matplotlib",
     "pandas",
     "plotly",
-    "pyright==1.1.393",
+    "pyright==1.1.394",
     "pytest",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.9.4",
+    "ruff==0.9.6",
 ]
 
 all = ["kebab[dev]"]
