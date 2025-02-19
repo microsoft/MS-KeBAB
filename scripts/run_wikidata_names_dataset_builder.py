@@ -62,7 +62,7 @@ def main(
     logging_helpers.configure_logging()
 
     extractor = WikidataNamesDatasetBuilder(
-        wikidata_simple_entities_path=wikidata_simple_entities_path,
+        wikidata_entities_path=wikidata_simple_entities_path,
         wikidata_type_hierarchy_path=wikidata_type_hierarchy_path,
         output_dir=output_dir,
         type_ids=[target_type_id],
