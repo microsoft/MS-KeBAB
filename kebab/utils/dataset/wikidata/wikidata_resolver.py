@@ -35,6 +35,7 @@ class WikidataResolver:
         resolve_property_names: bool = True,
         resolve_property_values: bool = True,
         query_api: bool = True,
+        save_with_minimal_repr: bool = True,
         output_dir: pathlib.Path,
     ):
         """Initialize the Wikidata resolver."""
@@ -50,6 +51,7 @@ class WikidataResolver:
         self.attach_types: bool = attach_types
         self.resolve_attached_types: bool = resolve_attached_types
         self.query_api: bool = query_api
+        self.save_with_minimal_repr: bool = save_with_minimal_repr
 
         self.output_dir: pathlib.Path = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -94,18 +96,12 @@ class WikidataResolver:
             referenced_ids, wikidata_entities_path=self.wikidata_simple_entities_path, query_api=self.query_api
         )
 
-        # with open(pathlib.Path("D:/wk.jsonl"), "w", encoding="utf-8") as f:
-        #     for entity in wikidata_entities.values():
-        #         f.write(entity.to_json() + "\n")
-
         # substitute all properties and values
         self._logger.info("Substituting values into entities")
         self.substitute_values(
-            self.entities_path,
             wikidata_entities=wikidata_entities,
             wikidata_properties=wikidata_properties,
             type_id_to_node=type_id_to_node,
-            output_path=self.entities_output_path,
         )
 
         self._logger.info(f"Resolved entities saved to: {self.entities_output_path}")
@@ -130,31 +126,30 @@ class WikidataResolver:
 
     def substitute_values(
         self,
-        entities_path: pathlib.Path,
         wikidata_entities: dict[str, wikidata_utils.WikidataEntity],
         wikidata_properties: dict[str, dict],
         type_id_to_node: dict[str, dict],
-        output_path: pathlib.Path,
+        entities_path: pathlib.Path | None = None,
+        output_path: pathlib.Path | None = None,
+        save_with_minimal_repr: bool | None = None,
     ) -> None:
         """Substitute the actual values into the entities."""
         entities_path = entities_path or self.entities_path
         output_path = output_path or self.entities_output_path
+        save_with_minimal_repr = save_with_minimal_repr or self.save_with_minimal_repr
 
-        with open(entities_path, encoding="utf-8") as f:
-            entities = [Entity.from_json(line) for line in f]
+        with open(output_path, mode="w", encoding="utf-8") as f_out, open(entities_path, encoding="utf-8") as f_in:
+            for line in f_in:
+                entity = Entity.from_json(line)
 
-        for entity in entities:
-            self.substitute_values_into_entity(
-                entity,
-                wikidata_entities=wikidata_entities,
-                wikidata_properties=wikidata_properties,
-                type_id_to_node=type_id_to_node,
-            )
+                self.substitute_values_into_entity(
+                    entity,
+                    wikidata_entities=wikidata_entities,
+                    wikidata_properties=wikidata_properties,
+                    type_id_to_node=type_id_to_node,
+                )
 
-        with open(output_path, mode="w", encoding="utf-8") as f:
-            for entity in entities:
-                line = entity.to_json()
-                f.write(line + "\n")
+                f_out.write(entity.to_json(minimal_repr=save_with_minimal_repr) + "\n")
 
     def substitute_values_into_entity(
         self,
