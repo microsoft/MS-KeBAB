@@ -11,15 +11,15 @@ from kebab.utils.dataset.rebel.rebel_fragment_extractor import RebelFragmentExtr
 
 
 @pytest.fixture
-def t_rex_input_file_path() -> Path:
+def t_rex_single_doc_file_path() -> Path:
     """Return the path to a single T-REx JSON document record."""
     return Path(__file__).parent / "data" / "datasets" / "trex" / "t_rex_single_doc.json"
 
 
-def test_extract_entities(t_rex_input_file_path: Path) -> None:
+def test_extract_entities(t_rex_single_doc_file_path: Path) -> None:
     """Test the extraction of entities and properties from a single T-REx JSON document record."""
     # load a single T-REx document
-    with open(t_rex_input_file_path, encoding="utf-8") as f:
+    with open(t_rex_single_doc_file_path, encoding="utf-8") as f:
         doc_record = json.load(f)[0]
 
     entities = RebelFragmentExtractor.extract_entity_fragments_from_document(doc_record)
@@ -39,10 +39,10 @@ def test_extract_entities(t_rex_input_file_path: Path) -> None:
         assert len(entities[entity].properties) > 0
 
 
-def test_extract_sub_documents(t_rex_input_file_path: Path) -> None:
+def test_extract_sub_documents(t_rex_single_doc_file_path: Path) -> None:
     """Test the extraction of sub-documents from a single REBEL JSON document record."""
     # load a single T-REx document
-    with open(t_rex_input_file_path, encoding="utf-8") as f:
+    with open(t_rex_single_doc_file_path, encoding="utf-8") as f:
         doc_record = json.load(f)[0]
 
     sub_documents = RebelFragmentExtractor.extract_sub_documents_from_document(doc_record)

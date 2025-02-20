@@ -353,11 +353,11 @@ class WikidataTypeHierarchyExtractor:
 
         # verify consistency
         keys = {e.entity_id for e in type_entities}
-        assert len(keys) == len(type_entities), "Duplicate entity IDs found."
+        assert len(keys) == len(type_entities), "Duplicate entity IDs found"
 
         for entity in type_entities:
             parents = entity.properties[TypeProperties.SUBCLASS_OF.value]
-            assert all(p in keys for p in parents), f"Invalid parent entity ID found in entity {entity.entity_id}."
+            assert all(p in keys for p in parents), f"Invalid parent entity ID found in entity {entity.entity_id}"
 
         type_entities = {e.entity_id: e for e in type_entities}
 
@@ -697,7 +697,7 @@ class WikidataTypeHierarchyExtractor:
                 cls.assert_no_self_references(graph)
                 merged_cycles_count += 1
 
-            logging.info(f"Found {len(cycles):,} cycles, merged {merged_cycles_count:,} of them.")
+            logging.info(f"Found {len(cycles):,} cycles, merged {merged_cycles_count:,} of them")
 
         logging.info(f"Merged a total {len(merged_cycles):,} cycles.")
 

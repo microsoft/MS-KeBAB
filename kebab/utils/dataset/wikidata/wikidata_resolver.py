@@ -31,7 +31,7 @@ class WikidataResolver:
         wikidata_properties_path: pathlib.Path,
         wikidata_type_hierarchy_path: pathlib.Path,
         attach_types: bool = True,
-        resolves_types: bool = False,
+        resolve_attached_types: bool = False,
         resolve_property_names: bool = True,
         resolve_property_values: bool = True,
         query_api: bool = True,
@@ -48,7 +48,7 @@ class WikidataResolver:
         self.resolve_property_names: bool = resolve_property_names
         self.resolve_property_values: bool = resolve_property_values
         self.attach_types: bool = attach_types
-        self.resolves_types: bool = resolves_types
+        self.resolve_attached_types: bool = resolve_attached_types
         self.query_api: bool = query_api
 
         self.output_dir: pathlib.Path = output_dir
@@ -94,6 +94,10 @@ class WikidataResolver:
             referenced_ids, wikidata_entities_path=self.wikidata_simple_entities_path, query_api=self.query_api
         )
 
+        # with open(pathlib.Path("D:/wk.jsonl"), "w", encoding="utf-8") as f:
+        #     for entity in wikidata_entities.values():
+        #         f.write(entity.to_json() + "\n")
+
         # substitute all properties and values
         self._logger.info("Substituting values into entities")
         self.substitute_values(
@@ -103,6 +107,8 @@ class WikidataResolver:
             type_id_to_node=type_id_to_node,
             output_path=self.entities_output_path,
         )
+
+        self._logger.info(f"Resolved entities saved to: {self.entities_output_path}")
 
     def collect_referenced_ids(self, entities_path: pathlib.Path | None = None) -> set[str]:
         """Collect all distinct entity ids and reference property values."""
@@ -163,15 +169,15 @@ class WikidataResolver:
         unknown_properties = defaultdict(int)
 
         if self.resolve_property_names or self.resolve_property_values:
-            mapped_properties = {"names": entity.properties["names"]}
+            mapped_properties = {"name": entity.properties["name"]}
             for prop, prop_values in entity.properties.items():
-                if prop == "names":
+                if prop == "name":
                     continue
 
                 prop_name = wikidata_properties.get(prop, {}).get("label")
 
                 if prop_name is None:
-                    self._logger.warning(f"Property {prop} not found in the properties map.")
+                    self._logger.warning(f"Property {prop} not found in the properties map")
                     continue
 
                 values = []
@@ -211,10 +217,10 @@ class WikidataResolver:
         if self.attach_types:
             entity_types = wikidata_entities[entity.entity_id].type if entity.entity_id in wikidata_entities else []
 
-            if self.resolves_types:
+            if self.resolve_attached_types:
                 entity_types = [type_id_to_node[t]["name"] if t in type_id_to_node else t for t in entity_types]
 
-            entity.metadata["types"] = entity_types
+            entity.metadata["type"] = entity_types
 
         for prop, count in sorted(unknown_properties.items(), key=lambda x: x[1], reverse=True):
             self._logger.warning(f"Unknown values for property {prop}: {count:,}")

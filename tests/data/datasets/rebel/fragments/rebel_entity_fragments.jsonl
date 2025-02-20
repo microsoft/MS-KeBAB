@@ -1,0 +1,10 @@
+{"entity_id": "Q33298", "properties": {"name": ["Filipino"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "0"}}
+{"entity_id": "Q918448", "properties": {"name": ["denomination"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "1"}}
+{"entity_id": "Q17193", "properties": {"name": ["Philippine currency"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "2"}}
+{"entity_id": "Q1209571", "properties": {"name": ["Philippine president"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "3"}}
+{"entity_id": "Q223419", "properties": {"name": ["Manuel A. Roxas"], "P39": ["Q1209571"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "4"}}
+{"entity_id": "Q1484", "properties": {"name": ["Mayon Volcano"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "5"}}
+{"entity_id": "Q80378", "properties": {"name": ["whale shark"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "6"}}
+{"entity_id": "Q7185360", "properties": {"name": ["Philippine one hundred-peso note"], "P3934": ["+100"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "7"}}
+{"entity_id": "Q1418426", "properties": {"name": ["Senator"]}, "metadata": {"doc_id": "30111996", "source_text_hash": "6bd1b69974f27094d1d494106e54a7f8", "fragment_id": "11"}}
+{"entity_id": "Q222805", "properties": {"name": ["Benigno Aquino, Jr."]}, "metadata": {"doc_id": "30111996", "source_text_hash": "6bd1b69974f27094d1d494106e54a7f8", "fragment_id": "12"}}

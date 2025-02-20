@@ -18,18 +18,6 @@ def wikidata_dump_sample_prop_records_file_path() -> Path:
 
 
 @pytest.fixture
-def type_hierarchy_path() -> Path:
-    """Return the path to a JSON file with the type hierarchy of Wikidata."""
-    return Path(__file__).parent / "data" / "datasets" / "wikidata" / "wikidata_type_hierarchy.jsonl"
-
-
-@pytest.fixture
-def properties_path() -> Path:
-    """Return the path to a JSON file with the properties of Wikidata."""
-    return Path(__file__).parent / "data" / "datasets" / "wikidata" / "wikidata_properties.json"
-
-
-@pytest.fixture
 def temp_output_file(tmp_path: Path) -> Path:
     """Return the path to a temporary output file."""
     return tmp_path / "temp_output.json"
@@ -70,16 +58,16 @@ def test_query_entity_via_api_and_simplify(
     assert queried_entity == entities[0]
 
 
-def test_load_type_hierarchy(type_hierarchy_path: Path) -> None:
+def test_load_type_hierarchy(wikidata_full_type_hierarchy_file_path: Path) -> None:
     """Test the loading of the type hierarchy of Wikidata."""
-    graph, type_id_to_node_map = wikidata_utils.load_type_hierarchy(type_hierarchy_path)
+    graph, type_id_to_node_map = wikidata_utils.load_type_hierarchy(wikidata_full_type_hierarchy_file_path)
     assert len(graph) == 106019
     assert len(type_id_to_node_map) == 106999
 
 
-def test_load_properties(properties_path: Path) -> None:
+def test_load_properties(wikidata_full_properties_file_path: Path) -> None:
     """Test the loading of the properties of Wikidata."""
-    properties = wikidata_utils.load_properties(properties_path)
+    properties = wikidata_utils.load_properties(wikidata_full_properties_file_path)
     assert len(properties) == 12272
     prop = properties["P6"]
     assert prop["label"] == "head of government"

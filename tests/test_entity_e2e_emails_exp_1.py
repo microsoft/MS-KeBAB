@@ -5,18 +5,18 @@
 
 # ruff: noqa: RUF015, PLR2004
 
-import pathlib
+from pathlib import Path
 
 from kebab.contracts.document import Document, DocumentSchema, DocumentUtilities
 from kebab.contracts.entity import Entity, EntityUtilities, PropertySchema
 
 
-def test_load_document_collection(emails_exp_1_path: pathlib.Path):
+def test_load_document_collection(emails_exp_1_dir_path: Path):
     """Test loading a collection of documents from the emails experiment 1."""
     documents = list(
         DocumentUtilities.load_collection(
-            path_to_schema_dir=emails_exp_1_path / "document_schemas",
-            path_to_documents_dir=emails_exp_1_path / "documents",
+            path_to_schema_dir=emails_exp_1_dir_path / "document_schemas",
+            path_to_documents_dir=emails_exp_1_dir_path / "documents",
         )
     )
 
@@ -34,9 +34,9 @@ def test_load_document_collection(emails_exp_1_path: pathlib.Path):
     assert document.data["body"] == "Hello, John, Happy Birthday!"
 
 
-def test_schema_to_from_dict(emails_exp_1_path: pathlib.Path):
+def test_schema_to_from_dict(emails_exp_1_dir_path: Path):
     """Test converting a schema to and from a dictionary."""
-    schema = next(iter(DocumentUtilities.load_schemas(emails_exp_1_path / "document_schemas").values()))
+    schema = next(iter(DocumentUtilities.load_schemas(emails_exp_1_dir_path / "document_schemas").values()))
 
     schema_dict = schema.to_dict()
     new_schema = DocumentSchema.from_dict(schema_dict)
@@ -44,12 +44,12 @@ def test_schema_to_from_dict(emails_exp_1_path: pathlib.Path):
     assert schema == new_schema
 
 
-def test_document_to_from_json(emails_exp_1_path: pathlib.Path):
+def test_document_to_from_json(emails_exp_1_dir_path: Path):
     """Test converting a document to and from a dictionary."""
     documents = list(
         DocumentUtilities.load_collection(
-            path_to_schema_dir=emails_exp_1_path / "document_schemas",
-            path_to_documents_dir=emails_exp_1_path / "documents",
+            path_to_schema_dir=emails_exp_1_dir_path / "document_schemas",
+            path_to_documents_dir=emails_exp_1_dir_path / "documents",
         )
     )
 
@@ -61,9 +61,9 @@ def test_document_to_from_json(emails_exp_1_path: pathlib.Path):
     assert document == new_document
 
 
-def test_load_property_schema(emails_exp_1_path: pathlib.Path):
+def test_load_property_schema(emails_exp_1_dir_path: Path):
     """Test loading a property schema from the emails experiment 1."""
-    schema = EntityUtilities.load_schema(emails_exp_1_path / "properties" / "property_schema.json")
+    schema = EntityUtilities.load_schema(emails_exp_1_dir_path / "properties" / "property_schema.json")
     assert schema.name == "email_exp_schema"
     assert len(schema.data_types) == 1
     assert len(schema.properties) == 3
@@ -80,9 +80,9 @@ def test_load_property_schema(emails_exp_1_path: pathlib.Path):
     assert schema.properties["date_of_birth"].is_collection is False
 
 
-def test_property_schema_to_from_json(emails_exp_1_path: pathlib.Path):
+def test_property_schema_to_from_json(emails_exp_1_dir_path: Path):
     """Test converting a property schema to and from a dictionary."""
-    schema = EntityUtilities.load_schema(emails_exp_1_path / "properties" / "property_schema.json")
+    schema = EntityUtilities.load_schema(emails_exp_1_dir_path / "properties" / "property_schema.json")
 
     schema_dict = schema.to_dict()
     new_schema = PropertySchema.from_dict(schema_dict)
@@ -102,10 +102,10 @@ def test_property_schema_to_from_json(emails_exp_1_path: pathlib.Path):
     assert schema == new_schema
 
 
-def test_load_entities(emails_exp_1_path: pathlib.Path):
+def test_load_entities(emails_exp_1_dir_path: Path):
     """Test loading a collection of entities from the emails experiment 1."""
-    schema = EntityUtilities.load_schema(emails_exp_1_path / "properties" / "property_schema.json")
-    entities = list(EntityUtilities.load_entities(emails_exp_1_path / "extracted_entities"))
+    schema = EntityUtilities.load_schema(emails_exp_1_dir_path / "properties" / "property_schema.json")
+    entities = list(EntityUtilities.load_entities(emails_exp_1_dir_path / "extracted_entities"))
     assert len(entities) == 1
 
     entity = entities[0]
@@ -117,9 +117,9 @@ def test_load_entities(emails_exp_1_path: pathlib.Path):
     assert entity.properties[emails_property_id] == ["john@email.com"]
 
 
-def test_entity_without_metadata(emails_exp_1_path: pathlib.Path):
+def test_entity_without_metadata(emails_exp_1_dir_path: Path):
     """Test metadata clearing."""
-    entities = list(EntityUtilities.load_entities(emails_exp_1_path / "extracted_entities"))
+    entities = list(EntityUtilities.load_entities(emails_exp_1_dir_path / "extracted_entities"))
     assert len(entities) == 1
 
     entity = entities[0]
@@ -128,9 +128,9 @@ def test_entity_without_metadata(emails_exp_1_path: pathlib.Path):
     assert entity_without_metadata.metadata == {}
 
 
-def test_entity_to_from_dict(emails_exp_1_path: pathlib.Path):
+def test_entity_to_from_dict(emails_exp_1_dir_path: Path):
     """Test converting an entity to and from a dictionary."""
-    entities = list(EntityUtilities.load_entities(emails_exp_1_path / "extracted_entities"))
+    entities = list(EntityUtilities.load_entities(emails_exp_1_dir_path / "extracted_entities"))
     entity = entities[0]
 
     # test that _eq__ method works (that attributes are created)

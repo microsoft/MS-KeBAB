@@ -340,7 +340,7 @@ class RebelFragmentExtractor:
         err = None
 
         json_files = list(self.rebel_dir.glob("*.json"))
-        self._logger.info(f"Found {len(json_files)} JSON files in the directory.")
+        self._logger.info(f"Found {len(json_files)} JSON files in the directory")
 
         for count, file in enumerate(json_files, start=1):
             with open(file, encoding="utf-8") as f:
@@ -350,10 +350,10 @@ class RebelFragmentExtractor:
                     error_count += 1
                     err = e
 
-            self._logger.info(f"Processed {count}/{len(json_files)} ({100 * count / len(json_files):.2f}%) files.")
+            self._logger.info(f"Processed {count}/{len(json_files)} ({100 * count / len(json_files):.2f}%) files")
 
         jsonl_files = list(self.rebel_dir.glob("*.jsonl"))
-        self._logger.info(f"Found {len(jsonl_files)} JSONL files in the directory.")
+        self._logger.info(f"Found {len(jsonl_files)} JSONL files in the directory")
 
         for count, file in enumerate(jsonl_files, start=1):
             with open(file, encoding="utf-8") as f:
@@ -364,7 +364,7 @@ class RebelFragmentExtractor:
                         error_count += 1
                         err = e
 
-            self._logger.info(f"Processed {count}/{len(jsonl_files)} ({100 * count / len(jsonl_files):.2f}%) files.")
+            self._logger.info(f"Processed {count}/{len(jsonl_files)} ({100 * count / len(jsonl_files):.2f}%) files")
 
         if error_count:
             self._logger.error(f"Errors while decoding JSON: {error_count}, last error: {err}")

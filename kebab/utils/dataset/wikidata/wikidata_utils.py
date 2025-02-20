@@ -62,6 +62,11 @@ class WikidataEntity(Entity):
         )
 
     @property
+    def names(self) -> list[str]:
+        """Return all names of the entity."""
+        return self.properties.get("name", [])
+
+    @property
     def description(self) -> str:
         """Return the description of the entity."""
         return self.metadata.get("description", "")
@@ -134,7 +139,7 @@ class WikidataEntity(Entity):
         if "wikipedia" in data:
             data["metadata"]["wikipedia_title"] = data.pop("wikipedia")
 
-        return WikidataEntity(**data)
+        return cls(**data)
 
     @classmethod
     def from_wikidata_record(
@@ -207,6 +212,31 @@ class WikidataEntity(Entity):
         wikidata_entity.properties["name"] = [label, *aliases]
 
         return wikidata_entity
+
+
+@dataclass
+class ResolvedWikidataEntity(WikidataEntity):
+    """A Wikidata entity with resolved properties."""
+
+    @property
+    def type(self) -> list[str]:
+        """Return the types of the entity."""
+        return self.properties["instance of"]
+
+    @type.setter
+    def type(self, value: list[str]) -> None:
+        """Set the types of the entity."""
+        self.properties["instance of"] = value
+
+    @property
+    def wikidata_type(self) -> list[str] | None:
+        """Return the types of the entity obtained from Wikidata."""
+        return self.metadata.get("type", None)
+
+    @wikidata_type.setter
+    def wikidata_type(self, value: list[str]) -> None:
+        """Set the types of the entity."""
+        self.metadata["type"] = value
 
 
 def _query_entities_via_api(wikidata_ids: Iterable[str], english_only: bool = True) -> dict[str, dict] | None:
@@ -431,7 +461,7 @@ def load_properties(path: pathlib.Path) -> dict[str, dict]:
 
 def load_type_hierarchy(type_hierarchy_path: pathlib.Path) -> tuple[dict[str, dict], dict[str, dict]]:
     """Load the hierarchy of Wikidata types."""
-    logging.info("Loading the hierarchy of Wikidata types.")
+    logging.info("Loading the hierarchy of Wikidata types")
     graph = {}
     type_id_to_node_map = {}
 
