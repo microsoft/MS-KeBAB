@@ -22,8 +22,8 @@ from kebab.utils.dataset.rebel.rebel_fragment_extractor import RebelFragmentExtr
     / "REBEL"
     / "Original Dataset"
     # / "single",
-    / "sample",
-    # / "full",
+    # / "sample",
+    / "full",
     help="Path to the REBEL data directory (will be *json/*.jsonl-globbed against).",
 )
 @click.option(
