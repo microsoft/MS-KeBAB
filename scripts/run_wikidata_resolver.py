@@ -21,7 +21,7 @@ from kebab.utils.dataset.wikidata.wikidata_resolver import WikidataResolver
     / "Datasets"
     / "REBEL"
     / "Fragments"
-    / "sample"
+    # / "sample"
     / "rebel_entity_fragments.jsonl",
     help="Path to the input entities file.",
 )
@@ -35,7 +35,7 @@ from kebab.utils.dataset.wikidata.wikidata_resolver import WikidataResolver
     / "Wikidata"
     / "Simple Entities"
     / "2025-01-30"
-    / "sample"
+    # / "sample"
     / "wikidata_simple_entities.jsonl",
     help="The path to the extracted Wikidata simple entities.",
 )
