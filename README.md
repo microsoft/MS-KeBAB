@@ -18,7 +18,7 @@ Our goal is to enable benchmarking of:
 - Different approaches for KB construction,
 - Different approaches for individual steps in KB construction (e.g., for entity extraction and clustering)
 
-Our current focus is on building a shared internal benchmarck to encourage and facilitate cross-group collaborations across Microsoft.
+Our current focus is on building a shared internal benchmark to encourage and facilitate cross-group collaborations across Microsoft.
 Eventually, we would like to publicly release the benchmark and build research communities around these shared tasks.
 
 
@@ -31,10 +31,11 @@ Eventually, we would like to publicly release the benchmark and build research c
 
 ## Tasks
 
-The benchmark will support several related **tasks** depicted by red rectangules in the figure below.
+The benchmark will support several related **tasks** depicted by red rectangles in the figure below.
 For each task, the benchmark may provide multiple benchmarking datasets and corresponding evaluation metrics, each of which we refer to as a **task instance**.
-All task instances for the same task will support the same interfaces and with corresponding that respect the same interfaces for interoperability.
 For example, the KB construction task may have one instance that benchmarks based on a corpus of emails and another based on a corpus of scholarly articles.
+We define consistent interfaces for each task that all corresponding task instances will comply with.
+This is to ensure that any given model for a task can be easily run on all corresponding task instances without requiring instance-specific code changes.
 We describe the supported tasks and task instances below.
 
 ![](mskebab-tasks.png)
