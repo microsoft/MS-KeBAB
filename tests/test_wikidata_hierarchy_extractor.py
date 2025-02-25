@@ -13,13 +13,13 @@ from pytest_mock import MockerFixture
 
 
 @pytest.fixture
-def wikidata_dump_sample_1_record_input_file_path() -> Path:
+def wikidata_dump_sample_1_record_file_path() -> Path:
     """Return the path to the input file with 1 sample record from the Wikidata dump."""
     return Path(__file__).parent / "data" / "datasets" / "wikidata" / "sample" / "wikidata_dump_1_record.json"
 
 
 @pytest.fixture
-def wikidata_type_hierarchy_queried_entities_input_file_path() -> Path:
+def wikidata_type_hierarchy_queried_entities_file_path() -> Path:
     """Return the path to the input file with the queried entities for type hierarchy of Wikidata."""
     return (
         Path(__file__).parent
@@ -32,20 +32,20 @@ def wikidata_type_hierarchy_queried_entities_input_file_path() -> Path:
 
 
 def test_wikidata_type_hierarchy_extractor(
-    wikidata_dump_sample_1_record_input_file_path: Path,
-    wikidata_type_hierarchy_queried_entities_input_file_path: Path,
+    wikidata_dump_sample_1_record_file_path: Path,
+    wikidata_type_hierarchy_queried_entities_file_path: Path,
     mocker: MockerFixture,
     tmp_path: Path,
 ) -> None:
     """Test the extraction of simple entities from Wikidata."""
-    with open(wikidata_type_hierarchy_queried_entities_input_file_path, encoding="utf-8") as f:
+    with open(wikidata_type_hierarchy_queried_entities_file_path, encoding="utf-8") as f:
         queried_entities = json.loads(f.read())
 
     query_func = wikidata_utils._query_entities_via_api  # noqa: SLF001
     mocker.patch(f"{query_func.__module__}.{query_func.__qualname__}", return_value=queried_entities)
 
     extractor = WikidataTypeHierarchyExtractor(
-        wikidata_json_dump_path=wikidata_dump_sample_1_record_input_file_path,
+        wikidata_json_dump_path=wikidata_dump_sample_1_record_file_path,
         output_dir=tmp_path,
     )
 
