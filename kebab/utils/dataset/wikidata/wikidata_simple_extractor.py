@@ -3,7 +3,7 @@
 
 # ruff: noqa: S101
 """
-Extract simple entities (ID + names + types) from Wikidata, scrape all properties via API, etc.
+Extract simple entities (ID + names + types) from Wikidata, fetch all properties via API, etc.
 
 Inputs:
 - Wikidata dump in JSON format (e.g. from https://dumps.wikimedia.org/wikidatawiki/entities/latest-all.json.gz).
@@ -25,7 +25,7 @@ from kebab.utils.dataset.wikidata import wikidata_utils
 
 
 class WikidataSimpleExtractor:
-    """Scrape simplified entities (WikidataEntity) from Wikidata."""
+    """Get simplified entities (WikidataEntity) and properties from Wikidata."""
 
     WIKIDATA_SIMPLE_ENTITIES_FILENAME = "wikidata_simple_entities.jsonl"
     WIKIDATA_PROPERTIES_FILENAME = "wikidata_properties.json"
@@ -35,7 +35,7 @@ class WikidataSimpleExtractor:
         *,
         wikidata_json_dump_path: pathlib.Path | None = None,
         run_entity_extraction: bool,
-        run_property_scrape: bool,
+        run_property_fetch: bool,
         output_dir: pathlib.Path | None = None,
     ):
         """Initialize the extractor."""
@@ -43,7 +43,7 @@ class WikidataSimpleExtractor:
 
         self.wikidata_dump_path: pathlib.Path | None = wikidata_json_dump_path
         self.run_entity_extraction: bool = run_entity_extraction
-        self.run_property_scrape: bool = run_property_scrape
+        self.run_property_fetch: bool = run_property_fetch
 
         self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
 
@@ -55,8 +55,8 @@ class WikidataSimpleExtractor:
         if self.run_entity_extraction:
             self.extract_simple_entities()
 
-        if self.run_property_scrape:
-            self.scrape_properties()
+        if self.run_property_fetch:
+            self.fetch_properties()
 
     def extract_simple_entities(self, wikidata_dump_path: pathlib.Path | None = None) -> pathlib.Path:
         """Extract simple entities (ID + names + types) from Wikidata."""
@@ -85,13 +85,13 @@ class WikidataSimpleExtractor:
 
         return output_path
 
-    def scrape_properties(self) -> pathlib.Path:
-        """Scrape all properties from Wikidata."""
+    def fetch_properties(self) -> pathlib.Path:
+        """Fetch all properties from Wikidata."""
         output_path = self.output_dir / self.WIKIDATA_PROPERTIES_FILENAME
 
-        self._logger.info(f"Scraping properties from Wikidata to {output_path}...")
+        self._logger.info(f"Fetching properties from Wikidata to {output_path}...")
 
-        wikidata_utils.scrape_properties_via_api(output_path=output_path)
-        self._logger.info(f"Scraped {len(json.loads(output_path.read_text()))} properties.")
+        wikidata_utils.fetch_properties_via_api(output_path=output_path)
+        self._logger.info(f"Fetched {len(json.loads(output_path.read_text()))} properties.")
 
         return output_path

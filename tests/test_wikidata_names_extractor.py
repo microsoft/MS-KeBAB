@@ -16,7 +16,7 @@ def test_wikidata_simple_extractor(wikidata_dump_sample_10_records_file_path: Pa
     extractor = WikidataSimpleExtractor(
         wikidata_json_dump_path=wikidata_dump_sample_10_records_file_path,
         run_entity_extraction=True,
-        run_property_scrape=False,
+        run_property_fetch=False,
         output_dir=tmp_path,
     )
 
