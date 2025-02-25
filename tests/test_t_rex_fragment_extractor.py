@@ -1,30 +1,28 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Tests for the T-REx fragment extractor."""
+"""Tests for the REBEL fragment extractor on T-REx data."""
 
 import json
 from pathlib import Path
 
 import pytest
-from kebab.utils.dataset.t_rex.t_rex_fragment_extractor import TRexFragmentExtractor
+from kebab.utils.dataset.rebel.rebel_fragment_extractor import RebelFragmentExtractor
 
 
 @pytest.fixture
-def t_rex_input_file_path() -> Path:
+def t_rex_single_doc_file_path() -> Path:
     """Return the path to a single T-REx JSON document record."""
     return Path(__file__).parent / "data" / "datasets" / "trex" / "t_rex_single_doc.json"
 
 
-# TODO(pmyshkov): The T-REx is to be replaced with REBEL
-@pytest.mark.xfail
-def test_extract_entities(t_rex_input_file_path: Path) -> None:
+def test_extract_entities(t_rex_single_doc_file_path: Path) -> None:
     """Test the extraction of entities and properties from a single T-REx JSON document record."""
     # load a single T-REx document
-    with open(t_rex_input_file_path, encoding="utf-8") as f:
+    with open(t_rex_single_doc_file_path, encoding="utf-8") as f:
         doc_record = json.load(f)[0]
 
-    entities = TRexFragmentExtractor.extract_entity_fragments_from_document(doc_record)
+    entities = RebelFragmentExtractor.extract_entity_fragments_from_document(doc_record)
     assert len(entities) == 27
 
     entities = {entity_id: entity for entity_id, entity in entities.items() if len(entity.properties) > 1}
@@ -32,10 +30,43 @@ def test_extract_entities(t_rex_input_file_path: Path) -> None:
 
     main_ent_key = "Q33199"
     assert main_ent_key in entities
-    assert "Austroasiatic languages" in entities[main_ent_key].properties["names"]
+    assert "Austroasiatic languages" in entities[main_ent_key].properties["name"]
 
     source_ids = entities[main_ent_key].source_ids
 
     for entity in entities:
         assert entities[entity].source_ids == source_ids
         assert len(entities[entity].properties) > 0
+
+
+def test_extract_sub_documents(t_rex_single_doc_file_path: Path) -> None:
+    """Test the extraction of sub-documents from a single REBEL JSON document record."""
+    # load a single T-REx document
+    with open(t_rex_single_doc_file_path, encoding="utf-8") as f:
+        doc_record = json.load(f)[0]
+
+    sub_documents = RebelFragmentExtractor.extract_sub_documents_from_document(doc_record)
+    sub_documents = list(sub_documents)
+    assert len(sub_documents) == len(doc_record["sentences_boundaries"])
+
+    all_entities = []
+    all_triples = []
+
+    for sub_doc in sub_documents:
+        assert sub_doc["docid"] == doc_record["docid"]
+        assert sub_doc["title"] == doc_record["title"]
+        assert sub_doc["uri"] == doc_record["uri"]
+
+        all_entities.extend(sub_doc["entities"])
+        all_triples.extend(sub_doc["triples"])
+
+    assert len(all_entities) == len(doc_record["entities"])
+    assert len(all_triples) == len(doc_record["triples"])
+
+    all_ent_json = {json.dumps(entity) for entity in all_entities}
+    ent_json = {json.dumps(entity) for entity in doc_record["entities"]}
+    assert all_ent_json == ent_json
+
+    all_triples_json = {json.dumps(triple) for triple in all_triples}
+    triples_json = {json.dumps(triple) for triple in doc_record["triples"]}
+    assert all_triples_json == triples_json

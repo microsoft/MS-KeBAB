@@ -74,11 +74,11 @@ class WikidataNamesDatasetBuilder:
 
     def load_hierarchy(self, type_hierarchy_path: pathlib.Path | None) -> dict[str, dict]:
         """Load the hierarchy of Wikidata types."""
-        self._logger.info("Loading the hierarchy of Wikidata types.")
+        self._logger.info("Loading the hierarchy of Wikidata types")
         input_path = type_hierarchy_path or self.wikidata_type_hierarchy_path
 
         if input_path is None:
-            raise ValueError("Path to the hierarchy of Wikidata types is not provided.")
+            raise ValueError("Path to the hierarchy of Wikidata types is not provided")
 
         graph = {}
         with open(input_path, encoding="utf-8") as f:

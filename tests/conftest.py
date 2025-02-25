@@ -25,12 +25,30 @@ def wikidata_entity() -> WikidataEntity:
 
 
 @pytest.fixture
-def wikidata_dump_sample_10_records_input_file_path() -> Path:
+def wikidata_full_type_hierarchy_file_path() -> Path:
+    """Return the path to a JSON file with the type hierarchy of Wikidata."""
+    return Path(__file__).parent / "data" / "datasets" / "wikidata" / "wikidata_type_hierarchy.jsonl"
+
+
+@pytest.fixture
+def wikidata_full_properties_file_path() -> Path:
+    """Return the path to a JSON file with the properties of Wikidata."""
+    return Path(__file__).parent / "data" / "datasets" / "wikidata" / "wikidata_properties.json"
+
+
+@pytest.fixture
+def wikidata_dump_sample_10_records_file_path() -> Path:
     """Return the path to the input file with a small subset of the Wikidata dump."""
     return Path(__file__).parent / "data" / "datasets" / "wikidata" / "sample" / "wikidata_dump_10_records.json"
 
 
 @pytest.fixture
-def emails_exp_1_path() -> Path:
+def wikidata_sample_simple_entities_file_path() -> Path:
+    """Return the path to the input file with a subset of Wikidata simple entities."""
+    return Path(__file__).parent / "data" / "datasets" / "wikidata" / "sample" / "wikidata_simple_entities.jsonl"
+
+
+@pytest.fixture
+def emails_exp_1_dir_path() -> Path:
     """Get the path to the emails experiment 1 directory."""
     return Path(__file__).parent / "data" / "emails_exp_1"

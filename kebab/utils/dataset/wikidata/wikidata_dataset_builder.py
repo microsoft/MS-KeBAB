@@ -104,11 +104,11 @@ class WikidataDatasetBuilder:
         self, type_hierarchy_path: pathlib.Path | None = None
     ) -> tuple[dict[str, dict], dict[str, dict]]:
         """Load the hierarchy of Wikidata types."""
-        self._logger.info("Loading the hierarchy of Wikidata types.")
+        self._logger.info("Loading the hierarchy of Wikidata types")
         input_path = type_hierarchy_path or self.wikidata_type_hierarchy_path
 
         if input_path is None:
-            raise ValueError("Path to the hierarchy of Wikidata types is not provided.")
+            raise ValueError("Path to the hierarchy of Wikidata types is not provided")
 
         graph = {}
         type_id_to_node = {}
@@ -223,7 +223,7 @@ class WikidataDatasetBuilder:
             prop_name = wikidata_properties.get(prop, {}).get("label")
 
             if prop_name is None:
-                self._logger.warning(f"Property {prop} not found in the properties map.")
+                self._logger.warning(f"Property {prop} not found in the properties map")
                 continue
 
             values = []
