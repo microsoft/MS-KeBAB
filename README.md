@@ -45,7 +45,7 @@ We describe the supported tasks and task instances below.
 **Expected output:** A generated response.  
 **Task instance(s):** Currently, one task instance comprising of document completion given initial few tokens of the document.
 
-### Knowledge surfacing task
+### KB surfacing task
 **Input instance:** A KB + a user input.  
 **Expected output:** A generated response.  
 **Task instance(s):** Currently, one task instance comprising of document completion given initial few tokens of the document.
