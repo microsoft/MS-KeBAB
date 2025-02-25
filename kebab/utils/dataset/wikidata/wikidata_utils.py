@@ -324,7 +324,7 @@ def query_single_entity_via_api(wikidata_id: str, english_only: bool = True) -> 
     return entities.get(wikidata_id) if entities else None
 
 
-def scrape_properties_via_api(
+def fetch_properties_via_api(
     start: int = 1,
     end: int = 15_000,
     output_path: pathlib.Path | None = None,

@@ -18,9 +18,9 @@ from kebab.utils.dataset.wikidata.wikidata_simple_extractor import WikidataSimpl
     help="Whether to run the entity extraction step.",
 )
 @click.option(
-    "--run-property-scrape/--no-run-property-scrape",
+    "--run-property-fetch/--no-run-property-fetch",
     default=False,
-    help="Whether to run the property scraping step.",
+    help="Whether to run the property fetching step.",
 )
 @click.option(
     "--wikidata-json-dump-path",
@@ -37,7 +37,7 @@ from kebab.utils.dataset.wikidata.wikidata_simple_extractor import WikidataSimpl
 @click.command()
 def main(
     run_entity_extraction: bool,
-    run_property_scrape: bool,
+    run_property_fetch: bool,
     wikidata_json_dump_path: pathlib.Path,
     output_dir: pathlib.Path,
 ):
@@ -47,7 +47,7 @@ def main(
     extractor = WikidataSimpleExtractor(
         wikidata_json_dump_path=wikidata_json_dump_path,
         run_entity_extraction=run_entity_extraction,
-        run_property_scrape=run_property_scrape,
+        run_property_fetch=run_property_fetch,
         output_dir=output_dir,
     )
 

@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 """
-Download Wikipedia pages for the given Wikidata entities in a batched-streaming manner.
+Download Wikipedia page texts for the given Wikidata entities in a batched-streaming manner via API.
 Skip entities that already have Wikipedia pages in the output directory.
 
 Required inputs:
@@ -27,7 +27,7 @@ from tqdm import tqdm
 from kebab.utils.dataset.wikidata import wikidata_utils
 
 
-class WikipediaPageScraper:
+class WikipediaTextFetcher:
     """Extract Wikipedia pages for the given Wikidata entities."""
 
     WIKIPEDIA_PAGES_FILENAME = "wikipedia_pages.jsonl"
@@ -36,30 +36,30 @@ class WikipediaPageScraper:
         self,
         *,
         entities_path: pathlib.Path | None = None,
-        scrape_full_intros: bool = False,
+        fetch_full_intros: bool = False,
         output_dir: pathlib.Path | None = None,
     ):
         """Initialize the extractor."""
         self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
 
         self.entities_path: pathlib.Path | None = entities_path
-        self.scrape_full_intros: bool = scrape_full_intros
+        self.fetch_full_intros: bool = fetch_full_intros
         self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
 
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def scrape_wikipedia_pages(
+    def fetch_wikipedia_texts(
         self,
         entities_path: pathlib.Path | None = None,
-        scrape_full_intros: bool = False,
+        fetch_full_intros: bool = False,
     ) -> pathlib.Path:
-        """Scrape Wikipedia pages for the given Wikidata entities."""
+        """Fetch Wikipedia texts for the given Wikidata entities."""
         entities_path = entities_path or self.entities_path
         if entities_path is None:
             raise ValueError("Path to the entities file is required.")
 
-        scrape_full_intros = scrape_full_intros or self.scrape_full_intros
+        fetch_full_intros = fetch_full_intros or self.fetch_full_intros
 
         output_path = self.output_dir / self.WIKIPEDIA_PAGES_FILENAME
 
@@ -89,12 +89,12 @@ class WikipediaPageScraper:
         # shuffle entities to reduce the load on the Wikipedia servers
         random.shuffle(entity_ids)
 
-        self._logger.info(f"Scraping Wikipedia pages for {len(entity_ids)} entities...")
+        self._logger.info(f"Fetching Wikipedia pages for {len(entity_ids)} entities...")
 
-        scraper = wikidata_utils.get_wikipedia_intros if scrape_full_intros else wikidata_utils.get_wikipedia_titles
+        fetcher = wikidata_utils.get_wikipedia_intros if fetch_full_intros else wikidata_utils.get_wikipedia_titles
 
         with open(output_path, "a", encoding="utf-8", newline="\n") as output_file:
-            for entity_id, text in tqdm(scraper(entity_ids), total=len(entity_ids)):
+            for entity_id, text in tqdm(fetcher(entity_ids), total=len(entity_ids)):
                 output_file.write(json.dumps({"entity_id": entity_id, "text": text}) + "\n")
 
         return output_path

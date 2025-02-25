@@ -7,12 +7,12 @@ from pathlib import Path
 from unittest.mock import Mock
 
 from kebab.utils.dataset.wikidata.wikidata_utils import WikidataEntity
-from kebab.utils.dataset.wikipedia.wikipedia_page_scraper import WikipediaPageScraper
+from kebab.utils.dataset.wikipedia.wikipedia_text_fetcher import WikipediaTextFetcher
 from pytest_mock import MockerFixture
 
 
-def test_scrape_wikipedia_pages(wikidata_entity: WikidataEntity, mocker: MockerFixture, tmp_path: Path) -> None:
-    """Test the scrape_wikipedia_pages method."""
+def test_fetch_wikipedia_pages(wikidata_entity: WikidataEntity, mocker: MockerFixture, tmp_path: Path) -> None:
+    """Test the fetch_wikipedia_pages method."""
     mock_intro_response = Mock()
     mock_intro_response.json.return_value = {
         "query": {"pages": {"12345": {"pageid": 31, "title": "Test title", "extract": "Test intro text"}}}
@@ -37,8 +37,8 @@ def test_scrape_wikipedia_pages(wikidata_entity: WikidataEntity, mocker: MockerF
 
     # test titles
     output_dir = tmp_path / "output_1"
-    scraper = WikipediaPageScraper(entities_path=test_entities_path, output_dir=output_dir)
-    output_file = scraper.scrape_wikipedia_pages()
+    fetcher = WikipediaTextFetcher(entities_path=test_entities_path, output_dir=output_dir)
+    output_file = fetcher.fetch_wikipedia_texts()
 
     results = [json.loads(line) for line in output_file.read_text(encoding="utf-8").splitlines()]
     assert len(results) == 1
@@ -47,8 +47,8 @@ def test_scrape_wikipedia_pages(wikidata_entity: WikidataEntity, mocker: MockerF
 
     # test intros
     output_dir = tmp_path / "output_2"
-    scraper = WikipediaPageScraper(entities_path=test_entities_path, output_dir=output_dir)
-    output_file = scraper.scrape_wikipedia_pages(scrape_full_intros=True)
+    fetcher = WikipediaTextFetcher(entities_path=test_entities_path, output_dir=output_dir)
+    output_file = fetcher.fetch_wikipedia_texts(fetch_full_intros=True)
 
     results = [json.loads(line) for line in output_file.read_text(encoding="utf-8").splitlines()]
     assert len(results) == 1
