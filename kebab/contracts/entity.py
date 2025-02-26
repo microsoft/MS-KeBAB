@@ -316,19 +316,19 @@ class Entity:
 
         return entity_dict
 
-    def get_hashable_repr(self) -> str:
-        """Return a hashable representation of the entity."""
-        properties_str = "|".join(
-            f"{prop_id}:{','.join(sorted(values))}" for prop_id, values in sorted(self.properties.items())
-        )
-
-        return f"{self.entity_id} | {properties_str}"
-
     def without_metadata(self) -> Self:
         """Return a new entity without metadata."""
         entity = self.__class__.from_dict(self.to_dict())
         entity.metadata = {}
         return entity
+
+    def property_values_str(self) -> str:
+        """Get the string representation of the entity properties and values."""
+        properties_str = "|".join(
+            f"{prop_id}:{','.join(sorted(values))}" for prop_id, values in sorted(self.properties.items())
+        )
+
+        return f"{self.entity_id} | {properties_str}"
 
     @classmethod
     def merge(cls, entities: list[Self]) -> Self:
@@ -354,6 +354,10 @@ class Entity:
         """Create an entity from a JSON string."""
         # Note: dates will be represented as strings
         return cls.from_dict(json.loads(json_str))
+
+    def __str__(self) -> str:
+        """String representation of the entity."""
+        return self.property_values_str()
 
 
 class EntityUtilities:

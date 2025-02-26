@@ -100,11 +100,10 @@ class RebelFragmentExtractor:
                     )
                     for fragment in fragments.values():
                         if remove_duplicates:
-                            str_repr = fragment.get_hashable_repr()
-                            if str_repr in seen:
+                            if fragment.property_values_str() in seen:
                                 continue
 
-                            seen.add(str_repr)
+                            seen.add(fragment.property_values_str())
 
                         try:
                             f.write(fragment.to_json(minimal_repr=True) + "\n")
