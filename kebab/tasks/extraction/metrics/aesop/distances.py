@@ -58,8 +58,11 @@ class TokenDistance(ElementDistance):
 
     def check_constraints(self, property_: Property) -> None:
         """Check constraints for token distance."""
-        if property_.data_type.value_type is not ValueType.TEXT:
-            raise ValueError("Only ValueType.TEXT properties are supported.")
+        if (
+            property_.data_type.value_type is not ValueType.TEXT
+            and property_.data_type.value_type is not ValueType.DATE
+        ):
+            raise ValueError("Only ValueType.TEXT and ValueType.DATE properties are supported.")
 
     def compute(self, value1: Any, value2: Any, property_: Property) -> float:  # noqa: ARG002
         """Compute token distance between property values of ground truth and prediction entity."""
@@ -266,14 +269,20 @@ class EntityDistance:
         return distance
 
     @classmethod
-    def from_dict(cls, config: dict[str, Any]) -> EntityDistance:
+    def from_dict(cls, config: dict[str, Any], property_schema: PropertySchema) -> EntityDistance:
         """Create entity distance from dictionary."""
-        property_schema = PropertySchema.from_file(config["property_schema"])
         property_to_distance_function_and_weight = {}
-        num_properties = len(config["entity_distance"])
         num_missing_weights = sum("weight" not in params for params in config["entity_distance"].values())
-        default_weight = 1.0 / (num_properties - num_missing_weights) if num_missing_weights < num_properties else 1.0
+        weight_sum = sum(params.get("weight", 0.0) for params in config["entity_distance"].values())
+        if weight_sum > 1.0:
+            raise ValueError("Sum of weights should be less than or equal to 1.")
+        if weight_sum < 1.0 and num_missing_weights == 0:
+            raise ValueError("Sum of weights should be equal to 1.")
+        default_weight = (1.0 - weight_sum) / num_missing_weights if num_missing_weights > 0 else 0.0
+
         for property_id, params in config["entity_distance"].items():
+            if property_id not in property_schema.properties:
+                raise ValueError(f"Property '{property_id}' is not in the property schema.")
             element_distance = getattr(sys.modules[__name__], params["distance_function"]["name"]).from_dict(
                 params["distance_function"].get("params", {})
             )

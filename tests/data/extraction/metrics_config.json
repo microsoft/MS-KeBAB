@@ -37,34 +37,9 @@
                     "model": "paraphrase-MiniLM-L6-v2"
                 }
             },
-            "objectives": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
-            },
-            "risks": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
-            },
-            "purpose": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
-            },
-            "url": {
-                "name": "BinaryMatchDistance"
-            },
             "email": {
                 "name": "BinaryMatchDistance"
-            },
-            "password": {
-                "name": "BinaryMatchDistance"
             }
-        },
-        "property_schema": "./tests/data/extraction/property_schema.json"
+        }
     }
 }

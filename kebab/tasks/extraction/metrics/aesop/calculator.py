@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -52,11 +54,16 @@ class ValueAveragedAesopConfig(MetricConfig):
 
         property_score_functions = defaultdict(lambda: default_property_score)
         for property_name, score_config in config["property_distance_functions"].items():
+            if property_name not in property_schema.properties:
+                raise ValueError(f"Property '{property_name}' is not present in the property schema.")
+            element_distance = get_element_distance(score_config)
             property_score_functions[property_name] = PropertyScore(
-                SetPropertyDistance(get_element_distance(score_config))
+                SetPropertyDistance(element_distance)
+                if property_schema.properties[property_name].is_collection
+                else SingleValuePropertyDistance(element_distance)
             )
         return ValueAveragedAesopConfig(
-            matching_score_function=EntityDistance.from_dict(config),
+            matching_score_function=EntityDistance.from_dict(config, property_schema),
             matching_threshold=config["matching_threshold"],
             property_score_functions=property_score_functions,
             property_schema=property_schema,
@@ -74,21 +81,49 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
     Similarly, we compute recall scores for each property and average them to obtain the average recall.
     """
 
-    def __init__(self, config: ValueAveragedAesopConfig):
+    def __init__(self, config: ValueAveragedAesopConfig, logger: logging.Logger | None = None):
         """Configure value-averaged-AESOP metric calculator."""
         self.config = config
+        self.logger = logger or logging.getLogger("Value-Averaged-AESOP")
 
     def run(self, prediction: Iterable[ExtractionOutput], ground_truth: Iterable[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
         metrics_accumulator = MetricsAccumulator()
-        for pred, gt in zip(prediction, ground_truth, strict=True):
+
+        def process_document(
+            input_: tuple[int, tuple[ExtractionOutput, ExtractionOutput]],
+        ) -> MetricsAccumulator:
+            """Compute metrics for a single document."""
+            idx, (pred, gt) = input_
+            self.logger.info(f"Processing document {idx + 1}")
             entity_matcher = EntityMatcher(gt.entities, pred.entities)
+            self.logger.info(f"Document {idx + 1}: Matching entities")
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)
+            self.logger.info(f"Document {idx + 1}: Computing metrics")
             metrics_computer = MetricsComputer(gt.entities, pred.entities, self.config.property_schema)
-            metrics_accumulator.update(
-                metrics_computer.compute_bipartite_metrics(matched_pairs, self.config.property_score_functions)
+            metrics = metrics_computer.compute_bipartite_metrics(matched_pairs, self.config.property_score_functions)
+            self.logger.info(f"Document {idx + 1}: Done")
+            return metrics
+
+        start = time.time()
+        for idx, result in enumerate(
+            map(
+                process_document,
+                enumerate(zip(prediction, ground_truth, strict=True)),
             )
-        return metrics_accumulator.accumulate_metrics()
+        ):
+            metrics_accumulator.update(result)
+            elapsed = time.time() - start
+            self.logger.info(f"Time elapsed: {elapsed:.2f} seconds")
+            self.logger.info(f"Average processing time: {elapsed / (idx + 1):.2f} seconds per document")
+        self.logger.info("Accumulating scores across documents")
+        elapsed = time.time() - start
+        self.logger.info(f"Total time elapsed: {elapsed:.2f} seconds")
+        start = time.time()
+        accumulated_metrics = metrics_accumulator.accumulate_metrics()
+        elapsed = time.time() - start
+        self.logger.info(f"Metrics accumulation time: {elapsed:.2f} seconds")
+        return accumulated_metrics
 
 
 def make_default_value_averaged_aesop_config(

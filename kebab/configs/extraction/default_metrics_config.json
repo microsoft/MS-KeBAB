@@ -21,24 +21,6 @@
             },
             "definitions": {
                 "name": "EmbeddingDistance"
-            },
-            "objectives": {
-                "name": "EmbeddingDistance"
-            },
-            "risks": {
-                "name": "EmbeddingDistance"
-            },
-            "purpose": {
-                "name": "EmbeddingDistance"
-            },
-            "url": {
-                "name": "BinaryMatchDistance"
-            },
-            "email": {
-                "name": "BinaryMatchDistance"
-            },
-            "password": {
-                "name": "BinaryMatchDistance"
             }
         }
     }

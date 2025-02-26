@@ -136,6 +136,15 @@ class MetricsAccumulator:
             metrics["property_recall"][key] = total_score / recall_denominator if recall_denominator > 0 else None
             if len(scores) == 0 and self.total_unmatched_counts_per_doc[key] == 0:
                 metrics["property_precision"][key] = None
+
+        # sort for convenience
+        metrics["property_precision"] = dict(
+            sorted(metrics["property_precision"].items(), key=lambda key: -key[1] if key[1] else 0.0)
+        )
+        metrics["property_recall"] = dict(
+            sorted(metrics["property_recall"].items(), key=lambda key: -key[1] if key[1] else 0.0)
+        )
+
         metrics["avg_property_precision"] = np.mean(  # type: ignore
             [value for value in metrics["property_precision"].values() if value is not None]
         )
@@ -149,9 +158,15 @@ class MetricsAccumulator:
             "pairs": self.unmatched_pair_count,
         }
         metrics["unmatched_fractions"] = {
-            "pairs": self.unmatched_pair_count / (self.unmatched_pair_count + self.matched_count),
-            "extra_pred_entities": self.unmatched_extra_pred_count / self.total_pred_entities,
-            "extra_gt_entities": self.unmatched_extra_gt_count / self.total_gt_entities,
+            "pairs": self.unmatched_pair_count / (self.unmatched_pair_count + self.matched_count)
+            if (self.unmatched_pair_count + self.matched_count) > 0
+            else 0,
+            "extra_pred_entities": self.unmatched_extra_pred_count / self.total_pred_entities
+            if self.total_pred_entities > 0
+            else 0,
+            "extra_gt_entities": self.unmatched_extra_gt_count / self.total_gt_entities
+            if self.total_gt_entities > 0
+            else 0,
         }
 
         return metrics
