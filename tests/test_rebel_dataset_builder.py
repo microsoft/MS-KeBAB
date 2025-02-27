@@ -91,7 +91,6 @@ def test_get_confusing_entities_map_and_sample() -> None:
             fragments,
             conf_entities,
             min_acc_rate=1e-6,
-            min_fragment_acc_rate=1e-6,
             min_fragment_attempt_count=1000,
             max_count=5,
             rng=rng,

@@ -141,9 +141,8 @@ class RebelDatasetBuilder:
         fragments: list[ResolvedWikidataEntity],
         confusing_entities_map: dict[str, list[str]],
         max_count: int | None = None,
-        min_acc_rate: float = 0.05,
-        min_fragment_acc_rate: float = 0.2,
-        min_fragment_attempt_count: int = 2,
+        min_acc_rate: float = 0.5,
+        min_fragment_attempt_count: int = 3,
         rng: np.random.Generator | None = None,
     ) -> Iterable[tuple[int, int]]:
         """
@@ -207,12 +206,12 @@ class RebelDatasetBuilder:
         conf_entity_probs = [arr / arr.sum() for arr in conf_entity_sizes]
         del conf_entity_sizes
 
-        # track overall acceptance rate and stop if it is below threshold
-        acc_rate = _EmaThreshold(decay=0.99, min_value=min_acc_rate, min_count=1000)
+        # track overall acceptance rate for diagnostics
+        acc_rate = _EmaThreshold(decay=0.99, min_value=0, min_count=0)
 
         # track each fragment's acceptance rate and exclude it if the AR drops below threshold
         fragment_acc_rates = {
-            idx: _EmaThreshold(decay=0.25, min_value=min_fragment_acc_rate, min_count=min_fragment_attempt_count)
+            idx: _EmaThreshold(decay=0.7, min_value=min_acc_rate, min_count=min_fragment_attempt_count)
             for idx in range(len(fragments))
         }
 
@@ -220,7 +219,7 @@ class RebelDatasetBuilder:
         iterations = 0
         start = pc()
 
-        while available_fragment_indices.items and not acc_rate.below_threshold():
+        while available_fragment_indices.items:
             # sample left fragment uniformly
             left_f_idx = available_fragment_indices.sample()
             entity_idx = fragment_entities[left_f_idx]
@@ -241,21 +240,20 @@ class RebelDatasetBuilder:
                 if left_f_idx != right_f_idx and pair not in seen_pairs:
                     accepted = True
                     seen_pairs.add(pair)
+                    fragment_ar.update(1)
+                    acc_rate.update(1)
                     yield left_f_idx, right_f_idx
                     break
 
                 # mark reject and retry
                 fragment_ar.update(0)
+                acc_rate.update(0)
 
             if accepted:
-                acc_rate.update(1)
-                fragment_ar.update(1)
-
                 # stop early if the required number of pairs was reached
                 if max_count and len(seen_pairs) >= max_count:
                     break
             else:
-                acc_rate.update(0)
                 available_fragment_indices.remove(left_f_idx)
 
             iterations += 1
@@ -272,7 +270,7 @@ class RebelDatasetBuilder:
         elif acc_rate.below_threshold():
             logging.info(f"Sampling finished - acceptance rate {acc_rate.avg:.2f} < {min_acc_rate:.2f}")
         else:
-            logging.info(f"Sampling finished - all candidate fragments acceptance rate < {min_fragment_acc_rate:.2f}")
+            logging.info(f"Sampling finished - all candidate fragments acceptance rate < {min_acc_rate:.2f}")
 
         logging.info(f"Produced {len(seen_pairs):,} pairs of fragments")
         logging.info(
@@ -377,7 +375,7 @@ class _EmaThreshold:
     def update(self, x: float) -> None:
         """Update the moving average."""
         self.n += 1
-        self.avg = (1 - self.decay) * x + self.decay * self.avg
+        self.avg = ((1 - self.decay) * x + self.decay * self.avg) if self.n > 1 else x
 
     def below_threshold(self) -> bool:
         """Check if the threshold is met."""
