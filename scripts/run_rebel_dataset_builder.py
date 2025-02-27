@@ -34,7 +34,7 @@ from kebab.utils.dataset.rebel.rebel_dataset_builder import RebelDatasetBuilder
 @click.option(
     "--max-count",
     type=int,
-    default=20_000,
+    default=100_000,
     help="The maximum number of pairs to include in the dataset. A negative value is ignored.",
 )
 @click.command()

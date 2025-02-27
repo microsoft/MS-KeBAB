@@ -78,6 +78,8 @@ class RebelDatasetBuilder:
         fragments_path = fragments_path or self.fragments_path
         fragments = []
 
+        self._logger.info("Loading REBEL entity fragments from %s", fragments_path)
+
         with open(fragments_path, encoding="utf-8") as f:
             for line in f:
                 fragment = ResolvedWikidataEntity.from_json(line)
@@ -129,8 +131,9 @@ class RebelDatasetBuilder:
         fragments: list[ResolvedWikidataEntity],
         confusing_entities_map: dict[str, list[str]],
         max_count: int | None = None,
-        min_acc_rate: float = 0.1,
-        min_fragment_acc_rate: float = 0.1,
+        min_acc_rate: float = 0.05,
+        min_fragment_acc_rate: float = 0.2,
+        min_fragment_attempt_count: int = 2,
         rng: np.random.Generator | None = None,
     ) -> Iterable[tuple[int, int]]:
         """
@@ -145,11 +148,14 @@ class RebelDatasetBuilder:
 
         # we'll operate on numpy arrays
         entity_ids = list(confusing_entities_map.keys())
-        entity_id_to_idx = {entity_id: i for i, entity_id in enumerate(entity_ids)}
-        fragment_idx_to_entity_idx = {i: entity_id_to_idx[fragment.entity_id] for i, fragment in enumerate(fragments)}
+        entity_id_to_ent_idx = {entity_id: i for i, entity_id in enumerate(entity_ids)}
 
-        entity_idx_to_confusing_idx = {
-            entity_id_to_idx[entity_id]: np.array([entity_id_to_idx[eid] for eid in entity_ids])
+        fragment_idx_to_entity_idx = {
+            i: entity_id_to_ent_idx[fragment.entity_id] for i, fragment in enumerate(fragments)
+        }
+
+        entity_idx_to_confusing_ent_indices = {
+            entity_id_to_ent_idx[entity_id]: np.array([entity_id_to_ent_idx[eid] for eid in entity_ids])
             for entity_id, entity_ids in confusing_entities_map.items()
         }
 
@@ -157,15 +163,21 @@ class RebelDatasetBuilder:
             f"Received {len(fragments):,} fragments, confusing entities map contains {len(confusing_entities_map):,} keys"
         )
 
-        entity_idx_to_fragment_idx = defaultdict(list)
+        entity_idx_to_fragment_indices = defaultdict(list)
         for idx, fragment in enumerate(fragments):
-            entity_idx_to_fragment_idx[entity_id_to_idx[fragment.entity_id]].append(idx)
+            entity_idx_to_fragment_indices[entity_id_to_ent_idx[fragment.entity_id]].append(idx)
 
-        entity_idx_to_fragment_idx = {idx: np.array(indices) for idx, indices in entity_idx_to_fragment_idx.items()}
+        entity_idx_to_fragment_indices = {
+            idx: np.array(indices) for idx, indices in entity_idx_to_fragment_indices.items()
+        }
 
         entity_sizes = np.array(
-            [len(entity_idx_to_fragment_idx[idx]) for idx in range(len(entity_ids))], dtype=np.float32
+            [len(entity_idx_to_fragment_indices[idx]) for idx in range(len(entity_ids))], dtype=np.float32
         )
+
+        conf_entity_sizes = [
+            entity_sizes[entity_idx_to_confusing_ent_indices[entity_idx]] for entity_idx in range(len(entity_ids))
+        ]
 
         logging.info(f"Largest entity contains {entity_sizes.max():,.0f} fragments")
 
@@ -174,31 +186,40 @@ class RebelDatasetBuilder:
 
         available_fragment_idx = _RandomSet(rng)
         for i in range(len(fragments)):
-            available_fragment_idx.add(i)
+            if conf_entity_sizes[fragment_idx_to_entity_idx[i]].sum() > 1:
+                available_fragment_idx.add(i)
+
+        logging.info(f"Available fragment indices {len(available_fragment_idx.items):,}")
 
         acc_rate = _EmaThreshold(decay=0.99, min_value=min_acc_rate, min_count=1000)
 
         fragment_acc_rates = {
-            idx: _EmaThreshold(decay=0.9, min_value=min_fragment_acc_rate, min_count=10)
+            idx: _EmaThreshold(decay=0.25, min_value=min_fragment_acc_rate, min_count=min_fragment_attempt_count)
             for idx in range(len(fragments))
         }
 
         seen_pairs = set()
         iterations = 0
 
+        conf_entity_probs = [arr / arr.sum() for arr in conf_entity_sizes]
+
         while available_fragment_idx.items and not acc_rate.below_threshold():
             left_f_idx = available_fragment_idx.sample()
             entity_idx = fragment_idx_to_entity_idx[left_f_idx]
-            ent_indices = entity_idx_to_confusing_idx[entity_idx]
-            probs = entity_sizes[ent_indices]
-            probs /= probs.sum()
+            ent_indices = entity_idx_to_confusing_ent_indices[entity_idx]
+
+            probs = conf_entity_probs[entity_idx]
 
             fragment_ar = fragment_acc_rates[left_f_idx]
             accepted = False
 
+            attempts = 0
             while not fragment_ar.below_threshold():
+                attempts += 1
+
                 ent_idx = rng.choice(ent_indices, p=probs)
-                right_f_idx = rng.choice(entity_idx_to_fragment_idx[ent_idx])
+                right_f_idx = rng.choice(entity_idx_to_fragment_indices[ent_idx])
+
                 pair = (left_f_idx, right_f_idx) if left_f_idx < right_f_idx else (right_f_idx, left_f_idx)
                 if pair not in seen_pairs and left_f_idx != right_f_idx:
                     yield left_f_idx, right_f_idx
@@ -218,10 +239,12 @@ class RebelDatasetBuilder:
                 available_fragment_idx.remove(left_f_idx)
 
             iterations += 1
-            if iterations % 100 == 0:
+            if iterations % 1_000 == 0:
                 logging.info(
-                    f"Run for {iterations:,} iterations, acceptance rate = {acc_rate.avg:.2f}, "
-                    f"available fragments = {len(available_fragment_idx.items):,}"
+                    f"Run for {iterations:,} iterations"
+                    f", returned {len(seen_pairs):,} pairs"
+                    f", acceptance rate = {acc_rate.avg:.2f}"
+                    f", available fragments = {len(available_fragment_idx.items):,}"
                 )
 
         if max_count and len(seen_pairs) >= max_count:
@@ -236,7 +259,7 @@ class RebelDatasetBuilder:
 
     def write_datasets(self, fragments: list[ResolvedWikidataEntity], pairs: Iterable[tuple[int, int]]) -> None:
         """Write the linking and clustering datasets."""
-        indices = set()
+        entity_ids = set()
 
         # write the linking dataset
         count = 0
@@ -248,19 +271,26 @@ class RebelDatasetBuilder:
                 }
                 f.write(json.dumps(d) + "\n")
 
-                indices.add(pair[0])
-                indices.add(pair[1])
+                entity_ids.add(fragments[pair[0]].entity_id)
+                entity_ids.add(fragments[pair[1]].entity_id)
 
                 count += 1
 
         logging.info(f"Wrote {count:,} pairs to {self.linking_dataset_output_path}")
 
         # write the clustering dataset
+        count = 0
         with open(self.clustering_dataset_output_path, mode="w", encoding="utf-8") as f:
-            for index in indices:
-                f.write(fragments[index].to_json(minimal_repr=True) + "\n")
+            for fragment in fragments:
+                if fragment.entity_id not in entity_ids:
+                    continue
 
-        logging.info(f"Wrote {len(indices):,} fragments to {self.clustering_dataset_output_path}")
+                f.write(fragment.to_json(minimal_repr=True) + "\n")
+                count += 1
+
+        logging.info(
+            f"Wrote {count:,} fragments from {len(entity_ids):,} entities to {self.clustering_dataset_output_path}"
+        )
 
 
 class _RandomSet:
@@ -305,7 +335,8 @@ class _RandomSet:
         if not self.items:
             raise IndexError("Cannot sample from an empty set")
 
-        return self.rng.choice(self.items)
+        idx = self.rng.integers(0, len(self.items))
+        return self.items[idx]
 
 
 class _EmaThreshold:
