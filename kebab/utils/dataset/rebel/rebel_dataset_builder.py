@@ -4,21 +4,22 @@ Build datasets based on REBEL and Wikidata:
 - Clustering dataset that contains merged fragments from REBEL.
 
 Required inputs:
-- REBEL entity fragments
-- Wikidata simple entities
-- Wikidata properties
-- Wikidata type hierarchy
+- REBEL fragments
 
 Workflow:
-- Filter fragments based on the number of properties they have, remove names not found on Wikidata, etc.
+- Load all fragment into memory.
 - Collect "confusing" entities - entities that share at least one name through their fragments.
 - Sample pairs of fragments such that each pair comes from entities that are confusing to each other.
-- Given all the entity IDs used in the pairwise dataset, take all fragments for these entities and merge to form
-  the clustering dataset.
+- Given all the entity IDs used in the pairwise dataset, use all fragments of these entities to produce the clustering dataset.
 - Write the datasets.
 
-Example output:
-TBD.
+Example output (linking):
+{"left": {"entity_id": "Q3490384", "properties": {"name": ["Song for a Blue Guitar"], "performer": ["Red House Painters"]}, "metadata": {"fragment_id": "9623392", "type": ["album"]}}, "right": {"entity_id": "Q3490384", "properties": {"name": ["Songs for a Blue Guitar"]}, "metadata": {"fragment_id": "8314516", "type": ["album"]}}}
+{"left": {"entity_id": "Q5520487", "properties": {"name": ["Gananoque River"], "located in the administrative territorial entity": ["Leeds and the Thousand Islands"], "country": ["Canada"]}, "metadata": {"fragment_id": "15937038", "type": ["river"]}}, "right": {"entity_id": "Q5520487", "properties": {"name": ["Gananoque River"]}, "metadata": {"fragment_id": "4126717", "type": ["river"]}}}
+
+Example output (clustering):
+{"entity_id": "Q2038835", "properties": {"name": ["Trinity Peninsula"], "part of": ["Graham Land"], "continent": ["Antarctica"]}, "metadata": {"fragment_id": "1", "type": ["peninsula"]}}
+{"entity_id": "Q618370", "properties": {"name": ["Graham Land"], "continent": ["Antarctica"]}, "metadata": {"fragment_id": "2", "type": ["geographic region"]}}
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ import logging
 import pathlib
 from collections import defaultdict
 from collections.abc import Iterable
+from time import perf_counter as pc
 
 import numpy as np
 from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
@@ -83,6 +85,14 @@ class RebelDatasetBuilder:
         with open(fragments_path, encoding="utf-8") as f:
             for line in f:
                 fragment = ResolvedWikidataEntity.from_json(line)
+
+                # discard unused data
+                if "doc_id" in fragment.metadata:
+                    del fragment.metadata["doc_id"]
+
+                if "source_text_hash" in fragment.metadata:
+                    del fragment.metadata["source_text_hash"]
+
                 fragments.append(fragment)
 
         self._logger.info(f"Loaded {len(fragments):,} fragments")
@@ -146,53 +156,61 @@ class RebelDatasetBuilder:
         """
         logging.info("Sampling pairs")
 
-        # we'll operate on numpy arrays
-        entity_ids = list(confusing_entities_map.keys())
-        entity_id_to_ent_idx = {entity_id: i for i, entity_id in enumerate(entity_ids)}
-
-        fragment_idx_to_entity_idx = {
-            i: entity_id_to_ent_idx[fragment.entity_id] for i, fragment in enumerate(fragments)
-        }
-
-        entity_idx_to_confusing_ent_indices = {
-            entity_id_to_ent_idx[entity_id]: np.array([entity_id_to_ent_idx[eid] for eid in entity_ids])
-            for entity_id, entity_ids in confusing_entities_map.items()
-        }
-
         logging.info(
             f"Received {len(fragments):,} fragments, confusing entities map contains {len(confusing_entities_map):,} keys"
         )
 
-        entity_idx_to_fragment_indices = defaultdict(list)
+        rng = rng or np.random.default_rng()
+
+        # we'll keep base collections (fragments, entity_ids) as lists, and maintain index->array(indices) dictionaries
+        entity_ids = list(confusing_entities_map.keys())
+
+        # maps entity id to entity index in the flat list
+        entity_id_to_ent_index = {entity_id: i for i, entity_id in enumerate(entity_ids)}
+
+        # maps fragment index to its entity index
+        fragment_entities = [entity_id_to_ent_index[fragment.entity_id] for i, fragment in enumerate(fragments)]
+
+        # reverse: maps entity index to fragment indices that belong to this entity
+        entity_i_to_frag_ixs = defaultdict(list)
         for idx, fragment in enumerate(fragments):
-            entity_idx_to_fragment_indices[entity_id_to_ent_idx[fragment.entity_id]].append(idx)
+            entity_i_to_frag_ixs[entity_id_to_ent_index[fragment.entity_id]].append(idx)
 
-        entity_idx_to_fragment_indices = {
-            idx: np.array(indices) for idx, indices in entity_idx_to_fragment_indices.items()
-        }
+        entity_fragments = [np.array(entity_i_to_frag_ixs[i]) for i in range(len(entity_ids))]
+        del entity_i_to_frag_ixs
 
-        entity_sizes = np.array(
-            [len(entity_idx_to_fragment_indices[idx]) for idx in range(len(entity_ids))], dtype=np.float32
-        )
-
-        conf_entity_sizes = [
-            entity_sizes[entity_idx_to_confusing_ent_indices[entity_idx]] for entity_idx in range(len(entity_ids))
-        ]
+        # the list of entity sizes (measured in the number of fragments)
+        entity_sizes = np.array([len(entity_fragments[idx]) for idx in range(len(entity_ids))], dtype=np.float32)
 
         logging.info(f"Largest entity contains {entity_sizes.max():,.0f} fragments")
 
-        # maintain a set of available fragment indices that are (still) likely to form a valid pair
-        rng = rng or np.random.default_rng()
+        # maps entity index to indices of entities that are confusing with it
+        confusing_entity_indices = [
+            np.array([entity_id_to_ent_index[eid] for eid in confusing_entities_map[entity_id]])
+            for entity_id in entity_ids
+        ]
 
-        available_fragment_idx = _RandomSet(rng)
+        # maps entity index to a numpy array of sizes of its confusing entities
+        conf_entity_sizes = [
+            entity_sizes[confusing_entity_indices[entity_idx]] for entity_idx in range(len(entity_ids))
+        ]
+
+        # maintain a set of available fragment indices that are (still) likely to form an unseen pair
+        available_fragment_indices = _RandomSet(rng)
         for i in range(len(fragments)):
-            if conf_entity_sizes[fragment_idx_to_entity_idx[i]].sum() > 1:
-                available_fragment_idx.add(i)
+            # a fragment from a single-entity that is confusing only with itself can not form a pair
+            if conf_entity_sizes[fragment_entities[i]].sum() > 1:
+                available_fragment_indices.add(i)
 
-        logging.info(f"Available fragment indices {len(available_fragment_idx.items):,}")
+        logging.info(f"Available fragment indices {len(available_fragment_indices.items):,}")
 
+        conf_entity_probs = [arr / arr.sum() for arr in conf_entity_sizes]
+        del conf_entity_sizes
+
+        # track overall acceptance rate and stop if it is below threshold
         acc_rate = _EmaThreshold(decay=0.99, min_value=min_acc_rate, min_count=1000)
 
+        # track each fragment's acceptance rate and exclude it if the AR drops below threshold
         fragment_acc_rates = {
             idx: _EmaThreshold(decay=0.25, min_value=min_fragment_acc_rate, min_count=min_fragment_attempt_count)
             for idx in range(len(fragments))
@@ -200,51 +218,53 @@ class RebelDatasetBuilder:
 
         seen_pairs = set()
         iterations = 0
+        start = pc()
 
-        conf_entity_probs = [arr / arr.sum() for arr in conf_entity_sizes]
-
-        while available_fragment_idx.items and not acc_rate.below_threshold():
-            left_f_idx = available_fragment_idx.sample()
-            entity_idx = fragment_idx_to_entity_idx[left_f_idx]
-            ent_indices = entity_idx_to_confusing_ent_indices[entity_idx]
+        while available_fragment_indices.items and not acc_rate.below_threshold():
+            # sample left fragment uniformly
+            left_f_idx = available_fragment_indices.sample()
+            entity_idx = fragment_entities[left_f_idx]
+            ent_indices = confusing_entity_indices[entity_idx]
 
             probs = conf_entity_probs[entity_idx]
-
             fragment_ar = fragment_acc_rates[left_f_idx]
             accepted = False
-
-            attempts = 0
             while not fragment_ar.below_threshold():
-                attempts += 1
-
+                # sample the candidate right entity according to their sizes
                 ent_idx = rng.choice(ent_indices, p=probs)
-                right_f_idx = rng.choice(entity_idx_to_fragment_indices[ent_idx])
 
+                # sample the candidate right fragment uniformly from the selected right entity
+                right_f_idx = rng.choice(entity_fragments[ent_idx])
+
+                # accept the pair if unseen
                 pair = (left_f_idx, right_f_idx) if left_f_idx < right_f_idx else (right_f_idx, left_f_idx)
-                if pair not in seen_pairs and left_f_idx != right_f_idx:
-                    yield left_f_idx, right_f_idx
+                if left_f_idx != right_f_idx and pair not in seen_pairs:
                     accepted = True
                     seen_pairs.add(pair)
+                    yield left_f_idx, right_f_idx
                     break
 
+                # mark reject and retry
                 fragment_ar.update(0)
 
             if accepted:
                 acc_rate.update(1)
                 fragment_ar.update(1)
+
+                # stop early if the required number of pairs was reached
                 if max_count and len(seen_pairs) >= max_count:
                     break
             else:
                 acc_rate.update(0)
-                available_fragment_idx.remove(left_f_idx)
+                available_fragment_indices.remove(left_f_idx)
 
             iterations += 1
-            if iterations % 1_000 == 0:
+            if iterations % 10_000 == 0:
                 logging.info(
                     f"Run for {iterations:,} iterations"
                     f", returned {len(seen_pairs):,} pairs"
                     f", acceptance rate = {acc_rate.avg:.2f}"
-                    f", available fragments = {len(available_fragment_idx.items):,}"
+                    f", available fragments = {len(available_fragment_indices.items):,}"
                 )
 
         if max_count and len(seen_pairs) >= max_count:
@@ -255,7 +275,9 @@ class RebelDatasetBuilder:
             logging.info(f"Sampling finished - all candidate fragments acceptance rate < {min_fragment_acc_rate:.2f}")
 
         logging.info(f"Produced {len(seen_pairs):,} pairs of fragments")
-        logging.info(f"Final acceptance rate: {acc_rate.avg:.2f}")
+        logging.info(
+            f"Final acceptance rate: {acc_rate.avg:.2f}, speed = {len(seen_pairs) / (pc() - start):,.2f} pairs/second"
+        )
 
     def write_datasets(self, fragments: list[ResolvedWikidataEntity], pairs: Iterable[tuple[int, int]]) -> None:
         """Write the linking and clustering datasets."""
