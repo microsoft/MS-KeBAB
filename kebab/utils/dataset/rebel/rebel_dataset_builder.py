@@ -3,6 +3,13 @@ Build datasets based on REBEL and Wikidata:
 - Pairwise linking dataset that contains pairs of entity fragments from REBEL.
 - Clustering dataset that contains merged fragments from REBEL.
 
+The linking dataset contains pairs of fragments that either belong to the same entity or not.
+The ground truth (a boolean indicating whether the fragments belong to the same entity) is stored in a separate file.
+
+The clustering dataset contains a flat collection of fragments in no particular order.
+The corresponding ground truth file contains the entity IDs (equivalently, cluster IDs) of the fragments that indicate
+which fragments belong to the same entity and should be clustered together.
+
 Required inputs:
 - REBEL fragments
 
@@ -10,8 +17,8 @@ Workflow:
 - Load all fragment into memory.
 - Collect "confusing" entities - entities that share at least one name through their fragments.
 - Sample pairs of fragments such that each pair comes from entities that are confusing to each other.
+- The sampled pairs are written to the pairwise linking dataset.
 - Given all the entity IDs used in the pairwise dataset, use all fragments of these entities to produce the clustering dataset.
-- Write the datasets.
 
 Example output (linking):
 {"left": {"entity_id": "", "properties": {"name": ["President"]}, "metadata": {"fragment_id": "13", "type": ["public office", "elective office"]}}, "right": {"entity_id": "", "properties": {"name": ["Philippine president"], "has list": ["list of presidents of the Philippines"]}, "metadata": {"fragment_id": "64", "type": ["public office", "elective office"]}}}
@@ -28,7 +35,6 @@ Example output (clustering):
 Example output (clustering ground truth):
 {"entity_id": "Q1209571"}
 {"entity_id": "Q1209571"}
-
 """
 
 from __future__ import annotations
