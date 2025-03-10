@@ -322,6 +322,12 @@ class Entity:
         entity.metadata = {}
         return entity
 
+    def without_entity_id(self) -> Self:
+        """Return a new entity without entity ID."""
+        entity = self.__class__.from_dict(self.to_dict())
+        entity.entity_id = ""
+        return entity
+
     def property_values_str(self) -> str:
         """Get the string representation of the entity properties and values."""
         properties_str = "|".join(

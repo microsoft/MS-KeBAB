@@ -14,12 +14,21 @@ Workflow:
 - Write the datasets.
 
 Example output (linking):
-{"left": {"entity_id": "Q3490384", "properties": {"name": ["Song for a Blue Guitar"], "performer": ["Red House Painters"]}, "metadata": {"fragment_id": "9623392", "type": ["album"]}}, "right": {"entity_id": "Q3490384", "properties": {"name": ["Songs for a Blue Guitar"]}, "metadata": {"fragment_id": "8314516", "type": ["album"]}}}
-{"left": {"entity_id": "Q5520487", "properties": {"name": ["Gananoque River"], "located in the administrative territorial entity": ["Leeds and the Thousand Islands"], "country": ["Canada"]}, "metadata": {"fragment_id": "15937038", "type": ["river"]}}, "right": {"entity_id": "Q5520487", "properties": {"name": ["Gananoque River"]}, "metadata": {"fragment_id": "4126717", "type": ["river"]}}}
+{"left": {"entity_id": "", "properties": {"name": ["President"]}, "metadata": {"fragment_id": "13", "type": ["public office", "elective office"]}}, "right": {"entity_id": "", "properties": {"name": ["Philippine president"], "has list": ["list of presidents of the Philippines"]}, "metadata": {"fragment_id": "64", "type": ["public office", "elective office"]}}}
+{"left": {"entity_id": "", "properties": {"name": ["Philippine president"]}, "metadata": {"fragment_id": "3", "type": ["public office", "elective office"]}}, "right": {"entity_id": "", "properties": {"name": ["President"]}, "metadata": {"fragment_id": "13", "type": ["public office", "elective office"]}}}
+
+Example output (linking ground truth):
+{"label": true}
+{"label": true}
 
 Example output (clustering):
-{"entity_id": "Q2038835", "properties": {"name": ["Trinity Peninsula"], "part of": ["Graham Land"], "continent": ["Antarctica"]}, "metadata": {"fragment_id": "1", "type": ["peninsula"]}}
-{"entity_id": "Q618370", "properties": {"name": ["Graham Land"], "continent": ["Antarctica"]}, "metadata": {"fragment_id": "2", "type": ["geographic region"]}}
+{"entity_id": "", "properties": {"name": ["Philippine president"]}, "metadata": {"fragment_id": "3", "type": ["public office", "elective office"]}}
+{"entity_id": "", "properties": {"name": ["President"]}, "metadata": {"fragment_id": "13", "type": ["public office", "elective office"]}}
+
+Example output (clustering ground truth):
+{"entity_id": "Q1209571"}
+{"entity_id": "Q1209571"}
+
 """
 
 from __future__ import annotations
@@ -39,7 +48,9 @@ class RebelDatasetBuilder:
     """Build linking and clustering fragment datasets based on REBEL and Wikidata."""
 
     LINKING_DATASET_FILENAME: str = "rebel_linking_pairs_dataset.jsonl"
+    LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_pairs_ground_truth.jsonl"
     CLUSTERING_DATASET_FILENAME: str = "rebel_clustering_entities_dataset.jsonl"
+    CLUSTERING_GROUND_TRUTH_FILENAME: str = "rebel_clustering_ground_truth.jsonl"
 
     def __init__(
         self,
@@ -59,7 +70,9 @@ class RebelDatasetBuilder:
         self.max_count: int | None = max_count
 
         self.clustering_dataset_output_path = self.output_dir / self.CLUSTERING_DATASET_FILENAME
+        self.clustering_ground_truth_output_path = self.output_dir / self.CLUSTERING_GROUND_TRUTH_FILENAME
         self.linking_dataset_output_path = self.output_dir / self.LINKING_DATASET_FILENAME
+        self.linking_ground_truth_output_path = self.output_dir / self.LINKING_GROUND_TRUTH_FILENAME
 
     def run(self) -> None:
         """Run the dataset building pipeline."""
@@ -278,18 +291,25 @@ class RebelDatasetBuilder:
         )
 
     def write_datasets(self, fragments: list[ResolvedWikidataEntity], pairs: Iterable[tuple[int, int]]) -> None:
-        """Write the linking and clustering datasets."""
+        """Write the pairwise linking and clustering datasets."""
         entity_ids = set()
 
-        # write the linking dataset
+        # write the pairwise linking dataset
         count = 0
-        with open(self.linking_dataset_output_path, mode="w", encoding="utf-8") as f:
+        with (
+            open(self.linking_dataset_output_path, mode="w", encoding="utf-8") as f_ds,
+            open(self.linking_ground_truth_output_path, mode="w", encoding="utf-8") as f_gt,
+        ):
             for pair in pairs:
                 d = {
-                    "left": fragments[pair[0]].to_dict(minimal_repr=True),
-                    "right": fragments[pair[1]].to_dict(minimal_repr=True),
+                    "left": fragments[pair[0]].without_entity_id().to_dict(minimal_repr=True),
+                    "right": fragments[pair[1]].without_entity_id().to_dict(minimal_repr=True),
                 }
-                f.write(json.dumps(d) + "\n")
+                f_ds.write(json.dumps(d) + "\n")
+
+                label = fragments[pair[0]].entity_id == fragments[pair[1]].entity_id
+                label = {"label": label}
+                f_gt.write(json.dumps(label) + "\n")
 
                 entity_ids.add(fragments[pair[0]].entity_id)
                 entity_ids.add(fragments[pair[1]].entity_id)
@@ -300,12 +320,18 @@ class RebelDatasetBuilder:
 
         # write the clustering dataset
         count = 0
-        with open(self.clustering_dataset_output_path, mode="w", encoding="utf-8") as f:
+        with (
+            open(self.clustering_dataset_output_path, mode="w", encoding="utf-8") as f_ds,
+            open(self.clustering_ground_truth_output_path, mode="w", encoding="utf-8") as f_gt,
+        ):
             for fragment in fragments:
                 if fragment.entity_id not in entity_ids:
                     continue
 
-                f.write(fragment.to_json(minimal_repr=True) + "\n")
+                f_ds.write(fragment.without_entity_id().to_json(minimal_repr=True) + "\n")
+
+                label = {"entity_id": fragment.entity_id}
+                f_gt.write(json.dumps(label) + "\n")
                 count += 1
 
         logging.info(

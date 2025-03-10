@@ -125,7 +125,23 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
 
     assert len(lines) > 0
 
+    output_file = tmp_path / RebelDatasetBuilder.LINKING_GROUND_TRUTH_FILENAME
+    assert output_file.exists()
+
+    with open(output_file, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+
+    assert len(lines) > 0
+
     output_file = tmp_path / RebelDatasetBuilder.CLUSTERING_DATASET_FILENAME
+    assert output_file.exists()
+
+    with open(output_file, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+
+    assert len(lines) > 0
+
+    output_file = tmp_path / RebelDatasetBuilder.CLUSTERING_GROUND_TRUTH_FILENAME
     assert output_file.exists()
 
     with open(output_file, encoding="utf-8") as f:
