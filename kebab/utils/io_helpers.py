@@ -68,6 +68,35 @@ class ItemReader[DataItemType](ABC):
         """
 
 
+class ItemJsonlReader[DataItemType](ItemReader[DataItemType]):
+    """
+    Reader for JSONL files containing DataItemType objects.
+    This is aimed to be used with simple objects that can be serialized to JSON, such as integers, strings, or booleans.
+
+    This class reads a JSONL file, where each line contains a serialized object.
+    """
+
+    def __init__(self, path: Path):
+        """
+        Initializes the JSONL reader for objects.
+
+        Args:
+            path: The file path to the JSONL file.
+        """
+        self.path = path
+
+    def read_items(self) -> Iterable[DataItemType]:
+        """
+        Reads the JSONL file and yields objects.
+
+        Returns:
+            Iterable[DataItemType]: An iterable of objects.
+        """
+        with open(self.path, encoding="utf-8") as file:
+            for line in file:
+                yield json.loads(line)
+
+
 class DocumentJsonlReader(ItemReader[Document]):
     """
     Reader for JSONL files containing `Document` objects.
@@ -178,42 +207,7 @@ class EntityPairJsonlReader(ItemReader[tuple[Entity, Entity]]):
         for entities in EntityListJsonlReader(self.path).read_items():
             if len(entities) != 2:  # noqa: PLR2004 magic-value-comparison
                 raise ValueError(f"Expected exactly two entities in line: {entities}")
-            yield (entities[0], entities[1])
-
-
-class BooleanFileReader(ItemReader[bool]):
-    """
-    Reader for files containing boolean values.
-
-    This class reads a file where each line contains either "0" or "1", representing
-    `False` and `True` respectively.
-    """
-
-    def __init__(self, path: Path):
-        """
-        Initializes the reader for files containing boolean values.
-
-        Args:
-            path: The file path.
-        """
-        self.path = path
-
-    def read_items(self) -> Iterable[bool]:
-        """
-        Reads boolean values from the file.
-
-        Returns:
-            Iterable[bool]: An iterable of boolean values.
-        """
-        with open(self.path, encoding="utf-8") as file:
-            for line in file:
-                stripped_line = line.strip()
-                if stripped_line == "0":
-                    yield False
-                elif stripped_line == "1":
-                    yield True
-                else:
-                    raise ValueError(f"Invalid line content for {BooleanFileReader.__name__}: {stripped_line}")
+            yield entities[0], entities[1]
 
 
 class ItemWriter[DataItemType](ABC):
@@ -232,6 +226,36 @@ class ItemWriter[DataItemType](ABC):
         Args:
             items (Iterable[DataItemType]): An iterable of output items to be written.
         """
+
+
+class ItemJsonlWriter[DataItemType](ItemWriter[DataItemType]):
+    """
+    Writer for JSONL files containing DataItemType objects.
+    This is aimed to be used with simple objects that can be serialized to JSON, such as integers, strings, or booleans.
+
+    This class writes a JSONL file, where each line contains a serialized object.
+    """
+
+    def __init__(self, path: Path):
+        """
+        Initializes the JSONL writer for objects.
+
+        Args:
+            path: The file path where the JSONL file will be written.
+        """
+        self.path = path
+
+    def write_items(self, items: Iterable[DataItemType]) -> None:
+        """
+        Writes objects to a JSONL file.
+
+        Args:
+            items: An iterable of objects to be written to the file.
+        """
+        with open(self.path, "w", encoding="utf-8", newline="\n") as file:
+            for obj in items:
+                json_line = json.dumps(obj)
+                file.write(json_line + "\n")
 
 
 class EntityJsonlWriter(ItemWriter[Entity]):
@@ -300,35 +324,6 @@ class EntityListJsonlWriter(ItemWriter[list[Entity]]):
                     separators=(",", ":"),
                 )
                 file.write(json_line + "\n")
-
-
-class BooleanFileWriter(ItemWriter[bool]):
-    """
-    Writer for files containing boolean values.
-
-    This class writes a file where each line contains "0" or "1", representing
-    `False` and `True` respectively.
-    """
-
-    def __init__(self, path: Path):
-        """
-        Initializes the writer for boolean values.
-
-        Args:
-            path: The file path where the boolean values will be written.
-        """
-        self.path = path
-
-    def write_items(self, items: Iterable[bool]) -> None:
-        """
-        Writes boolean values to a file.
-
-        Args:
-            items: An iterable of boolean values to be written to the file.
-        """
-        with open(self.path, "w", encoding="utf-8", newline="\n") as file:
-            for item in items:
-                file.write("1\n" if item else "0\n")
 
 
 def generate_draft_property_schema_from_data(paths: Iterable[Path], output_path: Path) -> None:

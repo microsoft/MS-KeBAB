@@ -3,13 +3,15 @@
 
 from __future__ import annotations
 
+import math
+from collections import defaultdict
 from collections.abc import Iterable
 from itertools import zip_longest
 from pathlib import Path
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskInstance
-from kebab.utils.io_helpers import BooleanFileReader, BooleanFileWriter, EntityPairJsonlReader, save_dict_to_json
+from kebab.utils.io_helpers import EntityPairJsonlReader, ItemJsonlReader, ItemJsonlWriter, save_dict_to_json
 
 
 class LinkingTaskInstance(TaskInstance):
@@ -47,18 +49,18 @@ class LinkingTaskInstance(TaskInstance):
         Read data items with optional ground-truth entity fragment pairs.
 
         Returns:
-            Iterable[Tuple[Tuple[Entity, Entity], bool | None]]: An iterable of tuples, where each
+            Iterable[tuple[tuple[Entity, Entity], bool | None]]: An iterable of tuples, where each
             tuple contains:
                 - A pair of `Entity` objects.
                 - An optional boolean value providing the ground-truth labels.
         """
         entity_pairs = EntityPairJsonlReader(self.data_entity_fragment_pairs).read_items()
-        booleans = (
-            BooleanFileReader(self.data_ground_truth_boolean).read_items()
+        labels = (
+            ItemJsonlReader[bool](self.data_ground_truth_boolean).read_items()
             if self.data_ground_truth_boolean is not None
             else iter([])
         )
-        return zip_longest(entity_pairs, booleans)
+        return zip_longest(entity_pairs, labels)
 
     def write_items(self, path: Path, items: Iterable[bool]) -> None:
         """
@@ -68,21 +70,50 @@ class LinkingTaskInstance(TaskInstance):
             path: The file path where the boolean labels should be written.
             items: An iterable of boolean labels to be written to the file.
         """
-        BooleanFileWriter(path).write_items(items)
+        ItemJsonlWriter[bool](path).write_items(items)
 
     def evaluate(
         self,
-        output_to_evaluate: Path,  # noqa: ARG002
+        output_to_evaluate: Path,
         eval_result_path: Path | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the linking task instance."""
-        if hasattr(self, "__data_ground_truth_boolean"):
-            raise ValueError("Can not evaluate on heldout Linking task instance")
+        if self.data_ground_truth_boolean is None:
+            raise ValueError("Ground truth data is required for evaluation.")
 
-        # TODO(bmitra): Implement actual metric computation
-        eval_result = {"primary_linking_metric": 0.8, "secondary_linking_metric": 0.6}
+        predictions = ItemJsonlReader[bool](output_to_evaluate).read_items()
+        ground_truth = ItemJsonlReader[bool](self.data_ground_truth_boolean).read_items()
+
+        metrics = defaultdict(float)
+
+        for pred, gt in zip(predictions, ground_truth):
+            metrics["total"] += 1
+
+            if pred == gt:
+                if pred:
+                    metrics["true_positive"] += 1
+                else:
+                    metrics["true_negative"] += 1
+            else:
+                if pred:
+                    metrics["false_positive"] += 1
+                else:
+                    metrics["false_negative"] += 1
+
+        metrics["precision"] = metrics["true_positive"] / (metrics["true_positive"] + metrics["false_positive"])
+        metrics["recall"] = metrics["true_positive"] / (metrics["true_positive"] + metrics["false_negative"])
+        metrics["tpr"] = metrics["precision"]
+        metrics["tnr"] = metrics["true_negative"] / (metrics["true_negative"] + metrics["false_negative"])
+
+        log_prob = metrics["true_positive"] * math.log(metrics["tpr"])
+        log_prob += metrics["false_positive"] * math.log(1 - metrics["tpr"])
+        log_prob += metrics["true_negative"] * math.log(metrics["tnr"])
+        log_prob += metrics["false_negative"] * math.log(1 - metrics["tnr"])
+        metrics["log_prob"] = log_prob
+
+        metrics = dict(metrics)
 
         if eval_result_path:
-            save_dict_to_json(eval_result, eval_result_path)
+            save_dict_to_json(metrics, eval_result_path)
 
-        return eval_result
+        return metrics

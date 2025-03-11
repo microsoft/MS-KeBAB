@@ -2,6 +2,7 @@
 # Licensed under the MIT license.
 
 import filecmp
+import json
 import shutil
 from collections.abc import Generator
 from pathlib import Path
@@ -61,3 +62,46 @@ def test_linking_read_write_items_roundtrip() -> None:
         str(boolean_labels_file_path),
         str(boolean_labels_output_file_path),
     )
+
+
+@pytest.mark.usefixtures(_setup_and_teardown.__name__)
+def test_linking_metrics(tmp_path: Path) -> None:
+    """Test the linking metrics calculation."""
+    # Prepare the data
+    labels = [True, True, False, False, False]
+    predictions = [True, False, False, False, True]
+
+    labels_path = tmp_path / "labels.jsonl"
+    with open(labels_path, "w") as f:
+        for label in labels:
+            f.write(json.dumps(label) + "\n")
+
+    predictions_path = tmp_path / "predictions.jsonl"
+    with open(predictions_path, "w") as f:
+        for prediction in predictions:
+            f.write(json.dumps(prediction) + "\n")
+
+    entity_pairs_path = tmp_path / "entity_pairs.jsonl"
+    entity_pairs_path.write_text("")
+
+    schema_file_path = tmp_path / "schema.json"
+    schema_file_path.write_text("")
+
+    task_instance = LinkingTaskInstance(
+        "Linking-Metrics-Test",
+        Task(TaskType.Linking),
+        str(entity_pairs_path),
+        str(schema_file_path),
+        str(labels_path),
+    )
+
+    metrics = task_instance.evaluate(predictions_path)
+    assert metrics["total"] == 5
+    assert metrics["true_positive"] == 1
+    assert metrics["false_positive"] == 1
+    assert metrics["false_negative"] == 1
+    assert metrics["true_negative"] == 2
+    assert metrics["precision"] == 0.5
+    assert metrics["recall"] == 0.5
+    assert metrics["tpr"] == 0.5
+    assert abs(metrics["tnr"] - 2 / 3) < 1e-6
