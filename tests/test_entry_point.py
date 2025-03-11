@@ -69,10 +69,17 @@ def test_task_interface():
             },
         },
         "Linking-Heldout": {
-            "predictions": "some_output_file",
+            "predictions": "tests/data/linking/predictions.jsonl",
             "metrics": {
-                "primary_linking_metric": 0.8,
-                "secondary_linking_metric": 0.6,
+                "false_negative": 0.0,
+                "false_positive": 0.0,
+                "precision": 1.0,
+                "recall": 1.0,
+                "tnr": 1.0,
+                "total": 2.0,
+                "tpr": 1.0,
+                "true_negative": 1.0,
+                "true_positive": 1.0,
             },
         },
     }

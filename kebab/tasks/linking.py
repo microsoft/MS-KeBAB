@@ -100,16 +100,18 @@ class LinkingTaskInstance(TaskInstance):
                 else:
                     metrics["false_negative"] += 1
 
-        metrics["precision"] = metrics["true_positive"] / (metrics["true_positive"] + metrics["false_positive"])
-        metrics["recall"] = metrics["true_positive"] / (metrics["true_positive"] + metrics["false_negative"])
-        metrics["tpr"] = metrics["precision"]
-        metrics["tnr"] = metrics["true_negative"] / (metrics["true_negative"] + metrics["false_negative"])
+        if metrics["true_positive"] > 0 and metrics["true_negative"] > 0:
+            metrics["precision"] = metrics["true_positive"] / (metrics["true_positive"] + metrics["false_positive"])
+            metrics["recall"] = metrics["true_positive"] / (metrics["true_positive"] + metrics["false_negative"])
+            metrics["tpr"] = metrics["precision"]
+            metrics["tnr"] = metrics["true_negative"] / (metrics["true_negative"] + metrics["false_negative"])
 
-        log_prob = metrics["true_positive"] * math.log(metrics["tpr"])
-        log_prob += metrics["false_positive"] * math.log(1 - metrics["tpr"])
-        log_prob += metrics["true_negative"] * math.log(metrics["tnr"])
-        log_prob += metrics["false_negative"] * math.log(1 - metrics["tnr"])
-        metrics["log_prob"] = log_prob
+            if 0 < metrics["tpr"] < 1 and 0 < metrics["tnr"] < 1:
+                log_prob = metrics["true_positive"] * math.log(metrics["tpr"])
+                log_prob += metrics["false_positive"] * math.log(1 - metrics["tpr"])
+                log_prob += metrics["true_negative"] * math.log(metrics["tnr"])
+                log_prob += metrics["false_negative"] * math.log(1 - metrics["tnr"])
+                metrics["log_prob"] = log_prob
 
         metrics = dict(metrics)
 
