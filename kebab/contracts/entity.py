@@ -242,7 +242,7 @@ class Entity:
 
     def __post_init__(self) -> None:
         """Post-initialisation checks."""
-        assert self.entity_id, "Entity ID must be provided."
+        assert self.entity_id is not None, "Entity ID must be provided."
 
         if self.properties is None:
             self.properties = defaultdict(list)
