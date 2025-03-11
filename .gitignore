@@ -6,8 +6,7 @@
 log/
 
 # data
-experiments/input
-experiments/output
+scripts/output
 .local_cache
 
 # visual studio
