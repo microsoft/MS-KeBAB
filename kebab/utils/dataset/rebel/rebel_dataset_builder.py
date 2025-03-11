@@ -25,16 +25,16 @@ Example output (linking):
 {"left": {"entity_id": "", "properties": {"name": ["Philippine president"]}, "metadata": {"fragment_id": "3", "type": ["public office", "elective office"]}}, "right": {"entity_id": "", "properties": {"name": ["President"]}, "metadata": {"fragment_id": "13", "type": ["public office", "elective office"]}}}
 
 Example output (linking ground truth):
-{"label": true}
-{"label": true}
+true
+true
 
 Example output (clustering):
 {"entity_id": "", "properties": {"name": ["Philippine president"]}, "metadata": {"fragment_id": "3", "type": ["public office", "elective office"]}}
 {"entity_id": "", "properties": {"name": ["President"]}, "metadata": {"fragment_id": "13", "type": ["public office", "elective office"]}}
 
 Example output (clustering ground truth):
-{"entity_id": "Q1209571"}
-{"entity_id": "Q1209571"}
+"Q1209571"
+"Q1209571"
 """
 
 from __future__ import annotations
@@ -314,7 +314,6 @@ class RebelDatasetBuilder:
                 f_ds.write(json.dumps(d) + "\n")
 
                 label = fragments[pair[0]].entity_id == fragments[pair[1]].entity_id
-                label = {"label": label}
                 f_gt.write(json.dumps(label) + "\n")
 
                 entity_ids.add(fragments[pair[0]].entity_id)
@@ -336,7 +335,7 @@ class RebelDatasetBuilder:
 
                 f_ds.write(fragment.without_entity_id().to_json(minimal_repr=True) + "\n")
 
-                label = {"entity_id": fragment.entity_id}
+                label = fragment.entity_id
                 f_gt.write(json.dumps(label) + "\n")
                 count += 1
 
