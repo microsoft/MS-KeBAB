@@ -29,7 +29,7 @@ def test_linking_read_write_items_roundtrip() -> None:
     # Arrange
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
     boolean_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
-    schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "propert_schema.json"
+    schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
     task_instance = LinkingTaskInstance(
         "Linking-Alexandria-Train",
         Task(TaskType.Linking),
@@ -65,6 +65,26 @@ def test_linking_read_write_items_roundtrip() -> None:
 
 
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
+def test_linking_read_int_labels() -> None:
+    # Arrange
+    entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
+    int_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "int_labels.jsonl"
+    schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
+    task_instance = LinkingTaskInstance(
+        "Linking-Alexandria-Train",
+        Task(TaskType.Linking),
+        str(entity_pairs_file_path),
+        str(schema_file_path),
+        str(int_labels_file_path),
+    )
+
+    # Act
+    items = list(task_instance.read_items())
+    assert len(items) == 2
+    assert isinstance(items[0][1], bool)
+
+
+@pytest.mark.usefixtures(_setup_and_teardown.__name__)
 def test_linking_metrics(tmp_path: Path) -> None:
     """Test the linking metrics calculation."""
     # Prepare the data
@@ -87,8 +107,9 @@ def test_linking_metrics(tmp_path: Path) -> None:
     schema_file_path = tmp_path / "schema.json"
     schema_file_path.write_text("")
 
+    # Evaluate
     task_instance = LinkingTaskInstance(
-        "Linking-Metrics-Test",
+        "Linking-Metrics-Train",
         Task(TaskType.Linking),
         str(entity_pairs_path),
         str(schema_file_path),

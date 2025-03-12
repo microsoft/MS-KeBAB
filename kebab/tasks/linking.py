@@ -56,7 +56,7 @@ class LinkingTaskInstance(TaskInstance):
         """
         entity_pairs = EntityPairJsonlReader(self.data_entity_fragment_pairs).read_items()
         labels = (
-            ItemJsonlReader[bool](self.data_ground_truth_boolean).read_items()
+            ItemJsonlReader[bool](self.data_ground_truth_boolean, converter=bool).read_items()
             if self.data_ground_truth_boolean is not None
             else iter([])
         )
@@ -82,7 +82,7 @@ class LinkingTaskInstance(TaskInstance):
             raise ValueError("Ground truth data is required for evaluation.")
 
         predictions = ItemJsonlReader[bool](output_to_evaluate).read_items()
-        ground_truth = ItemJsonlReader[bool](self.data_ground_truth_boolean).read_items()
+        ground_truth = ItemJsonlReader[bool](self.data_ground_truth_boolean, converter=bool).read_items()
 
         metrics = defaultdict(float)
 

@@ -7,7 +7,7 @@ import json
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from kebab.contracts.document import Document, DocumentUtilities
 from kebab.contracts.entity import DataType, Entity, Property, PropertySchema, ValueType
@@ -76,14 +76,20 @@ class ItemJsonlReader[DataItemType](ItemReader[DataItemType]):
     This class reads a JSONL file, where each line contains a serialized object.
     """
 
-    def __init__(self, path: Path):
+    def __init__(
+        self,
+        path: Path,
+        converter: Callable[[Any], DataItemType] | None = None,
+    ):
         """
         Initializes the JSONL reader for objects.
 
         Args:
             path: The file path to the JSONL file.
+            converter: An optional converter function to convert the deserialized objects to the target type.
         """
         self.path = path
+        self.converter = converter
 
     def read_items(self) -> Iterable[DataItemType]:
         """
@@ -94,7 +100,12 @@ class ItemJsonlReader[DataItemType](ItemReader[DataItemType]):
         """
         with open(self.path, encoding="utf-8") as file:
             for line in file:
-                yield json.loads(line)
+                obj = json.loads(line)
+
+                if self.converter is not None:
+                    obj = self.converter(obj)
+
+                yield obj
 
 
 class DocumentJsonlReader(ItemReader[Document]):
