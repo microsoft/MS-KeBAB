@@ -57,7 +57,7 @@ class ClusteringTaskInstance(TaskInstance):
         """
         entities = EntityJsonlReader(self.data_entity_fragments).read_items()
         labels = (
-            ItemJsonlReader[str](self.data_ground_truth_labels).read_items()
+            ItemJsonlReader[str](self.data_ground_truth_labels, converter=str).read_items()
             if self.data_ground_truth_labels is not None
             else iter([])
         )
@@ -82,7 +82,7 @@ class ClusteringTaskInstance(TaskInstance):
         if self.data_ground_truth_labels is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        predictions = list(ItemJsonlReader[str](output_to_evaluate).read_items())
+        predictions = list(ItemJsonlReader[str](output_to_evaluate, converter=str).read_items())
         ground_truth = list(ItemJsonlReader[str](self.data_ground_truth_labels).read_items())
 
         fragment_count = len(predictions)
@@ -126,9 +126,9 @@ class ClusteringTaskInstance(TaskInstance):
             recalls.append(recall)
             f1s.append(f1)
 
-        metrics["precision"] = np.mean(precisions, dtype=np.float64)
-        metrics["recall"] = np.mean(recalls, dtype=np.float64)
-        metrics["f1"] = np.mean(f1s, dtype=np.float64)
+        metrics["precision"] = float(np.mean(precisions, dtype=np.float64))
+        metrics["recall"] = float(np.mean(recalls, dtype=np.float64))
+        metrics["f1"] = float(np.mean(f1s, dtype=np.float64))
 
         metrics = dict(metrics)
 
