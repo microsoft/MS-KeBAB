@@ -53,8 +53,9 @@
     "Linking-Heldout": {
       "task": "Linking",
       "data": {
-        "entity_fragment_pairs": "https://some.public/download/link",
-        "schema": "https://some.public/download/link"
+        "entity_fragment_pairs": "./tests/data/linking/entity_pairs.jsonl",
+        "schema": "https://some.public/download/link",
+        "ground_truth_boolean": "./tests/data/linking/boolean_labels.jsonl"
       }
     },
     "Entity-Generation-REBEL": {

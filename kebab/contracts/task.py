@@ -42,7 +42,7 @@ class Task:
     def __new__(cls, task_type: TaskType) -> Self:
         """Disallow instantiating multiple Task objects for same task type."""
         if task_type in cls.__created_task_types:
-            raise ValueError("Not allowed to create multiple task objects of type {task_type}")
+            raise ValueError(f"Not allowed to create multiple task objects of type {task_type}")
         cls.__created_task_types.add(task_type)
         return super().__new__(cls)
 
