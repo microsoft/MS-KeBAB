@@ -81,12 +81,21 @@ class LinkingTaskInstance(TaskInstance):
         if self.data_ground_truth_boolean is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        predictions = ItemJsonlReader[bool](output_to_evaluate).read_items()
-        ground_truth = ItemJsonlReader[bool](self.data_ground_truth_boolean, converter=bool).read_items()
+        predictions = list(ItemJsonlReader[float](output_to_evaluate, converter=float).read_items())
+
+        # TODO(pmyshkov): For now, we simply use a threshold of 0.5 to convert the predictions to boolean labels
+        pred_labels = [pred > 0.5 for pred in predictions]  # noqa: PLR2004
+        probabilistic = any(0 < pred < 1 for pred in predictions)
+
+        if probabilistic:
+            eps = 1e-6
+            predictions = [min(max(pred, eps), 1 - eps) for pred in predictions]
+
+        gt_labels = list(ItemJsonlReader[bool](self.data_ground_truth_boolean, converter=bool).read_items())
 
         metrics = defaultdict(float)
 
-        for pred, gt in zip(predictions, ground_truth):
+        for pred, gt in zip(pred_labels, gt_labels):
             metrics["total"] += 1
 
             if pred == gt:
@@ -100,6 +109,10 @@ class LinkingTaskInstance(TaskInstance):
                 else:
                     metrics["false_negative"] += 1
 
+            if probabilistic:
+                metrics["log_prob"] += math.log(predictions[0] if gt else 1 - predictions[0])
+
+        # add an empirical log-prob estimated from the confusion matrix
         if metrics["true_positive"] > 0 and metrics["true_negative"] > 0:
             metrics["precision"] = metrics["true_positive"] / (metrics["true_positive"] + metrics["false_positive"])
             metrics["recall"] = metrics["true_positive"] / (metrics["true_positive"] + metrics["false_negative"])
@@ -111,7 +124,7 @@ class LinkingTaskInstance(TaskInstance):
                 log_prob += metrics["false_positive"] * math.log(1 - metrics["tpr"])
                 log_prob += metrics["true_negative"] * math.log(metrics["tnr"])
                 log_prob += metrics["false_negative"] * math.log(1 - metrics["tnr"])
-                metrics["log_prob"] = log_prob
+                metrics["empirical_log_prob"] = log_prob
 
         metrics = dict(metrics)
 

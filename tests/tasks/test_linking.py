@@ -90,6 +90,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     # Prepare the data
     labels = [True, True, False, False, False]
     predictions = [True, False, False, False, True]
+    prob_predictions = [0.9, 0.1, 0.1, 0.1, 0.9]
 
     labels_path = tmp_path / "labels.jsonl"
     with open(labels_path, "w") as f:
@@ -99,6 +100,11 @@ def test_linking_metrics(tmp_path: Path) -> None:
     predictions_path = tmp_path / "predictions.jsonl"
     with open(predictions_path, "w") as f:
         for prediction in predictions:
+            f.write(json.dumps(prediction) + "\n")
+
+    prob_predictions_path = tmp_path / "prob_predictions.jsonl"
+    with open(prob_predictions_path, "w") as f:
+        for prediction in prob_predictions:
             f.write(json.dumps(prediction) + "\n")
 
     entity_pairs_path = tmp_path / "entity_pairs.jsonl"
@@ -126,3 +132,18 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert metrics["recall"] == 0.5
     assert metrics["tpr"] == 0.5
     assert abs(metrics["tnr"] - 2 / 3) < 1e-6
+    assert abs(metrics["empirical_log_prob"] - -3.2966) < 1e-3
+    assert "log_prob" not in metrics
+
+    metrics = task_instance.evaluate(prob_predictions_path)
+    assert metrics["total"] == 5
+    assert metrics["true_positive"] == 1
+    assert metrics["false_positive"] == 1
+    assert metrics["false_negative"] == 1
+    assert metrics["true_negative"] == 2
+    assert metrics["precision"] == 0.5
+    assert metrics["recall"] == 0.5
+    assert metrics["tpr"] == 0.5
+    assert abs(metrics["tnr"] - 2 / 3) < 1e-6
+    assert abs(metrics["empirical_log_prob"] - -3.296) < 1e-3
+    assert abs(metrics["log_prob"] - -7.118) < 1e-3
