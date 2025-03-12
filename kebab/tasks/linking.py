@@ -83,34 +83,32 @@ class LinkingTaskInstance(TaskInstance):
 
         predictions = list(ItemJsonlReader[float](output_to_evaluate, converter=float).read_items())
 
-        # TODO(pmyshkov): For now, we simply use a threshold of 0.5 to convert the predictions to boolean labels
-        pred_labels = [pred > 0.5 for pred in predictions]  # noqa: PLR2004
-        probabilistic = any(0 < pred < 1 for pred in predictions)
+        # The predictions are either true/false (exactly 0/1 floats), or we treat them as log-odds
+        probabilistic = sorted(set(predictions)) != [0, 1]
 
-        if probabilistic:
-            eps = 1e-6
-            predictions = [min(max(pred, eps), 1 - eps) for pred in predictions]
-
+        # TODO(pmyshkov): For now, we simply use a threshold of 0 to convert the predictions to boolean labels
+        pred_labels = [pred > 0 for pred in predictions]
         gt_labels = list(ItemJsonlReader[bool](self.data_ground_truth_boolean, converter=bool).read_items())
 
         metrics = defaultdict(float)
-
-        for pred, gt in zip(pred_labels, gt_labels):
+        for log_odds, pred_label, gt_label in zip(predictions, pred_labels, gt_labels):
             metrics["total"] += 1
 
-            if pred == gt:
-                if pred:
+            if pred_label == gt_label:
+                if pred_label:
                     metrics["true_positive"] += 1
                 else:
                     metrics["true_negative"] += 1
             else:
-                if pred:
+                if pred_label:
                     metrics["false_positive"] += 1
                 else:
                     metrics["false_negative"] += 1
 
             if probabilistic:
-                metrics["log_prob"] += math.log(predictions[0] if gt else 1 - predictions[0])
+                metrics["log_prob"] += (
+                    math.log(1 / (1 + math.exp(-log_odds))) if gt_label else math.log(1 / (1 + math.exp(log_odds)))
+                )
 
         # add an empirical log-prob estimated from the confusion matrix
         if metrics["true_positive"] > 0 and metrics["true_negative"] > 0:

@@ -3,6 +3,7 @@
 
 import filecmp
 import json
+import math
 import shutil
 from collections.abc import Generator
 from pathlib import Path
@@ -91,6 +92,10 @@ def test_linking_metrics(tmp_path: Path) -> None:
     labels = [True, True, False, False, False]
     predictions = [True, False, False, False, True]
     prob_predictions = [0.9, 0.1, 0.1, 0.1, 0.9]
+    odds = [p / (1 - p) for p in prob_predictions]
+    log_odds = [math.log(o) for o in odds]
+    log_probs = [math.log(p) if l else math.log(1 - p) for p, l in zip(prob_predictions, labels)]
+    log_prob_total = sum(log_probs)
 
     labels_path = tmp_path / "labels.jsonl"
     with open(labels_path, "w") as f:
@@ -104,7 +109,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
 
     prob_predictions_path = tmp_path / "prob_predictions.jsonl"
     with open(prob_predictions_path, "w") as f:
-        for prediction in prob_predictions:
+        for prediction in log_odds:
             f.write(json.dumps(prediction) + "\n")
 
     entity_pairs_path = tmp_path / "entity_pairs.jsonl"
@@ -146,4 +151,4 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert metrics["tpr"] == 0.5
     assert abs(metrics["tnr"] - 2 / 3) < 1e-6
     assert abs(metrics["empirical_log_prob"] - -3.296) < 1e-3
-    assert abs(metrics["log_prob"] - -7.118) < 1e-3
+    assert abs(metrics["log_prob"] - log_prob_total) < 1e-3
