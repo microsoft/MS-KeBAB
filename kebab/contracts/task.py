@@ -20,6 +20,7 @@ class TaskType(Enum):
     EntityGeneration = 1
     Extraction = 2
     Linking = 3
+    Clustering = 4
 
 
 class Task:

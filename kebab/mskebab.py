@@ -15,6 +15,7 @@ from kebab.contracts.task import Task, TaskInstance, TaskType
 from kebab.tasks.entity_generation import EntityGenerationTaskInstance
 from kebab.tasks.extraction.task import ExtractionTaskInstance
 from kebab.tasks.linking import LinkingTaskInstance
+from tasks.clustering import ClusteringTaskInstance
 
 
 class Benchmark:
@@ -57,6 +58,7 @@ class Benchmark:
         TaskInstance.register_task_type(TaskType.EntityGeneration, EntityGenerationTaskInstance)
         TaskInstance.register_task_type(TaskType.Extraction, ExtractionTaskInstance)
         TaskInstance.register_task_type(TaskType.Linking, LinkingTaskInstance)
+        TaskInstance.register_task_type(TaskType.Clustering, ClusteringTaskInstance)
 
 
 class Cache:

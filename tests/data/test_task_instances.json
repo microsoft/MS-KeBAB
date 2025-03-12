@@ -64,5 +64,13 @@
         "entities": "https://some.public/download/link",
         "schema": "https://some.public/download/link"
       }
+    },
+      "Clustering-Heldout": {
+      "task": "Clustering",
+      "data": {
+        "entity_fragments": "./tests/data/clustering/entity_fragments.jsonl",
+        "schema": "https://some.public/download/link",
+        "ground_truth_labels": "./tests/data/clustering/labels.jsonl"
+      }
     }
-  }
+}
