@@ -67,8 +67,8 @@ def test_clustering_metrics(tmp_path: Path) -> None:
     # Prepare the data
     labels = ["0", "1", "0", "1", "2"]
     predictions_all_good = ["a", "b", "a", "b", "c"]
-    predictions_precision = ["0", "1", "2", "3", "4"]
-    predictions_recall = ["0", "0", "0", "0", "0"]
+    predictions_precision = ["0", "1", "2", "3", "4"]  # recalls: 0.5, 0.5, 0.5, 0.5, 1.0 => mean = 0.6
+    predictions_recall = ["0", "0", "0", "0", "0"]  # precisions: 0.4, 0.4, 0.4, 0.4, 0.2 => mean = 0.36
     predictions_mix = ["a", "b", "a", "a", "a"]
 
     labels_path = tmp_path / "labels.jsonl"
