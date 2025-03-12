@@ -94,7 +94,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     prob_predictions = [0.9, 0.1, 0.1, 0.1, 0.9]
     odds = [p / (1 - p) for p in prob_predictions]
     log_odds = [math.log(o) for o in odds]
-    log_probs = [math.log(p) if l else math.log(1 - p) for p, l in zip(prob_predictions, labels)]
+    log_probs = [math.log(pred) if label else math.log(1 - pred) for pred, label in zip(prob_predictions, labels)]
     log_prob_total = sum(log_probs)
 
     labels_path = tmp_path / "labels.jsonl"
