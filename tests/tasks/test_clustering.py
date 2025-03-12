@@ -66,16 +66,34 @@ def test_clustering_metrics(tmp_path: Path) -> None:
     """Test the clustering metrics calculation."""
     # Prepare the data
     labels = ["0", "1", "0", "1", "2"]
-    predictions = ["a", "b", "a", "a", "a"]
+    predictions_all_good = ["a", "b", "a", "b", "c"]
+    predictions_precision = ["0", "1", "2", "3", "4"]
+    predictions_recall = ["0", "0", "0", "0", "0"]
+    predictions_mix = ["a", "b", "a", "a", "a"]
 
     labels_path = tmp_path / "labels.jsonl"
     with open(labels_path, "w") as f:
         for label in labels:
             f.write(json.dumps(label) + "\n")
 
-    predictions_path = tmp_path / "predictions.jsonl"
-    with open(predictions_path, "w") as f:
-        for prediction in predictions:
+    predictions_all_good_path = tmp_path / "predictions_all_good.jsonl"
+    with open(predictions_all_good_path, "w") as f:
+        for prediction in predictions_all_good:
+            f.write(json.dumps(prediction) + "\n")
+
+    predictions_precision_path = tmp_path / "predictions_precision.jsonl"
+    with open(predictions_precision_path, "w") as f:
+        for prediction in predictions_precision:
+            f.write(json.dumps(prediction) + "\n")
+
+    predictions_recall_path = tmp_path / "predictions_recall.jsonl"
+    with open(predictions_recall_path, "w") as f:
+        for prediction in predictions_recall:
+            f.write(json.dumps(prediction) + "\n")
+
+    predictions_mix_path = tmp_path / "predictions_mix.jsonl"
+    with open(predictions_mix_path, "w") as f:
+        for prediction in predictions_mix:
             f.write(json.dumps(prediction) + "\n")
 
     entity_fragments_path = tmp_path / "entity_fragments.jsonl"
@@ -93,7 +111,28 @@ def test_clustering_metrics(tmp_path: Path) -> None:
         str(labels_path),
     )
 
-    metrics = task_instance.evaluate(predictions_path)
+    metrics = task_instance.evaluate(predictions_all_good_path)
+    assert metrics["fragments"] == 5
+    assert metrics["predicted_clusters"] == 3
+    assert metrics["ground_truth_clusters"] == 3
+    assert metrics["precision"] == 1.0
+    assert metrics["recall"] == 1.0
+
+    metrics = task_instance.evaluate(predictions_precision_path)
+    assert metrics["fragments"] == 5
+    assert metrics["predicted_clusters"] == 5
+    assert metrics["ground_truth_clusters"] == 3
+    assert metrics["precision"] == 1.0
+    assert metrics["recall"] == 0.6
+
+    metrics = task_instance.evaluate(predictions_recall_path)
+    assert metrics["fragments"] == 5
+    assert metrics["predicted_clusters"] == 1
+    assert metrics["ground_truth_clusters"] == 3
+    assert metrics["precision"] == 0.36
+    assert metrics["recall"] == 1.0
+
+    metrics = task_instance.evaluate(predictions_mix_path)
     assert metrics["fragments"] == 5
     assert metrics["predicted_clusters"] == 2
     assert metrics["ground_truth_clusters"] == 3
