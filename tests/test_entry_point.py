@@ -30,7 +30,7 @@ def test_task_interface():
     benchmark = mskebab.Benchmark(Path(__file__).parent / "data" / "test_task_instances.json")
 
     tasks = benchmark.tasks
-    assert set(tasks.keys()) == {TaskType.Extraction, TaskType.Linking, TaskType.EntityGeneration}
+    assert set(tasks.keys()) == {TaskType.Extraction, TaskType.Linking, TaskType.EntityGeneration, TaskType.Clustering}
     for task_type, task in tasks.items():
         assert task_type == task.task_type
 
@@ -44,6 +44,7 @@ def test_task_interface():
         "Linking-MAVE",
         "Linking-Heldout",
         "Entity-Generation-REBEL",
+        "Clustering-Heldout",
     }
     for task_instance_name, task_instance in task_instances.items():
         assert task_instance_name == task_instance.name
@@ -80,6 +81,17 @@ def test_task_interface():
                 "tpr": 1.0,
                 "true_negative": 1.0,
                 "true_positive": 1.0,
+            },
+        },
+        "Clustering-Heldout": {
+            "predictions": "tests/data/clustering/predictions.jsonl",
+            "metrics": {
+                "f1": 1.0,
+                "fragments": 2,
+                "ground_truth_clusters": 2,
+                "precision": 1.0,
+                "predicted_clusters": 2,
+                "recall": 1.0,
             },
         },
     }
