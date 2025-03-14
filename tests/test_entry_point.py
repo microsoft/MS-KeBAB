@@ -99,7 +99,7 @@ def test_task_interface():
                         },
                     },
                 },
-            }
+            },
         },
         "Linking-Heldout": {
             "predictions": "tests/data/linking/predictions.jsonl",
