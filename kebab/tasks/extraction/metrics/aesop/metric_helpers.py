@@ -91,6 +91,9 @@ class EvaluatedPropertyMetrics:
             f"unmatched_count={self.unmatched_count})"
         )
 
+def safe_division(a: float, b: float, default=0) -> float:
+    """Safely divide two numbers."""
+    return a / b if b != 0 else default
 
 @dataclass
 class MetricsAccumulator:
@@ -132,8 +135,8 @@ class MetricsAccumulator:
             total_score = np.sum(scores)
             precision_denominator = len(scores) + np.sum(self.total_unmatched_counts_per_doc[key])
             recall_denominator = np.sum(self.total_gt_property_value_counts_per_doc[key])
-            metrics["property_precision"][key] = total_score / precision_denominator if precision_denominator > 0 else 0
-            metrics["property_recall"][key] = total_score / recall_denominator if recall_denominator > 0 else None
+            metrics["property_precision"][key] = safe_division(total_score, precision_denominator)
+            metrics["property_recall"][key] = safe_division(total_score, recall_denominator, None)
             if len(scores) == 0 and self.total_unmatched_counts_per_doc[key] == 0:
                 metrics["property_precision"][key] = None
 
@@ -158,15 +161,9 @@ class MetricsAccumulator:
             "pairs": self.unmatched_pair_count,
         }
         metrics["unmatched_fractions"] = {
-            "pairs": self.unmatched_pair_count / (self.unmatched_pair_count + self.matched_count)
-            if (self.unmatched_pair_count + self.matched_count) > 0
-            else 0,
-            "extra_pred_entities": self.unmatched_extra_pred_count / self.total_pred_entities
-            if self.total_pred_entities > 0
-            else 0,
-            "extra_gt_entities": self.unmatched_extra_gt_count / self.total_gt_entities
-            if self.total_gt_entities > 0
-            else 0,
+            "pairs": safe_division(self.unmatched_pair_count, self.unmatched_pair_count + self.matched_count),
+            "extra_pred_entities": safe_division(self.unmatched_extra_pred_count, self.total_pred_entities),
+            "extra_gt_entities": safe_division(self.unmatched_extra_gt_count, self.total_gt_entities),
         }
 
         return metrics

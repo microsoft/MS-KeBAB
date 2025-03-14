@@ -1,12 +1,18 @@
 {
     "aesop": {
         "entity_distance": {
-            "name": {
-                "distance_function": {
-                    "name": "EmbeddingDistance"
-                },
-                "weight": 1.0
-            }
+            "property_to_distance": {
+                "name": {
+                    "distance_function": {
+                        "name": "EmbeddingDistance"
+                    },
+                    "weight": 1
+                }
+            },
+            "default_property_distance": {
+                "name": "TokenDistance"
+            },
+            "default_property_weight": 0
         },
         "matching_threshold": 0.5,
         "default_property_distance": {

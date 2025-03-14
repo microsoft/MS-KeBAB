@@ -63,7 +63,7 @@ class ValueAveragedAesopConfig(MetricConfig):
                 else SingleValuePropertyDistance(element_distance)
             )
         return ValueAveragedAesopConfig(
-            matching_score_function=EntityDistance.from_dict(config, property_schema),
+            matching_score_function=EntityDistance.from_dict(config["entity_distance"], property_schema),
             matching_threshold=config["matching_threshold"],
             property_score_functions=property_score_functions,
             property_schema=property_schema,
@@ -157,7 +157,11 @@ def make_default_value_averaged_aesop_config(
     )
 
     return ValueAveragedAesopConfig(
-        matching_score_function=EntityDistance(property_schema, {"name": (SetPropertyDistance(TokenDistance()), 1.0)}),
+        matching_score_function=EntityDistance(
+            property_schema,
+            {"name": (SetPropertyDistance(TokenDistance()), 1)},
+            default_property_distance=SetPropertyDistance(TokenDistance()),
+            default_property_weight=0),
         matching_threshold=matching_threshold,
         property_score_functions=property_to_score,
         property_schema=property_schema,

@@ -58,10 +58,7 @@ class TokenDistance(ElementDistance):
 
     def check_constraints(self, property_: Property) -> None:
         """Check constraints for token distance."""
-        if (
-            property_.data_type.value_type is not ValueType.TEXT
-            and property_.data_type.value_type is not ValueType.DATE
-        ):
+        if property_.data_type.value_type not in {ValueType.TEXT, ValueType.DATE}:
             raise ValueError("Only ValueType.TEXT and ValueType.DATE properties are supported.")
 
     def compute(self, value1: Any, value2: Any, property_: Property) -> float:  # noqa: ARG002
@@ -251,14 +248,22 @@ class EntityDistance:
     Computed as a weighted sum of distances between properties.
     """
 
+    DEFAULT_ELEMENT_DISTANCE_CLS = TokenDistance
+    DEFAULT_PROPERTY_WEIGHT = 1.0
+
     def __init__(
         self,
         property_schema: PropertySchema,
         property_to_distance_function_and_weight: dict[str, tuple[PropertyDistance, float]],
+        default_property_distance: PropertyDistance,
+        default_property_weight: float = DEFAULT_PROPERTY_WEIGHT,
     ):
         """Initialize entity distance."""
         self.property_to_distance_function_and_weight = property_to_distance_function_and_weight
         self.property_schema = property_schema
+        self.default_property_distance = default_property_distance
+        self.default_property_weight = default_property_weight
+        self.__normalize_weights()
 
     def __call__(self, gt_entity: Entity, pred_entity: Entity) -> float:
         """Compute distance between two entities."""
@@ -268,19 +273,32 @@ class EntityDistance:
             distance += float(np.mean(value_distances)) * weight
         return distance
 
+    def __normalize_weights(self):
+        """Normalize weights to sum to 1."""
+        weight_sum = 0.0
+        for property_id in self.property_schema.properties:
+            if property_id not in self.property_to_distance_function_and_weight:
+                weight_sum += self.default_property_weight
+            else:
+                weight_sum += self.property_to_distance_function_and_weight[property_id][1]
+        for property_id in self.property_schema.properties:
+            if property_id not in self.property_to_distance_function_and_weight:
+                self.property_to_distance_function_and_weight[property_id] = (
+                    self.default_property_distance,
+                    self.default_property_weight / weight_sum,
+                )
+            else:
+                self.property_to_distance_function_and_weight[property_id] = (
+                    self.property_to_distance_function_and_weight[property_id][0],
+                    self.property_to_distance_function_and_weight[property_id][1] / weight_sum,
+                )
+
     @classmethod
     def from_dict(cls, config: dict[str, Any], property_schema: PropertySchema) -> EntityDistance:
         """Create entity distance from dictionary."""
         property_to_distance_function_and_weight = {}
-        num_missing_weights = sum("weight" not in params for params in config["entity_distance"].values())
-        weight_sum = sum(params.get("weight", 0.0) for params in config["entity_distance"].values())
-        if weight_sum > 1.0:
-            raise ValueError("Sum of weights should be less than or equal to 1.")
-        if weight_sum < 1.0 and num_missing_weights == 0:
-            raise ValueError("Sum of weights should be equal to 1.")
-        default_weight = (1.0 - weight_sum) / num_missing_weights if num_missing_weights > 0 else 0.0
-
-        for property_id, params in config["entity_distance"].items():
+        default_weight = config.get("default_property_weight", cls.DEFAULT_PROPERTY_WEIGHT)
+        for property_id, params in config["property_to_distance"].items():
             if property_id not in property_schema.properties:
                 raise ValueError(f"Property '{property_id}' is not in the property schema.")
             element_distance = getattr(sys.modules[__name__], params["distance_function"]["name"]).from_dict(
@@ -291,11 +309,19 @@ class EntityDistance:
                 if property_schema.properties[property_id].is_collection
                 else SingleValuePropertyDistance(element_distance)
             )
-            property_to_distance_function_and_weight[property_id] = (
-                property_distance,
-                params.get("weight", default_weight),
-            )
-        return EntityDistance(property_schema, property_to_distance_function_and_weight)
+            weight = params.get("weight", default_weight)
+            property_to_distance_function_and_weight[property_id] = (property_distance, weight)
+        default_element_distance_cls = (getattr(sys.modules[__name__], config["default_property_distance"]["name"])
+                                        if "default_property_distance" in config
+                                        else cls.DEFAULT_ELEMENT_DISTANCE_CLS)
+        default_property_distance = SetPropertyDistance(
+            default_element_distance_cls.from_dict(
+                config["default_property_distance"].get("params", {})
+            ))
+        return EntityDistance(property_schema,
+                              property_to_distance_function_and_weight,
+                              default_property_distance,
+                              default_weight)
 
 
 #######################################################################################################################
