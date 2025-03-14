@@ -311,17 +311,17 @@ class EntityDistance:
             )
             weight = params.get("weight", default_weight)
             property_to_distance_function_and_weight[property_id] = (property_distance, weight)
-        default_element_distance_cls = (getattr(sys.modules[__name__], config["default_property_distance"]["name"])
-                                        if "default_property_distance" in config
-                                        else cls.DEFAULT_ELEMENT_DISTANCE_CLS)
+        default_element_distance_cls = (
+            getattr(sys.modules[__name__], config["default_property_distance"]["name"])
+            if "default_property_distance" in config
+            else cls.DEFAULT_ELEMENT_DISTANCE_CLS
+        )
         default_property_distance = SetPropertyDistance(
-            default_element_distance_cls.from_dict(
-                config["default_property_distance"].get("params", {})
-            ))
-        return EntityDistance(property_schema,
-                              property_to_distance_function_and_weight,
-                              default_property_distance,
-                              default_weight)
+            default_element_distance_cls.from_dict(config["default_property_distance"].get("params", {}))
+        )
+        return EntityDistance(
+            property_schema, property_to_distance_function_and_weight, default_property_distance, default_weight
+        )
 
 
 #######################################################################################################################

@@ -91,9 +91,11 @@ class EvaluatedPropertyMetrics:
             f"unmatched_count={self.unmatched_count})"
         )
 
-def safe_division(a: float, b: float, default=0) -> float:
+
+def safe_division(a: float, b: float, default: float | None = 0.0) -> float | None:
     """Safely divide two numbers."""
     return a / b if b != 0 else default
+
 
 @dataclass
 class MetricsAccumulator:
