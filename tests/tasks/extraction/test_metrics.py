@@ -193,7 +193,7 @@ def test_entity_matches_with_low_matching_scores_should_not_be_evaluated(propert
 
     config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=0.5, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     # no entities are matched
     assert metrics["matched_count"] == 0
@@ -228,7 +228,7 @@ def test_match_entities_with_different_thresholds(property_schema: PropertySchem
     # threshold 1.0
     config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=1.0, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     # no extra entities in the ground truth or predictions
     assert metrics["unmatched_counts"]["extra_gt_entities"] == 0
@@ -244,7 +244,7 @@ def test_match_entities_with_different_thresholds(property_schema: PropertySchem
     # threshold 0.5
     config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=0.5, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     # with a threshold of 0.5, the first two entities are matched
     assert metrics["matched_count"] == 2
@@ -256,7 +256,7 @@ def test_match_entities_with_different_thresholds(property_schema: PropertySchem
     # threshold 0.0
     config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=0.0, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     # with a threshold of 0, one entity is matched
 
@@ -311,7 +311,7 @@ def test_evaluate_target_entities_with_themselves(property_schema: PropertySchem
 
     config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["property_precision"]["name"] == metrics["property_precision"]["type"] == 1.0
     assert metrics["property_recall"]["name"] == metrics["property_recall"]["type"] == 1.0
@@ -333,7 +333,7 @@ def test_evaluate_target_entities_with_more_predictions(property_schema: Propert
 
     config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["matched_count"] == 2
     assert metrics["unmatched_counts"]["extra_pred_entities"] == 2
@@ -362,7 +362,7 @@ def test_evaluate_target_entities_with_more_ground_truth(property_schema: Proper
 
     config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["matched_count"] == 2
     assert metrics["unmatched_counts"]["extra_pred_entities"] == 0
@@ -381,7 +381,7 @@ def test_evaluate_set_properties_with_same_values(property_schema: PropertySchem
 
     config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["property_precision"]["name"] == metrics["property_precision"]["type"] == 1.0
     assert metrics["property_recall"]["name"] == metrics["property_recall"]["type"] == 1.0
@@ -475,7 +475,7 @@ def test_evaluate_missing_properties_in_prediction(property_schema: PropertySche
 
     config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["property_precision"]["name"] == 1.0
     assert metrics["property_recall"]["name"] == 1.0
@@ -489,7 +489,7 @@ def test_evaluate_more_properties_in_prediction(property_schema: PropertySchema)
 
     config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["property_precision"]["name"] == 1.0
     assert metrics["property_recall"]["name"] == 1.0
@@ -593,7 +593,7 @@ def test_evaluate_entities_with_different_properties(property_schema: PropertySc
 
     config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert not metrics["property_precision"]["employer"]
     assert metrics["property_recall"]["employer"] == 0.0
@@ -797,7 +797,7 @@ def test_unmatched_entities_in_predictions_should_not_be_evaluated(property_sche
 
     config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["matched_count"] == 2
     assert metrics["unmatched_counts"]["extra_gt_entities"] == 0
@@ -818,7 +818,7 @@ def test_unmatched_entities_in_gt_should_not_be_evaluated(property_schema: Prope
 
     config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
     aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
-    metrics = aesop_metric_calculator.run(predictions, ground_truth)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["matched_count"] == 2
     assert metrics["unmatched_counts"]["extra_gt_entities"] == 1
