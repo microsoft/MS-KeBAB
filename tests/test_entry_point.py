@@ -77,35 +77,29 @@ def test_task_interface():
                             "avg_property_precision": 0.237,
                             "avg_property_recall": 0.356,
                             "matched_count": 4,
-                            "unmatched_counts": {
-                                "extra_gt_entities": 24,
-                                "extra_pred_entities": 0,
-                                "pairs": 0
-                            },
+                            "unmatched_counts": {"extra_gt_entities": 24, "extra_pred_entities": 0, "pairs": 0},
                             "unmatched_fractions": {
                                 "pairs": 0.0,
                                 "extra_pred_entities": 0.0,
-                                "extra_gt_entities": 0.857
-                            }},
+                                "extra_gt_entities": 0.857,
+                            },
+                        },
                         "cd831c4a59537a6936fde50c355173e088621a74bd594da1e76e00fd89db9e9f": {
                             "property_precision": {"name": 0.672, "type": 0.0, "descriptions": 0.0},
                             "property_recall": {"name": 0.672, "type": 0.0, "descriptions": None},
                             "avg_property_precision": 0.224,
                             "avg_property_recall": 0.336,
                             "matched_count": 4,
-                            "unmatched_counts": {
-                                "extra_gt_entities": 23,
-                                "extra_pred_entities": 0,
-                                "pairs": 0},
+                            "unmatched_counts": {"extra_gt_entities": 23, "extra_pred_entities": 0, "pairs": 0},
                             "unmatched_fractions": {
                                 "pairs": 0.0,
                                 "extra_pred_entities": 0.0,
-                                "extra_gt_entities": 0.852
-                            }
-                        }
+                                "extra_gt_entities": 0.852,
+                            },
+                        },
                     },
-                    },
-                }
+                },
+            },
         },
         "Linking-Heldout": {
             "predictions": "tests/data/linking/predictions.jsonl",

@@ -92,7 +92,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
 
         def process_document(
             input_: tuple[int, tuple[ExtractionOutput, ExtractionOutput]],
-        ) -> MetricsAccumulator:
+        ) -> tuple[MetricsAccumulator, str]:
             """Compute metrics for a single document."""
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1}")
