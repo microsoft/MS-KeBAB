@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from itertools import zip_longest
 from pathlib import Path
@@ -94,6 +95,7 @@ class ExtractionTaskInstance(TaskInstance):
         self,
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
+        logger: logging.Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the extraction task instance."""
         if hasattr(self, "__data_ground_truth_extracted_entities"):
@@ -113,7 +115,7 @@ class ExtractionTaskInstance(TaskInstance):
         for metric_name, metric_config_dict in self.metrics_config.items():
             metric_calculator_cls = self.__metric_calculator_cls[metric_name]
             metric_config = self.__metric_config_cls[metric_name].from_dict(metric_config_dict, self.property_schema)
-            metric_results = metric_calculator_cls(metric_config).run(pred_extractions, self.read_items())  # type: ignore
+            metric_results = metric_calculator_cls(metric_config, logger).run(pred_extractions, self.read_items())  # type: ignore
             metrics[metric_name] = metric_results
         if eval_result_path:
             save_dict_to_json(metrics, eval_result_path)

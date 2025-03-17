@@ -1,15 +1,21 @@
 {
     "aesop": {
         "entity_distance": {
-            "name": {
-                "distance_function": {
-                    "name": "EmbeddingDistance",
-                    "params": {
-                        "model": "paraphrase-MiniLM-L6-v2"
-                    }
-                },
-                "weight": 1.0
-            }
+            "property_to_distance": {
+                "name": {
+                    "distance_function": {
+                        "name": "EmbeddingDistance"
+                    },
+                    "weight": 1
+                }
+            },
+            "default_property_distance": {
+                "name": "TokenDistance",
+                "params": {
+                    "encoding": "cl100k_base"
+                }
+            },
+            "default_property_weight": 0
         },
         "matching_threshold": 0.5,
         "default_property_distance": {
@@ -37,34 +43,9 @@
                     "model": "paraphrase-MiniLM-L6-v2"
                 }
             },
-            "objectives": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
-            },
-            "risks": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
-            },
-            "purpose": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
-            },
-            "url": {
-                "name": "BinaryMatchDistance"
-            },
             "email": {
                 "name": "BinaryMatchDistance"
-            },
-            "password": {
-                "name": "BinaryMatchDistance"
             }
-        },
-        "property_schema": "./tests/data/extraction/property_schema.json"
+        }
     }
 }

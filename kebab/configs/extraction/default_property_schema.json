@@ -28,6 +28,13 @@
             "description": "Entity definitions.",
             "display_name": "definitions",
             "is_collection": true
+        },
+        {
+            "property_id": "descriptions",
+            "data_type_id": "text",
+            "description": "Entity descriptions.",
+            "display_name": "descriptions",
+            "is_collection": true
         }
     ]
 }

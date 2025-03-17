@@ -53,16 +53,18 @@ def test_task_interface():
             "predictions": "tests/data/extraction/re_docred_dev_extracted_entities.jsonl",
             "metrics": {
                 "aesop": {
-                    "avg_property_precision": 0.022,
-                    "avg_property_recall": 0.36,
+                    "avg_property_precision": 0.23,
+                    "avg_property_recall": 0.345,
                     "matched_count": 8,
                     "property_precision": {
-                        "name": 0.044,
+                        "name": 0.692,
                         "type": 0.0,
+                        "descriptions": 0.0,
                     },
                     "property_recall": {
-                        "name": 0.72,
+                        "name": 0.692,
                         "type": 0.0,
+                        "descriptions": None,
                     },
                     "unmatched_counts": {"extra_gt_entities": 47, "extra_pred_entities": 0, "pairs": 0},
                     "unmatched_fractions": {"extra_gt_entities": 0.854, "extra_pred_entities": 0.0, "pairs": 0.0},

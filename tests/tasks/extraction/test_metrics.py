@@ -51,7 +51,12 @@ set_token_score = PropertyScore(SetPropertyDistance(TokenDistance(encoder=encode
 
 
 def name_entity_distance(property_schema: PropertySchema) -> EntityDistance:
-    return EntityDistance(property_schema, {"name": (SingleValuePropertyDistance(TokenDistance()), 1.0)})
+    return EntityDistance(
+        property_schema,
+        {"name": (SingleValuePropertyDistance(TokenDistance()), 1)},
+        default_property_distance=SetPropertyDistance(TokenDistance(encoder=encoder)),
+        default_property_weight=0,
+    )
 
 
 def to_entities(properties: list[dict[str, Any]]) -> list[Entity]:

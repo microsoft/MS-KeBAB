@@ -92,6 +92,11 @@ class EvaluatedPropertyMetrics:
         )
 
 
+def safe_division(a: float, b: float, default: float | None = 0.0) -> float | None:
+    """Safely divide two numbers."""
+    return a / b if b != 0 else default
+
+
 @dataclass
 class MetricsAccumulator:
     """Accumulates scores for metrics computation across all files."""
@@ -132,10 +137,19 @@ class MetricsAccumulator:
             total_score = np.sum(scores)
             precision_denominator = len(scores) + np.sum(self.total_unmatched_counts_per_doc[key])
             recall_denominator = np.sum(self.total_gt_property_value_counts_per_doc[key])
-            metrics["property_precision"][key] = total_score / precision_denominator if precision_denominator > 0 else 0
-            metrics["property_recall"][key] = total_score / recall_denominator if recall_denominator > 0 else None
+            metrics["property_precision"][key] = safe_division(total_score, precision_denominator)
+            metrics["property_recall"][key] = safe_division(total_score, recall_denominator, None)
             if len(scores) == 0 and self.total_unmatched_counts_per_doc[key] == 0:
                 metrics["property_precision"][key] = None
+
+        # sort for convenience
+        metrics["property_precision"] = dict(
+            sorted(metrics["property_precision"].items(), key=lambda key: -key[1] if key[1] else 0.0)
+        )
+        metrics["property_recall"] = dict(
+            sorted(metrics["property_recall"].items(), key=lambda key: -key[1] if key[1] else 0.0)
+        )
+
         metrics["avg_property_precision"] = np.mean(  # type: ignore
             [value for value in metrics["property_precision"].values() if value is not None]
         )
@@ -149,9 +163,9 @@ class MetricsAccumulator:
             "pairs": self.unmatched_pair_count,
         }
         metrics["unmatched_fractions"] = {
-            "pairs": self.unmatched_pair_count / (self.unmatched_pair_count + self.matched_count),
-            "extra_pred_entities": self.unmatched_extra_pred_count / self.total_pred_entities,
-            "extra_gt_entities": self.unmatched_extra_gt_count / self.total_gt_entities,
+            "pairs": safe_division(self.unmatched_pair_count, self.unmatched_pair_count + self.matched_count),
+            "extra_pred_entities": safe_division(self.unmatched_extra_pred_count, self.total_pred_entities),
+            "extra_gt_entities": safe_division(self.unmatched_extra_gt_count, self.total_gt_entities),
         }
 
         return metrics

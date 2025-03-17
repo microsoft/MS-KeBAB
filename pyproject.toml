@@ -47,7 +47,7 @@ pythonpath = [
 ]
 
 [tool.setuptools.package-data]
-"*" = ["py.typed"]
+"*" = ["py.typed", "configs/**/*"]
 
 [tool.pyright]
 typeCheckingMode = "standard"
