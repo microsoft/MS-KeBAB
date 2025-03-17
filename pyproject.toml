@@ -14,7 +14,7 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
     "click",
-    "numpy==2.2.3",
+    "numpy==2.2.4",
     "requests",
     "tqdm",
     "tiktoken",
