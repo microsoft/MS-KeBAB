@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from kebab.contracts.document import Document, DocumentUtilities
 from kebab.contracts.entity import DataType, Entity, Property, PropertySchema, ValueType

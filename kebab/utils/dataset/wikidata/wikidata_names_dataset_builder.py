@@ -61,8 +61,10 @@ class WikidataNamesDatasetBuilder:
         """Run the extraction process."""
         self._logger.info("Extracting names of entities from Wikidata.")
 
-        graph = self.load_hierarchy(self.wikidata_type_hierarchy_path)
-        all_subtypes = {st for t in self.type_ids for st in wikidata_utils.collect_all_subtypes(graph, t)}
+        graph, type_id_to_node = self.load_hierarchy(self.wikidata_type_hierarchy_path)
+        all_subtypes = {
+            st for t in self.type_ids for st in wikidata_utils.collect_all_subtypes(graph, type_id_to_node, t)
+        }
 
         self._logger.info(f"Extracting names for {len(all_subtypes):,d} subtypes")
 

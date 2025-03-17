@@ -460,7 +460,11 @@ def load_properties(path: pathlib.Path) -> dict[str, dict]:
 
 
 def load_type_hierarchy(type_hierarchy_path: pathlib.Path) -> tuple[dict[str, dict], dict[str, dict]]:
-    """Load the hierarchy of Wikidata types."""
+    """Load the hierarchy of Wikidata types.
+
+    Returns:
+        A tuple containing the type hierarchy graph and a map from all type IDs to their nodes.
+    """
     logging.info("Loading the hierarchy of Wikidata types")
     graph = {}
     type_id_to_node_map = {}
@@ -492,18 +496,9 @@ def load_wikidata_entities(wikidata_entities_path: pathlib.Path) -> Iterable[Wik
     logging.info(f"Read {count:,d} entities")
 
 
-def collect_all_subtypes(graph: dict[str, dict], type_id: str) -> set[str]:
+def collect_all_subtypes(graph: dict[str, dict], type_id_to_node: dict[str, dict], type_id: str) -> set[str]:
     """Collect all subtypes of the given type from the type hierarchy."""
-    type_id_to_node = {}
-    for node in graph.values():
-        for node_id in node["merged_ids"]:
-            type_id_to_node[node_id] = node
-
-        for node_id in node["redirect_from_ids"]:
-            type_id_to_node[node_id] = node
-
     type_id = type_id_to_node[type_id]["id"]
-
     subtypes = set()
     stack = [type_id]
     while stack:

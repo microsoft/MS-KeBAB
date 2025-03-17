@@ -62,7 +62,9 @@ class WikidataDatasetBuilder:
 
         # load type hierarchy
         graph, type_id_to_node = self.load_type_hierarchy(self.wikidata_type_hierarchy_path)
-        all_subtypes = {st for t in self.type_ids for st in wikidata_utils.collect_all_subtypes(graph, t)}
+        all_subtypes = {
+            st for t in self.type_ids for st in wikidata_utils.collect_all_subtypes(graph, type_id_to_node, t)
+        }
         self._logger.info(f"Found {len(all_subtypes):,d} subtypes")
 
         # load properties
