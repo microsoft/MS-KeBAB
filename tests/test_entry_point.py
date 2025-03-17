@@ -53,22 +53,52 @@ def test_task_interface():
             "predictions": "tests/data/extraction/re_docred_dev_extracted_entities.jsonl",
             "metrics": {
                 "aesop": {
-                    "avg_property_precision": 0.23,
-                    "avg_property_recall": 0.345,
-                    "matched_count": 8,
-                    "property_precision": {
-                        "name": 0.692,
-                        "type": 0.0,
-                        "descriptions": 0.0,
+                    "dataset_metrics": {
+                        "avg_property_precision": 0.23,
+                        "avg_property_recall": 0.345,
+                        "matched_count": 8,
+                        "property_precision": {
+                            "name": 0.692,
+                            "type": 0.0,
+                            "descriptions": 0.0,
+                        },
+                        "property_recall": {
+                            "name": 0.692,
+                            "type": 0.0,
+                            "descriptions": None,
+                        },
+                        "unmatched_counts": {"extra_gt_entities": 47, "extra_pred_entities": 0, "pairs": 0},
+                        "unmatched_fractions": {"extra_gt_entities": 0.854, "extra_pred_entities": 0.0, "pairs": 0.0},
                     },
-                    "property_recall": {
-                        "name": 0.692,
-                        "type": 0.0,
-                        "descriptions": None,
+                    "per_document_metrics": {
+                        "2f984bacd714639a11d0ed2055b9c212c4ddad6cf1c80c83d92f92a7e92af058": {
+                            "property_precision": {"name": 0.712, "type": 0.0, "descriptions": 0.0},
+                            "property_recall": {"name": 0.712, "type": 0.0, "descriptions": None},
+                            "avg_property_precision": 0.237,
+                            "avg_property_recall": 0.356,
+                            "matched_count": 4,
+                            "unmatched_counts": {"extra_gt_entities": 24, "extra_pred_entities": 0, "pairs": 0},
+                            "unmatched_fractions": {
+                                "pairs": 0.0,
+                                "extra_pred_entities": 0.0,
+                                "extra_gt_entities": 0.857,
+                            },
+                        },
+                        "cd831c4a59537a6936fde50c355173e088621a74bd594da1e76e00fd89db9e9f": {
+                            "property_precision": {"name": 0.672, "type": 0.0, "descriptions": 0.0},
+                            "property_recall": {"name": 0.672, "type": 0.0, "descriptions": None},
+                            "avg_property_precision": 0.224,
+                            "avg_property_recall": 0.336,
+                            "matched_count": 4,
+                            "unmatched_counts": {"extra_gt_entities": 23, "extra_pred_entities": 0, "pairs": 0},
+                            "unmatched_fractions": {
+                                "pairs": 0.0,
+                                "extra_pred_entities": 0.0,
+                                "extra_gt_entities": 0.852,
+                            },
+                        },
                     },
-                    "unmatched_counts": {"extra_gt_entities": 47, "extra_pred_entities": 0, "pairs": 0},
-                    "unmatched_fractions": {"extra_gt_entities": 0.854, "extra_pred_entities": 0.0, "pairs": 0.0},
-                }
+                },
             },
         },
         "Linking-Heldout": {

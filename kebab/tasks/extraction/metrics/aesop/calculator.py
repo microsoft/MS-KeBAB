@@ -88,11 +88,12 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
 
     def run(self, prediction: Iterable[ExtractionOutput], ground_truth: Iterable[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
+        metrics = {"per_document_metrics": {}, "dataset_metrics": {}}
         metrics_accumulator = MetricsAccumulator()
 
         def process_document(
             input_: tuple[int, tuple[ExtractionOutput, ExtractionOutput]],
-        ) -> MetricsAccumulator:
+        ) -> tuple[MetricsAccumulator, str]:
             """Compute metrics for a single document."""
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1}")
@@ -103,16 +104,18 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             metrics_computer = MetricsComputer(gt.entities, pred.entities, self.config.property_schema)
             metrics = metrics_computer.compute_bipartite_metrics(matched_pairs, self.config.property_score_functions)
             self.logger.info(f"Document {idx + 1}: Done")
-            return metrics
+            return metrics, gt.document.document_id
 
         start = time.time()
-        for idx, result in enumerate(
+        for idx, (document_metrics_accumulator, doc_id) in enumerate(
             map(
                 process_document,
                 enumerate(zip(prediction, ground_truth, strict=True)),
             )
         ):
-            metrics_accumulator.update(result)
+            document_metrics = document_metrics_accumulator.accumulate_metrics()
+            metrics["per_document_metrics"][doc_id] = document_metrics
+            metrics_accumulator.update(document_metrics_accumulator)
             elapsed = time.time() - start
             self.logger.info(f"Time elapsed: {elapsed:.2f} seconds")
             self.logger.info(f"Average processing time: {elapsed / (idx + 1):.2f} seconds per document")
@@ -120,10 +123,10 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         elapsed = time.time() - start
         self.logger.info(f"Total time elapsed: {elapsed:.2f} seconds")
         start = time.time()
-        accumulated_metrics = metrics_accumulator.accumulate_metrics()
+        metrics["dataset_metrics"] = metrics_accumulator.accumulate_metrics()
         elapsed = time.time() - start
         self.logger.info(f"Metrics accumulation time: {elapsed:.2f} seconds")
-        return accumulated_metrics
+        return metrics
 
 
 def make_default_value_averaged_aesop_config(
