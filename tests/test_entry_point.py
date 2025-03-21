@@ -27,6 +27,7 @@ def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
 
 def test_task_interface():
     """Test task interface."""
+    Task.clear_created_task_types()
     benchmark = mskebab.Benchmark(Path(__file__).parent / "data" / "test_task_instances.json")
 
     tasks = benchmark.tasks
@@ -136,8 +137,6 @@ def test_task_interface():
             if task_instance.name.endswith("-Heldout"):
                 metrics = task_instance.evaluate(Path(task_instance_data[task_instance.name]["predictions"]))
                 assert_dicts_equal(task_instance_data[task_instance.name]["metrics"], metrics, epsilon=1e-3)
-
-    Task.clear_created_task_types()
 
 
 def test_cache():
