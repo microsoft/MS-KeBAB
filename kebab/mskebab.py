@@ -141,9 +141,9 @@ class Cache:
         """Validate and save the cache map."""
         self.__cache_dir.mkdir(parents=True, exist_ok=True)
 
-        for k, v in self.__file_map.copy().items():
-            if not v.exists() or not v.is_file() or v.parents[0] != self.__cache_dir:
-                del self.__file_map[k]
+        self.__file_map = {
+            k: v for k, v in self.__file_map.items() if v.exists() and v.is_file() and v.parents[0] == self.__cache_dir
+        }
 
         file_map_str_dict = {k: str(v) for k, v in self.__file_map.items()}
 
