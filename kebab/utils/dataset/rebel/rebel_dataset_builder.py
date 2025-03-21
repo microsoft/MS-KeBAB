@@ -21,8 +21,8 @@ Workflow:
 - Given all the entity IDs used in the pairwise dataset, use all fragments of these entities to produce the clustering dataset.
 
 Example output (linking):
-{"left": {"entity_id": "", "properties": {"name": ["President"]}, "metadata": {"fragment_id": "13", "type": ["public office", "elective office"]}}, "right": {"entity_id": "", "properties": {"name": ["Philippine president"], "has list": ["list of presidents of the Philippines"]}, "metadata": {"fragment_id": "64", "type": ["public office", "elective office"]}}}
-{"left": {"entity_id": "", "properties": {"name": ["Philippine president"]}, "metadata": {"fragment_id": "3", "type": ["public office", "elective office"]}}, "right": {"entity_id": "", "properties": {"name": ["President"]}, "metadata": {"fragment_id": "13", "type": ["public office", "elective office"]}}}
+[{"entity_id": "", "properties": {"name": ["Philippine president"], "has list": ["list of presidents of the Philippines"]}, "metadata": {"fragment_id": "64", "type": ["public office", "elective office"]}}, {"entity_id": "", "properties": {"name": ["Philippine president"]}, "metadata": {"fragment_id": "3", "type": ["public office", "elective office"]}}]
+[{"entity_id": "", "properties": {"name": ["President"]}, "metadata": {"fragment_id": "13", "type": ["public office", "elective office"]}}, {"entity_id": "", "properties": {"name": ["Philippine president"], "has list": ["list of presidents of the Philippines"]}, "metadata": {"fragment_id": "64", "type": ["public office", "elective office"]}}]
 
 Example output (linking ground truth):
 true
@@ -35,6 +35,10 @@ Example output (clustering):
 Example output (clustering ground truth):
 "Q1209571"
 "Q1209571"
+
+Example output (fragment to entity map):
+["0", "Q33298"]
+["1", "Q918448"]
 """
 
 from __future__ import annotations
@@ -57,6 +61,7 @@ class RebelDatasetBuilder:
     LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_ground_truth.jsonl"
     CLUSTERING_DATASET_FILENAME: str = "rebel_clustering_dataset.jsonl"
     CLUSTERING_GROUND_TRUTH_FILENAME: str = "rebel_clustering_ground_truth.jsonl"
+    FRAGMENT_TO_ENTITY_MAP_FILENAME: str = "rebel_fragment_to_entity_map.jsonl"
 
     def __init__(
         self,
@@ -79,6 +84,7 @@ class RebelDatasetBuilder:
         self.clustering_ground_truth_output_path = self.output_dir / self.CLUSTERING_GROUND_TRUTH_FILENAME
         self.linking_dataset_output_path = self.output_dir / self.LINKING_DATASET_FILENAME
         self.linking_ground_truth_output_path = self.output_dir / self.LINKING_GROUND_TRUTH_FILENAME
+        self.fragment_to_entity_map_output_path = self.output_dir / self.FRAGMENT_TO_ENTITY_MAP_FILENAME
 
     def run(self) -> None:
         """Run the dataset building pipeline."""
@@ -298,20 +304,25 @@ class RebelDatasetBuilder:
 
     def write_datasets(self, fragments: list[ResolvedWikidataEntity], pairs: Iterable[tuple[int, int]]) -> None:
         """Write the pairwise linking and clustering datasets."""
-        entity_ids = set()
+        # write the fragment to entity map as tuples
+        fragment_to_entity_map = {fragment.metadata["fragment_id"]: fragment.entity_id for fragment in fragments}
+        with open(self.fragment_to_entity_map_output_path, mode="w", encoding="utf-8") as f:
+            for fragment_id, entity_id in fragment_to_entity_map.items():
+                f.write(json.dumps((fragment_id, entity_id)) + "\n")
 
         # write the pairwise linking dataset
+        entity_ids = set()
         count = 0
         with (
             open(self.linking_dataset_output_path, mode="w", encoding="utf-8") as f_ds,
             open(self.linking_ground_truth_output_path, mode="w", encoding="utf-8") as f_gt,
         ):
             for pair in pairs:
-                d = {
-                    "left": fragments[pair[0]].without_entity_id().to_dict(minimal_repr=True),
-                    "right": fragments[pair[1]].without_entity_id().to_dict(minimal_repr=True),
-                }
-                f_ds.write(json.dumps(d) + "\n")
+                record = (
+                    fragments[pair[0]].without_entity_id().to_dict(minimal_repr=True),
+                    fragments[pair[1]].without_entity_id().to_dict(minimal_repr=True),
+                )
+                f_ds.write(json.dumps(record) + "\n")
 
                 label = fragments[pair[0]].entity_id == fragments[pair[1]].entity_id
                 f_gt.write(json.dumps(label) + "\n")
