@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from kebab import mskebab
-from kebab.contracts.task import Task, TaskType
+from kebab.contracts.task import TaskType
 
 
 def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
@@ -27,7 +27,6 @@ def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
 
 def test_task_interface():
     """Test task interface."""
-    Task.clear_created_task_types()
     benchmark = mskebab.Benchmark(Path(__file__).parent / "data" / "test_task_instances.json")
 
     tasks = benchmark.tasks

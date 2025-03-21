@@ -153,6 +153,8 @@ class Cache:
 
 def benchmark(allowed_tasks: list[TaskType] | None = None) -> Benchmark:
     """Initialize and return benchmark object."""
+    # TODO(pmyshkov): Remove this line when the issue with the task type registration is fixed.
+    Task.clear_created_task_types()
     return Benchmark(Path(__file__).parents[0] / "configs" / "instances.json", allowed_tasks=allowed_tasks)
 
 
