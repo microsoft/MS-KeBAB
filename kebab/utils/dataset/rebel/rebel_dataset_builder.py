@@ -53,9 +53,9 @@ from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
 class RebelDatasetBuilder:
     """Build linking and clustering fragment datasets based on REBEL and Wikidata."""
 
-    LINKING_DATASET_FILENAME: str = "rebel_linking_pairs_dataset.jsonl"
-    LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_pairs_ground_truth.jsonl"
-    CLUSTERING_DATASET_FILENAME: str = "rebel_clustering_entities_dataset.jsonl"
+    LINKING_DATASET_FILENAME: str = "rebel_linking_dataset.jsonl"
+    LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_ground_truth.jsonl"
+    CLUSTERING_DATASET_FILENAME: str = "rebel_clustering_dataset.jsonl"
     CLUSTERING_GROUND_TRUTH_FILENAME: str = "rebel_clustering_ground_truth.jsonl"
 
     def __init__(
