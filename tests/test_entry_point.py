@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from kebab import mskebab
-from kebab.contracts.task import TaskType
+from kebab.contracts.task import Task, TaskType
 
 
 def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
@@ -46,8 +46,10 @@ def test_task_interface():
         "Entity-Generation-REBEL",
         "Clustering-Heldout",
     }
+
     for task_instance_name, task_instance in task_instances.items():
         assert task_instance_name == task_instance.name
+
     task_instance_data = {
         "Extraction-Heldout": {
             "predictions": "tests/data/extraction/re_docred_dev_extracted_entities.jsonl",
@@ -127,12 +129,15 @@ def test_task_interface():
             },
         },
     }
+
     for task in tasks.values():
         for task_instance in task.instances.values():
             assert task_instance.task == task
             if task_instance.name.endswith("-Heldout"):
                 metrics = task_instance.evaluate(Path(task_instance_data[task_instance.name]["predictions"]))
                 assert_dicts_equal(task_instance_data[task_instance.name]["metrics"], metrics, epsilon=1e-3)
+
+    Task.clear_created_task_types()
 
 
 def test_cache():
