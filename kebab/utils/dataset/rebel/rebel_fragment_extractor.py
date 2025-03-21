@@ -361,7 +361,7 @@ class RebelFragmentExtractor:
                 for line in f:
                     try:
                         yield json.loads(line)
-                    except json.JSONDecodeError as e:  # noqa: PERF203
+                    except json.JSONDecodeError as e:
                         error_count += 1
                         err = e
 

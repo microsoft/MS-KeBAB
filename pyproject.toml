@@ -33,7 +33,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.9.10",
+    "ruff==0.11.0",
 ]
 
 all = ["kebab[dev]"]

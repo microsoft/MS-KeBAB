@@ -46,8 +46,10 @@ def test_task_interface():
         "Entity-Generation-REBEL",
         "Clustering-Heldout",
     }
+
     for task_instance_name, task_instance in task_instances.items():
         assert task_instance_name == task_instance.name
+
     task_instance_data = {
         "Extraction-Heldout": {
             "predictions": "tests/data/extraction/re_docred_dev_extracted_entities.jsonl",
@@ -127,6 +129,7 @@ def test_task_interface():
             },
         },
     }
+
     for task in tasks.values():
         for task_instance in task.instances.values():
             assert task_instance.task == task
