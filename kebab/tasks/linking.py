@@ -91,7 +91,7 @@ class LinkingTaskInstance(TaskInstance):
         gt_labels = list(ItemJsonlReader[bool](self.data_ground_truth_boolean, converter=bool).read_items())
 
         metrics = defaultdict(float)
-        for log_odds, pred_label, gt_label in zip(predictions, pred_labels, gt_labels):
+        for log_odds, pred_label, gt_label in zip(predictions, pred_labels, gt_labels, strict=False):
             metrics["total"] += 1
 
             if pred_label == gt_label:

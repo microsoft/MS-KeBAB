@@ -12,10 +12,6 @@ import urllib.request
 from pathlib import Path
 
 from kebab.contracts.task import Task, TaskInstance, TaskType
-from kebab.tasks.clustering import ClusteringTaskInstance
-from kebab.tasks.entity_generation import EntityGenerationTaskInstance
-from kebab.tasks.extraction.task import ExtractionTaskInstance
-from kebab.tasks.linking import LinkingTaskInstance
 
 
 class Benchmark:
@@ -34,31 +30,53 @@ class Benchmark:
         """Return copy of task instance list."""
         return self.__task_instances.copy()  # To disallow modifying this dictionary from outside of this class
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, allowed_tasks: list[TaskType] | None = None):
         """Initialize entry point."""
         self.__tasks = {}
         self.__task_instances = {}
-        Benchmark.__register_task_types()
+        Benchmark.__register_task_types(allowed_tasks)
+
         with open(path) as f:
             task_instance_config = json.load(f)
+
         for instance_name, instance_config in task_instance_config.items():
             task_type = TaskType[instance_config["task"]]
+
+            if allowed_tasks and task_type not in allowed_tasks:
+                continue
+
             if task_type not in self.__tasks:
                 task = Task(task_type)
                 self.__tasks[task_type] = task
             else:
                 task = self.__tasks[task_type]
+
             self.__task_instances[instance_name] = TaskInstance.create_task_instance(
                 instance_name, task, instance_config["data"]
             )
 
     @staticmethod
-    def __register_task_types() -> None:
+    def __register_task_types(allowed_tasks: list[TaskType] | None = None) -> None:
         """Register available task types with their corresponding classes."""
-        TaskInstance.register_task_type(TaskType.EntityGeneration, EntityGenerationTaskInstance)
-        TaskInstance.register_task_type(TaskType.Extraction, ExtractionTaskInstance)
-        TaskInstance.register_task_type(TaskType.Linking, LinkingTaskInstance)
-        TaskInstance.register_task_type(TaskType.Clustering, ClusteringTaskInstance)
+        if allowed_tasks is None or TaskType.Linking in allowed_tasks:
+            from kebab.tasks.linking import LinkingTaskInstance
+
+            TaskInstance.register_task_type(TaskType.Linking, LinkingTaskInstance)
+
+        if allowed_tasks is None or TaskType.EntityGeneration in allowed_tasks:
+            from kebab.tasks.entity_generation import EntityGenerationTaskInstance
+
+            TaskInstance.register_task_type(TaskType.EntityGeneration, EntityGenerationTaskInstance)
+
+        if allowed_tasks is None or TaskType.Extraction in allowed_tasks:
+            from kebab.tasks.extraction.task import ExtractionTaskInstance
+
+            TaskInstance.register_task_type(TaskType.Extraction, ExtractionTaskInstance)
+
+        if allowed_tasks is None or TaskType.Clustering in allowed_tasks:
+            from kebab.tasks.clustering import ClusteringTaskInstance
+
+            TaskInstance.register_task_type(TaskType.Clustering, ClusteringTaskInstance)
 
 
 class Cache:
@@ -122,17 +140,22 @@ class Cache:
     def validate_and_save_map(self):
         """Validate and save the cache map."""
         self.__cache_dir.mkdir(parents=True, exist_ok=True)
-        for k, v in self.__file_map.items():
-            if not v.exists() or not v.is_file() or v.parents[0] != self.__cache_dir:
-                del self.__file_map[k]
+
+        self.__file_map = {
+            k: v for k, v in self.__file_map.items() if v.exists() and v.is_file() and v.parents[0] == self.__cache_dir
+        }
+
         file_map_str_dict = {k: str(v) for k, v in self.__file_map.items()}
+
         with open(self.__file_map_path, "w") as f:
             json.dump(file_map_str_dict, f)
 
 
-def benchmark() -> Benchmark:
+def benchmark(allowed_tasks: list[TaskType] | None = None) -> Benchmark:
     """Initialize and return benchmark object."""
-    return Benchmark(Path(__file__).parents[0] / "configs" / "instances.json")
+    # TODO(pmyshkov): Remove this line when the issue with the task type registration is fixed.
+    Task.clear_created_task_types()
+    return Benchmark(Path(__file__).parents[0] / "configs" / "instances.json", allowed_tasks=allowed_tasks)
 
 
 def cache(cache_dir_path: Path = Path(".cache")) -> Cache:

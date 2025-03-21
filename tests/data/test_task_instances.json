@@ -2,27 +2,27 @@
     "Extraction-ReDocRED-Train": {
       "task": "Extraction",
       "data": {
-        "extracts": "./tests/data/datasets/re-docred/train_small/extracts.jsonl",
+        "extracts": "./tests/utils/data/datasets/re-docred/train_small/extracts.jsonl",
         "schema": "./tests/data/extraction/property_schema.json",
-        "ground_truth_extracted_entities": "./tests/data/datasets/re-docred/train_small/entities.jsonl",
+        "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/train_small/entities.jsonl",
         "metrics_config": "./tests/data/extraction/metrics_config.json"
       }
     },
     "Extraction-ReDocRED-Test": {
       "task": "Extraction",
       "data": {
-        "extracts": "./tests/data/datasets/re-docred/test_small/extracts.jsonl",
+        "extracts": "./tests/utils/data/datasets/re-docred/test_small/extracts.jsonl",
         "schema": "./tests/data/extraction/property_schema.json",
-        "ground_truth_extracted_entities": "./tests/data/datasets/re-docred/test_small/entities.jsonl",
+        "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/test_small/entities.jsonl",
         "metrics_config": "./tests/data/extraction/metrics_config.json"
       }
     },
     "Extraction-Heldout": {
       "task": "Extraction",
       "data": {
-        "extracts": "./tests/data/datasets/re-docred/dev_small/extracts.jsonl",
+        "extracts": "./tests/utils/data/datasets/re-docred/dev_small/extracts.jsonl",
         "schema": "./tests/data/extraction/property_schema.json",
-        "ground_truth_extracted_entities": "./tests/data/datasets/re-docred/dev_small/entities.jsonl",
+        "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/dev_small/entities.jsonl",
         "metrics_config": "./tests/data/extraction/metrics_config.json"
       }
     },
