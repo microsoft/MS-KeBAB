@@ -28,7 +28,7 @@ class Task:
 
     __task_type: TaskType
     __instances: dict[str, TaskInstance]
-    __created_task_types: ClassVar[set[TaskType]] = set()
+    __created_tasks: ClassVar[dict[TaskType, Task]] = {}
 
     @property
     def task_type(self) -> TaskType:
@@ -40,11 +40,10 @@ class Task:
         """Return task instances."""
         return self.__instances.copy()  # To disallow modifying this dictionary from outside of this class
 
-    def __new__(cls, task_type: TaskType) -> Self:
-        """Disallow instantiating multiple Task objects for same task type."""
-        if task_type in cls.__created_task_types:
-            raise ValueError(f"Not allowed to create multiple task objects of type {task_type}")
-        cls.__created_task_types.add(task_type)
+    def __new__(cls, task_type: TaskType) -> Self | Task:
+        """For the same task type disallow instantiating multiple Task objects."""
+        if task_type in cls.__created_tasks:
+            return cls.__created_tasks[task_type]
         return super().__new__(cls)
 
     def __init__(self, task_type: TaskType):
@@ -58,11 +57,6 @@ class Task:
             raise ValueError(f"Instance with name '{instance.name}' already exists.")
         self.__instances[instance.name] = instance
 
-    @classmethod
-    def clear_created_task_types(cls) -> None:
-        """Clear the set of created task types."""
-        cls.__created_task_types.clear()
-
 
 class TaskInstance(ABC):
     """Represents a benchmark task instance with its data files."""
@@ -70,7 +64,6 @@ class TaskInstance(ABC):
     __name: str
     __task: Task
     __schema: Path
-    __task_type_registry: ClassVar[dict[TaskType, type[TaskInstance]]] = {}
 
     def __init__(self, name: str, task: Task, schema: str):
         """Initialize a task instance."""
@@ -88,19 +81,6 @@ class TaskInstance(ABC):
     def task(self) -> Task:
         """Return task."""
         return self.__task
-
-    @classmethod
-    def register_task_type(cls, task_type: TaskType, task_instance_class: type[TaskInstance]):
-        """Register a task type with its corresponding class."""
-        cls.__task_type_registry[task_type] = task_instance_class
-
-    @classmethod
-    def create_task_instance(cls, instance_name: str, task: Task, data_dict: dict[str, str]) -> TaskInstance:
-        """Create appropriate task instance."""
-        task_class = cls.__task_type_registry.get(task.task_type)
-        if task_class is None:
-            raise ValueError(f"No registered class for task type: {task.task_type}.")
-        return task_class(instance_name, task, **data_dict)
 
     @abstractmethod
     def read_items(self) -> Iterable[Any]:

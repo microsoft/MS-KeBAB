@@ -17,7 +17,7 @@ def test_kebab_import() -> None:
 
 def test_kebab_import_limited() -> None:
     """Test the import of the kebab module with limited tasks."""
-    task_instances = mskebab.benchmark(allowed_tasks=[TaskType.Linking]).task_instances
+    task_instances = mskebab.benchmark().task_instances
 
     assert task_instances is not None
     assert len(task_instances) > 0

@@ -16,9 +16,7 @@ from kebab.tasks.entity_generation import EntityGenerationTaskInstance
 def _setup_and_teardown() -> Generator[None, Any, None]:
     output_dir = Path(__file__).parents[1] / "output" / "entity_generation"
     output_dir.mkdir(parents=True, exist_ok=True)
-    Task.clear_created_task_types()
     yield
-    Task.clear_created_task_types()
     shutil.rmtree(output_dir)
 
 
