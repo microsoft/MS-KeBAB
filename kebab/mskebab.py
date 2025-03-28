@@ -58,9 +58,8 @@ class Benchmark:
                     task_class = ClusteringTaskInstance
                 case _:
                     raise ValueError(f"No registered class for task type: {task.task_type}.")
-            self.__task_instances[instance_name] = task_class(
-                instance_name, task, **instance_config["data"]
-            )
+            self.__task_instances[instance_name] = task_class(instance_name, task, **instance_config["data"])
+
 
 class Cache:
     """The cache class."""
