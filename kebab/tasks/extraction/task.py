@@ -11,7 +11,6 @@ from typing import ClassVar
 
 from kebab.contracts.entity import Entity, PropertySchema
 from kebab.contracts.task import Task, TaskInstance
-from kebab.tasks.extraction.metrics.aesop.calculator import ValueAveragedAesopConfig, ValueAveragedAesopMetricCalculator
 from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricCalculator, MetricConfig
 from kebab.utils.io_helpers import (
     DocumentJsonlReader,
@@ -30,8 +29,8 @@ class ExtractionTaskInstance(TaskInstance):
     __default_metrics_config_path: Path = (
         Path(__file__).parents[2] / "configs" / "extraction" / "default_metrics_config.json"
     )
-    __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {"aesop": ValueAveragedAesopMetricCalculator}
-    __metric_config_cls: ClassVar[dict[str, type[MetricConfig]]] = {"aesop": ValueAveragedAesopConfig}
+    __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {}
+    __metric_config_cls: ClassVar[dict[str, type[MetricConfig]]] = {}
 
     @property
     def data_extracts(self) -> Path:
@@ -111,6 +110,14 @@ class ExtractionTaskInstance(TaskInstance):
         )
 
         metrics = {}
+
+        from kebab.tasks.extraction.metrics.aesop.calculator import (
+            ValueAveragedAesopConfig,
+            ValueAveragedAesopMetricCalculator,
+        )
+
+        self.__metric_calculator_cls["aesop"] = ValueAveragedAesopMetricCalculator
+        self.__metric_config_cls["aesop"] = ValueAveragedAesopConfig
 
         for metric_name, metric_config_dict in self.metrics_config.items():
             metric_calculator_cls = self.__metric_calculator_cls[metric_name]
