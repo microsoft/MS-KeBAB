@@ -66,7 +66,7 @@
   "Linking-REBEL-Sampled": {
     "task": "Linking",
     "data": {
-      "schema": "~/code/MS-KeBAB/kebab/configs/schemas/rebel_human_schema.json",
+      "schema": "~/code/MS-KeBAB/kebab/configs/kb_schemas/rebel_human_schema.json",
       "entity_fragment_pairs": "~/data/rebel_sampled/sampled_rebel_linking_dataset.jsonl",
       "ground_truth_boolean": "~/data/rebel_sampled/sampled_rebel_linking_ground_truth.jsonl"
     }

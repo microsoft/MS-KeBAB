@@ -62,7 +62,7 @@ class ReDocRedDatasetBuilder:
     MIN_PROPERTY_COUNT: typing.ClassVar[int] = 2
 
     SCHEMAS: typing.ClassVar[dict[str, DocumentSchema]] = DocumentUtilities.load_schemas(
-        pathlib.Path(__file__).parents[3] / "configs" / "schemas"
+        pathlib.Path(__file__).parents[3] / "configs" / "doc_schemas"
     )
 
     def __init__(
