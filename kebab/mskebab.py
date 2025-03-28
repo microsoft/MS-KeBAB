@@ -12,10 +12,10 @@ import urllib.request
 from pathlib import Path
 
 from kebab.contracts.task import Task, TaskInstance, TaskType
+from kebab.tasks.clustering import ClusteringTaskInstance
 from kebab.tasks.entity_generation import EntityGenerationTaskInstance
 from kebab.tasks.extraction.task import ExtractionTaskInstance
 from kebab.tasks.linking import LinkingTaskInstance
-from kebab.tasks.clustering import ClusteringTaskInstance
 
 
 class Benchmark:
