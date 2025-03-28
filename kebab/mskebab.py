@@ -134,11 +134,9 @@ class Cache:
             json.dump(file_map_str_dict, f)
 
 
-def benchmark(path: Path | None = None) -> Benchmark:
-    """Initialize and return benchmark object."""
-    if not path:
-        path = Path(__file__).parents[0] / "configs" / "instances.json"
-    return Benchmark(path)
+def get_default_benchmark() -> Benchmark:
+    """Initialize and return default benchmark object."""
+    return Benchmark(Path(__file__).parents[0] / "configs" / "instances.json")
 
 
 def cache(cache_dir_path: Path = Path(".cache")) -> Cache:
