@@ -10,7 +10,6 @@ from typing import Any
 import pytest
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
-from kebab.contracts.task import Task, TaskType
 from kebab.tasks.extraction.task import ExtractionTask
 
 

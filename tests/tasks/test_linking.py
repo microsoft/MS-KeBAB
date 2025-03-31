@@ -11,7 +11,6 @@ from typing import Any
 
 import pytest
 from kebab.contracts.entity import Entity
-from kebab.contracts.task import Task, TaskType
 from kebab.tasks.linking import LinkingTask
 
 
