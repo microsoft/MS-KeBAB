@@ -50,6 +50,7 @@ class Task:
         """Initialize a task."""
         self.__task_type = task_type
         self.__instances = {}
+        Task.__created_tasks[TaskType] = self  # type: ignore
 
     def add_instance(self, instance: TaskInstance):
         """Add a task instance."""
