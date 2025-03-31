@@ -70,7 +70,7 @@ def test_linking_read_int_labels() -> None:
     int_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "int_labels.jsonl"
     schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
     task_instance = LinkingTaskInstance(
-        "Linking-Alexandria-Train",
+        "Linking-Alexandria-UnitTest",
         Task(TaskType.Linking),
         str(entity_pairs_file_path),
         str(schema_file_path),

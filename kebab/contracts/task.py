@@ -26,19 +26,19 @@ class TaskType(Enum):
 class Task:
     """Represents a benchmark task with its task instances."""
 
-    __task_type: TaskType
-    __instances: dict[str, TaskInstance]
+    _task_type: TaskType
+    _instances: dict[str, TaskInstance]
     __created_tasks: ClassVar[dict[TaskType, Task]] = {}
 
     @property
     def task_type(self) -> TaskType:
         """Return task type."""
-        return self.__task_type
+        return self._task_type
 
     @property
     def instances(self) -> dict[str, TaskInstance]:
         """Return task instances."""
-        return self.__instances.copy()  # To disallow modifying this dictionary from outside of this class
+        return self._instances.copy()  # To disallow modifying this dictionary from outside of this class
 
     def __new__(cls, task_type: TaskType) -> Self | Task:
         """For the same task type disallow instantiating multiple Task objects."""
@@ -48,15 +48,16 @@ class Task:
 
     def __init__(self, task_type: TaskType):
         """Initialize a task."""
-        self.__task_type = task_type
-        self.__instances = {}
-        Task.__created_tasks[TaskType] = self  # type: ignore
+        if task_type not in Task.__created_tasks:
+            self._task_type = task_type
+            self._instances = {}
+            Task.__created_tasks[task_type] = self
 
     def add_instance(self, instance: TaskInstance):
         """Add a task instance."""
-        if instance.name in self.__instances:
+        if instance.name in self._instances:
             raise ValueError(f"Instance with name '{instance.name}' already exists.")
-        self.__instances[instance.name] = instance
+        self._instances[instance.name] = instance
 
 
 class TaskInstance(ABC):

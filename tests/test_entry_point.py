@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from kebab import mskebab
-from kebab.contracts.task import TaskType
+from kebab.contracts.task import Task, TaskType
 
 
 def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
@@ -23,6 +23,16 @@ def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
             assert abs(value1 - dict2[key]) < epsilon
         else:
             assert value1 == dict2[key]
+
+
+def test_task_singleton():
+    """Test singleton implementation of Task."""
+
+    x = Task(TaskType.Extraction)
+    y = Task(TaskType.Extraction)
+    z = Task(TaskType.Linking)
+    assert x is y
+    assert x is not z
 
 
 def test_task_interface():
