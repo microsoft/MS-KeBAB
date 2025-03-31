@@ -30,7 +30,12 @@ def test_task_interface():
     benchmark = mskebab.Benchmark(Path(__file__).parent / "data" / "test_task_instances.json")
 
     tasks_by_type = benchmark.tasks_by_type
-    assert set(tasks_by_type.keys()) == {TaskType.Extraction, TaskType.Linking, TaskType.EntityGeneration, TaskType.Clustering}
+    assert set(tasks_by_type.keys()) == {
+        TaskType.Extraction,
+        TaskType.Linking,
+        TaskType.EntityGeneration,
+        TaskType.Clustering,
+    }
     for task_type, tasks in tasks_by_type.items():
         for task in tasks:
             assert task.task_type == task_type
