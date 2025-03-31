@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Task and instance interface implementation for MS-KeBAB benchmark."""
+"""Task interface implementation for MS-KeBAB benchmark."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Self
+from typing import Any
 
 from kebab.contracts.entity import PropertySchema
 
@@ -23,66 +23,26 @@ class TaskType(Enum):
     Clustering = 4
 
 
-class Task:
-    """Represents a benchmark task with its task instances."""
-
-    _task_type: TaskType
-    _instances: dict[str, TaskInstance]
-    __created_tasks: ClassVar[dict[TaskType, Task]] = {}
-
-    @property
-    def task_type(self) -> TaskType:
-        """Return task type."""
-        return self._task_type
-
-    @property
-    def instances(self) -> dict[str, TaskInstance]:
-        """Return task instances."""
-        return self._instances.copy()  # To disallow modifying this dictionary from outside of this class
-
-    def __new__(cls, task_type: TaskType) -> Self | Task:
-        """For the same task type disallow instantiating multiple Task objects."""
-        if task_type in cls.__created_tasks:
-            return cls.__created_tasks[task_type]
-        return super().__new__(cls)
-
-    def __init__(self, task_type: TaskType):
-        """Initialize a task."""
-        if task_type not in Task.__created_tasks:
-            self._task_type = task_type
-            self._instances = {}
-            Task.__created_tasks[task_type] = self
-
-    def add_instance(self, instance: TaskInstance):
-        """Add a task instance."""
-        if instance.name in self._instances:
-            raise ValueError(f"Instance with name '{instance.name}' already exists.")
-        self._instances[instance.name] = instance
-
-
-class TaskInstance(ABC):
-    """Represents a benchmark task instance with its data files."""
+class Task(ABC):
+    """Represents a benchmark task with its data files."""
 
     __name: str
-    __task: Task
     __schema: Path
 
-    def __init__(self, name: str, task: Task, schema: str):
-        """Initialize a task instance."""
+    def __init__(self, name: str, schema: str):
+        """Initialize a task."""
         self.__name = name
-        self.__task = task
         self.__schema = Path(schema)
-        self.__task.add_instance(self)
 
     @property
     def name(self) -> str:
-        """Return task instance name."""
+        """Return task name."""
         return self.__name
 
     @property
-    def task(self) -> Task:
-        """Return task."""
-        return self.__task
+    @abstractmethod
+    def task_type(self) -> TaskType:
+        """Return task type."""
 
     @abstractmethod
     def read_items(self) -> Iterable[Any]:
@@ -108,7 +68,7 @@ class TaskInstance(ABC):
     @abstractmethod
     def evaluate(self, output_to_evaluate: Path, eval_result_path: Path | None = None) -> dict[str, float]:
         """
-        Evaluate an output for the task instance.
+        Evaluate an output for the task.
 
         Args:
             output_to_evaluate: The output that needs to be evaluated.

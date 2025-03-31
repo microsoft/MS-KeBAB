@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.tasks.entity_generation import EntityGenerationTaskInstance
+from kebab.tasks.entity_generation import EntityGenerationTask
 
 
 @pytest.fixture
@@ -25,9 +25,8 @@ def test_entity_generation_read_write_items_roundtrip() -> None:
     # Arrange
     entities_file_path = Path(__file__).parents[1] / "data" / "entity_generation" / "entities.jsonl"
     schema_file_path = Path(__file__).parents[1] / "data" / "entity_generation" / "propert_schema.json"
-    task_instance = EntityGenerationTaskInstance(
+    task_instance = EntityGenerationTask(
         "EntityGeneration-Alexandria-Train",
-        Task(TaskType.EntityGeneration),
         str(entities_file_path),
         str(schema_file_path),
     )

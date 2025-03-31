@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from kebab.contracts.entity import Entity, PropertySchema
-from kebab.contracts.task import Task, TaskInstance
+from kebab.contracts.task import Task, TaskType
 from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricCalculator, MetricConfig
 from kebab.utils.io_helpers import (
     DocumentJsonlReader,
@@ -21,8 +21,8 @@ from kebab.utils.io_helpers import (
 )
 
 
-class ExtractionTaskInstance(TaskInstance):
-    """Represents an extraction benchmark task instance with its data files."""
+class ExtractionTask(Task):
+    """Represents an extraction benchmark task with its data files."""
 
     __data_extracts: Path
     __data_ground_truth_extracted_entities: Path | None = None
@@ -31,6 +31,11 @@ class ExtractionTaskInstance(TaskInstance):
     )
     __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {}
     __metric_config_cls: ClassVar[dict[str, type[MetricConfig]]] = {}
+
+    @property
+    def task_type(self) -> TaskType:
+        """Return task type."""
+        return TaskType.Extraction
 
     @property
     def data_extracts(self) -> Path:
@@ -45,14 +50,13 @@ class ExtractionTaskInstance(TaskInstance):
     def __init__(
         self,
         name: str,
-        task: Task,
         extracts: str,
         schema: str,
         ground_truth_extracted_entities: str | None = None,
         metrics_config: str | None = None,
     ):
-        """Initialize an extraction task instance."""
-        super().__init__(name, task, schema)
+        """Initialize an extraction task."""
+        super().__init__(name, schema)
         self.__data_extracts = Path(extracts)
         if ground_truth_extracted_entities is not None:
             self.__data_ground_truth_extracted_entities = Path(ground_truth_extracted_entities)
@@ -96,9 +100,9 @@ class ExtractionTaskInstance(TaskInstance):
         eval_result_path: Path | None = None,
         logger: logging.Logger | None = None,
     ) -> dict[str, float]:
-        """Evaluate an output for the extraction task instance."""
+        """Evaluate an output for the extraction task."""
         if hasattr(self, "__data_ground_truth_extracted_entities"):
-            raise ValueError("Can not evaluate on heldout Extraction task instance")
+            raise ValueError("Can not evaluate on heldout Extraction task")
 
         pred_extractions = (
             ExtractionOutput(document=document, entities=entity_list)

@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.tasks.clustering import ClusteringTaskInstance
+from kebab.tasks.clustering import ClusteringTask
 
 
 @pytest.fixture
@@ -28,9 +28,8 @@ def test_clustering_read_write_items_roundtrip() -> None:
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "clustering" / "entity_fragments.jsonl"
     labels_file_path = Path(__file__).parents[1] / "data" / "clustering" / "labels.jsonl"
     schema_file_path = Path(__file__).parents[1] / "data" / "clustering" / "property_schema.json"
-    task_instance = ClusteringTaskInstance(
+    task_instance = ClusteringTask(
         "Clustering-Roundtrip-Train",
-        Task(TaskType.Clustering),
         str(entity_pairs_file_path),
         str(schema_file_path),
         str(labels_file_path),
@@ -101,9 +100,8 @@ def test_clustering_metrics(tmp_path: Path) -> None:
     schema_file_path.write_text("")
 
     # Evaluate
-    task_instance = ClusteringTaskInstance(
+    task_instance = ClusteringTask(
         "Clustering-Metrics-Train",
-        Task(TaskType.Clustering),
         str(entity_fragments_path),
         str(schema_file_path),
         str(labels_path),

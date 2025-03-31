@@ -25,26 +25,17 @@ def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
             assert value1 == dict2[key]
 
 
-def test_task_singleton():
-    """Test singleton implementation of Task."""
-
-    x = Task(TaskType.Extraction)
-    y = Task(TaskType.Extraction)
-    z = Task(TaskType.Linking)
-    assert x is y
-    assert x is not z
-
-
 def test_task_interface():
     """Test task interface."""
     benchmark = mskebab.Benchmark(Path(__file__).parent / "data" / "test_task_instances.json")
 
-    tasks = benchmark.tasks
-    assert set(tasks.keys()) == {TaskType.Extraction, TaskType.Linking, TaskType.EntityGeneration, TaskType.Clustering}
-    for task_type, task in tasks.items():
-        assert task_type == task.task_type
+    tasks_by_type = benchmark.tasks_by_type
+    assert set(tasks_by_type.keys()) == {TaskType.Extraction, TaskType.Linking, TaskType.EntityGeneration, TaskType.Clustering}
+    for task_type, tasks in tasks_by_type.items():
+        for task in tasks:
+            assert task.task_type == task_type
 
-    task_instances = benchmark.task_instances
+    task_instances = benchmark.tasks_by_name
     assert set(task_instances.keys()) == {
         "Extraction-ReDocRED-Train",
         "Extraction-ReDocRED-Test",
@@ -140,12 +131,10 @@ def test_task_interface():
         },
     }
 
-    for task in tasks.values():
-        for task_instance in task.instances.values():
-            assert task_instance.task == task
-            if task_instance.name.endswith("-Heldout"):
-                metrics = task_instance.evaluate(Path(task_instance_data[task_instance.name]["predictions"]))
-                assert_dicts_equal(task_instance_data[task_instance.name]["metrics"], metrics, epsilon=1e-3)
+    for task_name, task_instance in task_instances.items():
+        if task_name.endswith("-Heldout"):
+            metrics = task_instance.evaluate(Path(task_instance_data[task_name]["predictions"]))
+            assert_dicts_equal(task_instance_data[task_name]["metrics"], metrics, epsilon=1e-3)
 
 
 def test_cache():

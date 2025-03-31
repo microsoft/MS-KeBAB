@@ -11,7 +11,7 @@ import pytest
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.tasks.extraction.task import ExtractionTaskInstance
+from kebab.tasks.extraction.task import ExtractionTask
 
 
 @pytest.fixture
@@ -31,9 +31,8 @@ def test_extraction_read_write_items_roundtrip() -> None:
     )
     metrics_config_file_path = Path(__file__).parents[1] / "data" / "extraction" / "metrics_config.json"
     property_schema_file_path = Path(__file__).parents[1] / "data" / "extraction" / "property_schema.json"
-    task_instance = ExtractionTaskInstance(
+    task_instance = ExtractionTask(
         "Extraction-Alexandria-Train",
-        Task(TaskType.Extraction),
         extracts=str(items_file_path),
         schema=str(property_schema_file_path),
         ground_truth_extracted_entities=str(extracted_entities_file_path),

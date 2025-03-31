@@ -8,14 +8,19 @@ from pathlib import Path
 from typing import Any
 
 from kebab.contracts.entity import Entity
-from kebab.contracts.task import Task, TaskInstance
+from kebab.contracts.task import Task, TaskType
 from kebab.utils.io_helpers import EntityJsonlReader
 
 
-class EntityGenerationTaskInstance(TaskInstance):
-    """Represents an entity generation benchmark task instance with its data files."""
+class EntityGenerationTask(Task):
+    """Represents an entity generation benchmark task with its data files."""
 
     __data_entities: Path
+
+    @property
+    def task_type(self) -> TaskType:
+        """Return task type."""
+        return TaskType.EntityGeneration
 
     @property
     def data_entities(self) -> Path:
@@ -25,12 +30,11 @@ class EntityGenerationTaskInstance(TaskInstance):
     def __init__(
         self,
         name: str,
-        task: Task,
         entities: str,
         schema: str,
     ):
-        """Initialize an entity generation task instance."""
-        super().__init__(name, task, schema)
+        """Initialize an entity generation task."""
+        super().__init__(name, schema)
         self.__data_entities = Path(entities)
 
     def read_items(self) -> Iterable[Entity]:
@@ -51,12 +55,12 @@ class EntityGenerationTaskInstance(TaskInstance):
             path: The file path where the items should be written.
             items: An iterable of items to be written to the file.
         """
-        raise NotImplementedError("write_items is not implemented for EntityGenerationTaskInstance")
+        raise NotImplementedError("write_items is not implemented for EntityGenerationTask")
 
     def evaluate(
         self,
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
     ) -> dict[str, float]:
-        """Evaluate an output for the entity generation task instance."""
-        raise NotImplementedError("evaluate is not implemented for EntityGenerationTaskInstance")
+        """Evaluate an output for the entity generation task."""
+        raise NotImplementedError("evaluate is not implemented for EntityGenerationTask")

@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.tasks.linking import LinkingTaskInstance
+from kebab.tasks.linking import LinkingTask
 
 
 @pytest.fixture
@@ -29,9 +29,8 @@ def test_linking_read_write_items_roundtrip() -> None:
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
     boolean_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
     schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
-    task_instance = LinkingTaskInstance(
+    task_instance = LinkingTask(
         "Linking-Alexandria-Train",
-        Task(TaskType.Linking),
         str(entity_pairs_file_path),
         str(schema_file_path),
         str(boolean_labels_file_path),
@@ -69,9 +68,8 @@ def test_linking_read_int_labels() -> None:
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
     int_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "int_labels.jsonl"
     schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
-    task_instance = LinkingTaskInstance(
+    task_instance = LinkingTask(
         "Linking-Alexandria-UnitTest",
-        Task(TaskType.Linking),
         str(entity_pairs_file_path),
         str(schema_file_path),
         str(int_labels_file_path),
@@ -119,9 +117,8 @@ def test_linking_metrics(tmp_path: Path) -> None:
     schema_file_path.write_text("")
 
     # Evaluate
-    task_instance = LinkingTaskInstance(
+    task_instance = LinkingTask(
         "Linking-Metrics-Train",
-        Task(TaskType.Linking),
         str(entity_pairs_path),
         str(schema_file_path),
         str(labels_path),
