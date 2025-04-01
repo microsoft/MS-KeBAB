@@ -1,0 +1,24 @@
+{
+    "name": "rebel_human_schema",
+    "data_types": [
+        {
+            "data_type_id": "text",
+            "value_type": "Text",
+            "description": "A generic text or a value stored as a string."
+        }
+    ],
+    "properties": [
+        {
+            "property_id": "names",
+            "data_type_id": "text",
+            "description": "The name of the person.",
+            "display_name": "names"
+        },
+        {
+            "property_id": "date_of_birth",
+            "data_type_id": "text",
+            "description": "The person's date of birth.",
+            "display_name": "date of birth"
+        }
+    ]
+}

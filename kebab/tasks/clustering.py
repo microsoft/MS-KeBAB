@@ -11,15 +11,20 @@ from pathlib import Path
 import numpy as np
 
 from kebab.contracts.entity import Entity
-from kebab.contracts.task import Task, TaskInstance
+from kebab.contracts.task import Task, TaskType
 from kebab.utils.io_helpers import EntityJsonlReader, ItemJsonlReader, ItemJsonlWriter, save_dict_to_json
 
 
-class ClusteringTaskInstance(TaskInstance):
-    """Represents a clustering benchmark task instance with its data files."""
+class ClusteringTask(Task):
+    """Represents a clustering benchmark task with its data files."""
 
     __data_entity_fragments: Path
     __data_ground_truth_labels: Path | None
+
+    @property
+    def task_type(self) -> TaskType:
+        """Return task type."""
+        return TaskType.Clustering
 
     @property
     def data_entity_fragments(self) -> Path:
@@ -34,13 +39,12 @@ class ClusteringTaskInstance(TaskInstance):
     def __init__(
         self,
         name: str,
-        task: Task,
         entity_fragments: str | Path,
         schema: str,
         ground_truth_labels: str | Path | None = None,
     ):
-        """Initialize a new clustering task instance."""
-        super().__init__(name, task, schema)
+        """Initialize a new clustering task."""
+        super().__init__(name, schema)
         self.__data_entity_fragments = Path(entity_fragments)
         if ground_truth_labels is not None:
             self.__data_ground_truth_labels = Path(ground_truth_labels)
@@ -78,7 +82,7 @@ class ClusteringTaskInstance(TaskInstance):
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
     ) -> dict[str, float]:
-        """Evaluate an output for the clustering task instance."""
+        """Evaluate an output for the clustering task."""
         if self.data_ground_truth_labels is None:
             raise ValueError("Ground truth data is required for evaluation.")
 

@@ -11,72 +11,60 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from kebab.contracts.task import Task, TaskInstance, TaskType
+from kebab.contracts.task import Task, TaskType
+from kebab.tasks.clustering import ClusteringTask
+from kebab.tasks.entity_generation import EntityGenerationTask
+from kebab.tasks.extraction.task import ExtractionTask
+from kebab.tasks.linking import LinkingTask
 
 
 class Benchmark:
     """The entry point class."""
 
-    __tasks: dict[TaskType, Task]
-    __task_instances: dict[str, TaskInstance]
+    __tasks_by_type: dict[TaskType, list[Task]]
+    __tasks_by_name: dict[str, Task]
 
     @property
-    def tasks(self) -> dict[TaskType, Task]:
+    def tasks_by_type(self) -> dict[TaskType, list[Task]]:
+        """Return copy of task list by task type."""
+        return self.__tasks_by_type
+
+    @property
+    def tasks_by_name(self) -> dict[str, Task]:
+        """Return copy of task list by name."""
+        return self.__tasks_by_name
+
+    @property
+    def tasks(self) -> list[Task]:
         """Return copy of task list."""
-        return self.__tasks.copy()  # To disallow modifying this dictionary from outside of this class
+        return list(self.__tasks_by_name.values())
 
-    @property
-    def task_instances(self) -> dict[str, TaskInstance]:
-        """Return copy of task instance list."""
-        return self.__task_instances.copy()  # To disallow modifying this dictionary from outside of this class
-
-    def __init__(self, path: Path, allowed_tasks: list[TaskType] | None = None):
+    def __init__(self, path: Path):
         """Initialize entry point."""
-        self.__tasks = {}
-        self.__task_instances = {}
-        Benchmark.__register_task_types(allowed_tasks)
+        self.__tasks_by_type = {}
+        self.__tasks_by_name = {}
 
         with open(path) as f:
-            task_instance_config = json.load(f)
+            task_config = json.load(f)
 
-        for instance_name, instance_config in task_instance_config.items():
-            task_type = TaskType[instance_config["task"]]
+        for task_instance_name, task_instance_config in task_config.items():
+            task_type = TaskType[task_instance_config["task"]]
 
-            if allowed_tasks and task_type not in allowed_tasks:
-                continue
-
-            if task_type not in self.__tasks:
-                task = Task(task_type)
-                self.__tasks[task_type] = task
+            match task_type:
+                case TaskType.EntityGeneration:
+                    task_class = EntityGenerationTask
+                case TaskType.Extraction:
+                    task_class = ExtractionTask
+                case TaskType.Linking:
+                    task_class = LinkingTask
+                case TaskType.Clustering:
+                    task_class = ClusteringTask
+            task = task_class(task_instance_name, **task_instance_config["data"])
+            self.__tasks_by_name[task_instance_name] = task
+            if task_type not in self.__tasks_by_type:
+                self.__tasks_by_type[task_type] = [task]
             else:
-                task = self.__tasks[task_type]
-
-            self.__task_instances[instance_name] = TaskInstance.create_task_instance(
-                instance_name, task, instance_config["data"]
-            )
-
-    @staticmethod
-    def __register_task_types(allowed_tasks: list[TaskType] | None = None) -> None:
-        """Register available task types with their corresponding classes."""
-        if allowed_tasks is None or TaskType.Linking in allowed_tasks:
-            from kebab.tasks.linking import LinkingTaskInstance
-
-            TaskInstance.register_task_type(TaskType.Linking, LinkingTaskInstance)
-
-        if allowed_tasks is None or TaskType.EntityGeneration in allowed_tasks:
-            from kebab.tasks.entity_generation import EntityGenerationTaskInstance
-
-            TaskInstance.register_task_type(TaskType.EntityGeneration, EntityGenerationTaskInstance)
-
-        if allowed_tasks is None or TaskType.Extraction in allowed_tasks:
-            from kebab.tasks.extraction.task import ExtractionTaskInstance
-
-            TaskInstance.register_task_type(TaskType.Extraction, ExtractionTaskInstance)
-
-        if allowed_tasks is None or TaskType.Clustering in allowed_tasks:
-            from kebab.tasks.clustering import ClusteringTaskInstance
-
-            TaskInstance.register_task_type(TaskType.Clustering, ClusteringTaskInstance)
+                self.__tasks_by_type[task_type].append(task)
 
 
 class Cache:
@@ -151,11 +139,9 @@ class Cache:
             json.dump(file_map_str_dict, f)
 
 
-def benchmark(allowed_tasks: list[TaskType] | None = None) -> Benchmark:
-    """Initialize and return benchmark object."""
-    # TODO(pmyshkov): Remove this line when the issue with the task type registration is fixed.
-    Task.clear_created_task_types()
-    return Benchmark(Path(__file__).parents[0] / "configs" / "instances.json", allowed_tasks=allowed_tasks)
+def get_default_benchmark() -> Benchmark:
+    """Initialize and return default benchmark object."""
+    return Benchmark(Path(__file__).parents[0] / "configs" / "tasks.json")
 
 
 def cache(cache_dir_path: Path = Path(".cache")) -> Cache:

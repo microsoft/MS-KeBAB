@@ -136,7 +136,7 @@ def make_default_value_averaged_aesop_config(
     # Set score functions are used for properties for which we expect multiple values.
     # Score function always returns a list of scores, even if there is only one value.
     if embed_model is None:
-        embed_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
+        embed_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")  # type: ignore
 
     set_embedding_score = PropertyScore(SetPropertyDistance(EmbeddingDistance()))
     set_token_score = PropertyScore(SetPropertyDistance(TokenDistance()))

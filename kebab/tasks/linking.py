@@ -10,15 +10,20 @@ from itertools import zip_longest
 from pathlib import Path
 
 from kebab.contracts.entity import Entity
-from kebab.contracts.task import Task, TaskInstance
+from kebab.contracts.task import Task, TaskType
 from kebab.utils.io_helpers import EntityPairJsonlReader, ItemJsonlReader, ItemJsonlWriter, save_dict_to_json
 
 
-class LinkingTaskInstance(TaskInstance):
-    """Represents a linking benchmark task instance with its data files."""
+class LinkingTask(Task):
+    """Represents a linking benchmark task with its data files."""
 
     __data_entity_fragment_pairs: Path
     __data_ground_truth_boolean: Path | None
+
+    @property
+    def task_type(self) -> TaskType:
+        """Return task type."""
+        return TaskType.Linking
 
     @property
     def data_entity_fragment_pairs(self) -> Path:
@@ -33,13 +38,12 @@ class LinkingTaskInstance(TaskInstance):
     def __init__(
         self,
         name: str,
-        task: Task,
         entity_fragment_pairs: str,
         schema: str,
         ground_truth_boolean: str | None = None,
     ):
-        """Initialize a linking task instance."""
-        super().__init__(name, task, schema)
+        """Initialize a linking task."""
+        super().__init__(name, schema)
         self.__data_entity_fragment_pairs = Path(entity_fragment_pairs)
         if ground_truth_boolean is not None:
             self.__data_ground_truth_boolean = Path(ground_truth_boolean)
@@ -77,7 +81,7 @@ class LinkingTaskInstance(TaskInstance):
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
     ) -> dict[str, float]:
-        """Evaluate an output for the linking task instance."""
+        """Evaluate an output for the linking task."""
         if self.data_ground_truth_boolean is None:
             raise ValueError("Ground truth data is required for evaluation.")
 

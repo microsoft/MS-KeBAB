@@ -10,17 +10,14 @@ from typing import Any
 import pytest
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
-from kebab.contracts.task import Task, TaskType
-from kebab.tasks.extraction.task import ExtractionTaskInstance
+from kebab.tasks.extraction.task import ExtractionTask
 
 
 @pytest.fixture
 def _setup_and_teardown() -> Generator[None, Any, None]:
     output_dir = Path(__file__).parents[1] / "output" / "extraction"
     output_dir.mkdir(parents=True, exist_ok=True)
-    Task.clear_created_task_types()
     yield
-    Task.clear_created_task_types()
     shutil.rmtree(output_dir)
 
 
@@ -33,9 +30,8 @@ def test_extraction_read_write_items_roundtrip() -> None:
     )
     metrics_config_file_path = Path(__file__).parents[1] / "data" / "extraction" / "metrics_config.json"
     property_schema_file_path = Path(__file__).parents[1] / "data" / "extraction" / "property_schema.json"
-    task_instance = ExtractionTaskInstance(
+    task_instance = ExtractionTask(
         "Extraction-Alexandria-Train",
-        Task(TaskType.Extraction),
         extracts=str(items_file_path),
         schema=str(property_schema_file_path),
         ground_truth_extracted_entities=str(extracted_entities_file_path),

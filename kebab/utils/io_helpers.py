@@ -123,7 +123,7 @@ class DocumentJsonlReader(ItemReader[Document]):
         Args:
             path: The file path to the JSONL file.
         """
-        self.schemas = DocumentUtilities.load_schemas(Path(__file__).parents[1] / "configs" / "schemas")
+        self.schemas = DocumentUtilities.load_schemas(Path(__file__).parents[1] / "configs" / "doc_schemas")
         self.path = path
 
     def read_items(self) -> Iterable[Document]:

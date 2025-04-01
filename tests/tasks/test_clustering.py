@@ -10,17 +10,14 @@ from typing import Any
 
 import pytest
 from kebab.contracts.entity import Entity
-from kebab.contracts.task import Task, TaskType
-from kebab.tasks.clustering import ClusteringTaskInstance
+from kebab.tasks.clustering import ClusteringTask
 
 
 @pytest.fixture
 def _setup_and_teardown() -> Generator[None, Any, None]:
     output_dir = Path(__file__).parents[1] / "output" / "clustering"
     output_dir.mkdir(parents=True, exist_ok=True)
-    Task.clear_created_task_types()
     yield
-    Task.clear_created_task_types()
     shutil.rmtree(output_dir)
 
 
@@ -30,9 +27,8 @@ def test_clustering_read_write_items_roundtrip() -> None:
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "clustering" / "entity_fragments.jsonl"
     labels_file_path = Path(__file__).parents[1] / "data" / "clustering" / "labels.jsonl"
     schema_file_path = Path(__file__).parents[1] / "data" / "clustering" / "property_schema.json"
-    task_instance = ClusteringTaskInstance(
+    task_instance = ClusteringTask(
         "Clustering-Roundtrip-Train",
-        Task(TaskType.Clustering),
         str(entity_pairs_file_path),
         str(schema_file_path),
         str(labels_file_path),
@@ -103,9 +99,8 @@ def test_clustering_metrics(tmp_path: Path) -> None:
     schema_file_path.write_text("")
 
     # Evaluate
-    task_instance = ClusteringTaskInstance(
+    task_instance = ClusteringTask(
         "Clustering-Metrics-Train",
-        Task(TaskType.Clustering),
         str(entity_fragments_path),
         str(schema_file_path),
         str(labels_path),

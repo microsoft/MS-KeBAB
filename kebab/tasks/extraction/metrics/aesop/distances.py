@@ -79,7 +79,7 @@ class EmbeddingDistance(ElementDistance):
     def __init__(self, model: SentenceTransformer | None = None):
         """Initialize embedding distance."""
         if model is None:
-            model = SentenceTransformer(self.__default_model)
+            model = SentenceTransformer(self.__default_model)  # type: ignore
         self.model = model
 
     def check_constraints(self, property_: Property) -> None:
@@ -94,7 +94,7 @@ class EmbeddingDistance(ElementDistance):
     @classmethod
     def from_dict(cls, config: dict[str, str]) -> EmbeddingDistance:
         """Create embedding distance from dictionary."""
-        return EmbeddingDistance(model=SentenceTransformer(config.get("model", cls.__default_model)))
+        return EmbeddingDistance(model=SentenceTransformer(config.get("model", cls.__default_model)))  # type: ignore
 
 
 class BinaryMatchDistance(ElementDistance):
