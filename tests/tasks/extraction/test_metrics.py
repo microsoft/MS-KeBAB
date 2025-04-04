@@ -14,12 +14,12 @@ import numpy as np
 import tiktoken
 from kebab.contracts.document import Document, DocumentSchema
 from kebab.contracts.entity import Entity, PropertySchema
-from kebab.tasks.extraction.metrics.aesop.calculator import (
+from kebab.tasks.metrics.extraction.aesop.calculator import (
     ValueAveragedAesopConfig,
     ValueAveragedAesopMetricCalculator,
     make_default_value_averaged_aesop_config,
 )
-from kebab.tasks.extraction.metrics.aesop.distances import (
+from kebab.tasks.metrics.extraction.aesop.distances import (
     BinaryMatchDistance,
     EditDistance,
     EmbeddingDistance,
@@ -29,15 +29,15 @@ from kebab.tasks.extraction.metrics.aesop.distances import (
     SingleValuePropertyDistance,
     TokenDistance,
 )
-from kebab.tasks.extraction.metrics.aesop.metric_helpers import (
+from kebab.tasks.metrics.extraction.aesop.metric_helpers import (
     EntityMatcher,
     MatchedEntitiesScorer,
     MetricsAccumulator,
     MetricsComputer,
     compute_properties_union,
 )
-from kebab.tasks.extraction.metrics.calculator import ExtractionOutput
-from kebab.tasks.extraction.metrics.utils import normalize_string
+from kebab.tasks.metrics.extraction.calculator import ExtractionOutput
+from kebab.tasks.metrics.extraction.utils import normalize_string
 from sentence_transformers import SentenceTransformer
 
 
