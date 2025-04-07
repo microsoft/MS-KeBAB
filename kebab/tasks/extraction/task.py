@@ -9,7 +9,7 @@ from itertools import zip_longest
 from pathlib import Path
 from typing import ClassVar
 
-from kebab.contracts.entity import Entity, PropertySchema
+from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
 from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricCalculator, MetricConfig
 from kebab.utils.io_helpers import (
@@ -61,7 +61,6 @@ class ExtractionTask(Task):
         if ground_truth_extracted_entities is not None:
             self.__data_ground_truth_extracted_entities = Path(ground_truth_extracted_entities)
         self.metrics_config = load_dict_from_json(Path(metrics_config or self.__default_metrics_config_path))
-        self.property_schema = PropertySchema.from_file(Path(schema))
 
     def read_items(self) -> Iterable[ExtractionOutput]:
         """
@@ -125,7 +124,7 @@ class ExtractionTask(Task):
 
         for metric_name, metric_config_dict in self.metrics_config.items():
             metric_calculator_cls = self.__metric_calculator_cls[metric_name]
-            metric_config = self.__metric_config_cls[metric_name].from_dict(metric_config_dict, self.property_schema)
+            metric_config = self.__metric_config_cls[metric_name].from_dict(metric_config_dict, self.read_schema())
             metric_results = metric_calculator_cls(metric_config, logger).run(pred_extractions, self.read_items())  # type: ignore
             metrics[metric_name] = metric_results
         if eval_result_path:
