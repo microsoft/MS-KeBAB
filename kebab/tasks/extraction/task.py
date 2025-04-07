@@ -9,7 +9,7 @@ from itertools import zip_longest
 from pathlib import Path
 from typing import ClassVar
 
-from kebab.contracts.entity import Entity, PropertySchema
+from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
 from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricCalculator, MetricConfig
 from kebab.utils.io_helpers import (
