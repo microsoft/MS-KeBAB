@@ -1,0 +1,78 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+from __future__ import annotations
+
+import json
+import re
+from collections.abc import Iterable
+from pathlib import Path
+
+from kebab.contracts.document import Document
+from kebab.contracts.task import Task, TaskType
+from kebab.utils.io_helpers import DocumentJsonlReader
+
+
+class TextCompletionTask(Task):
+    """Represents a text completion benchmark task with its data files."""
+
+    __data_documents: Path
+
+    @property
+    def task_type(self) -> TaskType:
+        """Return task type."""
+        return TaskType.TextCompletion
+
+    @property
+    def data_documents(self) -> Path:
+        """Return path to documents."""
+        return self.__data_documents
+
+    def __init__(
+        self,
+        name: str,
+        documents: str,
+        schema: str,
+    ):
+        """Initialize a linking task."""
+        super().__init__(name, schema)
+        self.__data_documents = Path(documents)
+
+    def read_items(self) -> Iterable[Document]:
+        return DocumentJsonlReader(self.__data_documents).read_items()
+
+    def write_items(self, path: Path, items: Iterable[tuple[str, float]]) -> None:
+        with open(path, "w", encoding="utf-8", newline="\n") as file:
+            for predicted_content, target_content_logprob in items:
+                json_line = json.dumps(
+                    {
+                        "predicted_content": predicted_content,
+                        "target_content_logprob": target_content_logprob,
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                file.write(json_line + "\n")
+
+    def generate_partial_queries(self) -> Iterable[dict[str, str]]:
+        docs = self.read_items()
+        for doc in docs:
+            text = doc.data["text"]
+            words = re.findall(r"\w+|\s+|[^\w\s]", text)
+            for i, word in enumerate(words):
+                if i == 0 or not word.strip().isalnum():
+                    continue
+                text_with_mask = "".join(words[ : i] + ["<mask>"])
+                yield {
+                    "text_with_mask": text_with_mask,
+                    "masked_content": word,
+                    "document_id": doc.document_id,
+                }
+
+    def evaluate(
+        self,
+        output_to_evaluate: Path,
+        eval_result_path: Path | None = None,
+    ) -> dict[str, float]:
+        """Evaluate an output for the linking task."""
+        raise NotImplementedError("Evaluation for text completion task is not implemented.")
