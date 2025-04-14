@@ -41,19 +41,6 @@ class TextCompletionTask(Task):
     def read_items(self) -> Iterable[Document]:
         return DocumentJsonlReader(self.__data_documents).read_items()
 
-    def write_items(self, path: Path, items: Iterable[tuple[str, float]]) -> None:
-        with open(path, "w", encoding="utf-8", newline="\n") as file:
-            for predicted_content, target_content_logprob in items:
-                json_line = json.dumps(
-                    {
-                        "predicted_content": predicted_content,
-                        "target_content_logprob": target_content_logprob,
-                    },
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                )
-                file.write(json_line + "\n")
-
     def generate_partial_queries(self) -> Iterable[dict[str, str]]:
         docs = self.read_items()
         for doc in docs:
@@ -68,6 +55,19 @@ class TextCompletionTask(Task):
                     "masked_content": word,
                     "document_id": doc.document_id,
                 }
+
+    def write_items(self, path: Path, items: Iterable[tuple[str, float]]) -> None:
+        with open(path, "w", encoding="utf-8", newline="\n") as file:
+            for predicted_content, target_content_logprob in items:
+                json_line = json.dumps(
+                    {
+                        "predicted_content": predicted_content,
+                        "target_content_logprob": target_content_logprob,
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                file.write(json_line + "\n")
 
     def evaluate(
         self,
