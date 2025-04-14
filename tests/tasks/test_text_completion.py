@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+import filecmp
 import shutil
 from collections.abc import Generator
 from pathlib import Path
@@ -21,6 +22,8 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
 def test_text_completion_read_items_and_generate_queries() -> None:
     # Arrange
     documents_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "plain_text_items.jsonl"
+    predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "predictions.jsonl"
+    predictions_output_file_path = Path(__file__).parents[1] / "output" / "text_completion" / "predictions.jsonl"
     task_instance = TextCompletionTask(
         "TextCompletion",
         str(documents_file_path),
@@ -43,15 +46,27 @@ def test_text_completion_read_items_and_generate_queries() -> None:
 
     # Assert
     assert partial_queries == [
-        {'text_with_mask': 'The <mask>', 'target_content': 'capital', 'document_id': 'doc_0'},
-        {'text_with_mask': 'The capital <mask>', 'target_content': 'of', 'document_id': 'doc_0'},
-        {'text_with_mask': 'The capital of <mask>', 'target_content': 'France', 'document_id': 'doc_0'},
-        {'text_with_mask': 'The capital of France <mask>', 'target_content': 'is', 'document_id': 'doc_0'},
-        {'text_with_mask': 'The capital of France is <mask>', 'target_content': 'Paris', 'document_id': 'doc_0'},
+        {"text_with_mask": "The <mask>", "target_content": "capital", 'document_id': "doc_0"},
+        {"text_with_mask": "The capital <mask>", "target_content": "of", 'document_id': "doc_0"},
+        {"text_with_mask": "The capital of <mask>", "target_content": "France", 'document_id': "doc_0"},
+        {"text_with_mask": "The capital of France <mask>", "target_content": "is", 'document_id': "doc_0"},
+        {"text_with_mask": "The capital of France is <mask>", "target_content": "Paris", 'document_id': "doc_0"},
 
-        {'text_with_mask': 'The <mask>', 'target_content': 'capital', 'document_id': 'doc_1'},
-        {'text_with_mask': 'The capital <mask>', 'target_content': 'of', 'document_id': 'doc_1'},
-        {'text_with_mask': 'The capital of <mask>', 'target_content': 'China', 'document_id': 'doc_1'},
-        {'text_with_mask': 'The capital of China <mask>', 'target_content': 'is', 'document_id': 'doc_1'},
-        {'text_with_mask': 'The capital of China is <mask>', 'target_content': 'Beijing', 'document_id': 'doc_1'},
+        {"text_with_mask": "The <mask>", "target_content": "capital", 'document_id': "doc_1"},
+        {"text_with_mask": "The capital <mask>", "target_content": "of", 'document_id': "doc_1"},
+        {"text_with_mask": "The capital of <mask>", "target_content": "China", 'document_id': "doc_1"},
+        {"text_with_mask": "The capital of China <mask>", "target_content": "is", 'document_id': "doc_1"},
+        {"text_with_mask": "The capital of China is <mask>", "target_content": "Beijing", 'document_id': "doc_1"},
     ]
+
+    # Act
+    task_instance.write_items(
+        predictions_output_file_path,
+        [(query["target_content"], -0.1) for query in partial_queries],
+    )
+
+    # Assert
+    assert filecmp.cmp(
+        str(predictions_file_path),
+        str(predictions_output_file_path),
+    )
