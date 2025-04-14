@@ -11,7 +11,7 @@ from kebab.contracts.document import Document
 from kebab.utils.io_helpers import DocumentJsonlReader
 from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 
 class BaseTextCompleter(ABC):
@@ -40,8 +40,14 @@ class BaseTextCompleter(ABC):
             all_results = []
         else:
             all_results = None
-        i = -1
+        count = 0
         for i, partial_query_with_augmented_context in enumerate(partial_queries_with_augmented_contexts):
+            if partial_query_with_augmented_context["text_with_mask"] is None:
+                if all_results is not None:
+                    result = copy.deepcopy(partial_query_with_augmented_context)
+                    all_results.append(result)
+                    continue
+
             masked_content_logprob, masked_content_top_logprobs = self.complete_text(
                 partial_query_with_augmented_context["text_with_mask"],
                 partial_query_with_augmented_context["masked_content"],
@@ -58,7 +64,8 @@ class BaseTextCompleter(ABC):
                 result["masked_content_top_logprobs"] = masked_content_top_logprobs
                 all_results.append(result)
 
-            print(f"Processed {i + 1} partial queries.")
+            count += 1
+            print(f"Processed {count} partial queries.")
 
         if all_logprobs:
             sum_log_prob = sum(all_logprobs)
@@ -71,18 +78,23 @@ class BaseTextCompleter(ABC):
         return {
             "sum_log_prob": sum_log_prob,
             "var_log_prob": var_log_prob,
-            "count": i + 1,
+            "count": count,
             "perplexity": perplexity,
             "all_results": all_results,
         }
 
     @staticmethod
-    def generate_partial_queries(docs: Iterable[Document]) -> Iterable[dict[str, str]]:
+    def generate_partial_queries(docs: Iterable[Document]) -> Iterable[dict[str, str | None]]:
         for doc in docs:
             text = doc.data["text"]
             words = re.findall(r"\w+|\s+|[^\w\s]", text)
             for i, word in enumerate(words):
                 if i == 0 or not word.strip().isalnum():
+                    yield {
+                        "text_with_mask": None,
+                        "masked_content": word,
+                        "document_id": doc.document_id,
+                    }
                     continue
                 text_with_mask = "".join(words[ : i] + [BaseTextCompleter.mask])
                 yield {
@@ -123,10 +135,10 @@ class BaseTextCompleter(ABC):
         </ul>
         <hr>
         <p>
-"""
+        """
         for item in text_completion_results:
-            if len(item) == 1:
-                html_content += f'\t\t<span class="word">{item["masked_content"]}</span>'
+            if item["text_with_mask"] is None:
+                html_content += f'<span class="word">{item["masked_content"]}</span>'
                 continue
             masked_word_logprob = item["masked_content_logprob"]
             tooltip = ""
@@ -226,11 +238,12 @@ Answer: """
         top_logprobs = [[{"token": word, "logprob": logprob} for word, logprob in zip(top_words, top_logprobs.tolist())]]
         return masked_content_logprob, top_logprobs
 
-def augment_partial_queries_with_empty_contexts(
-    queries: Iterable[dict[str, str]]
-) -> Iterable[dict[str, str]]:
+def augment_partial_queries_with_contexts(
+    queries: Iterable[dict[str, str | None]],
+    get_augmented_context: Callable[[dict[str, str | None]], str] = lambda _: "",
+) -> Iterable[dict[str, str | None]]:
     for query in queries:
-        query["augmented_context"] = ""
+        query["augmented_context"] = get_augmented_context(query)
         yield query
 
 
@@ -239,7 +252,7 @@ if __name__ == "__main__":
     docReader = DocumentJsonlReader(Path(input_path))
     docs = docReader.read_items()
     queries = BaseTextCompleter.generate_partial_queries(docs)
-    queries = augment_partial_queries_with_empty_contexts(queries)
+    queries = augment_partial_queries_with_contexts(queries)
     phi_annotator = PhiTextCompleter()
     metrics = phi_annotator.complete_text_and_evaluate(queries, verbose=True)
 
@@ -247,5 +260,15 @@ if __name__ == "__main__":
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2, ensure_ascii=False)
 
-    all_results = metrics["all_results"]
-    BaseTextCompleter.generate_annotated_doc_html(all_results, os.path.splitext(input_path)[0] + "_annotated.html")
+    doc_id = "Invalid"
+    results_per_doc = []
+    for result in metrics["all_results"]:
+        if result["document_id"] != doc_id and doc_id != "Invalid":
+            BaseTextCompleter.generate_annotated_doc_html(results_per_doc, os.path.splitext(input_path)[0] + f"_annotated_{doc_id}.html")
+            results_per_doc = []
+        else:
+            results_per_doc.append(result)
+        doc_id = result["document_id"]
+    if results_per_doc:
+        BaseTextCompleter.generate_annotated_doc_html(results_per_doc, os.path.splitext(input_path)[0] + f"_annotated_{doc_id}.html")
+        results_per_doc = []
