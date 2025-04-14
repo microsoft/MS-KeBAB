@@ -43,15 +43,15 @@ def test_text_completion_read_items_and_generate_queries() -> None:
 
     # Assert
     assert partial_queries == [
-        {'text_with_mask': 'The <mask>', 'masked_content': 'capital', 'document_id': 'doc_0'},
-        {'text_with_mask': 'The capital <mask>', 'masked_content': 'of', 'document_id': 'doc_0'},
-        {'text_with_mask': 'The capital of <mask>', 'masked_content': 'France', 'document_id': 'doc_0'},
-        {'text_with_mask': 'The capital of France <mask>', 'masked_content': 'is', 'document_id': 'doc_0'},
-        {'text_with_mask': 'The capital of France is <mask>', 'masked_content': 'Paris', 'document_id': 'doc_0'},
+        {'text_with_mask': 'The <mask>', 'target_content': 'capital', 'document_id': 'doc_0'},
+        {'text_with_mask': 'The capital <mask>', 'target_content': 'of', 'document_id': 'doc_0'},
+        {'text_with_mask': 'The capital of <mask>', 'target_content': 'France', 'document_id': 'doc_0'},
+        {'text_with_mask': 'The capital of France <mask>', 'target_content': 'is', 'document_id': 'doc_0'},
+        {'text_with_mask': 'The capital of France is <mask>', 'target_content': 'Paris', 'document_id': 'doc_0'},
 
-        {'text_with_mask': 'The <mask>', 'masked_content': 'capital', 'document_id': 'doc_1'},
-        {'text_with_mask': 'The capital <mask>', 'masked_content': 'of', 'document_id': 'doc_1'},
-        {'text_with_mask': 'The capital of <mask>', 'masked_content': 'China', 'document_id': 'doc_1'},
-        {'text_with_mask': 'The capital of China <mask>', 'masked_content': 'is', 'document_id': 'doc_1'},
-        {'text_with_mask': 'The capital of China is <mask>', 'masked_content': 'Beijing', 'document_id': 'doc_1'},
+        {'text_with_mask': 'The <mask>', 'target_content': 'capital', 'document_id': 'doc_1'},
+        {'text_with_mask': 'The capital <mask>', 'target_content': 'of', 'document_id': 'doc_1'},
+        {'text_with_mask': 'The capital of <mask>', 'target_content': 'China', 'document_id': 'doc_1'},
+        {'text_with_mask': 'The capital of China <mask>', 'target_content': 'is', 'document_id': 'doc_1'},
+        {'text_with_mask': 'The capital of China is <mask>', 'target_content': 'Beijing', 'document_id': 'doc_1'},
     ]

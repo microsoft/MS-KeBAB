@@ -52,7 +52,7 @@ class TextCompletionTask(Task):
                 text_with_mask = "".join(words[ : i] + ["<mask>"])
                 yield {
                     "text_with_mask": text_with_mask,
-                    "masked_content": word,
+                    "target_content": word,
                     "document_id": doc.document_id,
                 }
 
