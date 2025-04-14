@@ -1,14 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-import filecmp
 import shutil
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
 import pytest
-from kebab.contracts.entity import Entity
 from kebab.tasks.text_completion import TextCompletionTask
 
 
@@ -20,18 +18,40 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
     shutil.rmtree(output_dir)
 
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
-def test_text_completion_read_items() -> None:
+def test_text_completion_read_items_and_generate_queries() -> None:
     # Arrange
     documents_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "plain_text_items.jsonl"
     task_instance = TextCompletionTask(
-        "Linking-Alexandria-Train",
+        "TextCompletion",
         str(documents_file_path),
         "",
     )
+
+    # Act
     items = list(task_instance.read_items())
+
+    # Assert
     items[0].document_id = "doc_0"
     items[0].data["title"] = "Paris"
     items[0].data["text"] = "The capital of France is Paris."
     items[1].document_id = "doc_1"
     items[1].data["title"] = "Beijing"
     items[1].data["text"] = "The capital of China is Beijing."
+
+    # Act
+    partial_queries = list(task_instance.generate_partial_queries())
+
+    # Assert
+    assert partial_queries == [
+        {'text_with_mask': 'The <mask>', 'masked_content': 'capital', 'document_id': 'doc_0'},
+        {'text_with_mask': 'The capital <mask>', 'masked_content': 'of', 'document_id': 'doc_0'},
+        {'text_with_mask': 'The capital of <mask>', 'masked_content': 'France', 'document_id': 'doc_0'},
+        {'text_with_mask': 'The capital of France <mask>', 'masked_content': 'is', 'document_id': 'doc_0'},
+        {'text_with_mask': 'The capital of France is <mask>', 'masked_content': 'Paris', 'document_id': 'doc_0'},
+
+        {'text_with_mask': 'The <mask>', 'masked_content': 'capital', 'document_id': 'doc_1'},
+        {'text_with_mask': 'The capital <mask>', 'masked_content': 'of', 'document_id': 'doc_1'},
+        {'text_with_mask': 'The capital of <mask>', 'masked_content': 'China', 'document_id': 'doc_1'},
+        {'text_with_mask': 'The capital of China <mask>', 'masked_content': 'is', 'document_id': 'doc_1'},
+        {'text_with_mask': 'The capital of China is <mask>', 'masked_content': 'Beijing', 'document_id': 'doc_1'},
+    ]
