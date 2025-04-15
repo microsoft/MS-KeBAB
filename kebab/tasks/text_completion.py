@@ -84,8 +84,6 @@ class TextCompletionTask(Task):
             metrics["mean_log_prob"] = statistics.mean(log_probs)
             metrics["variance_log_prob"] = statistics.variance(log_probs, metrics["mean_log_prob"])
             metrics["perplexity"] = math.exp(-metrics["mean_log_prob"])
-            metrics["min_log_prob"] = min(log_probs)
-            metrics["max_log_prob"] = max(log_probs)
         else:
             raise ValueError("No log probabilities found in predictions.")
 
