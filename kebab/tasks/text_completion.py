@@ -35,8 +35,8 @@ class TextCompletionTask(Task):
         name: str,
         documents: str,
     ):
-        """Initialize a linking task."""
-        super().__init__(name, schema="")
+        """Initialize a text completion task."""
+        super().__init__(name, schema="")  # kb schema is not used in this task
         self.__data_documents = Path(documents)
 
     def read_items(self) -> Iterable[Document]:
@@ -55,14 +55,15 @@ class TextCompletionTask(Task):
         Returns:
             Iterable[dict[str, str]]: An iterable of dicts, where each dictionary contains:
                 - "text_with_mask": The text with a chunk replaced by "<mask>".
-                - "target_content": The chunk that was replaced by "<mask>".
+                - "target_content": The content of the chunk that was replaced by "<mask>".
                 - "document_id": The ID of the document being processed.
         """
         docs = self.read_items()
         for doc in docs:
             text = doc.data["text"]
             # Split text into alphanumeric words, consecutive spaces/tabs, and punctuations.
-            # TODO (allenwang): Use a more sophisticated tokenizer for better handling of punctuations, special characters, non-Latin scripts, etc.
+            # TODO (allenwang-ms): Use a more sophisticated tokenizer for better handling of
+            # punctuations, special characters, non-Latin scripts, etc.
             words = re.findall(r"\w+|\s+|[^\w\s]", text)
             for i, word in enumerate(words):
                 # Skip the first word and non-alphanumeric words.
@@ -113,6 +114,9 @@ class TextCompletionTask(Task):
             metrics["perplexity"] = math.exp(-metrics["mean_log_prob"])
         else:
             raise ValueError("No log probabilities found in predictions.")
+
+        # TODO (allenwang-ms): Consider adding more evaluation metrics, such as BLEU, to assess the
+        # quality of predicted contents.
 
         if eval_result_path:
             save_dict_to_json(metrics, eval_result_path)
