@@ -396,6 +396,7 @@ def generate_draft_property_schema_from_data(paths: Iterable[Path], output_path:
     )
     property_schema.to_file(output_path)
 
+
 def compare_files_ignore_linebreaks(file_1_path: Path, file_2_path: Path) -> bool:
     """
     Compares two files on disk while ignoring line breaks.

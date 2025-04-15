@@ -19,6 +19,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
     yield
     shutil.rmtree(output_dir)
 
+
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
 def test_text_completion_read_items_and_generate_queries() -> None:
     # Arrange
@@ -47,17 +48,16 @@ def test_text_completion_read_items_and_generate_queries() -> None:
     assert items[1].data["title"] == "Beijing"
     assert items[1].data["text"] == "The capital of China is Beijing."
     assert partial_queries == [
-        {"text_with_mask": "The <mask>", "target_content": "capital", 'document_id': "doc_0"},
-        {"text_with_mask": "The capital <mask>", "target_content": "of", 'document_id': "doc_0"},
-        {"text_with_mask": "The capital of <mask>", "target_content": "France", 'document_id': "doc_0"},
-        {"text_with_mask": "The capital of France <mask>", "target_content": "is", 'document_id': "doc_0"},
-        {"text_with_mask": "The capital of France is <mask>", "target_content": "Paris", 'document_id': "doc_0"},
-
-        {"text_with_mask": "The <mask>", "target_content": "capital", 'document_id': "doc_1"},
-        {"text_with_mask": "The capital <mask>", "target_content": "of", 'document_id': "doc_1"},
-        {"text_with_mask": "The capital of <mask>", "target_content": "China", 'document_id': "doc_1"},
-        {"text_with_mask": "The capital of China <mask>", "target_content": "is", 'document_id': "doc_1"},
-        {"text_with_mask": "The capital of China is <mask>", "target_content": "Beijing", 'document_id': "doc_1"},
+        {"text_with_mask": "The <mask>", "target_content": "capital", "document_id": "doc_0"},
+        {"text_with_mask": "The capital <mask>", "target_content": "of", "document_id": "doc_0"},
+        {"text_with_mask": "The capital of <mask>", "target_content": "France", "document_id": "doc_0"},
+        {"text_with_mask": "The capital of France <mask>", "target_content": "is", "document_id": "doc_0"},
+        {"text_with_mask": "The capital of France is <mask>", "target_content": "Paris", "document_id": "doc_0"},
+        {"text_with_mask": "The <mask>", "target_content": "capital", "document_id": "doc_1"},
+        {"text_with_mask": "The capital <mask>", "target_content": "of", "document_id": "doc_1"},
+        {"text_with_mask": "The capital of <mask>", "target_content": "China", "document_id": "doc_1"},
+        {"text_with_mask": "The capital of China <mask>", "target_content": "is", "document_id": "doc_1"},
+        {"text_with_mask": "The capital of China is <mask>", "target_content": "Beijing", "document_id": "doc_1"},
     ]
     assert filecmp.cmp(
         str(predictions_file_path),
