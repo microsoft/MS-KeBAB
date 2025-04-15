@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-import filecmp
 import json
 import math
 import shutil
@@ -12,6 +11,7 @@ from typing import Any
 import pytest
 from kebab.contracts.entity import Entity
 from kebab.tasks.linking import LinkingTask
+from kebab.utils.io_helpers import compare_files_ignore_linebreaks
 
 
 @pytest.fixture
@@ -55,9 +55,9 @@ def test_linking_read_write_items_roundtrip() -> None:
     first_boolean_label = items[0][1]
     assert isinstance(first_boolean_label, bool)
     assert first_boolean_label
-    assert filecmp.cmp(
-        str(boolean_labels_file_path),
-        str(boolean_labels_output_file_path),
+    assert compare_files_ignore_linebreaks(
+        boolean_labels_file_path,
+        boolean_labels_output_file_path,
     )
 
 

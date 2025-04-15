@@ -65,12 +65,18 @@
         "schema": "https://some.public/download/link"
       }
     },
-      "Clustering-Heldout": {
+    "Clustering-Heldout": {
       "task": "Clustering",
       "data": {
         "entity_fragments": "./tests/data/clustering/entity_fragments.jsonl",
         "schema": "https://some.public/download/link",
         "ground_truth_labels": "./tests/data/clustering/labels.jsonl"
+      }
+    },
+    "TextCompletion": {
+      "task": "TextCompletion",
+      "data": {
+        "documents": "./tests/data/text_completion/documents.jsonl"
       }
     }
 }

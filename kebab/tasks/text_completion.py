@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 import json
+import math
 import re
+import statistics
 from collections.abc import Iterable
 from pathlib import Path
 
 from kebab.contracts.document import Document
 from kebab.contracts.task import Task, TaskType
-from kebab.utils.io_helpers import DocumentJsonlReader
+from kebab.utils.io_helpers import DocumentJsonlReader, ItemJsonlReader, save_dict_to_json
 
 
 class TextCompletionTask(Task):
@@ -32,10 +34,9 @@ class TextCompletionTask(Task):
         self,
         name: str,
         documents: str,
-        schema: str,
     ):
         """Initialize a linking task."""
-        super().__init__(name, schema)
+        super().__init__(name, schema="")
         self.__data_documents = Path(documents)
 
     def read_items(self) -> Iterable[Document]:
@@ -74,5 +75,21 @@ class TextCompletionTask(Task):
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
     ) -> dict[str, float]:
-        """Evaluate an output for the linking task."""
-        raise NotImplementedError("Evaluation for text completion task is not implemented.")
+        """Evaluate an output for the text completion task."""
+        predictions = ItemJsonlReader[dict[str, str | float]](output_to_evaluate).read_items()
+        log_probs = [float(pred["target_content_logprob"]) for pred in predictions]
+
+        metrics = {}
+        if log_probs:
+            metrics["mean_log_prob"] = statistics.mean(log_probs)
+            metrics["variance_log_prob"] = statistics.variance(log_probs, metrics["mean_log_prob"])
+            metrics["perplexity"] = math.exp(-metrics["mean_log_prob"])
+            metrics["min_log_prob"] = min(log_probs)
+            metrics["max_log_prob"] = max(log_probs)
+        else:
+            raise ValueError("No log probabilities found in predictions.")
+
+        if eval_result_path:
+            save_dict_to_json(metrics, eval_result_path)
+
+        return metrics

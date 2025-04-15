@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-import filecmp
 import shutil
 from collections.abc import Generator
 from pathlib import Path
@@ -11,6 +10,7 @@ import pytest
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.tasks.extraction.task import ExtractionTask
+from kebab.utils.io_helpers import compare_files_ignore_linebreaks
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ def test_extraction_read_write_items_roundtrip() -> None:
     first_extracted_entity = first_doc_extracted_entities[0]
     assert isinstance(first_extracted_entity, Entity)
     assert first_extracted_entity.entity_id == "doc_0_entity_0"
-    assert filecmp.cmp(
-        str(extracted_entities_file_path),
-        str(extracted_entities_output_file_path),
+    assert compare_files_ignore_linebreaks(
+        extracted_entities_file_path,
+        extracted_entities_output_file_path,
     )

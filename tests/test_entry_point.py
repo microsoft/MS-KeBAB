@@ -35,6 +35,7 @@ def test_task_interface():
         TaskType.Linking,
         TaskType.EntityGeneration,
         TaskType.Clustering,
+        TaskType.TextCompletion,
     }
     for task_type, tasks in tasks_by_type.items():
         for task in tasks:
@@ -51,6 +52,7 @@ def test_task_interface():
         "Linking-Heldout",
         "Entity-Generation-REBEL",
         "Clustering-Heldout",
+        "TextCompletion",
     }
 
     for task_instance_name, task_instance in task_instances.items():
