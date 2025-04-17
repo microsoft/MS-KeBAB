@@ -7,14 +7,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kebab"
-version = "0.0.1"
+version = "0.0.2"
 description = "Knowledge Base construction and Access Benchmark (KeBAB)."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
     "click",
-    "numpy==2.2.4",
+    "numpy<2.2",
     "requests",
     "tqdm",
     "tiktoken",
