@@ -8,6 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from enum import Enum
+from logging import Logger
 from pathlib import Path
 from typing import Any
 
@@ -66,7 +67,8 @@ class Task(ABC):
         """
 
     @abstractmethod
-    def evaluate(self, output_to_evaluate: Path, eval_result_path: Path | None = None) -> dict[str, float]:
+    def evaluate(self, output_to_evaluate: Path, eval_result_path: Path | None = None,
+                 logger: Logger | None = None ) -> dict[str, float]:
         """
         Evaluate an output for the task.
 

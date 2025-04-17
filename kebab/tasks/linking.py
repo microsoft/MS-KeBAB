@@ -7,6 +7,7 @@ import math
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import zip_longest
+from logging import Logger
 from pathlib import Path
 
 from kebab.contracts.entity import Entity
@@ -80,6 +81,7 @@ class LinkingTask(Task):
         self,
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
+        logger: Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the linking task."""
         if self.data_ground_truth_boolean is None:
