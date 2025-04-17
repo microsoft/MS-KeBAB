@@ -67,14 +67,16 @@ class Task(ABC):
         """
 
     @abstractmethod
-    def evaluate(self, output_to_evaluate: Path, eval_result_path: Path | None = None,
-                 logger: Logger | None = None ) -> dict[str, float]:
+    def evaluate(
+        self, output_to_evaluate: Path, eval_result_path: Path | None = None, logger: Logger | None = None
+    ) -> dict[str, float]:
         """
         Evaluate an output for the task.
 
         Args:
             output_to_evaluate: The output that needs to be evaluated.
             eval_result_path: Optional path to save the evaluation result.
+            logger: Optional logger to log the evaluation process.
 
         Returns:
             dict[str, float]: A dictionary containing the evaluation metrics.

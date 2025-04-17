@@ -114,7 +114,7 @@ class ExtractionTask(Task):
 
         metrics = {}
 
-        from kebab.tasks.extraction.metrics.aesop.calculator import (
+        from kebab.tasks.metrics.extraction.aesop.calculator import (
             ValueAveragedAesopConfig,
             ValueAveragedAesopMetricCalculator,
         )

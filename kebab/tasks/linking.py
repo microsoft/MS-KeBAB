@@ -81,7 +81,7 @@ class LinkingTask(Task):
         self,
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
-        logger: Logger | None = None,
+        logger: Logger | None = None,  # noqa: ARG002
     ) -> dict[str, float]:
         """Evaluate an output for the linking task."""
         if self.data_ground_truth_boolean is None:
