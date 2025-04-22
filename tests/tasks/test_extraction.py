@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
-from kebab.tasks.extraction.task import ExtractionTask
+from kebab.tasks.extraction import ExtractionTask
 from kebab.utils.io_helpers import compare_files_ignore_linebreaks
 
 

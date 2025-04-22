@@ -11,7 +11,7 @@ from typing import ClassVar
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricCalculator, MetricConfig
+from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator, MetricConfig
 from kebab.utils.io_helpers import (
     DocumentJsonlReader,
     EntityListJsonlReader,
@@ -114,7 +114,7 @@ class ExtractionTask(Task):
 
         metrics = {}
 
-        from kebab.tasks.extraction.metrics.aesop.calculator import (
+        from kebab.tasks.metrics.extraction.aesop.calculator import (
             ValueAveragedAesopConfig,
             ValueAveragedAesopMetricCalculator,
         )

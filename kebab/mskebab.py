@@ -14,7 +14,7 @@ from pathlib import Path
 from kebab.contracts.task import Task, TaskType
 from kebab.tasks.clustering import ClusteringTask
 from kebab.tasks.entity_generation import EntityGenerationTask
-from kebab.tasks.extraction.task import ExtractionTask
+from kebab.tasks.extraction import ExtractionTask
 from kebab.tasks.linking import LinkingTask
 from kebab.tasks.text_completion import TextCompletionTask
 

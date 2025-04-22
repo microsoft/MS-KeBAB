@@ -13,8 +13,8 @@ from typing import Any
 from sentence_transformers import SentenceTransformer
 
 from kebab.contracts.entity import Entity, Property, PropertySchema
-from kebab.tasks.extraction.metrics.aesop import distances
-from kebab.tasks.extraction.metrics.aesop.distances import (
+from kebab.tasks.metrics.extraction.aesop import distances
+from kebab.tasks.metrics.extraction.aesop.distances import (
     BinaryMatchDistance,
     EditDistance,
     ElementDistance,
@@ -26,8 +26,8 @@ from kebab.tasks.extraction.metrics.aesop.distances import (
     SingleValuePropertyDistance,
     TokenDistance,
 )
-from kebab.tasks.extraction.metrics.aesop.metric_helpers import EntityMatcher, MetricsAccumulator, MetricsComputer
-from kebab.tasks.extraction.metrics.calculator import ExtractionOutput, MetricCalculator, MetricConfig
+from kebab.tasks.metrics.extraction.aesop.metric_helpers import EntityMatcher, MetricsAccumulator, MetricsComputer
+from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator, MetricConfig
 
 
 @dataclass
