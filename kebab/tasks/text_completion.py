@@ -66,8 +66,9 @@ class TextCompletionTask(Task):
             # punctuations, special characters, non-Latin scripts, etc.
             words = re.findall(r"\w+|\s+|[^\w\s]", text)
             for i, word in enumerate(words):
-                # Skip the first word and non-alphanumeric words.
-                if i == 0 or not word.strip().isalnum():
+                # Skip the first word, non-alphanumeric words, and words longer than 30 characters.
+                word = word.strip()
+                if i == 0 or not word.isalnum() or len(word) > 30:
                     continue
                 text_with_mask = "".join(words[:i] + ["<mask>"])
                 yield {
@@ -105,7 +106,9 @@ class TextCompletionTask(Task):
     ) -> dict[str, float]:
         """Evaluate an output for the text completion task."""
         predictions = ItemJsonlReader[dict[str, str | float]](output_to_evaluate).read_items()
-        log_probs = [float(pred["target_content_logprob"]) for pred in predictions]
+        targets = [query["target_content"] for query in self.generate_partial_queries()]
+        predictions_and_targets = zip(predictions, targets, strict=True)
+        log_probs = [float(pred[0]["target_content_logprob"]) for pred in predictions_and_targets]
 
         metrics = {}
         if log_probs:
