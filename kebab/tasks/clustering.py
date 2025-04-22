@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import zip_longest
+from logging import Logger
 from pathlib import Path
 
 import numpy as np
@@ -81,6 +82,7 @@ class ClusteringTask(Task):
         self,
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
+        logger: Logger | None = None,  # noqa: ARG002
     ) -> dict[str, float]:
         """Evaluate an output for the clustering task."""
         if self.data_ground_truth_labels is None:

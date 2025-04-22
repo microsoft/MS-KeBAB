@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from logging import Logger
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +62,7 @@ class EntityGenerationTask(Task):
         self,
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
+        logger: Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the entity generation task."""
         raise NotImplementedError("evaluate is not implemented for EntityGenerationTask")

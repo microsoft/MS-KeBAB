@@ -15,8 +15,8 @@ from scipy.spatial.distance import cosine
 from sentence_transformers import SentenceTransformer
 
 from kebab.contracts.entity import Entity, Property, PropertySchema, ValueType
-from kebab.tasks.extraction.metrics.aesop.metric_helpers import match_items
-from kebab.tasks.extraction.metrics.utils import normalize_property_value, normalize_string
+from kebab.tasks.metrics.extraction.aesop.metric_helpers import match_items
+from kebab.tasks.metrics.extraction.utils import normalize_property_value, normalize_string
 
 
 class ElementDistance(abc.ABC):
