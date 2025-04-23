@@ -395,3 +395,21 @@ def generate_draft_property_schema_from_data(paths: Iterable[Path], output_path:
         }
     )
     property_schema.to_file(output_path)
+
+
+def compare_files_ignore_linebreaks(file_1_path: Path, file_2_path: Path) -> bool:
+    """
+    Compares two files on disk while ignoring line breaks.
+
+    Args:
+        file_1_path: Path to the first file.
+        file_2_path: Path to the second file.
+
+    Returns:
+        bool: True if the files are identical (ignoring line breaks), False otherwise.
+    """
+    with open(file_1_path, encoding="utf-8") as f1, open(file_2_path, encoding="utf-8") as f2:
+        lines1 = f1.read().splitlines()
+        lines2 = f2.read().splitlines()
+
+    return lines1 == lines2
