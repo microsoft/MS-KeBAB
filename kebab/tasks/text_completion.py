@@ -8,6 +8,7 @@ import math
 import re
 import statistics
 from collections.abc import Iterable
+from logging import Logger
 from pathlib import Path
 
 from kebab.contracts.document import Document
@@ -58,6 +59,7 @@ class TextCompletionTask(Task):
                 - "target_content": The content of the chunk that was replaced by "<mask>".
                 - "document_id": The ID of the document being processed.
         """
+        max_word_length = 30
         docs = self.read_items()
         for doc in docs:
             text = doc.data["text"]
@@ -66,9 +68,8 @@ class TextCompletionTask(Task):
             # punctuations, special characters, non-Latin scripts, etc.
             words = re.findall(r"\w+|\s+|[^\w\s]", text)
             for i, word in enumerate(words):
-                # Skip the first word, non-alphanumeric words, and words longer than 30 characters.
-                word = word.strip()
-                if i == 0 or not word.isalnum() or len(word) > 30:
+                # Skip the first word, non-alphanumeric words, and long words.
+                if i == 0 or not word.isalnum() or len(word) > max_word_length:
                     continue
                 text_with_mask = "".join(words[:i] + ["<mask>"])
                 yield {
@@ -103,8 +104,12 @@ class TextCompletionTask(Task):
         self,
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
+        logger: Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the text completion task."""
+        if logger:
+            logger.info("Starting evaluation for the text completion task.")
+
         predictions = ItemJsonlReader[dict[str, str | float]](output_to_evaluate).read_items()
         targets = [query["target_content"] for query in self.generate_partial_queries()]
         predictions_and_targets = zip(predictions, targets, strict=True)
@@ -121,6 +126,9 @@ class TextCompletionTask(Task):
         # TODO (allenwang-ms): Consider adding more evaluation metrics, such as BLEU, to assess the
         # quality of predicted contents.
 
+        if logger:
+            logger.info("Evaluation metrics calculated successfully.")
+            logger.info(f"Metrics: {metrics}")
         if eval_result_path:
             save_dict_to_json(metrics, eval_result_path)
 
