@@ -71,6 +71,19 @@
             "data_type_id": "text",
             "description": "Company of the entity.",
             "is_collection": false
+        },
+        {
+            "property_id": "location",
+            "data_type_id": "text",
+            "description": "Location of the entity.",
+            "is_collection": false
+        },
+        {
+            "property_id": "key_points",
+            "data_type_id": "text",
+            "description": "Key points related to the entity.",
+            "display_name": "key points",
+            "is_collection": true
         }
     ]
 }

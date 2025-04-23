@@ -70,6 +70,11 @@ class ValueAveragedAesopConfig(MetricConfig):
         )
 
 
+def filter_json_values(entity: Entity) -> Entity:
+    """Filter JSON values from entity properties."""
+    return entity.filter_values(lambda _, value: not isinstance(value, dict))
+
+
 class ValueAveragedAesopMetricCalculator(MetricCalculator):
     """Value-averaged-AESOP metric calculator.
     Computes AESOP metric as described in the paper: https://arxiv.org/pdf/2402.04437
@@ -97,11 +102,13 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             """Compute metrics for a single document."""
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1}")
-            entity_matcher = EntityMatcher(gt.entities, pred.entities)
+            gt_entities = list(map(filter_json_values, gt.entities))
+            pred_entities = list(map(filter_json_values, pred.entities))
+            entity_matcher = EntityMatcher(gt_entities, pred_entities)
             self.logger.info(f"Document {idx + 1}: Matching entities")
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)
             self.logger.info(f"Document {idx + 1}: Computing metrics")
-            metrics_computer = MetricsComputer(gt.entities, pred.entities, self.config.property_schema)
+            metrics_computer = MetricsComputer(gt_entities, pred_entities, self.config.property_schema)
             metrics = metrics_computer.compute_bipartite_metrics(matched_pairs, self.config.property_score_functions)
             self.logger.info(f"Document {idx + 1}: Done")
             return metrics, gt.document.document_id

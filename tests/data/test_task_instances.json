@@ -26,6 +26,15 @@
         "metrics_config": "./tests/data/extraction/metrics_config.json"
       }
     },
+    "Extraction-Modified-Heldout": {
+      "task": "Extraction",
+      "data": {
+        "extracts": "./tests/utils/data/datasets/re-docred/dev_small_modified/extracts.jsonl",
+        "schema": "./tests/data/extraction/property_schema.json",
+        "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/dev_small_modified/entities.jsonl",
+        "metrics_config": "./tests/data/extraction/metrics_config.json"
+      }
+    },
     "Linking-TREx-Train": {
       "task": "Linking",
       "data": {

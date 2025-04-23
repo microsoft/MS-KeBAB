@@ -87,3 +87,97 @@ def test_merge_method(sample_entity_1: Entity, sample_entity_2: Entity) -> None:
     assert merged.properties["prop2"] == ["value31"]
     assert merged.properties["prop3"] == ["value31"]
     assert set(merged.source_ids) == {"source1", "source2", "source4"}
+
+
+def filter_and_check(entity: Entity, expected: Entity, filter_func) -> None:
+    """
+    Helper function to filter an entity and check the result.
+    """
+    filtered_entity = entity.filter_values(filter_func)
+    assert filtered_entity.entity_id == expected.entity_id
+    assert filtered_entity.properties == expected.properties
+    assert filtered_entity.source_ids == expected.source_ids
+    assert filtered_entity.evidence_map == expected.evidence_map
+
+
+def test_filter(sample_entity_1: Entity) -> None:
+    """
+    Test the filter method by filtering out specific values.
+    """
+    # Filter out "value12" from "prop1"
+    filter_and_check(
+        sample_entity_1,
+        expected=Entity.from_dict(
+            {
+                "entity_id": "entity_1",
+                "properties": {"prop1": ["value11"], "prop2": ["value31"]},
+                "source_ids": ["source1"],
+                "evidence_map": {"prop1": [[0]], "prop2": [[0]]},
+            }
+        ),
+        filter_func=lambda _, value: value != "value12",
+    )
+    # Filter out "prop2" by filtering the only value "value31"
+    filter_and_check(
+        sample_entity_1,
+        expected=Entity.from_dict(
+            {
+                "entity_id": "entity_1",
+                "properties": {"prop1": ["value11", "value12"]},
+                "source_ids": ["source1", "source2"],
+                "evidence_map": {"prop1": [[0], [1]]},
+            }
+        ),
+        filter_func=lambda _, value: value != "value31",
+    )
+
+    # Filter out "source1" from source_ids by filtering out all values with that evidence
+    filter_and_check(
+        sample_entity_1,
+        expected=Entity.from_dict(
+            {
+                "entity_id": "entity_1",
+                "properties": {"prop1": ["value12"]},
+                "source_ids": ["source2"],
+                "evidence_map": {
+                    "prop1": [[0]],
+                },
+            }
+        ),
+        filter_func=lambda _, value: value not in {"value11", "value31"},
+    )
+
+    # Filter out all values
+    filter_and_check(
+        sample_entity_1,
+        expected=Entity.from_dict(
+            {
+                "entity_id": "entity_1",
+                "properties": {},
+                "source_ids": [],
+                "evidence_map": {},
+            }
+        ),
+        filter_func=lambda _, value: False,  # noqa: ARG005
+    )
+
+    # filter values from entity with empty evidence_map
+    filter_and_check(
+        Entity.from_dict(
+            {
+                "entity_id": "entity_1",
+                "properties": {"prop1": ["value12"]},
+                "source_ids": ["source2"],
+                "evidence_map": {},
+            }
+        ),
+        expected=Entity.from_dict(
+            {
+                "entity_id": "entity_1",
+                "properties": {},
+                "source_ids": [],
+                "evidence_map": {},
+            }
+        ),
+        filter_func=lambda _, value: False,  # noqa: ARG005
+    )
