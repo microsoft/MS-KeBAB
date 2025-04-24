@@ -831,6 +831,48 @@ def test_unmatched_entities_in_gt_should_not_be_evaluated(property_schema: Prope
     assert "type" not in metrics["property_recall"]
 
 
+def test_json_values_are_not_evaluated(property_schema: PropertySchema):
+    ground_truth = to_extraction_output(
+        to_entities(
+            [
+                {
+                    "name": "Consolidated statement of income",
+                    "type": "document",
+                    "key points": [
+                        {
+                            "name": "Increase in operating revenues",
+                            "Q2 1999": "$2,597 million",
+                            "Q2 2000": "$4,227 million",
+                            "six months 1999": "$4,875 million",
+                            "six months 2000": "$7,333 million",
+                        },
+                        {
+                            "name": "Improvement in operating income",
+                            "first six months 1999": "loss of $36 million",
+                            "first six months 2000": "gain of $652 million",
+                        },
+                    ],
+                }
+            ]
+        )
+    )
+    predictions = ground_truth.copy()
+
+    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
+
+    assert metrics["matched_count"] == 1
+    assert metrics["unmatched_counts"]["extra_gt_entities"] == 0
+    assert metrics["unmatched_counts"]["extra_pred_entities"] == 0
+    assert metrics["unmatched_counts"]["pairs"] == 0
+
+    assert metrics["property_precision"]["name"] == 1.0
+    assert metrics["property_recall"]["name"] == 1.0
+    assert metrics["property_precision"]["type"] == 1.0
+    assert metrics["property_recall"]["type"] == 1.0
+
+
 def test_final_statistics(property_schema: PropertySchema):
     ground_truth1 = to_extraction_output(to_entities([{"name": "John"}, {"name": "Alexandria"}, {"name": "FNKE"}]))
     predictions1 = to_extraction_output(to_entities([{"name": "James"}]))

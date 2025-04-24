@@ -10,7 +10,8 @@ from __future__ import annotations
 import json
 import pathlib
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Self
@@ -327,6 +328,53 @@ class Entity:
         entity = self.__class__.from_dict(self.to_dict())
         entity.entity_id = ""
         return entity
+
+    def filter_values(self, filter_func: Callable[[str, Any], bool]) -> Self:
+        """Return a new entity with filtered values.
+
+        Args:
+            filter_func: A function that takes a property ID and a value, and returns True if the value should be kept.
+
+        Returns:
+            A new entity with filtered values.
+        """
+        updated_properties = deepcopy(self.properties)
+        updated_evidence_map = deepcopy(self.evidence_map)
+        source_ids = deepcopy(self.source_ids)
+        for property_id, property_values in self.properties.items():
+            indices_to_remove = []
+            for idx, value in enumerate(property_values):
+                if not filter_func(property_id, value):
+                    indices_to_remove.append(idx)
+            for idx in sorted(indices_to_remove, reverse=True):
+                del updated_properties[property_id][idx]
+                if idx < len(updated_evidence_map[property_id]):
+                    del updated_evidence_map[property_id][idx]
+            if not updated_properties[property_id]:
+                updated_properties.pop(property_id, None)
+                updated_evidence_map.pop(property_id, None)
+        evidence_indices = set()
+        for value_to_evidence in updated_evidence_map.values():
+            for evidence in value_to_evidence:
+                evidence_indices.update(evidence)
+        missing_indices = set(range(len(self.source_ids))) - evidence_indices
+        if missing_indices:
+            # need to delete sources from source_ids and reflect that in evidence_map
+            new_evidence_idx = {old_idx: new_idx for new_idx, old_idx in enumerate(sorted(evidence_indices))}
+            for property_id, value_to_evidence in updated_evidence_map.items():
+                for value_idx, evidence in enumerate(value_to_evidence):
+                    updated_evidence_map[property_id][value_idx] = [
+                        new_evidence_idx[evidence_idx] for evidence_idx in evidence
+                    ]
+            for idx in sorted(missing_indices, reverse=True):
+                del source_ids[idx]
+        return self.__class__(
+            entity_id=self.entity_id,
+            source_ids=source_ids,
+            evidence_map=updated_evidence_map,
+            metadata=self.metadata,
+            properties=updated_properties,
+        )
 
     def property_values_str(self) -> str:
         """Get the string representation of the entity properties and values."""
