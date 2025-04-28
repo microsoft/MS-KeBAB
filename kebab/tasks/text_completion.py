@@ -27,6 +27,9 @@ from kebab.utils.io_helpers import (
 class TextCompletionTaskBase(Task):
     """Base class for text completion benchmark task."""
 
+    # The token used to mask the text in the task.
+    MASK : str = "<mask>"
+
     __data_documents: Path
 
     @property
@@ -59,10 +62,12 @@ class TextCompletionTaskBase(Task):
         """
         return DocumentJsonlReader(self.__data_documents).read_items()
 
-    def generate_partial_queries(self) -> Iterable[dict[str, str]]:
+    def generate_partial_queries(self, verbose: bool = False) -> Iterable[dict[str, str]]:
         """
         Generate partial queries for participants to fill in.
 
+        Args:
+            verbose: TODO (allenwang-ms).
         Returns:
             Iterable[dict[str, str]]: An iterable of dicts, where each dictionary contains:
                 - "text_with_mask": The text with a chunk replaced by "<mask>".
@@ -80,8 +85,14 @@ class TextCompletionTaskBase(Task):
             for i, word in enumerate(words):
                 # Skip the first word, non-alphanumeric words, and long words.
                 if i == 0 or not word.isalnum() or len(word) > max_word_length:
+                    if verbose:
+                        yield {
+                            "text_with_mask": "",
+                            "target_content": word,
+                            "document_id": doc.document_id,
+                        }
                     continue
-                text_with_mask = "".join([*words[:i], "<mask>"])
+                text_with_mask = "".join([*words[:i], TextCompletionTaskBase.MASK])
                 yield {
                     "text_with_mask": text_with_mask,
                     "target_content": word,
