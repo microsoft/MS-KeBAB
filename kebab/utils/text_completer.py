@@ -248,7 +248,7 @@ def augment_partial_queries_with_contexts(
 
 
 if __name__ == "__main__":
-    input_path = "/home/allenwang/pra/MS-KeBAB/tests/data/text_completion/plain_text_items.jsonl"
+    input_path = "/home/allenwang/pra/MS-KeBAB/tests/data/text_completion/documents.jsonl"
     docReader = DocumentJsonlReader(Path(input_path))
     docs = docReader.read_items()
     queries = BaseTextCompleter.generate_partial_queries(docs)
