@@ -27,8 +27,8 @@ from kebab.utils.io_helpers import (
 class TextCompletionTaskBase(Task):
     """Base class for text completion benchmark task."""
 
-    # The token used to mask the text in the task.
     MASK : str = "<mask>"
+    """The token used to mask the text in text completion tasks."""
 
     __data_documents: Path
 
@@ -67,7 +67,9 @@ class TextCompletionTaskBase(Task):
         Generate partial queries for participants to fill in.
 
         Args:
-            verbose: TODO (allenwang-ms).
+            verbose: Defaults to False. If True, includes skipped words with empty "text_with_mask"
+            for debugging.
+
         Returns:
             Iterable[dict[str, str]]: An iterable of dicts, where each dictionary contains:
                 - "text_with_mask": The text with a chunk replaced by "<mask>".

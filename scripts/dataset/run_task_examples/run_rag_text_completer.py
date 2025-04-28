@@ -25,7 +25,7 @@ if __name__ == "__main__":
     queries = task_instance.generate_partial_queries(verbose=True)
     queries = BaseRAGTextCompleter.augment_partial_queries_with_contexts(queries)
     phi_annotator = PhiRAGTextCompleter()
-    results = phi_annotator.complete_text_and_evaluate(queries, verbose=True)
+    results = list(phi_annotator.complete_partial_queries(queries))
 
     output_path = os.path.splitext(documents_file_path)[0] + "_tc_results.json"
     with open(output_path, "w", encoding="utf-8") as f:
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     doc_id = "Invalid"
     results_per_doc = []
-    for result in results["all_results"]:
+    for result in results:
         if result["document_id"] != doc_id and doc_id != "Invalid":
             BaseRAGTextCompleter.generate_annotated_doc_html(results_per_doc, os.path.splitext(documents_file_path)[0] + f"_annotated_{doc_id}.html")
             results_per_doc = [result]
@@ -43,3 +43,10 @@ if __name__ == "__main__":
     if results_per_doc:
         BaseRAGTextCompleter.generate_annotated_doc_html(results_per_doc, os.path.splitext(documents_file_path)[0] + f"_annotated_{doc_id}.html")
         results_per_doc = []
+
+    '''
+    if target_content_logprob != float("-inf"):
+        all_logprobs.append(target_content_logprob)
+    else:
+        all_logprobs.append(target_content_top_logprobs[0][-1]["logprob"])
+    '''
