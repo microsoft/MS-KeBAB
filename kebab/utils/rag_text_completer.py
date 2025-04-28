@@ -29,11 +29,15 @@ class BaseRAGTextCompleter(ABC):
     def complete_partial_queries(
         self,
         partial_queries_with_augmented_contexts: Iterable[dict[str, Any]],
+        verbose: bool = False,
     ) -> Iterable[dict[str, Any]]:
         count = 0
         for partial_query_with_augmented_context in partial_queries_with_augmented_contexts:
-            if partial_query_with_augmented_context["text_with_mask"] == "":
+            result = {}
+            if verbose:
                 result = copy.deepcopy(partial_query_with_augmented_context)
+
+            if partial_query_with_augmented_context["text_with_mask"] == "":
                 yield result
                 continue
 
@@ -42,8 +46,6 @@ class BaseRAGTextCompleter(ABC):
                 partial_query_with_augmented_context["target_content"],
                 partial_query_with_augmented_context["augmented_context"],
             )
-
-            result = copy.deepcopy(partial_query_with_augmented_context)
             result["target_content_logprob"] = target_content_logprob
             result["target_content_top_logprobs"] = target_content_top_logprobs
 
@@ -55,7 +57,7 @@ class BaseRAGTextCompleter(ABC):
     @staticmethod
     def augment_partial_queries_with_contexts(
         queries: Iterable[dict[str, str]],
-        get_augmented_context: Callable[[dict[str, str]], str] = lambda _: "",
+        get_augmented_context: Callable[[dict[str, str]], str],
     ) -> Iterable[dict[str, str]]:
         for query in queries:
             query["augmented_context"] = get_augmented_context(query)
@@ -119,9 +121,9 @@ class BaseRAGTextCompleter(ABC):
 
 class PhiRAGTextCompleter(BaseRAGTextCompleter):
 
-    def __init__(self) -> None:
-        model_id = "microsoft/phi-4"
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+    def __init__(self, model_id: str = "microsoft/phi-4") -> None:
+        self.model_id = model_id
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         self.bad_token_ids = [
             self.tokenizer.convert_tokens_to_ids(token) for token in ["<|im_start|>", "<|im_end|>"]
         ]
@@ -174,21 +176,21 @@ Answer: """
 
         # Extract top k token indices and their log probabilities
         top_logprobs, top_indices = torch.topk(log_probs, top_k)
-        top_words = [self.tokenizer.decode([idx]) for idx in top_indices]
-        top_words = [word.strip() for word in top_words]
+        top_words = [self.tokenizer.decode([idx]).strip() for idx in top_indices]
 
+        # TODO (allenwang-ms): refine the following logic.
         if target_content in top_words:
             target_index = top_words.index(target_content)
-            masked_content_logprob = top_logprobs[target_index].item()
+            target_content_logprob = top_logprobs[target_index].item()
         else:
-            masked_content_token_ids = self.tokenizer.encode(' ' + target_content, add_special_tokens=False)
-            word = self.tokenizer.decode([masked_content_token_ids[0]]).strip()
+            target_content_token_ids = self.tokenizer.encode(' ' + target_content, add_special_tokens=False)
+            word = self.tokenizer.decode([target_content_token_ids[0]]).strip()
             if len(word) > 0 and word in top_words:
                 target_index = top_words.index(word)
-                masked_content_logprob = top_logprobs[target_index].item()
+                target_content_logprob = top_logprobs[target_index].item()
             else:
-                masked_content_logprob = float("-inf")  # or assign a default value or handle as needed
+                target_content_logprob = float("-inf")
 
         # Output results
         top_logprobs = [[{"token": word, "logprob": logprob} for word, logprob in zip(top_words, top_logprobs.tolist())]]
-        return masked_content_logprob, top_logprobs
+        return target_content_logprob, top_logprobs
