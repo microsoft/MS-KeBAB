@@ -67,8 +67,8 @@ class TextCompletionTaskBase(Task):
         Generate partial queries for participants to fill in.
 
         Args:
-            verbose: Defaults to False. If True, includes skipped words with empty "text_with_mask"
-            for debugging.
+            verbose: Defaults to False. If True, includes skipped words with an empty
+            "text_with_mask" field for debugging.
 
         Returns:
             Iterable[dict[str, str]]: An iterable of dicts, where each dictionary contains:

@@ -28,40 +28,37 @@ class BaseRAGTextCompleter(ABC):
 
     def complete_partial_queries(
         self,
-        partial_queries_with_augmented_contexts: Iterable[dict[str, Any]],
+        partial_queries: Iterable[dict[str, Any]],
+        get_augmented_context: Callable[[dict[str, str]], str],
         verbose: bool = False,
     ) -> Iterable[dict[str, Any]]:
         count = 0
-        for partial_query_with_augmented_context in partial_queries_with_augmented_contexts:
+        for query in partial_queries:
             result = {}
             if verbose:
-                result = copy.deepcopy(partial_query_with_augmented_context)
+                result = copy.deepcopy(query)
 
-            if partial_query_with_augmented_context["text_with_mask"] == "":
+            if query["text_with_mask"] == "":
                 yield result
                 continue
 
-            target_content_logprob, target_content_top_logprobs = self.complete_single_partial_query(
-                partial_query_with_augmented_context["text_with_mask"],
-                partial_query_with_augmented_context["target_content"],
-                partial_query_with_augmented_context["augmented_context"],
+            # Run RAG to augment a partial query with context.
+            augmented_context = get_augmented_context(query)
+            if verbose:
+                result["augmented_context"] = augmented_context
+
+            target_content_logprob, predicted_content_top_logprobs = self.complete_single_partial_query(
+                text_with_mask=query["text_with_mask"],
+                target_content=query["target_content"],
+                augmented_context=augmented_context,
             )
             result["target_content_logprob"] = target_content_logprob
-            result["target_content_top_logprobs"] = target_content_top_logprobs
+            result["predicted_content_top_logprobs"] = predicted_content_top_logprobs
 
             count += 1
             print(f"Processed {count} partial queries.")
 
             yield result
-
-    @staticmethod
-    def augment_partial_queries_with_contexts(
-        queries: Iterable[dict[str, str]],
-        get_augmented_context: Callable[[dict[str, str]], str],
-    ) -> Iterable[dict[str, str]]:
-        for query in queries:
-            query["augmented_context"] = get_augmented_context(query)
-            yield query
 
     @staticmethod
     def get_font_color(logprob):
@@ -101,12 +98,12 @@ class BaseRAGTextCompleter(ABC):
             tooltip = ""
             if target_word_logprob == float("-inf"):
                 tooltip = "Incorrect prediction, "
-                target_word_logprob = item["target_content_top_logprobs"][0][-1]["logprob"]
+                target_word_logprob = item["predicted_content_top_logprobs"][0][-1]["logprob"]
             color = BaseRAGTextCompleter.get_font_color(target_word_logprob)
             font_weight = "bold" if target_word_logprob <= -12 else "normal"
             tooltip += f"LogProb: {target_word_logprob:.3f}"
-            top_logprobs_html = str(item["target_content_top_logprobs"]).replace('"', '&quot;')
-            tooltip += f', top {len(item["target_content_top_logprobs"][0])} token predictions: {top_logprobs_html}'
+            top_logprobs_html = str(item["predicted_content_top_logprobs"]).replace('"', '&quot;')
+            tooltip += f', top {len(item["predicted_content_top_logprobs"][0])} token predictions: {top_logprobs_html}'
             html_content += f'<span class="word" style="color: {color}; font-weight: {font_weight};" title="{tooltip}">{item["target_content"]}</span>'
         html_content += """
         </p>
@@ -121,11 +118,13 @@ class BaseRAGTextCompleter(ABC):
 
 class PhiRAGTextCompleter(BaseRAGTextCompleter):
 
+    BAD_TOKENS : list[str] = ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+
     def __init__(self, model_id: str = "microsoft/phi-4") -> None:
         self.model_id = model_id
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         self.bad_token_ids = [
-            self.tokenizer.convert_tokens_to_ids(token) for token in ["<|im_start|>", "<|im_end|>"]
+            self.tokenizer.convert_tokens_to_ids(token) for token in PhiRAGTextCompleter.BAD_TOKENS
         ]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = AutoModelForCausalLM.from_pretrained(
@@ -140,7 +139,7 @@ class PhiRAGTextCompleter(BaseRAGTextCompleter):
         text_with_mask: str,
         target_content: str,
         augmented_context: str = "",
-        top_k: int = 5,
+        top_k: int = 100,
     ) -> tuple[float, list[list[dict[str, Any]]]]:
         text_completion_prompt = f"""
 You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context.
@@ -158,23 +157,23 @@ What is the **single alphanumeric word** that best completes the masked position
 
 Answer: """
 
-        # Encode the prompt
+        # Encode the prompt.
         input_ids = self.tokenizer.encode(text_completion_prompt, return_tensors="pt").to(self.device)
 
-        # Get model outputs (logits for each token)
+        # Get model outputs (logits for each token).
         with torch.no_grad():
             outputs = self.model(input_ids)
 
-        # Extract logits for the next token (last position)
+        # Extract logits for the next token (last position).
         next_token_logits = outputs.logits[0, -1, :]
 
         for token_id in self.bad_token_ids:
             next_token_logits[token_id] = float("-inf")
 
-        # Compute log probabilities over the vocabulary
+        # Compute log probabilities over the vocabulary.
         log_probs = F.log_softmax(next_token_logits, dim=-1)
 
-        # Extract top k token indices and their log probabilities
+        # Extract top k token indices and their log probabilities.
         top_logprobs, top_indices = torch.topk(log_probs, top_k)
         top_words = [self.tokenizer.decode([idx]).strip() for idx in top_indices]
 
@@ -183,7 +182,7 @@ Answer: """
             target_index = top_words.index(target_content)
             target_content_logprob = top_logprobs[target_index].item()
         else:
-            target_content_token_ids = self.tokenizer.encode(' ' + target_content, add_special_tokens=False)
+            target_content_token_ids = self.tokenizer.encode(target_content, add_special_tokens=False)
             word = self.tokenizer.decode([target_content_token_ids[0]]).strip()
             if len(word) > 0 and word in top_words:
                 target_index = top_words.index(word)
@@ -191,6 +190,6 @@ Answer: """
             else:
                 target_content_logprob = float("-inf")
 
-        # Output results
+        # Output results.
         top_logprobs = [[{"token": word, "logprob": logprob} for word, logprob in zip(top_words, top_logprobs.tolist())]]
         return target_content_logprob, top_logprobs
