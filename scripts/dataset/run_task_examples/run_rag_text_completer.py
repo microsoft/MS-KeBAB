@@ -15,8 +15,12 @@ from kebab.utils.rag_text_completer import BaseRAGTextCompleter, PhiRAGTextCompl
 if __name__ == "__main__":
     # Create a text completion task instance.
     documents_file_path = Path(__file__).parents[3] / "tests" / "data" / "text_completion" / "documents.jsonl"
-    predictions_file_path = Path(__file__).parents[3] / "tests" / "data" / "text_completion" / "predicted_contents.jsonl"
-    predictions_output_file_path = Path(__file__).parents[3] / "tests" / "output" / "text_completion" / "predicted_contents.jsonl"
+    predictions_file_path = (
+        Path(__file__).parents[3] / "tests" / "data" / "text_completion" / "predicted_contents.jsonl"
+    )
+    predictions_output_file_path = (
+        Path(__file__).parents[3] / "tests" / "output" / "text_completion" / "predicted_contents.jsonl"
+    )
     task_instance = TextCompletionTask(
         "TextCompletion",
         str(documents_file_path),
@@ -27,11 +31,13 @@ if __name__ == "__main__":
 
     # Run the text completer.
     phi_annotator = PhiRAGTextCompleter()
-    results = list(phi_annotator.complete_partial_queries(
-        partial_queries=queries,
-        get_augmented_context=lambda _: "",
-        verbose=True,
-    ))
+    results = list(
+        phi_annotator.complete_partial_queries(
+            partial_queries=queries,
+            get_augmented_context=lambda _: "",
+            verbose=True,
+        )
+    )
 
     results_to_evaluate = []
     for result in results:
@@ -40,8 +46,11 @@ if __name__ == "__main__":
             if result["target_content_logprob"] != float("-inf"):
                 results_to_evaluate.append((predicted_content, result["target_content_logprob"]))
             else:
-                # Fallback to the smallest log probability among the top k predicted tokens when the target content log probability is -inf.
-                results_to_evaluate.append((predicted_content, result["predicted_content_top_logprobs"][0][-1]["logprob"]))
+                # Fallback to the smallest log probability among the top k predicted tokens when the
+                # target content log probability is -inf.
+                results_to_evaluate.append(
+                    (predicted_content, result["predicted_content_top_logprobs"][0][-1]["logprob"])
+                )
 
     # Write the results to a file.
     output_to_evaulate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_to_eval.jsonl")

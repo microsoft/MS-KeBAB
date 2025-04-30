@@ -1,21 +1,26 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from __future__ import annotations
+
 import copy
 import os
-import torch
-import torch.nn.functional as F
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable
+from typing import Any, ClassVar
+
+import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from typing import Any, Callable, Iterable
 
 from kebab.tasks.text_completion import TextCompletionTask
 
 
 class BaseRAGTextCompleter(ABC):
-
-    def __init__(self) -> None:
-        pass
+    """
+    A base class for RAG text completers, which provides a common interface for different RAG text
+    completion models. The derived classes should implement the `complete_single_partial_query`
+    method.
+    """
 
     @abstractmethod
     def complete_single_partial_query(
@@ -24,6 +29,7 @@ class BaseRAGTextCompleter(ABC):
         target_content: str,
         augmented_context: str = "",
     ) -> tuple[float, list[list[dict[str, Any]]]]:
+        """TODO (allenwang-ms)."""
         raise NotImplementedError
 
     def complete_partial_queries(
@@ -32,6 +38,22 @@ class BaseRAGTextCompleter(ABC):
         get_augmented_context: Callable[[dict[str, str]], str],
         verbose: bool = False,
     ) -> Iterable[dict[str, Any]]:
+        """
+        Processes a collection of partial queries and complete them using the
+        `complete_single_partial_query` method.
+
+        Args:
+            partial_queries: An iterable of dictionaries, where each dictionary represents a partial
+            query to complete.
+            get_augmented_context: A function that takes a partial query and returns the augmented
+            context as a string.
+            verbose: Defaults to False. If True, includes additional information such as the
+            original partial query and augmented context in the results for debugging.
+
+        Returns:
+            Iterable[dict[str, Any]]: An iterable of dictionaries, where each dictionary contains
+            the results for each partial query, including log probabilities and predicted content.
+        """
         count = 0
         for query in partial_queries:
             result = {}
@@ -60,32 +82,32 @@ class BaseRAGTextCompleter(ABC):
 
             yield result
 
-    @staticmethod
-    def get_font_color(logprob):
-        """
-        Compute the font color based on log probability.
-        """
-        if logprob > -4:
-            return "#000000"  # Black for high confidence
-        elif logprob > -8:
-            return "#800000"  # Dark red for medium confidence
-        else:
-            return "#FF0000"  # Bright red for low confidence
+    LOGPROB_THRESHOLDS: ClassVar[list[float]] = [-4, -8, -12]
 
     @staticmethod
-    def generate_annotated_doc_html(text_completion_results, output_path):
-        """
-        Create an HTML page that highlights words using font color based on log probability.
-        """
-        html_content = """
+    def get_font_color(logprob: float) -> str:
+        """Computes the font color based on log probability."""
+        if logprob > BaseRAGTextCompleter.LOGPROB_THRESHOLDS[0]:
+            return "#000000"  # Black for high confidence
+        if logprob > BaseRAGTextCompleter.LOGPROB_THRESHOLDS[1]:
+            return "#800000"  # Dark red for medium confidence
+        return "#FF0000"  # Bright red for low confidence
+
+    @staticmethod
+    def generate_annotated_doc_html(
+        text_completion_results: Iterable[dict[str, Any]],
+        output_path: str,
+    ) -> None:
+        """Create an HTML page that highlights words using font color based on log probability."""
+        html_content = f"""
 <html>
     <body>
         <p>LLM Prediction Confidence Visualization: Words are color-coded based on their log probabilities:</p>
         <ul>
-            <li><span style="color: black;">High confidence (black):</span> logprob > -4</li>
-            <li><span style="color: #800000;">Medium confidence (dark red):</span> -8 < logprob <= -4</li>
-            <li><span style="color: red;">Low confidence (red):</span> -12 <= logprob <= -8</li>
-            <li><span style="color: red; font-weight: bold;">Very low confidence (bold red):</span> logprob <= -12</li>
+            <li><span style="color: black;">High confidence (black): </span>logprob > {BaseRAGTextCompleter.LOGPROB_THRESHOLDS[0]}</li>
+            <li><span style="color: #800000;">Medium confidence (dark red): </span>{BaseRAGTextCompleter.LOGPROB_THRESHOLDS[1]} < logprob <= {BaseRAGTextCompleter.LOGPROB_THRESHOLDS[0]}</li>
+            <li><span style="color: red;">Low confidence (red): </span>{BaseRAGTextCompleter.LOGPROB_THRESHOLDS[2]} < logprob <= {BaseRAGTextCompleter.LOGPROB_THRESHOLDS[1]}</li>
+            <li><span style="color: red; font-weight: bold;">Very low confidence (bold red): </span>logprob <= {BaseRAGTextCompleter.LOGPROB_THRESHOLDS[2]}</li>
         </ul>
         <hr>
         <p>
@@ -100,10 +122,10 @@ class BaseRAGTextCompleter(ABC):
                 tooltip = "Incorrect prediction, "
                 target_word_logprob = item["predicted_content_top_logprobs"][0][-1]["logprob"]
             color = BaseRAGTextCompleter.get_font_color(target_word_logprob)
-            font_weight = "bold" if target_word_logprob <= -12 else "normal"
+            font_weight = "bold" if target_word_logprob <= BaseRAGTextCompleter.LOGPROB_THRESHOLDS[2] else "normal"
             tooltip += f"LogProb: {target_word_logprob:.3f}"
-            top_logprobs_html = str(item["predicted_content_top_logprobs"]).replace('"', '&quot;')
-            tooltip += f', top {len(item["predicted_content_top_logprobs"][0])} token predictions: {top_logprobs_html}'
+            top_logprobs_html = str(item["predicted_content_top_logprobs"]).replace('"', "&quot;")
+            tooltip += f", top {len(item['predicted_content_top_logprobs'][0])} token predictions: {top_logprobs_html}"
             html_content += f'<span class="word" style="color: {color}; font-weight: {font_weight};" title="{tooltip}">{item["target_content"]}</span>'
         html_content += """
         </p>
@@ -117,15 +139,20 @@ class BaseRAGTextCompleter(ABC):
 
 
 class PhiRAGTextCompleter(BaseRAGTextCompleter):
-
-    BAD_TOKENS : list[str] = ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+    """An implementation of a RAG text completer using the Phi model."""
+    BAD_TOKENS: ClassVar[list[str]] = ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
 
     def __init__(self, model_id: str = "microsoft/phi-4") -> None:
+        """
+        Initializes the text completer.
+
+        Args:
+            model_id: The Phi model Id to use for text completion.
+        """
+        super().__init__()
         self.model_id = model_id
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
-        self.bad_token_ids = [
-            self.tokenizer.convert_tokens_to_ids(token) for token in PhiRAGTextCompleter.BAD_TOKENS
-        ]
+        self.bad_token_ids = [self.tokenizer.convert_tokens_to_ids(token) for token in PhiRAGTextCompleter.BAD_TOKENS]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
@@ -141,6 +168,7 @@ class PhiRAGTextCompleter(BaseRAGTextCompleter):
         augmented_context: str = "",
         top_k: int = 100,
     ) -> tuple[float, list[list[dict[str, Any]]]]:
+        """TODO (allenwang-ms)."""
         text_completion_prompt = f"""
 You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context.
 
@@ -171,7 +199,7 @@ Answer: """
             next_token_logits[token_id] = float("-inf")
 
         # Compute log probabilities over the vocabulary.
-        log_probs = F.log_softmax(next_token_logits, dim=-1)
+        log_probs = torch.nn.functional.log_softmax(next_token_logits, dim=-1)
 
         # Extract top k token indices and their log probabilities.
         top_logprobs, top_indices = torch.topk(log_probs, top_k)
@@ -191,5 +219,7 @@ Answer: """
                 target_content_logprob = float("-inf")
 
         # Output results.
-        top_logprobs = [[{"token": word, "logprob": logprob} for word, logprob in zip(top_words, top_logprobs.tolist())]]
+        top_logprobs = [
+            [{"token": word, "logprob": logprob} for word, logprob in zip(top_words, top_logprobs.tolist(), strict=True)]
+        ]
         return target_content_logprob, top_logprobs

@@ -27,7 +27,7 @@ from kebab.utils.io_helpers import (
 class TextCompletionTaskBase(Task):
     """Base class for text completion benchmark task."""
 
-    MASK : str = "<mask>"
+    MASK: str = "<mask>"
     """The token used to mask the text in text completion tasks."""
 
     __data_documents: Path
