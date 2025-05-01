@@ -1,6 +1,13 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+"""
+This script demonstrates the usage of a RAG text completer, specifically the Phi model, for a text
+completion task. It generates partial queries, completes them using the Phi model, evaluates the
+results, and outputs evaluation metrics. Additionally, it annotates the documents by highlighting
+words that are challenging to predict based on their log probabilities.
+"""
+
 from __future__ import annotations
 
 import json
@@ -15,12 +22,6 @@ from kebab.utils.rag_text_completer import BaseRAGTextCompleter, PhiRAGTextCompl
 if __name__ == "__main__":
     # Create a text completion task instance.
     documents_file_path = Path(__file__).parents[3] / "tests" / "data" / "text_completion" / "documents.jsonl"
-    predictions_file_path = (
-        Path(__file__).parents[3] / "tests" / "data" / "text_completion" / "predicted_contents.jsonl"
-    )
-    predictions_output_file_path = (
-        Path(__file__).parents[3] / "tests" / "output" / "text_completion" / "predicted_contents.jsonl"
-    )
     task_instance = TextCompletionTask(
         "TextCompletion",
         str(documents_file_path),
@@ -34,7 +35,7 @@ if __name__ == "__main__":
     results = list(
         phi_annotator.complete_partial_queries(
             partial_queries=queries,
-            get_augmented_context=lambda _: "",
+            get_augmented_context=lambda _: "",  # A dummy RAG that always returns empty context.
             verbose=True,
         )
     )
@@ -42,7 +43,7 @@ if __name__ == "__main__":
     results_to_evaluate = []
     for result in results:
         if result["text_with_mask"] != "":
-            predicted_content = result["predicted_content_top_logprobs"][0][0]["token"]
+            predicted_content = result["predicted_content"]
             if result["target_content_logprob"] != float("-inf"):
                 results_to_evaluate.append((predicted_content, result["target_content_logprob"]))
             else:
