@@ -67,6 +67,13 @@
       "entities": "~/kebab_local/rebel_entity_generation_20k/rebel_entity_generation_20000_dataset.jsonl"
     }
   },
+  "Entity-Generation-REBEL-100k-Local": {
+    "task": "EntityGeneration",
+    "data": {
+      "schema": "~/kebab_local/configs/kb_schemas/rebel_10_properties_schema.json",
+      "entities": "~/kebab_local/rebel_entity_generation_100k/rebel_entity_generation_100000_dataset.jsonl"
+    }
+  },
   "Entity-Generation-REBEL-2m-Local": {
     "task": "EntityGeneration",
     "data": {
