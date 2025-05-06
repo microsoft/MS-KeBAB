@@ -27,7 +27,7 @@ class ExtractionTask(Task):
     __data_extracts: Path
     __data_ground_truth_extracted_entities: Path | None = None
     __default_metrics_config_path: Path = (
-        Path(__file__).parents[2] / "configs" / "extraction" / "default_metrics_config.json"
+        Path(__file__).parents[1] / "configs" / "extraction" / "default_metrics_config.json"
     )
     __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {}
     __metric_config_cls: ClassVar[dict[str, type[MetricConfig]]] = {}
