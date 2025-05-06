@@ -60,12 +60,34 @@
       "schema": "https://some.public/download/link"
     }
   },
-  "Linking-REBEL-Sampled": {
+  "Entity-Generation-REBEL-20k-Local": {
+    "task": "EntityGeneration",
+    "data": {
+      "schema": "~/kebab_local/configs/kb_schemas/rebel_10_properties_schema.json",
+      "entities": "~/kebab_local/rebel_entity_generation_20k/rebel_entity_generation_20000_dataset.jsonl"
+    }
+  },
+  "Entity-Generation-REBEL-2m-Local": {
+    "task": "EntityGeneration",
+    "data": {
+      "schema": "~/kebab_local/configs/kb_schemas/rebel_10_properties_schema.json",
+      "entities": "~/kebab_local/rebel_entity_generation_2m/rebel_entity_generation_2000000_dataset.jsonl"
+    }
+  },
+  "Linking-REBEL-Human-100-Local": {
     "task": "Linking",
     "data": {
-      "schema": "~/code/MS-KeBAB/kebab/configs/kb_schemas/rebel_human_schema.json",
-      "entity_fragment_pairs": "~/data/rebel_sampled/sampled_rebel_linking_dataset.jsonl",
-      "ground_truth_boolean": "~/data/rebel_sampled/sampled_rebel_linking_ground_truth.jsonl"
+      "schema": "~/kebab_local/configs/kb_schemas/rebel_1_property_schema.json",
+      "entity_fragment_pairs": "~/kebab_local/rebel_linking_human_100/rebel_human_100_linking_dataset.jsonl",
+      "ground_truth_boolean": "~/kebab_local/rebel_linking_human_100/rebel_human_100_linking_ground_truth.jsonl"
+    }
+  },
+  "Linking-REBEL-1k-Local": {
+    "task": "Linking",
+    "data": {
+      "schema": "~/kebab_local/configs/kb_schemas/rebel_10_properties_schema.json",
+      "entity_fragment_pairs": "~/kebab_local/rebel_linking_1k/rebel_linking_1000_dataset.jsonl",
+      "ground_truth_boolean": "~/kebab_local/rebel_linking_1k/rebel_linking_1000_ground_truth.jsonl"
     }
   }
 }
