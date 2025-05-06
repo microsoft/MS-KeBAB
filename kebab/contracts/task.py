@@ -37,7 +37,7 @@ class Task(ABC):
     def __init__(self, name: str, schema: str):
         """Initialize a task."""
         self.__name = name
-        self.__schema = Path(schema)
+        self.__schema = Path(schema).expanduser()
 
     @property
     def name(self) -> str:

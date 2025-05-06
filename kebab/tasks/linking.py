@@ -45,9 +45,9 @@ class LinkingTask(Task):
     ):
         """Initialize a linking task."""
         super().__init__(name, schema)
-        self.__data_entity_fragment_pairs = Path(entity_fragment_pairs)
+        self.__data_entity_fragment_pairs = Path(entity_fragment_pairs).expanduser()
         if ground_truth_boolean is not None:
-            self.__data_ground_truth_boolean = Path(ground_truth_boolean)
+            self.__data_ground_truth_boolean = Path(ground_truth_boolean).expanduser()
 
     def read_items(self) -> Iterable[tuple[tuple[Entity, Entity], bool | None]]:
         """

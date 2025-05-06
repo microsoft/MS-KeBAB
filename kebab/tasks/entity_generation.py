@@ -36,7 +36,7 @@ class EntityGenerationTask(Task):
     ):
         """Initialize an entity generation task."""
         super().__init__(name, schema)
-        self.__data_entities = Path(entities)
+        self.__data_entities = Path(entities).expanduser()
 
     def read_items(self) -> Iterable[Entity]:
         """
