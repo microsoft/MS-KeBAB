@@ -21,7 +21,7 @@ from kebab.utils.rag_text_completer import BaseRAGTextCompleter, PhiRAGTextCompl
 
 if __name__ == "__main__":
     # Create a text completion task instance.
-    documents_file_path = Path(__file__).parents[3] / "tests" / "data" / "text_completion" / "documents.jsonl"
+    documents_file_path = Path(__file__).parents[2] / "tests" / "data" / "text_completion" / "documents.jsonl"
     task_instance = TextCompletionTask(
         "TextCompletion",
         str(documents_file_path),

@@ -51,7 +51,7 @@ class BaseRAGTextCompleter(ABC):
         verbose: bool = False,
     ) -> Iterable[dict[str, Any]]:
         """
-        Processes a collection of partial queries and complete them using the
+        Processes a collection of partial queries and completes them using the
         `complete_single_partial_query` method.
 
         Args:
@@ -163,7 +163,7 @@ class BaseRAGTextCompleter(ABC):
 class PhiRAGTextCompleter(BaseRAGTextCompleter):
     """An implementation of a RAG text completer using the Phi model."""
 
-    BAD_TOKENS: ClassVar[list[str]] = ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+    TOKENS_TO_EXCLUDE: ClassVar[list[str]] = ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
     """Tokens that are excluded from the model's predictions."""
 
     def __init__(self, model_id: str = "microsoft/phi-4") -> None:
@@ -176,7 +176,9 @@ class PhiRAGTextCompleter(BaseRAGTextCompleter):
         super().__init__()
         self.model_id = model_id
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
-        self.bad_token_ids = [self.tokenizer.convert_tokens_to_ids(token) for token in PhiRAGTextCompleter.BAD_TOKENS]
+        self.token_ids_to_exclude = [
+            self.tokenizer.convert_tokens_to_ids(token) for token in PhiRAGTextCompleter.TOKENS_TO_EXCLUDE
+        ]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
@@ -237,7 +239,7 @@ Answer: """
         next_token_logits = outputs.logits[0, -1, :]
 
         # Exclude bad tokens from the predictions.
-        for token_id in self.bad_token_ids:
+        for token_id in self.token_ids_to_exclude:
             next_token_logits[token_id] = float("-inf")
 
         # Compute log probabilities over the vocabulary.
