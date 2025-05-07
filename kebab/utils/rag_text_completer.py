@@ -271,8 +271,7 @@ Answer: """
             first_token_log_prob = log_probs[target_content_token_ids[0]]
             # If the first token is not the same as the target content, we combine the two log probs.
             target_content_logprob = torch.logaddexp(
-                torch.tensor(target_content_logprob, device=self.device),
-                first_token_log_prob
+                torch.tensor(target_content_logprob, device=self.device), first_token_log_prob
             ).item()
 
         # Output results.
