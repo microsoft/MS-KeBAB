@@ -5,13 +5,14 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from typing import Any
 
 import numpy as np
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import min_weight_full_bipartite_matching
+import pandas as pd
 
 from kebab.contracts.entity import Entity, Property, PropertySchema
+from kebab.tasks.metrics.extraction.aesop.distances import ValueMatchingRecordWihScores, match_items
 
 
 @dataclass
@@ -187,13 +188,14 @@ class MetricsAccumulator:
 
 
 @dataclass
-class MatchedIndices:
-    """Stores the indices of matched items and unmatched items in ground truth and prediction."""
+class PropertyEvaluationRecord:
+    """Stores property evaluation information for 2 specific entities."""
 
-    left_ind: list[int]
-    right_ind: list[int]
-    left_unmatched: list[int]
-    right_unmatched: list[int]
+    property_id: str
+    property_values_pred: list[Any]
+    property_values_gt: list[Any]
+    property_value_scores: list[float]
+    unmatched_count: int
 
 
 class MatchedEntitiesScorer:
@@ -215,9 +217,12 @@ class MatchedEntitiesScorer:
 
         self.gt_ind = left_ind
         self.pred_ind = right_ind
+        self.debug_info: defaultdict[int, defaultdict[int, dict[str, ValueMatchingRecordWihScores]]] = defaultdict(
+            lambda: defaultdict(dict)
+        )
 
     def score(
-        self, score_function: Callable[[Entity, Entity, Property], tuple[list[float], int]], property_: Property
+        self, score_function: Callable[[Entity, Entity, Property], ValueMatchingRecordWihScores], property_: Property
     ) -> EvaluatedPropertyMetrics:
         """Compute scores for a given property for matched entities."""
         evaluated_property_metrics = EvaluatedPropertyMetrics(len(self.entities_gt))
@@ -225,15 +230,40 @@ class MatchedEntitiesScorer:
         for gt_idx, pred_idx in zip(self.gt_ind, self.pred_ind, strict=True):
             if property_ in self.entities_gt[gt_idx]:
                 if property_ in self.entities_pred[pred_idx]:
-                    scores, unmatched_pred_count = score_function(
+                    value_matching_record = score_function(
                         self.entities_gt[gt_idx], self.entities_pred[pred_idx], property_
                     )
-                    evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = scores
-                    evaluated_property_metrics.unmatched_count += unmatched_pred_count
+                    self.debug_info[gt_idx][pred_idx][property_.property_id] = value_matching_record
+                    evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = (
+                        value_matching_record.matched_scores
+                    )
+                    evaluated_property_metrics.unmatched_count += len(value_matching_record.unmatched_pred_values)
                 else:
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
+                    self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWihScores(
+                        self.entities_gt[gt_idx][property_], [], [], self.entities_gt[gt_idx][property_], []
+                    )
+
                 evaluated_property_metrics.property_value_count_gt[gt_idx] += len(self.entities_gt[gt_idx][property_])
+            elif property_ in self.entities_pred[pred_idx]:
+                pred_values = self.entities_pred[pred_idx][property_] 
+                self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWihScores(
+                    [], pred_values, [], [], pred_values
+                )
         return evaluated_property_metrics
+
+    def get_debug_info(self) -> pd.DataFrame:
+        """Collect debug information into a table."""
+        dfs = []
+        for pred_dict in self.debug_info.values():
+            for property_dict in pred_dict.values():
+                records = []
+                for property_id, value_matching_record in property_dict.items():
+                    records.append({"property_id": property_id, **asdict(value_matching_record)})
+                entity_debug_info = pd.DataFrame.from_records(records)
+                dfs.append(entity_debug_info)
+                dfs.append(pd.DataFrame([{}]))  # Empty row for separation
+        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
 
 class MetricsComputer:
@@ -253,8 +283,8 @@ class MetricsComputer:
     def compute_bipartite_metrics(
         self,
         matched_pair: MatchedPairInfo,
-        keys_to_score: dict[str, Callable[[Entity, Entity, Property], tuple[list[float], int]]],
-    ) -> MetricsAccumulator:
+        keys_to_score: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWihScores]],
+    ) -> tuple[MetricsAccumulator, pd.DataFrame]:
         """Compute provided property scores for the matched entities."""
         metrics_accumulator = MetricsAccumulator()
         metrics_accumulator.matched_count = len(matched_pair.left_ind)
@@ -291,29 +321,45 @@ class MetricsComputer:
             metrics_accumulator.total_gt_property_value_counts_per_doc[key] += (
                 evaluated_property_metrics.property_value_count_gt
             )
+        matched_entities_debug_info = entities_scorer.get_debug_info()
+        unmatched_gt_records = []
+        unmatched_gt_indices = set(range(len(self.ground_truth))) - set(matched_pair.left_ind)
+        for idx in unmatched_gt_indices:
+            entity = self.ground_truth[idx]
+            for property_id, values in entity.properties.items():
+                unmatched_gt_records.append(
+                    {
+                        "property_id": property_id,
+                        "gt_values": [],
+                        "pred_values": [],
+                        "matched_scores": [],
+                        "unmatched_gt_values": values,
+                        "unmatched_pred_values": [],
+                    })
+            unmatched_gt_records.append({})
+        unmatched_gt_entities_debug_info = pd.DataFrame.from_records(unmatched_gt_records)
 
-        return metrics_accumulator
-
-
-def match_items(distances: np.ndarray, threshold: float = 1.0) -> MatchedIndices:
-    """
-    Match items from two sets of items based on a distance matrix if the distance is within a threshold.
-    Returns the indices of the matched items.
-    """
-    epsilon = 0.01
-    left_ind, right_ind = min_weight_full_bipartite_matching(csr_matrix(distances + epsilon))
-
-    matched_dists = distances[left_ind, right_ind]
-    indices_within_threshold = np.where(matched_dists <= threshold)
-    unmatched_ind = np.where(matched_dists > threshold)
-
-    left_ind_matched = left_ind[indices_within_threshold]
-    right_ind_matched = right_ind[indices_within_threshold]
-
-    left_ind_unmatched = left_ind[unmatched_ind]
-    right_ind_unmatched = right_ind[unmatched_ind]
-
-    return MatchedIndices(left_ind_matched, right_ind_matched, left_ind_unmatched, right_ind_unmatched)
+        unmatched_pred_records = []
+        unmatched_pred_indices = set(range(len(self.predictions))) - set(matched_pair.right_ind)
+        for idx in unmatched_pred_indices:
+            entity = self.predictions[idx]
+            for property_id, values in entity.properties.items():
+                unmatched_pred_records.append(
+                    {
+                        "property_id": property_id,
+                        "gt_values": [],
+                        "pred_values": [],
+                        "matched_scores": [],
+                        "unmatched_gt_values": [],
+                        "unmatched_pred_values": values,
+                    })
+            unmatched_gt_records.append({})
+        unmatched_pred_entities_debug_info = pd.DataFrame.from_records(unmatched_pred_records)
+        
+        return metrics_accumulator, pd.concat(
+            [matched_entities_debug_info, unmatched_gt_entities_debug_info, unmatched_pred_entities_debug_info],
+            ignore_index=True,
+        )
 
 
 def compute_properties_union(

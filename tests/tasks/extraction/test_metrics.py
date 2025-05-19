@@ -394,9 +394,8 @@ def compute_intermediate_metrics(
         entity_matcher = EntityMatcher(gt.entities, pred.entities)
         matched_pairs = entity_matcher.match(config.matching_score_function, config.matching_threshold)
         metrics_computer = MetricsComputer(gt.entities, pred.entities, config.property_schema)
-        metrics_accumulator.update(
-            metrics_computer.compute_bipartite_metrics(matched_pairs, config.property_score_functions)
-        )
+        metrics, _ = metrics_computer.compute_bipartite_metrics(matched_pairs, config.property_score_functions)
+        metrics_accumulator.update(metrics)
     return metrics_accumulator
 
 
@@ -499,8 +498,8 @@ def test_evaluate_more_properties_in_prediction(property_schema: PropertySchema)
 def test_edit_score(property_schema: PropertySchema):
     ground_truth = to_entities([{"team": "Marketing"}])
     predictions = to_entities([{"team": "Strategic Marketing"}])
-    score, _ = edit_score(ground_truth[0], predictions[0], property_schema.properties["team"])
-    assert score[0] > 0
+    value_matching_record = edit_score(ground_truth[0], predictions[0], property_schema.properties["team"])
+    assert value_matching_record.matched_scores[0] > 0
 
 
 def test_aggregate_across_documents_simple(property_schema: PropertySchema):
@@ -909,8 +908,8 @@ def test_final_statistics(property_schema: PropertySchema):
 def test_str_match_score(property_schema: PropertySchema):
     ground_truth = to_entities([{"email": "test@microsoft.com"}])
     predictions = ground_truth.copy()
-    score, _ = str_score(ground_truth[0], predictions[0], property_schema.properties["email"])
-    assert score[0] == 1.0
+    value_matching_record = str_score(ground_truth[0], predictions[0], property_schema.properties["email"])
+    assert value_matching_record.matched_scores[0] == 1.0
 
 
 def test_embedding_based_score(property_schema: PropertySchema):
@@ -932,5 +931,5 @@ def test_embedding_based_score(property_schema: PropertySchema):
             }
         ]
     )
-    score, _ = embedding_score(ground_truth[0], predictions[0], property_schema.properties["definitions"])
-    assert score[0] > 0.5
+    value_matching_record = embedding_score(ground_truth[0], predictions[0], property_schema.properties["definitions"])
+    assert value_matching_record.matched_scores[0] > 0.5

@@ -8,8 +8,10 @@ import time
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+import pandas as pd
 from sentence_transformers import SentenceTransformer
 
 from kebab.contracts.entity import Entity, Property, PropertySchema
@@ -21,10 +23,10 @@ from kebab.tasks.metrics.extraction.aesop.distances import (
     EmbeddingDistance,
     EntityDistance,
     PropertyScore,
-    PropertyScoreValue,
     SetPropertyDistance,
     SingleValuePropertyDistance,
     TokenDistance,
+    ValueMatchingRecordWihScores,
 )
 from kebab.tasks.metrics.extraction.aesop.metric_helpers import EntityMatcher, MetricsAccumulator, MetricsComputer
 from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator, MetricConfig
@@ -36,8 +38,9 @@ class ValueAveragedAesopConfig(MetricConfig):
 
     matching_score_function: Callable[[Entity, Entity], float]
     matching_threshold: float
-    property_score_functions: dict[str, Callable[[Entity, Entity, Property], PropertyScoreValue]]
+    property_score_functions: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWihScores]]
     property_schema: PropertySchema
+    debug_output_dir: Path | None = None
 
     @staticmethod
     def from_dict(config: dict[str, Any], property_schema: PropertySchema) -> ValueAveragedAesopConfig:
@@ -62,11 +65,13 @@ class ValueAveragedAesopConfig(MetricConfig):
                 if property_schema.properties[property_name].is_collection
                 else SingleValuePropertyDistance(element_distance)
             )
+        debug_output_dir = config.get("debug_output_dir")
         return ValueAveragedAesopConfig(
             matching_score_function=EntityDistance.from_dict(config["entity_distance"], property_schema),
             matching_threshold=config["matching_threshold"],
             property_score_functions=property_score_functions,
             property_schema=property_schema,
+            debug_output_dir=Path(debug_output_dir) if debug_output_dir else None,
         )
 
 
@@ -94,11 +99,17 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
     def run(self, prediction: Iterable[ExtractionOutput], ground_truth: Iterable[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
         metrics = {"per_document_metrics": {}, "dataset_metrics": {}}
+        # debug_info = {}
         metrics_accumulator = MetricsAccumulator()
+        self.logger.info("Starting AESOP metric calculation")
+        self.logger.info(f"Debug output directory: {self.config.debug_output_dir}")
+        if self.config.debug_output_dir:
+            self.config.debug_output_dir.mkdir(parents=True, exist_ok=True)
+        self.logger.info("Debug output directory created")
 
         def process_document(
             input_: tuple[int, tuple[ExtractionOutput, ExtractionOutput]],
-        ) -> tuple[MetricsAccumulator, str]:
+        ) -> tuple[MetricsAccumulator, str, pd.DataFrame]:
             """Compute metrics for a single document."""
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1}")
@@ -111,12 +122,14 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)
             self.logger.info(f"Document {idx + 1}: Computing metrics")
             metrics_computer = MetricsComputer(gt_entities, pred_entities, self.config.property_schema)
-            metrics = metrics_computer.compute_bipartite_metrics(matched_pairs, self.config.property_score_functions)
+            metrics, document_debug_info = metrics_computer.compute_bipartite_metrics(
+                matched_pairs, self.config.property_score_functions
+            )
             self.logger.info(f"Document {idx + 1}: Done")
-            return metrics, gt.document.document_id
+            return metrics, gt.document.document_id, document_debug_info
 
         start = time.time()
-        for idx, (document_metrics_accumulator, doc_id) in enumerate(
+        for idx, (document_metrics_accumulator, doc_id, document_debug_info) in enumerate(
             map(
                 process_document,
                 enumerate(zip(prediction, ground_truth, strict=True)),
@@ -125,6 +138,9 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             document_metrics = document_metrics_accumulator.accumulate_metrics()
             metrics["per_document_metrics"][doc_id] = document_metrics
             metrics_accumulator.update(document_metrics_accumulator)
+            # debug_info[doc_id] = document_debug_info
+            if self.config.debug_output_dir:
+                document_debug_info.to_csv(self.config.debug_output_dir / f"{doc_id}_debug_info.csv", index=False)
             elapsed = time.time() - start
             self.logger.info(f"Time elapsed: {elapsed:.2f} seconds")
             self.logger.info(f"Average processing time: {elapsed / (idx + 1):.2f} seconds per document")
@@ -178,4 +194,5 @@ def make_default_value_averaged_aesop_config(
         matching_threshold=matching_threshold,
         property_score_functions=property_to_score,
         property_schema=property_schema,
+        debug_output_dir=None,
     )
