@@ -16,7 +16,7 @@ from kebab.tasks.clustering import ClusteringTask
 from kebab.tasks.entity_generation import EntityGenerationTask
 from kebab.tasks.extraction import ExtractionTask
 from kebab.tasks.linking import LinkingTask
-from kebab.tasks.text_completion import TextCompletionTask
+from kebab.tasks.text_completion import TextCompletionE2ETask
 
 
 class Benchmark:
@@ -60,8 +60,8 @@ class Benchmark:
                     task_class = LinkingTask
                 case TaskType.Clustering:
                     task_class = ClusteringTask
-                case TaskType.TextCompletion:
-                    task_class = TextCompletionTask
+                case TaskType.TextCompletionE2E:
+                    task_class = TextCompletionE2ETask
             task = task_class(task_instance_name, **task_instance_config["data"])
             self.__tasks_by_name[task_instance_name] = task
             if task_type not in self.__tasks_by_type:

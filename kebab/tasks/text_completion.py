@@ -7,24 +7,26 @@ import json
 import math
 import re
 import statistics
+from abc import abstractmethod
 from collections.abc import Iterable
 from logging import Logger
 from pathlib import Path
 
 from kebab.contracts.document import Document
+from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.utils.io_helpers import DocumentJsonlReader, ItemJsonlReader, save_dict_to_json
+from kebab.utils.io_helpers import DocumentJsonlReader, EntityJsonlReader, ItemJsonlReader, save_dict_to_json
 
 
-class TextCompletionTask(Task):
-    """Represents a text completion benchmark task with its data files."""
+class TextCompletionTaskBase(Task):
+    """Base class for text completion benchmark task."""
 
     __data_documents: Path
 
     @property
     def task_type(self) -> TaskType:
         """Return task type."""
-        return TaskType.TextCompletion
+        return TaskType.TextCompletionE2E
 
     @property
     def data_documents(self) -> Path:
@@ -35,9 +37,10 @@ class TextCompletionTask(Task):
         self,
         name: str,
         documents: str,
+        schema: str,
     ):
         """Initialize a text completion task."""
-        super().__init__(name, schema="")  # kb schema is not used in this task
+        super().__init__(name, schema=schema)
         self.__data_documents = Path(documents)
 
     def read_items(self) -> Iterable[Document]:
@@ -133,3 +136,44 @@ class TextCompletionTask(Task):
             save_dict_to_json(metrics, eval_result_path)
 
         return metrics
+
+
+class TextCompletionE2ETask(TextCompletionTaskBase):
+    """Represents a text completion benchmark task with its data files."""
+
+    def __init__(
+        self,
+        name: str,
+        documents: str,
+    ):
+        """Initialize a text completion task."""
+        super().__init__(name, documents=documents, schema="")  # kb schema is not used in this task
+
+
+class TextCompletionUsingKBTask(TextCompletionTaskBase):
+    """Represents a text completion benchmark task with its data files."""
+
+    def __init__(
+        self,
+        name: str,
+        documents: str,
+        kb: str,
+        schema: str,
+    ):
+        """Initialize a text completion task."""
+        super().__init__(name, documents=documents, schema=schema)
+        self.__data_kb = Path(kb)
+
+    @property
+    def data_kb(self) -> Path:
+        """Return path to knowledge base."""
+        return self.__data_kb
+
+    def read_kb(self) -> Iterable[Entity]:
+        """
+        Read entities from knowledge base.
+
+        Returns:
+            Iterable[Entity]: An iterable of `Entity` objects.
+        """
+        return EntityJsonlReader(self.__data_kb).read_items()
