@@ -107,7 +107,9 @@ class QuestionAnsweringE2ETask(QuestionAnsweringTaskBase):
         ground_truth_answers: str,
     ):
         """Initialize an end-to-end question-answering completion task."""
-        super().__init__(name, questions=questions, ground_truth_answers=ground_truth_answers, schema="")  # kb schema is not used in this task
+        super().__init__(
+            name, questions=questions, ground_truth_answers=ground_truth_answers, schema=""
+        )  # kb schema is not used in this task
         self.__data_documents = Path(documents)
 
     @property

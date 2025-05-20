@@ -66,7 +66,7 @@ def test_task_interface():
         "TextCompletionE2E-Test",
         "TextCompletionUsingKB-Test",
         "QuestionAnsweringE2E-Test",
-        "QuestionAnsweringUsingKB-Test"
+        "QuestionAnsweringUsingKB-Test",
     }
 
     for task_instance_name, task_instance in task_instances.items():
