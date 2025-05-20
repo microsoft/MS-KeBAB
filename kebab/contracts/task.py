@@ -24,6 +24,8 @@ class TaskType(Enum):
     Clustering = 4
     TextCompletionE2E = 5
     TextCompletionUsingKB = 6
+    QuestionAnsweringE2E = 7
+    QuestionAnsweringUsingKB = 8
 
 
 class Task(ABC):

@@ -139,35 +139,26 @@ class TextCompletionTaskBase(Task):
 
 
 class TextCompletionE2ETask(TextCompletionTaskBase):
-    """Represents a text completion benchmark task with its data files."""
-
-    def __init__(
-        self,
-        name: str,
-        documents: str,
-    ):
-        """Initialize a text completion task."""
-        super().__init__(name, documents=documents, schema="")  # kb schema is not used in this task
+    """Represents an end-to-end text completion benchmark task with its data files."""
 
     @property
     def task_type(self) -> TaskType:
         """Return task type."""
         return TaskType.TextCompletionE2E
 
-
-class TextCompletionUsingKBTask(TextCompletionTaskBase):
-    """Represents a text completion benchmark task with its data files."""
-
     def __init__(
         self,
         name: str,
         documents: str,
-        kb: str,
-        schema: str,
     ):
-        """Initialize a text completion task."""
-        super().__init__(name, documents=documents, schema=schema)
-        self.__data_kb = Path(kb)
+        """Initialize an end-to-end text completion task."""
+        super().__init__(name, documents=documents, schema="")  # kb schema is not used in this task
+
+
+class TextCompletionUsingKBTask(TextCompletionTaskBase):
+    """Represents a kb-augmented text completion benchmark task with its data files."""
+
+    __data_kb: Path
 
     @property
     def task_type(self) -> TaskType:
@@ -178,6 +169,17 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
     def data_kb(self) -> Path:
         """Return path to knowledge base."""
         return self.__data_kb
+
+    def __init__(
+        self,
+        name: str,
+        documents: str,
+        kb: str,
+        schema: str,
+    ):
+        """Initialize a kb-augmented text completion task."""
+        super().__init__(name, documents=documents, schema=schema)
+        self.__data_kb = Path(kb)
 
     def read_kb(self) -> Iterable[Entity]:
         """

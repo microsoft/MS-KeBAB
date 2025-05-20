@@ -91,8 +91,26 @@
   "TextCompletionUsingKB-Test": {
     "task": "TextCompletionUsingKB",
     "data": {
-      "documents": "./tests/data/text_completion/documents.jsonl",
-      "kb": "./tests/data/clustering/entity_fragments.jsonl"
+      "documents": "https://some.public/download/link",
+      "kb": "https://some.public/download/link",
+      "schema": "https://some.public/download/link"
+    }
+  },
+  "QuestionAnsweringE2E-Test": {
+    "task": "QuestionAnsweringE2E",
+    "data": {
+      "documents": "https://some.public/download/link",
+      "questions": "https://some.public/download/link",
+      "ground_truth_answers": "https://some.public/download/link"
+    }
+  },
+  "QuestionAnsweringUsingKB-Test": {
+    "task": "QuestionAnsweringUsingKB",
+    "data": {
+      "kb": "https://some.public/download/link",
+      "schema": "https://some.public/download/link",
+      "questions": "https://some.public/download/link",
+      "ground_truth_answers": "https://some.public/download/link"
     }
   }
 }
