@@ -45,7 +45,8 @@ class QuestionAnsweringTaskBase(Task):
         Returns:
             Iterable[str]: An iterable of string objects.
         """
-        return open(self.__data_questions, "r", encoding="utf-8", newline="\n").readlines()
+        with open(self.__data_questions, encoding="utf-8", newline="\n") as f:
+            yield from f
 
     def write_items(self, path: Path, items: Iterable[str]) -> None:
         """
@@ -69,8 +70,10 @@ class QuestionAnsweringTaskBase(Task):
         if logger:
             logger.info("Starting evaluation for the question-answering task.")
 
-        predictions = open(output_to_evaluate, "r", encoding="utf-8", newline="\n").readlines()
-        targets = open(self.__data_ground_truth_answers, "r", encoding="utf-8", newline="\n").readlines()
+        with open(output_to_evaluate, encoding="utf-8", newline="\n") as f:
+            predictions = f.readlines()
+        with open(self.__data_ground_truth_answers, encoding="utf-8", newline="\n") as f:
+            targets = f.readlines()
         predictions_and_targets = zip(predictions, targets, strict=True)
         accuracy = [1 if item[0] == item[1] else 0 for item in predictions_and_targets]
 
