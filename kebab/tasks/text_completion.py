@@ -8,9 +8,11 @@ import math
 import re
 import statistics
 from abc import abstractmethod
+from collections import defaultdict
 from collections.abc import Iterable
 from logging import Logger
 from pathlib import Path
+from typing import Any
 
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
@@ -134,17 +136,32 @@ class TextCompletionTaskBase(Task):
             logger.info("Starting evaluation for the text completion task.")
 
         predictions = ItemJsonlReader[dict[str, str | float]](output_to_evaluate).read_items()
-        targets = [query["target_content"] for query in self.generate_partial_queries()]
-        predictions_and_targets = zip(predictions, targets, strict=True)
-        log_probs = [float(pred[0]["target_content_logprob"]) for pred in predictions_and_targets]
+        queries = self.generate_partial_queries()
+        predictions_and_queries = zip(predictions, queries, strict=True)
+
+        log_probs = []
+        log_probs_by_doc = defaultdict(list)
+        for prediction, query in predictions_and_queries:
+            log_prob = float(prediction["target_content_logprob"])
+            log_probs.append(log_prob)
+            log_probs_by_doc[query["document_id"]].append(log_prob)
 
         metrics = {}
         if log_probs:
-            metrics["mean_log_prob"] = statistics.mean(log_probs)
-            metrics["variance_log_prob"] = statistics.variance(log_probs, metrics["mean_log_prob"])
-            metrics["perplexity"] = math.exp(-metrics["mean_log_prob"])
+            TextCompletionTaskBase.__calculate_metrics(metrics, log_probs)
         else:
             raise ValueError("No log probabilities found in predictions.")
+
+        metrics_by_doc = []
+        for doc_id, log_probs_per_doc in log_probs_by_doc.items():
+            metrics_per_doc = {}
+            if log_probs_per_doc:
+                metrics_per_doc["document_id"] = doc_id
+                TextCompletionTaskBase.__calculate_metrics(metrics_per_doc, log_probs_per_doc)
+            else:
+                raise ValueError(f"No log probabilities found for document {doc_id}.")
+            metrics_by_doc.append(metrics_per_doc)
+        metrics["metrics_by_doc"] = metrics_by_doc
 
         # TODO (allenwang-ms): Consider adding more evaluation metrics, such as BLEU, to assess the
         # quality of predicted contents.
@@ -156,6 +173,20 @@ class TextCompletionTaskBase(Task):
             save_dict_to_json(metrics, eval_result_path)
 
         return metrics
+
+    @staticmethod
+    def __calculate_metrics(metrics: dict[str, Any], log_probs: list[float]) -> None:
+        """
+        Fill the metrics dictionary with based on the provided log probabilities.
+
+        Args:
+            metrics: The dictionary to fill with metrics.
+            log_probs: A list of log probability values.
+        """
+        metrics["mean_log_prob"] = statistics.mean(log_probs)
+        metrics["variance_log_prob"] = statistics.variance(log_probs, metrics["mean_log_prob"])
+        metrics["perplexity"] = math.exp(-metrics["mean_log_prob"])
+        metrics["num_predictions"] = len(log_probs)
 
 
 class TextCompletionUsingDocumentsTask(TextCompletionTaskBase):
