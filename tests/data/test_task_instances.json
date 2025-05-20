@@ -82,16 +82,17 @@
       "ground_truth_labels": "./tests/data/clustering/labels.jsonl"
     }
   },
-  "TextCompletion": {
-    "task": "TextCompletion",
+  "TextCompletionE2E-Test": {
+    "task": "TextCompletionE2E",
     "data": {
       "documents": "./tests/data/text_completion/documents.jsonl"
     }
   },
-  "TextCompletion": {
-    "task": "TextCompletion",
+  "TextCompletionUsingKB-Test": {
+    "task": "TextCompletionUsingKB",
     "data": {
-      "documents": "./tests/data/text_completion/documents.jsonl"
+      "documents": "./tests/data/text_completion/documents.jsonl",
+      "kb": "./tests/data/clustering/entity_fragments.jsonl"
     }
   }
 }
