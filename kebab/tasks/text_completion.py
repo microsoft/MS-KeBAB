@@ -24,9 +24,9 @@ class TextCompletionTaskBase(Task):
     __data_documents: Path
 
     @property
+    @abstractmethod
     def task_type(self) -> TaskType:
         """Return task type."""
-        return TaskType.TextCompletionE2E
 
     @property
     def data_documents(self) -> Path:
@@ -149,6 +149,11 @@ class TextCompletionE2ETask(TextCompletionTaskBase):
         """Initialize a text completion task."""
         super().__init__(name, documents=documents, schema="")  # kb schema is not used in this task
 
+    @property
+    def task_type(self) -> TaskType:
+        """Return task type."""
+        return TaskType.TextCompletionE2E
+
 
 class TextCompletionUsingKBTask(TextCompletionTaskBase):
     """Represents a text completion benchmark task with its data files."""
@@ -163,6 +168,11 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
         """Initialize a text completion task."""
         super().__init__(name, documents=documents, schema=schema)
         self.__data_kb = Path(kb)
+
+    @property
+    def task_type(self) -> TaskType:
+        """Return task type."""
+        return TaskType.TextCompletionUsingKB
 
     @property
     def data_kb(self) -> Path:
