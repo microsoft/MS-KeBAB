@@ -376,11 +376,11 @@ class Entity:
             properties=updated_properties,
         )
 
-    def remove_sources(self, remove_sources: list[str]) -> Self:
+    def remove_sources(self, remove_sources_list: list[str]) -> Self | None:
         """Return a new entity after removing property values corresponding to specified sources.
 
         Args:
-            remove_sources: A list of sources IDs to remove.
+            remove_sources_list: A list of sources IDs to remove.
 
         Returns:
             A new entity with filtered values.
@@ -388,13 +388,18 @@ class Entity:
         updated_properties = deepcopy(self.properties)
         updated_evidence_map = deepcopy(self.evidence_map)
         updated_source_ids = deepcopy(self.source_ids)
+        remove_sources_set = set(remove_sources_list)
         source_indices_to_remove = [
-            idx for idx, source_id in enumerate(updated_source_ids) if source_id in remove_sources
+            idx for idx, source_id in enumerate(updated_source_ids) if source_id in remove_sources_set
         ]
-        updated_source_ids = [source_id for source_id in updated_source_ids if source_id not in remove_sources]
+        updated_source_ids = [source_id for source_id in updated_source_ids if source_id not in remove_sources_set]
         updated_evidence_map = {
             property_id: [
-                [evidence for evidence in evidences if evidence not in source_indices_to_remove]
+                [
+                    evidence - sum([1 for source_index in source_indices_to_remove if source_index < evidence])
+                    for evidence in evidences
+                    if evidence not in source_indices_to_remove
+                ]
                 for evidences in values_to_evidences
             ]
             for property_id, values_to_evidences in updated_evidence_map.items()
@@ -404,12 +409,19 @@ class Entity:
                 if len(updated_evidence_map[property_id][idx]) == 0:
                     del updated_properties[property_id][idx]
                     del updated_evidence_map[property_id][idx]
-        return self.__class__(
-            entity_id=self.entity_id,
-            source_ids=updated_source_ids,
-            evidence_map=updated_evidence_map,
-            metadata=self.metadata,
-            properties=updated_properties,
+            if len(updated_properties[property_id]) == 0:
+                del updated_properties[property_id]
+                del updated_evidence_map[property_id]
+        return (
+            self.__class__(
+                entity_id=self.entity_id,
+                source_ids=updated_source_ids,
+                evidence_map=updated_evidence_map,
+                metadata=self.metadata,
+                properties=updated_properties,
+            )
+            if len(updated_properties) > 0
+            else None
         )
 
     def property_values_str(self) -> str:

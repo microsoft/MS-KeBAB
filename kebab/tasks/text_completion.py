@@ -189,3 +189,17 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
             Iterable[Entity]: An iterable of `Entity` objects.
         """
         return EntityJsonlReader(self.__data_kb).read_items()
+
+    def remove_sources_from_kb(self, kb: list[Entity], remove_sources_list: list[str]) -> list[Entity]:
+        """Return a new KB after removing property values corresponding to specified sources from all entities.
+
+        Args:
+            kb: A list of entities
+            remove_sources_list: A list of sources IDs to remove.
+
+        Returns:
+            A new list of entities with filtered values.
+        """
+        updated_kb = [entity.remove_sources(remove_sources_list) for entity in kb]
+        updated_kb = [entity for entity in updated_kb if entity]  # remove any empty entities
+        return updated_kb

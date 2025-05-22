@@ -12,7 +12,13 @@ from pathlib import Path
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.utils.io_helpers import DocumentJsonlReader, EntityJsonlReader, save_dict_to_json
+from kebab.utils.io_helpers import (
+    DocumentJsonlReader,
+    EntityJsonlReader,
+    StringLineReader,
+    StringLineWriter,
+    save_dict_to_json,
+)
 
 
 class QuestionAnsweringTaskBase(Task):
@@ -45,8 +51,7 @@ class QuestionAnsweringTaskBase(Task):
         Returns:
             Iterable[str]: An iterable of string objects.
         """
-        with open(self.__data_questions, encoding="utf-8", newline="\n") as f:
-            yield from f
+        return StringLineReader(self.__data_questions).read_items()
 
     def write_items(self, path: Path, items: Iterable[str]) -> None:
         """
@@ -56,9 +61,7 @@ class QuestionAnsweringTaskBase(Task):
             path: The file path where the predicted answers should be written.
             items: An iterable of string answers
         """
-        with open(path, "w", encoding="utf-8", newline="\n") as file:
-            for answer in items:
-                file.write(answer.replace("\n", "") + "\n")
+        StringLineWriter(path).write_items([answer.replace("\n", "") for answer in items])
 
     def evaluate(
         self,
@@ -70,10 +73,8 @@ class QuestionAnsweringTaskBase(Task):
         if logger:
             logger.info("Starting evaluation for the question-answering task.")
 
-        with open(output_to_evaluate, encoding="utf-8", newline="\n") as f:
-            predictions = f.readlines()
-        with open(self.__data_ground_truth_answers, encoding="utf-8", newline="\n") as f:
-            targets = f.readlines()
+        predictions = StringLineReader(output_to_evaluate).read_items()
+        targets = StringLineReader(self.__data_ground_truth_answers).read_items()
         predictions_and_targets = zip(predictions, targets, strict=True)
         accuracy = [1 if item[0] == item[1] else 0 for item in predictions_and_targets]
 
@@ -165,3 +166,17 @@ class QuestionAnsweringUsingKBTask(QuestionAnsweringTaskBase):
             Iterable[Entity]: An iterable of `Entity` objects.
         """
         return EntityJsonlReader(self.__data_kb).read_items()
+
+    def remove_sources_from_kb(self, kb: list[Entity], remove_sources_list: list[str]) -> list[Entity]:
+        """Return a new KB after removing property values corresponding to specified sources from all entities.
+
+        Args:
+            kb: A list of entities
+            remove_sources_list: A list of sources IDs to remove.
+
+        Returns:
+            A new list of entities with filtered values.
+        """
+        updated_kb = [entity.remove_sources(remove_sources_list) for entity in kb]
+        updated_kb = [entity for entity in updated_kb if entity]  # remove any empty entities
+        return updated_kb
