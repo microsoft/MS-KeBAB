@@ -201,5 +201,5 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
             A new list of entities with filtered values.
         """
         updated_kb = [entity.remove_sources(remove_sources_list) for entity in kb]
-        updated_kb = [entity for entity in updated_kb if entity]  # remove any empty entities
+        updated_kb = [entity for entity in updated_kb if entity is not None]  # remove any empty entities
         return updated_kb

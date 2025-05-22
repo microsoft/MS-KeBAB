@@ -329,7 +329,7 @@ class Entity:
         entity.entity_id = ""
         return entity
 
-    def filter_values(self, filter_func: Callable[[str, Any], bool]) -> Self:
+    def filter_values(self, filter_func: Callable[[str, Any], bool]) -> Self | None:
         """Return a new entity with filtered values.
 
         Args:
@@ -368,12 +368,16 @@ class Entity:
                     ]
             for idx in sorted(missing_indices, reverse=True):
                 del source_ids[idx]
-        return self.__class__(
-            entity_id=self.entity_id,
-            source_ids=source_ids,
-            evidence_map=updated_evidence_map,
-            metadata=self.metadata,
-            properties=updated_properties,
+        return (
+            self.__class__(
+                entity_id=self.entity_id,
+                source_ids=source_ids,
+                evidence_map=updated_evidence_map,
+                metadata=self.metadata,
+                properties=updated_properties,
+            )
+            if len(updated_properties) > 0
+            else None
         )
 
     def remove_sources(self, remove_sources_list: list[str]) -> Self | None:
