@@ -113,10 +113,10 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             """Compute metrics for a single document."""
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1}")
-            gt_entities = list(map(filter_json_values, gt.entities))
-            pred_entities = list(map(filter_json_values, pred.entities))
-            gt_entities = [entity for entity in gt_entities if entity is not None]  # remove any empty entities
-            pred_entities = [entity for entity in pred_entities if entity is not None]  # remove any empty entities
+            gt_entities = [entity for entity in map(filter_json_values, gt.entities) if entity is not None]
+            pred_entities = [entity for entity in map(filter_json_values, pred.entities) if entity is not None]
+            gt_entities = [entity for entity in gt_entities if not entity.properties.get("type") or "time" not in entity.properties["type"]]
+            pred_entities = [entity for entity in pred_entities if (not entity.properties.get("type") or "time" not in entity.properties["type"])]
             entity_matcher = EntityMatcher(gt_entities, pred_entities)
             self.logger.info(f"Document {idx + 1}: Matching entities")
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)

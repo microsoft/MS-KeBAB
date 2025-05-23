@@ -18,20 +18,20 @@
                 "avg_property_recall": 0.42949068546295166,
                 "matched_count": 4,
                 "unmatched_counts": {
-                    "extra_gt_entities": 24,
+                    "extra_gt_entities": 16,
                     "extra_pred_entities": 0,
                     "pairs": 0
                 },
                 "unmatched_fractions": {
                     "pairs": 0.0,
                     "extra_pred_entities": 0.0,
-                    "extra_gt_entities": 0.8571428571428571
+                    "extra_gt_entities": 0.8
                 }
             },
             "cd831c4a59537a6936fde50c355173e088621a74bd594da1e76e00fd89db9e9f": {
                 "property_precision": {
-                    "name": 1.0,
                     "type": 1.0,
+                    "name": 1.0,
                     "descriptions": 0.0
                 },
                 "property_recall": {
@@ -43,14 +43,14 @@
                 "avg_property_recall": 0.875,
                 "matched_count": 3,
                 "unmatched_counts": {
-                    "extra_gt_entities": 23,
+                    "extra_gt_entities": 12,
                     "extra_pred_entities": 0,
                     "pairs": 1
                 },
                 "unmatched_fractions": {
                     "pairs": 0.25,
                     "extra_pred_entities": 0.0,
-                    "extra_gt_entities": 0.8518518518518519
+                    "extra_gt_entities": 0.75
                 }
             }
         },
@@ -71,14 +71,14 @@
             "avg_property_recall": 0.4952196929820631,
             "matched_count": 7,
             "unmatched_counts": {
-                "extra_gt_entities": 47,
+                "extra_gt_entities": 28,
                 "extra_pred_entities": 0,
                 "pairs": 1
             },
             "unmatched_fractions": {
                 "pairs": 0.125,
                 "extra_pred_entities": 0.0,
-                "extra_gt_entities": 0.8545454545454545
+                "extra_gt_entities": 0.7777777777777778
             }
         }
     }
