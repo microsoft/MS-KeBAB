@@ -22,7 +22,10 @@ class TaskType(Enum):
     Extraction = 2
     Linking = 3
     Clustering = 4
-    TextCompletion = 5
+    TextCompletionUsingDocuments = 5
+    TextCompletionUsingKB = 6
+    QuestionAnsweringUsingDocuments = 7
+    QuestionAnsweringUsingKB = 8
 
 
 class Task(ABC):

@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from __future__ import annotations
+
 import pytest
 from kebab.contracts.entity import Entity
 
@@ -89,15 +91,22 @@ def test_merge_method(sample_entity_1: Entity, sample_entity_2: Entity) -> None:
     assert set(merged.source_ids) == {"source1", "source2", "source4"}
 
 
-def filter_and_check(entity: Entity, expected: Entity, filter_func) -> None:
+def filter_and_check(entity: Entity, expected: Entity | None, filter_func) -> None:
     """
     Helper function to filter an entity and check the result.
     """
     filtered_entity = entity.filter_values(filter_func)
-    assert filtered_entity.entity_id == expected.entity_id
-    assert filtered_entity.properties == expected.properties
-    assert filtered_entity.source_ids == expected.source_ids
-    assert filtered_entity.evidence_map == expected.evidence_map
+    if expected is None:
+        assert filtered_entity is None
+    else:
+        assert filtered_entity is not None
+        assert filtered_entity.entity_id == expected.entity_id
+        assert filtered_entity is not None
+        assert filtered_entity.properties == expected.properties
+        assert filtered_entity is not None
+        assert filtered_entity.source_ids == expected.source_ids
+        assert filtered_entity is not None
+        assert filtered_entity.evidence_map == expected.evidence_map
 
 
 def test_filter(sample_entity_1: Entity) -> None:
@@ -150,14 +159,7 @@ def test_filter(sample_entity_1: Entity) -> None:
     # Filter out all values
     filter_and_check(
         sample_entity_1,
-        expected=Entity.from_dict(
-            {
-                "entity_id": "entity_1",
-                "properties": {},
-                "source_ids": [],
-                "evidence_map": {},
-            }
-        ),
+        expected=None,
         filter_func=lambda _, value: False,  # noqa: ARG005
     )
 
@@ -171,13 +173,52 @@ def test_filter(sample_entity_1: Entity) -> None:
                 "evidence_map": {},
             }
         ),
+        expected=None,
+        filter_func=lambda _, value: False,  # noqa: ARG005
+    )
+
+
+def remove_sources_and_check(entity: Entity, expected: Entity | None, remove_sources_list: list[str]) -> None:
+    """
+    Helper function to remove sources from an entity and check the result.
+    """
+    updated_entity = entity.remove_sources(remove_sources_list=remove_sources_list)
+    if expected is None:
+        assert updated_entity is None
+    else:
+        assert updated_entity is not None
+        assert updated_entity.entity_id == expected.entity_id
+        assert updated_entity is not None
+        assert updated_entity.properties == expected.properties
+        assert updated_entity is not None
+        assert updated_entity.source_ids == expected.source_ids
+        assert updated_entity is not None
+        assert updated_entity.evidence_map == expected.evidence_map
+
+
+def test_remove_sources(sample_entity_1: Entity) -> None:
+    """
+    Test the remove sources method.
+    """
+    # Filter out "source1" from source_ids by filtering out all values with that evidence
+    remove_sources_and_check(
+        sample_entity_1,
         expected=Entity.from_dict(
             {
                 "entity_id": "entity_1",
-                "properties": {},
-                "source_ids": [],
-                "evidence_map": {},
+                "properties": {"prop1": ["value12"]},
+                "source_ids": ["source2"],
+                "evidence_map": {
+                    "prop1": [[0]],
+                },
             }
         ),
-        filter_func=lambda _, value: False,  # noqa: ARG005
+        remove_sources_list=["source1"],
+    )
+
+    # Filter out all sources
+    remove_sources_and_check(
+        sample_entity_1,
+        expected=None,
+        remove_sources_list=["source1", "source2"],
     )

@@ -70,7 +70,7 @@ class ValueAveragedAesopConfig(MetricConfig):
         )
 
 
-def filter_json_values(entity: Entity) -> Entity:
+def filter_json_values(entity: Entity) -> Entity | None:
     """Filter JSON values from entity properties."""
     return entity.filter_values(lambda _, value: not isinstance(value, dict))
 
@@ -104,6 +104,8 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             self.logger.info(f"Processing document {idx + 1}")
             gt_entities = list(map(filter_json_values, gt.entities))
             pred_entities = list(map(filter_json_values, pred.entities))
+            gt_entities = [entity for entity in gt_entities if entity is not None]  # remove any empty entities
+            pred_entities = [entity for entity in pred_entities if entity is not None]  # remove any empty entities
             entity_matcher = EntityMatcher(gt_entities, pred_entities)
             self.logger.info(f"Document {idx + 1}: Matching entities")
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)

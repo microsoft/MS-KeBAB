@@ -1,91 +1,116 @@
 {
-    "Extraction-ReDocRED-Train": {
-      "task": "Extraction",
-      "data": {
-        "extracts": "./tests/utils/data/datasets/re-docred/train_small/extracts.jsonl",
-        "schema": "./tests/data/extraction/property_schema.json",
-        "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/train_small/entities.jsonl",
-        "metrics_config": "./tests/data/extraction/metrics_config.json"
-      }
-    },
-    "Extraction-ReDocRED-Test": {
-      "task": "Extraction",
-      "data": {
-        "extracts": "./tests/utils/data/datasets/re-docred/test_small/extracts.jsonl",
-        "schema": "./tests/data/extraction/property_schema.json",
-        "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/test_small/entities.jsonl",
-        "metrics_config": "./tests/data/extraction/metrics_config.json"
-      }
-    },
-    "Extraction-Heldout": {
-      "task": "Extraction",
-      "data": {
-        "extracts": "./tests/utils/data/datasets/re-docred/dev_small/extracts.jsonl",
-        "schema": "./tests/data/extraction/property_schema.json",
-        "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/dev_small/entities.jsonl",
-        "metrics_config": "./tests/data/extraction/metrics_config.json"
-      }
-    },
-    "Extraction-Modified-Heldout": {
-      "task": "Extraction",
-      "data": {
-        "extracts": "./tests/utils/data/datasets/re-docred/dev_small_modified/extracts.jsonl",
-        "schema": "./tests/data/extraction/property_schema.json",
-        "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/dev_small_modified/entities.jsonl",
-        "metrics_config": "./tests/data/extraction/metrics_config.json"
-      }
-    },
-    "Linking-TREx-Train": {
-      "task": "Linking",
-      "data": {
-        "entity_fragment_pairs": "https://some.public/download/link",
-        "schema": "https://some.public/download/link",
-        "ground_truth_boolean": "https://some.public/download/link"
-      }
-    },
-    "Linking-TREx-Test": {
-      "task": "Linking",
-      "data": {
-        "entity_fragment_pairs": "https://some.public/download/link",
-        "schema": "https://some.public/download/link",
-        "ground_truth_boolean": "https://some.public/download/link"
-      }
-    },
-    "Linking-MAVE": {
-      "task": "Linking",
-      "data": {
-        "entity_fragment_pairs": "https://some.public/download/link",
-        "schema": "https://some.public/download/link",
-        "ground_truth_boolean": "https://some.public/download/link"
-      }
-    },
-    "Linking-Heldout": {
-      "task": "Linking",
-      "data": {
-        "entity_fragment_pairs": "./tests/data/linking/entity_pairs.jsonl",
-        "schema": "https://some.public/download/link",
-        "ground_truth_boolean": "./tests/data/linking/boolean_labels.jsonl"
-      }
-    },
-    "Entity-Generation-REBEL": {
-      "task": "EntityGeneration",
-      "data": {
-        "entities": "https://some.public/download/link",
-        "schema": "https://some.public/download/link"
-      }
-    },
-    "Clustering-Heldout": {
-      "task": "Clustering",
-      "data": {
-        "entity_fragments": "./tests/data/clustering/entity_fragments.jsonl",
-        "schema": "https://some.public/download/link",
-        "ground_truth_labels": "./tests/data/clustering/labels.jsonl"
-      }
-    },
-    "TextCompletion": {
-      "task": "TextCompletion",
-      "data": {
-        "documents": "./tests/data/text_completion/documents.jsonl"
-      }
+  "Extraction-ReDocRED-Train": {
+    "task": "Extraction",
+    "data": {
+      "extracts": "./tests/utils/data/datasets/re-docred/train_small/extracts.jsonl",
+      "schema": "./tests/data/extraction/property_schema.json",
+      "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/train_small/entities.jsonl",
+      "metrics_config": "./tests/data/extraction/metrics_config.json"
     }
+  },
+  "Extraction-ReDocRED-Test": {
+    "task": "Extraction",
+    "data": {
+      "extracts": "./tests/utils/data/datasets/re-docred/test_small/extracts.jsonl",
+      "schema": "./tests/data/extraction/property_schema.json",
+      "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/test_small/entities.jsonl",
+      "metrics_config": "./tests/data/extraction/metrics_config.json"
+    }
+  },
+  "Extraction-Heldout": {
+    "task": "Extraction",
+    "data": {
+      "extracts": "./tests/utils/data/datasets/re-docred/dev_small/extracts.jsonl",
+      "schema": "./tests/data/extraction/property_schema.json",
+      "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/dev_small/entities.jsonl",
+      "metrics_config": "./tests/data/extraction/metrics_config.json"
+    }
+  },
+  "Extraction-Modified-Heldout": {
+    "task": "Extraction",
+    "data": {
+      "extracts": "./tests/utils/data/datasets/re-docred/dev_small_modified/extracts.jsonl",
+      "schema": "./tests/data/extraction/property_schema.json",
+      "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/dev_small_modified/entities.jsonl",
+      "metrics_config": "./tests/data/extraction/metrics_config.json"
+    }
+  },
+  "Linking-TREx-Train": {
+    "task": "Linking",
+    "data": {
+      "entity_fragment_pairs": "https://some.public/download/link",
+      "schema": "https://some.public/download/link",
+      "ground_truth_boolean": "https://some.public/download/link"
+    }
+  },
+  "Linking-TREx-Test": {
+    "task": "Linking",
+    "data": {
+      "entity_fragment_pairs": "https://some.public/download/link",
+      "schema": "https://some.public/download/link",
+      "ground_truth_boolean": "https://some.public/download/link"
+    }
+  },
+  "Linking-MAVE": {
+    "task": "Linking",
+    "data": {
+      "entity_fragment_pairs": "https://some.public/download/link",
+      "schema": "https://some.public/download/link",
+      "ground_truth_boolean": "https://some.public/download/link"
+    }
+  },
+  "Linking-Heldout": {
+    "task": "Linking",
+    "data": {
+      "entity_fragment_pairs": "./tests/data/linking/entity_pairs.jsonl",
+      "schema": "https://some.public/download/link",
+      "ground_truth_boolean": "./tests/data/linking/boolean_labels.jsonl"
+    }
+  },
+  "Entity-Generation-REBEL": {
+    "task": "EntityGeneration",
+    "data": {
+      "entities": "https://some.public/download/link",
+      "schema": "https://some.public/download/link"
+    }
+  },
+  "Clustering-Heldout": {
+    "task": "Clustering",
+    "data": {
+      "entity_fragments": "./tests/data/clustering/entity_fragments.jsonl",
+      "schema": "https://some.public/download/link",
+      "ground_truth_labels": "./tests/data/clustering/labels.jsonl"
+    }
+  },
+  "TextCompletionUsingDocuments-Test": {
+    "task": "TextCompletionUsingDocuments",
+    "data": {
+      "documents": "./tests/data/text_completion/documents.jsonl"
+    }
+  },
+  "TextCompletionUsingKB-Test": {
+    "task": "TextCompletionUsingKB",
+    "data": {
+      "documents": "https://some.public/download/link",
+      "kb": "https://some.public/download/link",
+      "schema": "https://some.public/download/link"
+    }
+  },
+  "QuestionAnsweringUsingDocuments-Test": {
+    "task": "QuestionAnsweringUsingDocuments",
+    "data": {
+      "documents": "https://some.public/download/link",
+      "questions": "https://some.public/download/link",
+      "ground_truth_answers": "https://some.public/download/link"
+    }
+  },
+  "QuestionAnsweringUsingKB-Test": {
+    "task": "QuestionAnsweringUsingKB",
+    "data": {
+      "kb": "https://some.public/download/link",
+      "schema": "https://some.public/download/link",
+      "questions": "https://some.public/download/link",
+      "ground_truth_answers": "https://some.public/download/link"
+    }
+  }
 }

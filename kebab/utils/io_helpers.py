@@ -68,6 +68,33 @@ class ItemReader[DataItemType](ABC):
         """
 
 
+class StringLineReader(ItemReader[str]):
+    """
+    Line by line reader for text files.
+
+    This class reads a text file, and outputs a line at a time.
+    """
+
+    def __init__(self, path: Path):
+        """
+        Initializes the line by line reader for text files.
+
+        Args:
+            path: The file path to the text file.
+        """
+        self.path = path
+
+    def read_items(self) -> Iterable[str]:
+        """
+        Reads the text file and yields lines.
+
+        Returns:
+            Iterable[str]: An iterable of lines from the document.
+        """
+        with open(self.path, encoding="utf-8", newline="\n") as f:
+            yield from f
+
+
 class ItemJsonlReader[DataItemType](ItemReader[DataItemType]):
     """
     Reader for JSONL files containing DataItemType objects.
@@ -237,6 +264,34 @@ class ItemWriter[DataItemType](ABC):
         Args:
             items (Iterable[DataItemType]): An iterable of output items to be written.
         """
+
+
+class StringLineWriter(ItemWriter[str]):
+    """
+    Writer for text files.
+
+    This class writes a text file line by line.
+    """
+
+    def __init__(self, path: Path):
+        """
+        Initializes the writer.
+
+        Args:
+            path: The file path where the text file will be written.
+        """
+        self.path = path
+
+    def write_items(self, items: Iterable[str]) -> None:
+        """
+        Writes lines to a text file.
+
+        Args:
+            items: An iterable of lines to be written to the file.
+        """
+        with open(self.path, "w", encoding="utf-8", newline="\n") as file:
+            for line in items:
+                file.write(line + "\n")
 
 
 class ItemJsonlWriter[DataItemType](ItemWriter[DataItemType]):
