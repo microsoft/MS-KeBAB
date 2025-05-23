@@ -211,7 +211,7 @@ class SingleValuePropertyDistance(PropertyDistance):
 
     def compute(
         self, gt_entity: Entity, pred_entity: Entity, property_: Property
-    ) -> ValueMatchingRecordWithDistances:  # PropertyDistanceValue:
+    ) -> ValueMatchingRecordWithDistances:
         """Compute distance between two entities for a given property id.
 
         Returns:
@@ -225,7 +225,6 @@ class SingleValuePropertyDistance(PropertyDistance):
         else:
             score = self.element_distance(gt_entity[property_][0], pred_entity[property_][0], property_)
         return ValueMatchingRecordWithDistances(gt_values, pred_values, [score], [], [])
-        # return [self.element_distance(gt_entity[property_][0], pred_entity[property_][0], property_)], 0
 
 
 class SetPropertyDistance(PropertyDistance):
@@ -250,11 +249,8 @@ class SetPropertyDistance(PropertyDistance):
         gt_values = np.array(gt_entity[property_] if property_ in gt_entity else [])  # noqa: SIM401
         pred_values = np.array(pred_entity[property_] if property_ in pred_entity else [])  # noqa: SIM401
         if property_ not in gt_entity or property_ not in pred_entity:
-            return ValueMatchingRecordWithDistances([], [], [1], list(gt_values), [])  # list(pred_values))
+            return ValueMatchingRecordWithDistances([], [], [1], list(gt_values), list(pred_values))
 
-        # gt_values = gt_entity[property_]
-        # pred_values = pred_entity[property_]
-        # print(gt_values, pred_values)
         distances = np.zeros((len(gt_values), len(pred_values)))
         for i, value1 in enumerate(gt_values):
             for j, value2 in enumerate(pred_values):
@@ -429,20 +425,10 @@ def match_items(distances: np.ndarray, threshold: float = 1.0) -> MatchedIndices
     left_ind, right_ind = min_weight_full_bipartite_matching(csr_matrix(distances + epsilon))
 
     matched_dists = distances[left_ind, right_ind]
-    # print("left_ind:", left_ind)
-    # print("right_ind:", right_ind)
-    # print("matched_dists:", matched_dists)
     indices_within_threshold = np.where(matched_dists <= threshold)
-    # print("indices_within_threshold", indices_within_threshold)
     unmatched_ind = np.where(matched_dists > threshold)
-    # print("unmatched_ind", unmatched_ind)
     left_ind_matched = left_ind[indices_within_threshold]
     right_ind_matched = right_ind[indices_within_threshold]
-    # print("left_ind_matched:", left_ind_matched)
-    # print("right_ind_matched:", right_ind_matched)
     left_ind_unmatched = left_ind[unmatched_ind]
     right_ind_unmatched = right_ind[unmatched_ind]
-    # print("left_ind_unmatched:", left_ind_unmatched)
-    # print("right_ind_unmatched:", right_ind_unmatched)
-
     return MatchedIndices(left_ind_matched, right_ind_matched, left_ind_unmatched, right_ind_unmatched)

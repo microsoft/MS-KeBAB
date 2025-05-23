@@ -126,6 +126,8 @@ def test_task_interface():
                 strict=False,
             ):
                 metrics = task_instance.evaluate(Path(predictions_file))
+                print(task_name)
+                print(json.dumps(metrics, indent=4))
                 assert_dicts_equal(gt_metrics, metrics, epsilon=1e-3)
 
 

@@ -99,7 +99,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
     def run(self, prediction: Iterable[ExtractionOutput], ground_truth: Iterable[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
         metrics = {"per_document_metrics": {}, "dataset_metrics": {}}
-        # debug_info = {}
+        debug_info = {}
         metrics_accumulator = MetricsAccumulator()
         self.logger.info("Starting AESOP metric calculation")
         self.logger.info(f"Debug output directory: {self.config.debug_output_dir}")
@@ -138,9 +138,10 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             document_metrics = document_metrics_accumulator.accumulate_metrics()
             metrics["per_document_metrics"][doc_id] = document_metrics
             metrics_accumulator.update(document_metrics_accumulator)
-            # debug_info[doc_id] = document_debug_info
             if self.config.debug_output_dir:
                 document_debug_info.to_csv(self.config.debug_output_dir / f"{doc_id}_debug_info.csv", index=False)
+                debug_info[doc_id] = document_debug_info
+                debug_info[doc_id]["document_id"] = doc_id
             elapsed = time.time() - start
             self.logger.info(f"Time elapsed: {elapsed:.2f} seconds")
             self.logger.info(f"Average processing time: {elapsed / (idx + 1):.2f} seconds per document")
@@ -151,6 +152,10 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         metrics["dataset_metrics"] = metrics_accumulator.accumulate_metrics()
         elapsed = time.time() - start
         self.logger.info(f"Metrics accumulation time: {elapsed:.2f} seconds")
+        if self.config.debug_output_dir:
+            debug_info_df = pd.concat(debug_info.values(), ignore_index=True)
+            debug_info_df.to_csv(self.config.debug_output_dir / "all_debug_info.csv", index=False)
+            self.logger.info(f"Debug info saved to {self.config.debug_output_dir / 'debug_info.csv'}")
         return metrics
 
 

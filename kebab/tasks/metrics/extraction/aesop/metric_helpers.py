@@ -205,18 +205,18 @@ class MatchedEntitiesScorer:
         self,
         entities_gt: list[Entity],
         entities_pred: list[Entity],
-        left_ind: list[int],
-        right_ind: list[int],
+        matched_pair: MatchedPairInfo,
     ) -> None:
         """Initialize the MatchedEntitiesScorer."""
         self.entities_gt = entities_gt
         self.entities_pred = entities_pred
 
-        if len(left_ind) != len(right_ind):
+        if len(matched_pair.left_ind) != len(matched_pair.right_ind):
             raise ValueError("left_ind and right_ind must have the same length.")
 
-        self.gt_ind = left_ind
-        self.pred_ind = right_ind
+        self.gt_ind = matched_pair.left_ind
+        self.pred_ind = matched_pair.right_ind
+        self.distances = matched_pair.distances
         self.debug_info: defaultdict[int, defaultdict[int, dict[str, ValueMatchingRecordWihScores]]] = defaultdict(
             lambda: defaultdict(dict)
         )
@@ -241,30 +241,65 @@ class MatchedEntitiesScorer:
                 else:
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
                     self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWihScores(
-                        self.entities_gt[gt_idx][property_], [], [], self.entities_gt[gt_idx][property_], []
+                        [], [], [], self.entities_gt[gt_idx][property_], []
                     )
 
                 evaluated_property_metrics.property_value_count_gt[gt_idx] += len(self.entities_gt[gt_idx][property_])
             elif property_ in self.entities_pred[pred_idx]:
                 pred_values = self.entities_pred[pred_idx][property_] 
                 self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWihScores(
-                    [], pred_values, [], [], pred_values
+                    [], [], [], [], pred_values
                 )
         return evaluated_property_metrics
 
     def get_debug_info(self) -> pd.DataFrame:
         """Collect debug information into a table."""
         dfs = []
-        for pred_dict in self.debug_info.values():
-            for property_dict in pred_dict.values():
+        for gt_idx, pred_dict in self.debug_info.items():
+            for pred_idx, property_dict in pred_dict.items():
                 records = []
+                entity_match_distance = self.distances[gt_idx, pred_idx]
                 for property_id, value_matching_record in property_dict.items():
-                    records.append({"property_id": property_id, **asdict(value_matching_record)})
+                    num_gt_values = len(self.entities_gt[gt_idx].properties[property_id])
+                    num_pred_values = len(self.entities_pred[pred_idx].properties[property_id])
+                    first_property_record = True
+                    for value_gt, value_pred, score in zip(
+                        value_matching_record.gt_values, value_matching_record.pred_values, value_matching_record.matched_scores
+                    ):
+                        record, first_property_record = create_property_record(
+                            property_id, value_gt, value_pred, score, num_gt_values, num_pred_values, first_property_record
+                        )
+                        records.append(record)
+                    for unmatched_gt_value in value_matching_record.unmatched_gt_values:
+                        record, first_property_record = create_property_record(
+                            property_id, unmatched_gt_value, "", None, num_gt_values, num_pred_values, first_property_record
+                        )
+                        records.append(record)
+                    for unmatched_pred_value in value_matching_record.unmatched_pred_values:
+                        record, first_property_record = create_property_record(
+                            property_id, "", unmatched_pred_value, None, num_gt_values, num_pred_values, first_property_record
+                        )
+                        records.append(record)
+                records[0]["entity_match_distance"] = entity_match_distance
                 entity_debug_info = pd.DataFrame.from_records(records)
                 dfs.append(entity_debug_info)
                 dfs.append(pd.DataFrame([{}]))  # Empty row for separation
         return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+    
 
+def create_property_record(property_id, gt_value, pred_value, score, total_gt_values, total_pred_values, first_property_record=False):
+    """Create a property evaluation record."""
+    record = {
+        "property_id": property_id,
+        "gt_values": gt_value,
+        "pred_values": pred_value,
+        "matched_scores": score,
+    }
+    if first_property_record:
+        record["num_gt_values"] = total_gt_values
+        record["num_pred_values"] = total_pred_values
+        first_property_record = False
+    return record, first_property_record
 
 class MetricsComputer:
     """Computes metrics for a given set of ground truth and prediction entities."""
@@ -300,9 +335,7 @@ class MetricsComputer:
 
         properties_union = compute_properties_union(self.ground_truth, self.predictions, matched_pair)
         properties_union = properties_union.intersection(self.property_schema.properties.keys())
-        entities_scorer = MatchedEntitiesScorer(
-            self.ground_truth, self.predictions, matched_pair.left_ind, matched_pair.right_ind
-        )
+        entities_scorer = MatchedEntitiesScorer(self.ground_truth, self.predictions, matched_pair)
 
         for key in properties_union:
             score_func = keys_to_score[key]
@@ -327,15 +360,12 @@ class MetricsComputer:
         for idx in unmatched_gt_indices:
             entity = self.ground_truth[idx]
             for property_id, values in entity.properties.items():
-                unmatched_gt_records.append(
-                    {
-                        "property_id": property_id,
-                        "gt_values": [],
-                        "pred_values": [],
-                        "matched_scores": [],
-                        "unmatched_gt_values": values,
-                        "unmatched_pred_values": [],
-                    })
+                first_property_record = True
+                for value in values:
+                    record, first_property_record = create_property_record(
+                        property_id, value, "", None, len(entity.properties[property_id]), 0, first_property_record
+                    )
+                    unmatched_gt_records.append(record)
             unmatched_gt_records.append({})
         unmatched_gt_entities_debug_info = pd.DataFrame.from_records(unmatched_gt_records)
 
@@ -344,15 +374,12 @@ class MetricsComputer:
         for idx in unmatched_pred_indices:
             entity = self.predictions[idx]
             for property_id, values in entity.properties.items():
-                unmatched_pred_records.append(
-                    {
-                        "property_id": property_id,
-                        "gt_values": [],
-                        "pred_values": [],
-                        "matched_scores": [],
-                        "unmatched_gt_values": [],
-                        "unmatched_pred_values": values,
-                    })
+                first_property_record = True
+                for value in values:
+                    record, first_property_record = create_property_record(
+                        property_id, "", value, None, 0, len(entity.properties[property_id]), first_property_record
+                    )
+                    unmatched_pred_records.append(record)
             unmatched_gt_records.append({})
         unmatched_pred_entities_debug_info = pd.DataFrame.from_records(unmatched_pred_records)
         

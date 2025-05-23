@@ -130,7 +130,6 @@ class ExtractionTask(Task):
             print(metric_config_dict)
             metric_calculator_cls = self.__metric_calculator_cls[metric_name]
             metric_config = self.__metric_config_cls[metric_name].from_dict(metric_config_dict, self.read_schema())
-            print(metric_config.debug_output_dir)
             metric_results = metric_calculator_cls(metric_config, logger).run(pred_extractions, self.read_items())  # type: ignore
             metrics[metric_name] = metric_results
         if eval_result_path:

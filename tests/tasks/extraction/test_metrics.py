@@ -174,7 +174,7 @@ def test_match_entities_with_no_overlap(property_schema: PropertySchema):
 
     assert not properties_union
 
-    entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matched_pair.left_ind, matched_pair.right_ind)
+    entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matched_pair)
 
     evaluated_property_metrics = entities_scorer.score(token_score, "name")
 
@@ -292,9 +292,7 @@ def test_compute_scores_of_target_entities_with_themselves(property_schema: Prop
     }
 
     for key in properties_union:
-        entities_scorer = MatchedEntitiesScorer(
-            ground_truth, predictions, matched_pair.left_ind, matched_pair.right_ind
-        )
+        entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matched_pair)
         evaluated_property_metrics = entities_scorer.score(property_to_score[key], property_schema.properties[key])
 
         assert_score_dicts_close(evaluated_property_metrics.relevant_pair_scores, {0: {0: [1.0]}})
