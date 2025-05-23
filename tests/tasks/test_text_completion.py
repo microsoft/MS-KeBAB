@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from kebab.tasks.text_completion import TextCompletionE2ETask
+from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def test_text_completion_read_items_and_generate_queries() -> None:
     documents_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "documents.jsonl"
     predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "predicted_contents.jsonl"
     predictions_output_file_path = Path(__file__).parents[1] / "output" / "text_completion" / "predicted_contents.jsonl"
-    task_instance = TextCompletionE2ETask(
+    task_instance = TextCompletionUsingDocumentsTask(
         "TextCompletion",
         str(documents_file_path),
     )

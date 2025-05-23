@@ -82,8 +82,8 @@
       "ground_truth_labels": "./tests/data/clustering/labels.jsonl"
     }
   },
-  "TextCompletionE2E-Test": {
-    "task": "TextCompletionE2E",
+  "TextCompletionUsingDocuments-Test": {
+    "task": "TextCompletionUsingDocuments",
     "data": {
       "documents": "./tests/data/text_completion/documents.jsonl"
     }
@@ -96,8 +96,8 @@
       "schema": "https://some.public/download/link"
     }
   },
-  "QuestionAnsweringE2E-Test": {
-    "task": "QuestionAnsweringE2E",
+  "QuestionAnsweringUsingDocuments-Test": {
+    "task": "QuestionAnsweringUsingDocuments",
     "data": {
       "documents": "https://some.public/download/link",
       "questions": "https://some.public/download/link",

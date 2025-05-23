@@ -138,13 +138,13 @@ class TextCompletionTaskBase(Task):
         return metrics
 
 
-class TextCompletionE2ETask(TextCompletionTaskBase):
+class TextCompletionUsingDocumentsTask(TextCompletionTaskBase):
     """Represents an end-to-end text completion benchmark task with its data files."""
 
     @property
     def task_type(self) -> TaskType:
         """Return task type."""
-        return TaskType.TextCompletionE2E
+        return TaskType.TextCompletionUsingDocuments
 
     def __init__(
         self,

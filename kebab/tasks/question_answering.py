@@ -61,7 +61,7 @@ class QuestionAnsweringTaskBase(Task):
             path: The file path where the predicted answers should be written.
             items: An iterable of string answers
         """
-        StringLineWriter(path).write_items([answer.replace("\n", "") for answer in items])
+        StringLineWriter(path).write_items([answer.replace("\n", " ") for answer in items])
 
     def evaluate(
         self,
@@ -93,7 +93,7 @@ class QuestionAnsweringTaskBase(Task):
         return metrics
 
 
-class QuestionAnsweringE2ETask(QuestionAnsweringTaskBase):
+class QuestionAnsweringUsingDocumentsTask(QuestionAnsweringTaskBase):
     """Represents an end-to-end question-answering benchmark task with its data files."""
 
     __data_documents: Path
@@ -101,7 +101,7 @@ class QuestionAnsweringE2ETask(QuestionAnsweringTaskBase):
     @property
     def task_type(self) -> TaskType:
         """Return task type."""
-        return TaskType.QuestionAnsweringE2E
+        return TaskType.QuestionAnsweringUsingDocuments
 
     def __init__(
         self,
