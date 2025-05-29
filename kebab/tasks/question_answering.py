@@ -9,6 +9,8 @@ from collections.abc import Iterable
 from logging import Logger
 from pathlib import Path
 
+import evaluate
+
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
@@ -79,10 +81,17 @@ class QuestionAnsweringTaskBase(Task):
         accuracy = [1 if item[0] == item[1] else 0 for item in predictions_and_targets]
 
         metrics = {}
-        metrics["mean_accuracy"] = statistics.mean(accuracy)
+        metrics["exact_match_accuracy"] = statistics.mean(accuracy)
 
-        # TODO (bmitra): Consider adding more evaluation metrics, such as from KBLaM, to assess the
-        # quality of predicted contents.
+        rouge = evaluate.load("rouge")
+        metrics |= rouge.compute(predictions=predictions, references=targets)
+
+        bertscore = evaluate.load("bertscore")
+        bertscore_metrics = bertscore.compute(
+            predictions=predictions, references=targets, lang="en", model_type="microsoft/deberta-xlarge-mnli"
+        )
+        bertscore_metrics = {"bertscore_" + metric: value for metric, value in bertscore_metrics.items()}
+        metrics |= bertscore_metrics
 
         if logger:
             logger.info("Evaluation metrics calculated successfully.")
