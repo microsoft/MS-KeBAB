@@ -84,14 +84,16 @@ class QuestionAnsweringTaskBase(Task):
         metrics["exact_match_accuracy"] = statistics.mean(accuracy)
 
         rouge = evaluate.load("rouge")
-        metrics |= rouge.compute(predictions=predictions, references=targets)
+        rouge_metrics = rouge.compute(predictions=predictions, references=targets)
+        if rouge_metrics is not None:
+            metrics |= rouge_metrics
 
         bertscore = evaluate.load("bertscore")
         bertscore_metrics = bertscore.compute(
             predictions=predictions, references=targets, lang="en", model_type="microsoft/deberta-xlarge-mnli"
         )
-        bertscore_metrics = {"bertscore_" + metric: value for metric, value in bertscore_metrics.items()}
-        metrics |= bertscore_metrics
+        if bertscore_metrics is not None:
+            metrics |= {"bertscore_" + metric: value for metric, value in bertscore_metrics.items()}
 
         if logger:
             logger.info("Evaluation metrics calculated successfully.")
