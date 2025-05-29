@@ -22,6 +22,7 @@ dependencies = [
     "sentence-transformers",
     "nltk", # TODO(atorunova): replace with editdistance?
     "scipy",
+    "evaluate",
 ]
 
 [project.optional-dependencies]
