@@ -23,6 +23,8 @@ dependencies = [
     "nltk", # TODO(atorunova): replace with editdistance?
     "scipy",
     "evaluate",
+    "rouge-score",
+    "bert_score",
 ]
 
 [project.optional-dependencies]
