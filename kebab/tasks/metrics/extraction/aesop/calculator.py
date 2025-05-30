@@ -80,6 +80,94 @@ def filter_json_values(entity: Entity) -> Entity | None:
     return entity.filter_values(lambda _, value: not isinstance(value, dict))
 
 
+def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_properties: list[str], output_path: Path):
+    """Convert debug information to an Excel file."""
+    # Create a Pandas Excel writer using XlsxWriter as the engine.
+    writer = pd.ExcelWriter(output_path, engine="xlsxwriter")
+
+    # Convert the dataframe to an XlsxWriter Excel object. Note that we turn off
+    # the default header and skip one row to allow us to insert a user defined
+    # header.
+    sheet_name = "debug_info"
+    num_rows = debug_info.shape[0]
+    ordered_columns = [
+        "document_id",
+        "original_text",
+        "original_extraction",
+        "property_id",
+        "gt_values",
+        "pred_values",
+        "matched_scores",
+        "num_gt_values",
+        "num_pred_values",
+        "entity_match_distance",
+    ]
+    debug_info = debug_info[ordered_columns]
+    column_to_letter = {col: chr(65 + idx) for idx, col in enumerate(ordered_columns)}
+    print(f"Column to letter mapping: {column_to_letter}")
+
+    def col(column_name: str, start: int = 2, end: int = num_rows + 1) -> str:
+        """Get column letter for a given column name."""
+        l = column_to_letter[column_name]
+        return f"${l}${start}:${l}${end}"
+
+    def conditions(property_id: str) -> str:
+        return f"""{col("gt_values")}, "?*", {col("pred_values")}, "?*", {col("property_id")}, "{property_id}" """
+
+    def property_precision_formula(property_id: str) -> str:
+        """Return excel formula for property precision."""
+        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}) / SUMIFS({col("num_pred_values")}, {conditions(property_id)})"""
+
+    def property_recall_formula(property_id: str) -> str:
+        """Return excel formula for property recall."""
+        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}) / SUMIFS({col("num_gt_values")}, {conditions(property_id)})"""
+
+    debug_info.to_excel(writer, sheet_name=sheet_name, columns=ordered_columns, index=False)
+
+    # Get the xlsxwriter workbook and worksheet objects.
+    workbook = writer.book
+    worksheet = writer.sheets[sheet_name]
+    merge_format = workbook.add_format({"align": "left", "valign": "top", "text_wrap": True})
+    first_row_idx = 2
+    for group_count in debug_info.groupby("document_id").size().values:
+        print(f"Processing group with count: {group_count}")
+        worksheet.merge_range(
+            f"{col('document_id', start=first_row_idx, end=first_row_idx + group_count - 1)}",
+            debug_info["document_id"].values[first_row_idx],
+            merge_format,
+        )
+        worksheet.merge_range(
+            f"{col('original_text', start=first_row_idx, end=first_row_idx + group_count - 1)}",
+            debug_info["original_text"].values[first_row_idx],
+            merge_format,
+        )
+        worksheet.merge_range(
+            f"{col('original_extraction', start=first_row_idx, end=first_row_idx + group_count - 1)}",
+            debug_info["original_extraction"].values[first_row_idx],
+            merge_format,
+        )
+        first_row_idx += group_count
+    worksheet.write_row("L1", ["property_id", "property_precision", "property_recall"])
+    for idx, property_id in enumerate(evaluated_properties):
+        worksheet.write(f"L{idx + 2}", property_id)
+        print(property_precision_formula(property_id))
+        print(property_recall_formula(property_id))
+        worksheet.write_formula(f"M{idx + 2}", property_precision_formula(property_id))
+        worksheet.write_formula(f"N{idx + 2}", property_recall_formula(property_id))
+    worksheet.write(f"L{len(evaluated_properties) + 2}", "Average")
+    worksheet.write_formula("M" + str(len(evaluated_properties) + 2), f"AVERAGE(M2:M{len(evaluated_properties) + 1})")
+    worksheet.write_formula("N" + str(len(evaluated_properties) + 2), f"AVERAGE(N2:N{len(evaluated_properties) + 1})")
+    worksheet.freeze_panes(1, 2)  # Freeze the first row and first two columns
+    green_row = workbook.add_format({"bg_color": "#dbf2d2"})
+    header_format = workbook.add_format({"bold": True})
+    worksheet.set_row(0, None, header_format)  # Set header format
+    worksheet.conditional_format(
+        f"D2:J{num_rows + 1}", {"type": "formula", "criteria": "=ISEVEN(ROW())", "format": green_row}
+    )
+    worksheet.autofit(300)  # Adjust column widths to fit content
+    writer.close()  # Save the Excel file
+
+
 class ValueAveragedAesopMetricCalculator(MetricCalculator):
     """Value-averaged-AESOP metric calculator.
     Computes AESOP metric as described in the paper: https://arxiv.org/pdf/2402.04437
@@ -113,10 +201,21 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             """Compute metrics for a single document."""
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1}")
+
             gt_entities = [entity for entity in map(filter_json_values, gt.entities) if entity is not None]
             pred_entities = [entity for entity in map(filter_json_values, pred.entities) if entity is not None]
-            gt_entities = [entity for entity in gt_entities if not entity.properties.get("type") or "time" not in entity.properties["type"]]
-            pred_entities = [entity for entity in pred_entities if (not entity.properties.get("type") or "time" not in entity.properties["type"])]
+
+            gt_entities = [
+                entity
+                for entity in gt_entities
+                if not entity.properties.get("type") or "time" not in entity.properties["type"]
+            ]
+            pred_entities = [
+                entity
+                for entity in pred_entities
+                if not entity.properties.get("type") or "time" not in entity.properties["type"]
+            ]
+
             entity_matcher = EntityMatcher(gt_entities, pred_entities)
             self.logger.info(f"Document {idx + 1}: Matching entities")
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)
@@ -126,6 +225,12 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 matched_pairs, self.config.property_score_functions
             )
             self.logger.info(f"Document {idx + 1}: Done")
+            if not document_debug_info.empty:
+                document_debug_info["document_id"] = gt.document.document_id
+                document_debug_info["original_text"] = gt.document.data.get("text", "")
+                document_debug_info["original_extraction"] = (
+                    "[" + ",\n".join(entity.to_json() for entity in pred.entities) + "]"
+                )
             return metrics, gt.document.document_id, document_debug_info
 
         start = time.time()
@@ -140,8 +245,12 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             metrics_accumulator.update(document_metrics_accumulator)
             if self.config.debug_output_dir:
                 document_debug_info.to_csv(self.config.debug_output_dir / f"{doc_id}_debug_info.csv", index=False)
+                document_debug_output_to_excel(
+                    document_debug_info,
+                    document_metrics["property_precision"].keys(),
+                    self.config.debug_output_dir / f"{doc_id}_debug_info.xlsx",
+                )
                 debug_info[doc_id] = document_debug_info
-                debug_info[doc_id]["document_id"] = doc_id
             elapsed = time.time() - start
             self.logger.info(f"Time elapsed: {elapsed:.2f} seconds")
             self.logger.info(f"Average processing time: {elapsed / (idx + 1):.2f} seconds per document")
@@ -155,6 +264,11 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         if self.config.debug_output_dir:
             debug_info_df = pd.concat(debug_info.values(), ignore_index=True)
             debug_info_df.to_csv(self.config.debug_output_dir / "all_debug_info.csv", index=False)
+            document_debug_output_to_excel(
+                debug_info_df,
+                metrics["dataset_metrics"]["property_precision"].keys(),
+                self.config.debug_output_dir / "debug_info.xlsx",
+            )
             self.logger.info(f"Debug info saved to {self.config.debug_output_dir / 'debug_info.csv'}")
         return metrics
 
