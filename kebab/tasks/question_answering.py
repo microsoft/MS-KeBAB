@@ -89,10 +89,12 @@ class QuestionAnsweringTaskBase(Task):
             metrics |= rouge_metrics
 
         bertscore = evaluate.load("bertscore")
+        model_type = "microsoft/deberta-xlarge-mnli"
         bertscore_metrics = bertscore.compute(
-            predictions=predictions, references=targets, lang="en", model_type="microsoft/deberta-xlarge-mnli"
+            predictions=predictions, references=targets, lang="en", model_type=model_type
         )
         if bertscore_metrics is not None:
+            metrics["bertscore_model"] = model_type
             metrics |= {"bertscore_" + metric: value for metric, value in bertscore_metrics.items()}
 
         if logger:
