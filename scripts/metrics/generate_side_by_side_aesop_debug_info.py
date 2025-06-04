@@ -1,37 +1,49 @@
+from argparse import ArgumentParser
+from pathlib import Path
 
 import pandas as pd
-from pathlib import Path
-from argparse import ArgumentParser
 
 
 def to_list_of_strings(serialized_list: str) -> list[str]:
     """Convert a serialized list of strings to a list of strings."""
-    return [item.strip().strip("''") for item in serialized_list.strip("[]").split(",") if item.strip().strip("''")]
+    return [item.strip().strip("'") for item in serialized_list.strip("[]").split(",") if item.strip().strip("'")]
+
 
 def to_list_of_float(serialized_list: str) -> list[float]:
     """Convert a serialized list of floats to a list of floats."""
     return [float(item.strip()) for item in serialized_list.strip("[]").split(",") if item.strip()]
 
-def empty_row(columns):
-    return pd.DataFrame.from_records([{col: "" for col in columns}])
+
+def empty_row(columns: list[str]) -> pd.DataFrame:
+    """Create an empty DataFrame with specified columns."""
+    return pd.DataFrame.from_records([dict.fromkeys(columns, "")])
+
 
 def load_debug_info(filename: str) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
     """Load debug info from a CSV file and return a dictionary of DataFrames."""
-    df = pd.read_csv(filename, converters={"property_id": str, "gt_values": to_list_of_strings, "pred_values": to_list_of_strings,
-                                           "matched_scores": to_list_of_float, "unmatched_gt_values": to_list_of_strings,
-                                           "unmatched_pred_values": to_list_of_strings})
+    debug_info = pd.read_csv(
+        filename,
+        converters={
+            "property_id": str,
+            "gt_values": to_list_of_strings,
+            "pred_values": to_list_of_strings,
+            "matched_scores": to_list_of_float,
+            "unmatched_gt_values": to_list_of_strings,
+            "unmatched_pred_values": to_list_of_strings,
+        },
+    )
     entity_rows = []
     gt_names_to_df = {}
     gt_names = None
     pred_values_idx = 0
-    for row in df.itertuples(index=False):
-        if row.property_id == "" and gt_names is not None: # reached entity separator row
+    for row in debug_info.itertuples(index=False):
+        if row.property_id == "" and gt_names is not None:  # reached entity separator row
             entity_df = pd.DataFrame.from_records(sorted(entity_rows, key=lambda x: x["property_id"]))
             entity_df["all_gt_names"] = str(gt_names)
             gt_names_to_df[gt_names] = entity_df
             entity_rows = []
             gt_names = None
-        elif row.property_id == "name": # found new entity names
+        elif row.property_id == "name":  # found new entity names
             gt_names = tuple(row.gt_values + row.unmatched_gt_values)
             if not gt_names:
                 # reached unmatched pred_values
@@ -41,13 +53,14 @@ def load_debug_info(filename: str) -> tuple[dict[str, pd.DataFrame], pd.DataFram
         else:
             entity_rows.append(row._asdict())
         pred_values_idx += 1
-    if gt_names is not None and entity_rows: # adding last entity
+    if gt_names is not None and entity_rows:  # adding last entity
         entity_df = pd.DataFrame.from_records(sorted(entity_rows, key=lambda x: x["property_id"]))
         entity_df["all_gt_names"] = gt_names
         gt_names_to_df[gt_names] = entity_df
-    unmatched_pred_df = df.iloc[pred_values_idx:]
+    unmatched_pred_df = debug_info.iloc[pred_values_idx:]
     unmatched_pred_df["all_gt_names"] = str([])
     return gt_names_to_df, unmatched_pred_df
+
 
 def generate_side_by_side_comparison(filename1, filename2, output_filename, suffixes=("_1", "_2")) -> None:
     gt_names_to_df1, unmatched_pred_df1 = load_debug_info(filename1)
@@ -84,10 +97,11 @@ def main():
         file2 = args.dir2 / file1.name
         if file2.exists():
             output_filename = args.output_dir / file1.name.replace(".csv", "_comparison.csv")
-            generate_side_by_side_comparison(file1, file2, output_filename, suffixes=("_phi4","_phi3"))
+            generate_side_by_side_comparison(file1, file2, output_filename, suffixes=("_phi4", "_phi3"))
             print(f"Generated comparison for {file1.name} and {file2.name} at {output_filename}.")
         else:
             print(f"File {file2} does not exist. Skipping comparison.")
+
 
 if __name__ == "__main__":
     main()

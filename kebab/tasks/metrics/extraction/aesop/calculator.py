@@ -80,7 +80,7 @@ def filter_json_values(entity: Entity) -> Entity | None:
     return entity.filter_values(lambda _, value: not isinstance(value, dict))
 
 
-def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_properties: list[str], output_path: Path):
+def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_properties: list[str], output_path: Path, merge_rows: bool = True) -> None:
     """Convert debug information to an Excel file."""
     # Create a Pandas Excel writer using XlsxWriter as the engine.
     writer = pd.ExcelWriter(output_path, engine="xlsxwriter")
@@ -93,7 +93,9 @@ def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_propertie
     ordered_columns = [
         "document_id",
         "original_text",
-        "original_extraction",
+        # "original_extraction",
+        "gt_entity_id",
+        "pred_entity_id",
         "property_id",
         "gt_values",
         "pred_values",
@@ -108,11 +110,11 @@ def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_propertie
 
     def col(column_name: str, start: int = 2, end: int = num_rows + 1) -> str:
         """Get column letter for a given column name."""
-        l = column_to_letter[column_name]
-        return f"${l}${start}:${l}${end}"
+        letter = column_to_letter[column_name]
+        return f"${letter}${start}:${letter}${end}"
 
     def conditions(property_id: str) -> str:
-        return f"""{col("gt_values")}, "?*", {col("pred_values")}, "?*", {col("property_id")}, "{property_id}" """
+        return f"""{col("gt_entity_id")}, "?*", {col("pred_entity_id")}, "?*", {col("property_id")}, "{property_id}" """
 
     def property_precision_formula(property_id: str) -> str:
         """Return excel formula for property precision."""
@@ -127,43 +129,55 @@ def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_propertie
     # Get the xlsxwriter workbook and worksheet objects.
     workbook = writer.book
     worksheet = writer.sheets[sheet_name]
-    merge_format = workbook.add_format({"align": "left", "valign": "top", "text_wrap": True})
-    first_row_idx = 2
-    for group_count in debug_info.groupby("document_id").size().values:
-        print(f"Processing group with count: {group_count}")
-        worksheet.merge_range(
-            f"{col('document_id', start=first_row_idx, end=first_row_idx + group_count - 1)}",
-            debug_info["document_id"].values[first_row_idx],
-            merge_format,
-        )
-        worksheet.merge_range(
-            f"{col('original_text', start=first_row_idx, end=first_row_idx + group_count - 1)}",
-            debug_info["original_text"].values[first_row_idx],
-            merge_format,
-        )
-        worksheet.merge_range(
-            f"{col('original_extraction', start=first_row_idx, end=first_row_idx + group_count - 1)}",
-            debug_info["original_extraction"].values[first_row_idx],
-            merge_format,
-        )
-        first_row_idx += group_count
-    worksheet.write_row("L1", ["property_id", "property_precision", "property_recall"])
+    if merge_rows:
+        # Merge cells for document_id, original_text, and original_extraction
+        merge_format = workbook.add_format({"align": "left", "valign": "top", "text_wrap": True})
+        first_row_idx = 2
+        for group_count in debug_info.groupby("document_id").size().to_numpy():
+            print(f"Processing group with count: {group_count}")
+            worksheet.merge_range(
+                f"{col('document_id', start=first_row_idx, end=first_row_idx + group_count - 1)}",
+                debug_info["document_id"].to_numpy()[first_row_idx],
+                merge_format,
+            )
+            worksheet.merge_range(
+                f"{col('original_text', start=first_row_idx, end=first_row_idx + group_count - 1)}",
+                debug_info["original_text"].to_numpy()[first_row_idx],
+                merge_format,
+            )
+            # worksheet.merge_range(
+            #     f"{col('original_extraction', start=first_row_idx, end=first_row_idx + group_count - 1)}",
+            #     debug_info["original_extraction"].to_numpy()[first_row_idx],
+            #     merge_format,
+            # )
+            first_row_idx += group_count
+    
+    metrics_start_col = chr(65 + len(ordered_columns) + 2)
+    precision_col = chr(65 + len(ordered_columns) + 3)
+    recall_col = chr(65 + len(ordered_columns) + 4)
+    worksheet.write_row(f"{metrics_start_col}1", ["property_id", "property_precision", "property_recall"])
     for idx, property_id in enumerate(evaluated_properties):
-        worksheet.write(f"L{idx + 2}", property_id)
+        worksheet.write(f"{metrics_start_col}{idx + 2}", property_id)
         print(property_precision_formula(property_id))
         print(property_recall_formula(property_id))
-        worksheet.write_formula(f"M{idx + 2}", property_precision_formula(property_id))
-        worksheet.write_formula(f"N{idx + 2}", property_recall_formula(property_id))
-    worksheet.write(f"L{len(evaluated_properties) + 2}", "Average")
-    worksheet.write_formula("M" + str(len(evaluated_properties) + 2), f"AVERAGE(M2:M{len(evaluated_properties) + 1})")
-    worksheet.write_formula("N" + str(len(evaluated_properties) + 2), f"AVERAGE(N2:N{len(evaluated_properties) + 1})")
+        worksheet.write_formula(f"{precision_col}{idx + 2}", property_precision_formula(property_id))
+        worksheet.write_formula(f"{recall_col}{idx + 2}", property_recall_formula(property_id))
+    worksheet.write(f"{metrics_start_col}{len(evaluated_properties) + 2}", "Average")
+    worksheet.write_formula(precision_col + str(len(evaluated_properties) + 2), f"""AVERAGEIF({precision_col}2:{precision_col}{len(evaluated_properties) + 1}, ">=0")""")
+    worksheet.write_formula(recall_col + str(len(evaluated_properties) + 2), f"""AVERAGEIF({recall_col}2:{recall_col}{len(evaluated_properties) + 1}, ">=0")""")
     worksheet.freeze_panes(1, 2)  # Freeze the first row and first two columns
     green_row = workbook.add_format({"bg_color": "#dbf2d2"})
     header_format = workbook.add_format({"bold": True})
     worksheet.set_row(0, None, header_format)  # Set header format
-    worksheet.conditional_format(
-        f"D2:J{num_rows + 1}", {"type": "formula", "criteria": "=ISEVEN(ROW())", "format": green_row}
-    )
+    last_col = column_to_letter[ordered_columns[-1]]
+    if merge_rows:
+        worksheet.conditional_format(
+            f"D2:{last_col}{num_rows + 1}", {"type": "formula", "criteria": "=ISEVEN(ROW())", "format": green_row}
+        )
+    else:
+        worksheet.conditional_format(
+            f"A2:{last_col}{num_rows + 1}", {"type": "formula", "criteria": "=ISEVEN(ROW())", "format": green_row}
+        )
     worksheet.autofit(300)  # Adjust column widths to fit content
     writer.close()  # Save the Excel file
 
@@ -228,9 +242,9 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             if not document_debug_info.empty:
                 document_debug_info["document_id"] = gt.document.document_id
                 document_debug_info["original_text"] = gt.document.data.get("text", "")
-                document_debug_info["original_extraction"] = (
-                    "[" + ",\n".join(entity.to_json() for entity in pred.entities) + "]"
-                )
+                # document_debug_info["original_extraction"] = (
+                #     "[" + ",\n".join(entity.to_json() for entity in pred.entities) + "]"
+                # )
             return metrics, gt.document.document_id, document_debug_info
 
         start = time.time()
@@ -249,6 +263,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                     document_debug_info,
                     document_metrics["property_precision"].keys(),
                     self.config.debug_output_dir / f"{doc_id}_debug_info.xlsx",
+                    merge_rows=False,
                 )
                 debug_info[doc_id] = document_debug_info
             elapsed = time.time() - start
@@ -268,6 +283,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 debug_info_df,
                 metrics["dataset_metrics"]["property_precision"].keys(),
                 self.config.debug_output_dir / "debug_info.xlsx",
+                merge_rows=False,
             )
             self.logger.info(f"Debug info saved to {self.config.debug_output_dir / 'debug_info.csv'}")
         return metrics

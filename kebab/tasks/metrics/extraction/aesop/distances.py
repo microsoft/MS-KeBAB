@@ -209,9 +209,7 @@ class SingleValuePropertyDistance(PropertyDistance):
         if property_.is_collection:
             raise ValueError("Collection properties are not supported.")
 
-    def compute(
-        self, gt_entity: Entity, pred_entity: Entity, property_: Property
-    ) -> ValueMatchingRecordWithDistances:
+    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> ValueMatchingRecordWithDistances:
         """Compute distance between two entities for a given property id.
 
         Returns:
