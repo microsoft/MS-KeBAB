@@ -75,11 +75,6 @@ class ValueAveragedAesopConfig(MetricConfig):
         )
 
 
-def filter_json_values(entity: Entity) -> Entity | None:
-    """Filter JSON values from entity properties."""
-    return entity.filter_values(lambda _, value: not isinstance(value, dict))
-
-
 def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_properties: list[str], output_path: Path, merge_rows: bool = True) -> None:
     """Convert debug information to an Excel file."""
     # Create a Pandas Excel writer using XlsxWriter as the engine.
@@ -215,18 +210,14 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             """Compute metrics for a single document."""
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1}")
-
-            gt_entities = [entity for entity in map(filter_json_values, gt.entities) if entity is not None]
-            pred_entities = [entity for entity in map(filter_json_values, pred.entities) if entity is not None]
-
             gt_entities = [
                 entity
-                for entity in gt_entities
+                for entity in gt.entities
                 if not entity.properties.get("type") or "time" not in entity.properties["type"]
             ]
             pred_entities = [
                 entity
-                for entity in pred_entities
+                for entity in pred.entities
                 if not entity.properties.get("type") or "time" not in entity.properties["type"]
             ]
 
@@ -242,9 +233,6 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             if not document_debug_info.empty:
                 document_debug_info["document_id"] = gt.document.document_id
                 document_debug_info["original_text"] = gt.document.data.get("text", "")
-                # document_debug_info["original_extraction"] = (
-                #     "[" + ",\n".join(entity.to_json() for entity in pred.entities) + "]"
-                # )
             return metrics, gt.document.document_id, document_debug_info
 
         start = time.time()
