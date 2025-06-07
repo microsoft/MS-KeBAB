@@ -198,6 +198,23 @@ class PropertyEvaluationRecord:
     unmatched_count: int
 
 
+def get_original_property_id(entity: Entity, property_id: str) -> str:
+    """
+    Get the original property ID from the entity's evidence map.
+
+    Args:
+        entity: The entity containing the property.
+        property_id: The property ID to look for.
+
+    Returns:
+        The original property ID if found, otherwise an empty string.
+    """
+    if property_id in entity.evidence_map:
+        evidence_idx = entity.evidence_map[property_id][0][0]
+        return entity.source_ids[evidence_idx]
+    return ""
+
+
 class MatchedEntitiesScorer:
     """Computes scores for a given property for matched entities."""
 
@@ -222,6 +239,7 @@ class MatchedEntitiesScorer:
         self.debug_info: defaultdict[int, defaultdict[int, dict[str, ValueMatchingRecordWihScores]]] = defaultdict(
             lambda: defaultdict(dict)
         )
+        self.unmapped_property_ids: set[str] = set()
 
     def score(
         self, score_function: Callable[[Entity, Entity, Property], ValueMatchingRecordWihScores], property_id: str,
@@ -239,6 +257,7 @@ class MatchedEntitiesScorer:
                     self.debug_info[gt_idx][pred_idx][property_id] = ValueMatchingRecordWihScores(
                         [], [], [], [], pred_values
                     )
+                    self.unmapped_property_ids.add(property_id)
             return evaluated_property_metrics
 
         for gt_idx, pred_idx in zip(self.gt_ind, self.pred_ind, strict=True):
@@ -278,12 +297,6 @@ class MatchedEntitiesScorer:
                 for property_id, value_matching_record in property_dict.items():
                     num_gt_values = len(self.entities_gt[gt_idx].properties[property_id])
                     num_pred_values = len(self.entities_pred[pred_idx].properties[property_id])
-                    original_property_id = ""
-                    property_evidence = self.entities_pred[pred_idx].evidence_map.get(property_id)
-
-                    if property_evidence:
-                        evidence_idx = property_evidence[0][0]
-                        original_property_id = self.entities_pred[pred_idx].source_ids[evidence_idx]
                     first_property_record = True
                     for value_gt, value_pred, score in zip(
                         value_matching_record.gt_values,
@@ -293,7 +306,7 @@ class MatchedEntitiesScorer:
                         record, first_property_record = create_property_record(
                             gt_entity_id,
                             pred_entity_id,
-                            original_property_id,
+                            get_original_property_id(self.entities_pred[pred_idx], property_id),
                             property_id,
                             value_gt,
                             value_pred,
@@ -318,11 +331,16 @@ class MatchedEntitiesScorer:
                         )
                         records.append(record)
                     for unmatched_pred_value in value_matching_record.unmatched_pred_values:
+                        original_property_id = get_original_property_id(self.entities_pred[pred_idx], property_id)
+                        property_id_ = property_id
+                        if property_id in self.unmapped_property_ids:
+                            property_id_ = ""  # use empty string for unmapped properties
+                            original_property_id = property_id
                         record, first_property_record = create_property_record(
                             gt_entity_id,
                             pred_entity_id,
                             original_property_id,
-                            property_id,
+                            property_id_,
                             "",
                             unmatched_pred_value,
                             None,
@@ -344,7 +362,7 @@ def create_property_record(
     record = {
         "gt_entity_id": gt_entity_id,
         "pred_entity_id": pred_entity_id,
-        "original_property_id": original_property_id,
+        "original_pred_property_id": original_property_id,
         "property_id": property_id,
         "gt_values": gt_value,
         "pred_values": pred_value,

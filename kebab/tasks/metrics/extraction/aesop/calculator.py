@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 import time
-from collections import defaultdict
+from collections import defaultdict, Counter
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -88,9 +88,9 @@ def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_propertie
     ordered_columns = [
         "document_id",
         "original_text",
-        # "original_extraction",
         "gt_entity_id",
         "pred_entity_id",
+        "original_pred_property_id",
         "property_id",
         "gt_values",
         "pred_values",
@@ -176,6 +176,43 @@ def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_propertie
     worksheet.autofit(300)  # Adjust column widths to fit content
     writer.close()  # Save the Excel file
 
+@dataclass
+class Statistics:
+
+    num_gt_entities: int = 0
+    num_gt_entities_after_filter: int = 0
+    num_predicted_entities: int = 0
+    num_predicted_entities_after_filter: int = 0
+    num_documents: int = 0
+    gt_property_counts: Counter[str] = field(default_factory=Counter)
+    pred_property_counts: Counter[str] = field(default_factory=Counter)
+
+    def update(self, other: Statistics) -> None:
+        """Update statistics with another EntityStatistics object."""
+        self.num_gt_entities += other.num_gt_entities
+        self.num_gt_entities_after_filter += other.num_gt_entities_after_filter
+        self.num_predicted_entities += other.num_predicted_entities
+        self.num_documents += other.num_documents
+        self.pred_property_counts.update(other.pred_property_counts)
+        self.gt_property_counts.update(other.gt_property_counts)
+    
+    def log_statistics(self, logger: logging.Logger) -> None:
+        """Log the entity statistics."""
+        logger.info("Entity statistics:")
+        logger.info(f"Ground truth has {self.num_gt_entities} in {self.num_documents} documents ({self.num_gt_entities / self.num_documents:.2f} entities per document)")
+        logger.info(f"After filtering, {self.num_gt_entities_after_filter} target entities remain ({self.num_gt_entities_after_filter / self.num_documents:.2f} entities per document)")
+        logger.info(f"Prediction has {self.num_predicted_entities} entities ({self.num_predicted_entities / self.num_documents:.2f} entities per document)")
+        logger.info("Property statistics:")
+        for key, value in self.gt_property_counts.items():
+            if key in self.pred_property_counts:
+                logger.info(f"{key}: {value} in ground truth, {self.pred_property_counts[key]} predicted")
+            else:
+                logger.info(f"{key}: {value} in ground truth, 0 predicted")
+        for key, value in self.pred_property_counts.items():
+            if key not in self.gt_property_counts:
+                logger.info(f"{key}: 0 in ground truth, {value} predicted")
+
+        
 
 class ValueAveragedAesopMetricCalculator(MetricCalculator):
     """Value-averaged-AESOP metric calculator.
@@ -206,10 +243,11 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
 
         def process_document(
             input_: tuple[int, tuple[ExtractionOutput, ExtractionOutput]],
-        ) -> tuple[MetricsAccumulator, str, pd.DataFrame]:
+        ) -> tuple[MetricsAccumulator, str, pd.DataFrame, Statistics]:
             """Compute metrics for a single document."""
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1}")
+            
             gt_entities = [
                 entity
                 for entity in gt.entities
@@ -220,7 +258,20 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 for entity in pred.entities
                 if not entity.properties.get("type") or "time" not in entity.properties["type"]
             ]
-
+            gt_property_counts = Counter()
+            for entity in gt_entities:
+                gt_property_counts.update(entity.properties.keys())
+            pred_property_counts = Counter()
+            for entity in pred_entities:
+                pred_property_counts.update(entity.properties.keys())
+            stats = Statistics(
+                num_gt_entities=len(gt.entities),
+                num_predicted_entities=len(pred.entities),
+                num_gt_entities_after_filter=len(gt_entities),
+                num_predicted_entities_after_filter=len(pred_entities),
+                num_documents=1,
+                gt_property_counts=gt_property_counts,
+                pred_property_counts=pred_property_counts)
             entity_matcher = EntityMatcher(gt_entities, pred_entities)
             self.logger.info(f"Document {idx + 1}: Matching entities")
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)
@@ -233,15 +284,17 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             if not document_debug_info.empty:
                 document_debug_info["document_id"] = gt.document.document_id
                 document_debug_info["original_text"] = gt.document.data.get("text", "")
-            return metrics, gt.document.document_id, document_debug_info
+            return metrics, gt.document.document_id, document_debug_info, stats
 
+        entity_and_property_stats = Statistics()
         start = time.time()
-        for idx, (document_metrics_accumulator, doc_id, document_debug_info) in enumerate(
+        for idx, (document_metrics_accumulator, doc_id, document_debug_info, document_stats) in enumerate(
             map(
                 process_document,
                 enumerate(zip(prediction, ground_truth, strict=True)),
             )
         ):
+            entity_and_property_stats.update(document_stats)
             document_metrics = document_metrics_accumulator.accumulate_metrics()
             metrics["per_document_metrics"][doc_id] = document_metrics
             metrics_accumulator.update(document_metrics_accumulator)
@@ -264,6 +317,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         metrics["dataset_metrics"] = metrics_accumulator.accumulate_metrics()
         elapsed = time.time() - start
         self.logger.info(f"Metrics accumulation time: {elapsed:.2f} seconds")
+        entity_and_property_stats.log_statistics(self.logger)
         if self.config.debug_output_dir:
             debug_info_df = pd.concat(debug_info.values(), ignore_index=True)
             debug_info_df.to_csv(self.config.debug_output_dir / "all_debug_info.csv", index=False)
