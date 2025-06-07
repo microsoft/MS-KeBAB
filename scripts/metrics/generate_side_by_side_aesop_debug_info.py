@@ -37,32 +37,35 @@ def load_debug_info(filename: str) -> tuple[dict[str, pd.DataFrame], pd.DataFram
     gt_names = None
     pred_values_idx = 0
     for row in debug_info.itertuples(index=False):
-        if row.property_id == "" and gt_names is not None:  # reached entity separator row
+        if row.property_id == "" and gt_names is not None:  # type: ignore
             entity_df = pd.DataFrame.from_records(sorted(entity_rows, key=lambda x: x["property_id"]))
             entity_df["all_gt_names"] = str(gt_names)
             gt_names_to_df[gt_names] = entity_df
             entity_rows = []
             gt_names = None
-        elif row.property_id == "name":  # found new entity names
-            gt_names = tuple(row.gt_values + row.unmatched_gt_values)
+        elif row.property_id == "name":  # type: ignore
+            gt_names = tuple(row.gt_values + row.unmatched_gt_values)  # type: ignore
             if not gt_names:
                 # reached unmatched pred_values
                 gt_names = None
                 break
-            entity_rows.append(row._asdict())
+            entity_rows.append(row._asdict())  # type: ignore
         else:
-            entity_rows.append(row._asdict())
+            entity_rows.append(row._asdict())  # type: ignore
         pred_values_idx += 1
-    if gt_names is not None and entity_rows:  # adding last entity
+    if gt_names is not None and entity_rows:
         entity_df = pd.DataFrame.from_records(sorted(entity_rows, key=lambda x: x["property_id"]))
         entity_df["all_gt_names"] = gt_names
         gt_names_to_df[gt_names] = entity_df
     unmatched_pred_df = debug_info.iloc[pred_values_idx:]
     unmatched_pred_df["all_gt_names"] = str([])
-    return gt_names_to_df, unmatched_pred_df
+    return gt_names_to_df, unmatched_pred_df  # type: ignore
 
 
-def generate_side_by_side_comparison(filename1, filename2, output_filename, suffixes=("_1", "_2")) -> None:
+def generate_side_by_side_comparison(
+    filename1: str, filename2: str, output_filename: str, suffixes: tuple[str, str] = ("_1", "_2")
+) -> None:
+    """Generate a side-by-side comparison of two debug info CSV files."""
     gt_names_to_df1, unmatched_pred_df1 = load_debug_info(filename1)
     gt_names_to_df2, unmatched_pred_df2 = load_debug_info(filename2)
 
@@ -70,11 +73,11 @@ def generate_side_by_side_comparison(filename1, filename2, output_filename, suff
     columns = ["gt_values", "pred_values", "matched_scores", "unmatched_gt_values", "unmatched_pred_values"]
     merged_columns = ["property_id", "all_gt_names"] + [col + suffix for col in columns for suffix in suffixes]
     key_intersection = set(gt_names_to_df1.keys()).intersection(set(gt_names_to_df2.keys()))
-    suffixes = ["_phi4", "_phi3"]
+    suffixes = ("_phi4", "_phi3")
     for key in key_intersection:
         df1 = gt_names_to_df1[key]
         df2 = gt_names_to_df2[key]
-        dfs.append(pd.merge(df1, df2, on=["property_id", "all_gt_names"], suffixes=suffixes)[merged_columns])
+        dfs.append(df1.merge(df2, on=["property_id", "all_gt_names"], suffixes=suffixes)[merged_columns])
         dfs.append(empty_row(merged_columns))
     unmatched_pred_df1 = unmatched_pred_df1.rename(mapper={col: col + suffixes[0] for col in columns}, axis=1)
     unmatched_pred_df2 = unmatched_pred_df2.rename(mapper={col: col + suffixes[1] for col in columns}, axis=1)
@@ -87,6 +90,7 @@ def generate_side_by_side_comparison(filename1, filename2, output_filename, suff
 
 
 def main():
+    """Entry point for the script to generate side-by-side comparison of debug info CSV files."""
     parser = ArgumentParser(description="Generate side-by-side comparison of debug info CSV files.")
     parser.add_argument("dir1", type=Path, help="Directory containing the first set of debug info CSV files.")
     parser.add_argument("dir2", type=Path, help="Directory containing the second set of debug info CSV files.")

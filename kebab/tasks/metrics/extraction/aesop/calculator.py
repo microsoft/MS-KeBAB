@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -75,7 +75,9 @@ class ValueAveragedAesopConfig(MetricConfig):
         )
 
 
-def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_properties: list[str], output_path: Path, merge_rows: bool = True) -> None:
+def document_debug_output_to_excel(
+    debug_info: pd.DataFrame, evaluated_properties: list[str], output_path: Path, merge_rows: bool = True
+) -> None:
     """Convert debug information to an Excel file."""
     # Create a Pandas Excel writer using XlsxWriter as the engine.
     writer = pd.ExcelWriter(output_path, engine="xlsxwriter")
@@ -99,7 +101,7 @@ def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_propertie
         "num_pred_values",
         "entity_match_distance",
     ]
-    debug_info = debug_info[ordered_columns]
+    debug_info = debug_info[ordered_columns]  # type: ignore
     column_to_letter = {col: chr(65 + idx) for idx, col in enumerate(ordered_columns)}
     print(f"Column to letter mapping: {column_to_letter}")
 
@@ -146,7 +148,7 @@ def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_propertie
             #     merge_format,
             # )
             first_row_idx += group_count
-    
+
     metrics_start_col = chr(65 + len(ordered_columns) + 2)
     precision_col = chr(65 + len(ordered_columns) + 3)
     recall_col = chr(65 + len(ordered_columns) + 4)
@@ -158,8 +160,14 @@ def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_propertie
         worksheet.write_formula(f"{precision_col}{idx + 2}", property_precision_formula(property_id))
         worksheet.write_formula(f"{recall_col}{idx + 2}", property_recall_formula(property_id))
     worksheet.write(f"{metrics_start_col}{len(evaluated_properties) + 2}", "Average")
-    worksheet.write_formula(precision_col + str(len(evaluated_properties) + 2), f"""AVERAGEIF({precision_col}2:{precision_col}{len(evaluated_properties) + 1}, ">=0")""")
-    worksheet.write_formula(recall_col + str(len(evaluated_properties) + 2), f"""AVERAGEIF({recall_col}2:{recall_col}{len(evaluated_properties) + 1}, ">=0")""")
+    worksheet.write_formula(
+        precision_col + str(len(evaluated_properties) + 2),
+        f"""AVERAGEIF({precision_col}2:{precision_col}{len(evaluated_properties) + 1}, ">=0")""",
+    )
+    worksheet.write_formula(
+        recall_col + str(len(evaluated_properties) + 2),
+        f"""AVERAGEIF({recall_col}2:{recall_col}{len(evaluated_properties) + 1}, ">=0")""",
+    )
     worksheet.freeze_panes(1, 2)  # Freeze the first row and first two columns
     green_row = workbook.add_format({"bg_color": "#dbf2d2"})
     header_format = workbook.add_format({"bold": True})
@@ -176,8 +184,10 @@ def document_debug_output_to_excel(debug_info: pd.DataFrame, evaluated_propertie
     worksheet.autofit(300)  # Adjust column widths to fit content
     writer.close()  # Save the Excel file
 
+
 @dataclass
 class Statistics:
+    """Entity and property statistics for extraction task."""
 
     num_gt_entities: int = 0
     num_gt_entities_after_filter: int = 0
@@ -195,13 +205,19 @@ class Statistics:
         self.num_documents += other.num_documents
         self.pred_property_counts.update(other.pred_property_counts)
         self.gt_property_counts.update(other.gt_property_counts)
-    
+
     def log_statistics(self, logger: logging.Logger) -> None:
         """Log the entity statistics."""
         logger.info("Entity statistics:")
-        logger.info(f"Ground truth has {self.num_gt_entities} in {self.num_documents} documents ({self.num_gt_entities / self.num_documents:.2f} entities per document)")
-        logger.info(f"After filtering, {self.num_gt_entities_after_filter} target entities remain ({self.num_gt_entities_after_filter / self.num_documents:.2f} entities per document)")
-        logger.info(f"Prediction has {self.num_predicted_entities} entities ({self.num_predicted_entities / self.num_documents:.2f} entities per document)")
+        logger.info(
+            f"Ground truth has {self.num_gt_entities} in {self.num_documents} documents ({self.num_gt_entities / self.num_documents:.2f} entities per document)"
+        )
+        logger.info(
+            f"After filtering, {self.num_gt_entities_after_filter} target entities remain ({self.num_gt_entities_after_filter / self.num_documents:.2f} entities per document)"
+        )
+        logger.info(
+            f"Prediction has {self.num_predicted_entities} entities ({self.num_predicted_entities / self.num_documents:.2f} entities per document)"
+        )
         logger.info("Property statistics:")
         for key, value in self.gt_property_counts.items():
             if key in self.pred_property_counts:
@@ -212,7 +228,6 @@ class Statistics:
             if key not in self.gt_property_counts:
                 logger.info(f"{key}: 0 in ground truth, {value} predicted")
 
-        
 
 class ValueAveragedAesopMetricCalculator(MetricCalculator):
     """Value-averaged-AESOP metric calculator.
@@ -247,7 +262,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             """Compute metrics for a single document."""
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1}")
-            
+
             gt_entities = [
                 entity
                 for entity in gt.entities
@@ -271,7 +286,8 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 num_predicted_entities_after_filter=len(pred_entities),
                 num_documents=1,
                 gt_property_counts=gt_property_counts,
-                pred_property_counts=pred_property_counts)
+                pred_property_counts=pred_property_counts,
+            )
             entity_matcher = EntityMatcher(gt_entities, pred_entities)
             self.logger.info(f"Document {idx + 1}: Matching entities")
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)
