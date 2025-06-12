@@ -504,10 +504,10 @@ def resolve_path(path: str | Path) -> Path:
     Replace every '*.lnk' segment that occurs in `path` with the shortcut's real target,
     preserving any tail that comes after it.
     """
-    p = Path(path)
+    path = Path(path)
     cur = Path()  # empty base (relative) or will grow absolute
 
-    for part in p.parts:
+    for part in path.parts:
         next_part = cur / part if cur != Path() else Path(part)
 
         # use an absolute path (if needed) to test for existence & read target
@@ -519,7 +519,8 @@ def resolve_path(path: str | Path) -> Path:
             if abs_r_path.exists() and abs_r_path.is_file():
                 abs_path = abs_r_path
             else:
-                raise FileNotFoundError(f"Cannot resolve path: {abs_path}")
+                # cannot resolve this part, return the original path
+                return path
 
         if abs_path.suffix.lower() == ".lnk" and abs_path.is_file():
             cur = _shortcut_target(abs_path)

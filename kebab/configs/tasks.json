@@ -34,8 +34,8 @@
     "task": "Linking",
     "data": {
       "schema": "./Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
-      "entity_fragment_pairs": "./Benchmark/Datasets/REBEL/Linking Merged Train Dataset/rebel_linking_1000_dataset.jsonl",
-      "ground_truth_boolean": "./Benchmark/Datasets/REBEL/Linking Merged Train Dataset/rebel_linking_1000_ground_truth.jsonl"
+      "entity_fragment_pairs": "./Benchmark/Datasets/REBEL/Linking Merged Train Dataset/rebel_linking_1000000_dataset.jsonl",
+      "ground_truth_boolean": "./Benchmark/Datasets/REBEL/Linking Merged Train Dataset/rebel_linking_1000000_ground_truth.jsonl"
     }
   },
   "Linking-REBEL-Validation": {

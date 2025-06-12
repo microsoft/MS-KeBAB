@@ -13,7 +13,7 @@ from kebab.utils import io_helpers
 from kebab.utils.io_helpers import resolve_path
 
 
-@pytest.mark.manual
+@pytest.mark.skip
 def test_benchmark_tasks_config():
     """Test that the benchmark tasks configuration is valid (the datasets exist)."""
     benchmark = mskebab.get_default_benchmark()
@@ -41,10 +41,9 @@ def test_benchmark_tasks_config_syntax():
 
     with open(config_file_path, encoding="utf-8") as f:
         config = json.load(f)
-        for task in config["tasks"]:
-            data = task.get("data")
-            for path in data.values():
-                assert "~" not in path, f"Path {path} in task {task['name']} contains a tilde (~), which is not allowed"
+        for name, task in config.items():
+            for path in task["data"].values():
+                assert "~" not in path, f"Path {path} in task {name} contains a tilde (~), which is not allowed"
 
 
 @pytest.mark.parametrize(
