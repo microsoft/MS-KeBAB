@@ -2,6 +2,7 @@
 # Licensed under the MIT license.
 
 
+import json
 from pathlib import Path
 from unittest import mock
 
@@ -31,6 +32,19 @@ def test_benchmark_tasks_config():
             assert item is not None, f"Task {task.name} should have at least one item"
         except (AssertionError, ValueError, OSError, FileNotFoundError, StopIteration) as e:
             print(f"Task {task.name} is not properly configured or has no items: {e}")
+
+
+def test_benchmark_tasks_config_syntax():
+    """Test that the benchmark tasks configuration has a valid syntax."""
+    config_file_path = Path(__file__).parent.parent / "kebab" / "configs" / "tasks.json"
+    assert config_file_path.exists(), f"Config file {config_file_path} does not exist"
+
+    with open(config_file_path, encoding="utf-8") as f:
+        config = json.load(f)
+        for task in config["tasks"]:
+            data = task.get("data")
+            for path in data.values():
+                assert "~" not in path, f"Path {path} in task {task['name']} contains a tilde (~), which is not allowed"
 
 
 @pytest.mark.parametrize(

@@ -15,6 +15,8 @@ The recommended way to have the data available on a Windows dev machine:
 3. In your local OneDrive folder (usually `%USERPROFILE%/OneDrive - Microsoft`), assuming it is synced, you will find the `Benchmark` folder.
 4. Create a shortcut to the `Benchmark` folder and place it in the root of this repository.
 
+You can run `test_benchmark_tasks_config` manually to verify that the data is available in the expected location.
+
 The recommended way to have the data available on a Linux VM:
 1. First, have the data available locally on your Windows machine as described above.
 2. On the VM, create a directory called `Benchmark` in the root of this repository.
