@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from kebab.contracts.entity import PropertySchema
+from kebab.utils.io_helpers import resolve_path
 
 
 class TaskType(Enum):
@@ -37,7 +38,7 @@ class Task(ABC):
     def __init__(self, name: str, schema: str):
         """Initialize a task."""
         self.__name = name
-        self.__schema = Path(schema).expanduser()
+        self.__schema = resolve_path(schema)
 
     @property
     def name(self) -> str:

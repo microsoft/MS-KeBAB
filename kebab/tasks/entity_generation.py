@@ -10,7 +10,7 @@ from typing import Any
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.utils.io_helpers import EntityJsonlReader
+from kebab.utils.io_helpers import EntityJsonlReader, resolve_path
 
 
 class EntityGenerationTask(Task):
@@ -36,7 +36,7 @@ class EntityGenerationTask(Task):
     ):
         """Initialize an entity generation task."""
         super().__init__(name, schema)
-        self.__data_entities = Path(entities).expanduser()
+        self.__data_entities = resolve_path(entities)
 
     def read_items(self) -> Iterable[Entity]:
         """

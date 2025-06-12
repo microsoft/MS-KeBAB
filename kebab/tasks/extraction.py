@@ -17,6 +17,7 @@ from kebab.utils.io_helpers import (
     EntityListJsonlReader,
     EntityListJsonlWriter,
     load_dict_from_json,
+    resolve_path,
     save_dict_to_json,
 )
 
@@ -57,10 +58,10 @@ class ExtractionTask(Task):
     ):
         """Initialize an extraction task."""
         super().__init__(name, schema)
-        self.__data_extracts = Path(extracts)
+        self.__data_extracts = resolve_path(extracts)
         if ground_truth_extracted_entities is not None:
-            self.__data_ground_truth_extracted_entities = Path(ground_truth_extracted_entities)
-        self.metrics_config = load_dict_from_json(Path(metrics_config or self.__default_metrics_config_path))
+            self.__data_ground_truth_extracted_entities = resolve_path(ground_truth_extracted_entities)
+        self.metrics_config = load_dict_from_json(resolve_path(metrics_config or self.__default_metrics_config_path))
 
     def read_items(self) -> Iterable[ExtractionOutput]:
         """

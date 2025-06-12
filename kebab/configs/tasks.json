@@ -33,54 +33,54 @@
   "Linking-REBEL-Train": {
     "task": "Linking",
     "data": {
-      "schema": "~/Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
-      "entity_fragment_pairs": "~/Benchmark/Datasets/REBEL/Linking Merged Train Dataset/rebel_linking_1000_dataset.jsonl",
-      "ground_truth_boolean": "~/Benchmark/Datasets/REBEL/Linking Merged Train Dataset/rebel_linking_1000_ground_truth.jsonl"
+      "schema": "./Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entity_fragment_pairs": "./Benchmark/Datasets/REBEL/Linking Merged Train Dataset/rebel_linking_1000_dataset.jsonl",
+      "ground_truth_boolean": "./Benchmark/Datasets/REBEL/Linking Merged Train Dataset/rebel_linking_1000_ground_truth.jsonl"
     }
   },
   "Linking-REBEL-Validation": {
     "task": "Linking",
     "data": {
-      "schema": "~/Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
-      "entity_fragment_pairs": "~/Benchmark/Datasets/REBEL/Linking Merged Validation Dataset/rebel_linking_1000_dataset.jsonl",
-      "ground_truth_boolean": "~/Benchmark/Datasets/REBEL/Linking Merged Validation Dataset/rebel_linking_1000_ground_truth.jsonl"
+      "schema": "./Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entity_fragment_pairs": "./Benchmark/Datasets/REBEL/Linking Merged Validation Dataset/rebel_linking_1000_dataset.jsonl",
+      "ground_truth_boolean": "./Benchmark/Datasets/REBEL/Linking Merged Validation Dataset/rebel_linking_1000_ground_truth.jsonl"
     }
   },
   "Linking-REBEL-Test": {
     "task": "Linking",
     "data": {
-      "schema": "~/Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
-      "entity_fragment_pairs": "~/Benchmark/Datasets/REBEL/Linking Merged Test Dataset/rebel_linking_1000_dataset.jsonl",
-      "ground_truth_boolean": "~/Benchmark/Datasets/REBEL/Linking Merged Test Dataset/rebel_linking_1000_ground_truth.jsonl"
+      "schema": "./Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entity_fragment_pairs": "./Benchmark/Datasets/REBEL/Linking Merged Test Dataset/rebel_linking_1000_dataset.jsonl",
+      "ground_truth_boolean": "./Benchmark/Datasets/REBEL/Linking Merged Test Dataset/rebel_linking_1000_ground_truth.jsonl"
     }
   },
   "EntityGeneration-REBEL-from-Linking-Train": {
     "task": "EntityGeneration",
     "data": {
-      "schema": "~/Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
-      "entities": "~/Benchmark/Datasets/REBEL/EntityGeneration from Linking Merged Train/rebel_entity_generation_from_linking_dataset.jsonl"
+      "schema": "./Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entities": "./Benchmark/Datasets/REBEL/EntityGeneration from Linking Merged Train/rebel_entity_generation_from_linking_dataset.jsonl"
     }
   },
   "EntityGeneration-REBEL-from-Linking-Validation": {
     "task": "EntityGeneration",
     "data": {
-      "schema": "~/Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
-      "entities": "~/Benchmark/Datasets/REBEL/EntityGeneration from Linking Merged Validation/rebel_entity_generation_from_linking_dataset.jsonl"
+      "schema": "./Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entities": "./Benchmark/Datasets/REBEL/EntityGeneration from Linking Merged Validation/rebel_entity_generation_from_linking_dataset.jsonl"
     }
   },
   "EntityGeneration-REBEL-from-Linking-Test": {
     "task": "EntityGeneration",
     "data": {
-      "schema": "~/Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
-      "entities": "~/Benchmark/Datasets/REBEL/EntityGeneration from Linking Merged Test/rebel_entity_generation_from_linking_dataset.jsonl"
+      "schema": "./Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entities": "./Benchmark/Datasets/REBEL/EntityGeneration from Linking Merged Test/rebel_entity_generation_from_linking_dataset.jsonl"
     }
   },
   "Clustering-REBEL-from-Linking-Test": {
     "task": "Clustering",
     "data": {
-      "schema": "~/Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
-      "entity_fragments": "~/Benchmark/Datasets/REBEL/Linking Merged Test Dataset/clustering/rebel_clustering_1000_dataset.jsonl",
-      "ground_truth_labels": "~/Benchmark/Datasets/REBEL/Linking Merged Test Dataset/clustering/rebel_clustering_1000_ground_truth.jsonl"
+      "schema": "./Benchmark/Datasets/REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entity_fragments": "./Benchmark/Datasets/REBEL/Linking Merged Test Dataset/clustering/rebel_clustering_1000_dataset.jsonl",
+      "ground_truth_labels": "./Benchmark/Datasets/REBEL/Linking Merged Test Dataset/clustering/rebel_clustering_1000_ground_truth.jsonl"
     }
   }
 }

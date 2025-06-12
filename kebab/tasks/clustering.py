@@ -13,7 +13,7 @@ import numpy as np
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.utils.io_helpers import EntityJsonlReader, ItemJsonlReader, ItemJsonlWriter, save_dict_to_json
+from kebab.utils.io_helpers import EntityJsonlReader, ItemJsonlReader, ItemJsonlWriter, resolve_path, save_dict_to_json
 
 
 class ClusteringTask(Task):
@@ -46,9 +46,9 @@ class ClusteringTask(Task):
     ):
         """Initialize a new clustering task."""
         super().__init__(name, schema)
-        self.__data_entity_fragments = Path(entity_fragments)
+        self.__data_entity_fragments = resolve_path(entity_fragments)
         if ground_truth_labels is not None:
-            self.__data_ground_truth_labels = Path(ground_truth_labels)
+            self.__data_ground_truth_labels = resolve_path(ground_truth_labels)
 
     def read_items(self) -> Iterable[tuple[Entity, str | None]]:
         """

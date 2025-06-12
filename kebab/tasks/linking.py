@@ -12,7 +12,13 @@ from pathlib import Path
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.utils.io_helpers import EntityPairJsonlReader, ItemJsonlReader, ItemJsonlWriter, save_dict_to_json
+from kebab.utils.io_helpers import (
+    EntityPairJsonlReader,
+    ItemJsonlReader,
+    ItemJsonlWriter,
+    resolve_path,
+    save_dict_to_json,
+)
 
 
 class LinkingTask(Task):
@@ -45,9 +51,9 @@ class LinkingTask(Task):
     ):
         """Initialize a linking task."""
         super().__init__(name, schema)
-        self.__data_entity_fragment_pairs = Path(entity_fragment_pairs).expanduser()
+        self.__data_entity_fragment_pairs = resolve_path(entity_fragment_pairs)
         if ground_truth_boolean is not None:
-            self.__data_ground_truth_boolean = Path(ground_truth_boolean).expanduser()
+            self.__data_ground_truth_boolean = resolve_path(ground_truth_boolean)
 
     def read_items(self) -> Iterable[tuple[tuple[Entity, Entity], bool | None]]:
         """
