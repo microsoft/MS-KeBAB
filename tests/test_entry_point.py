@@ -59,7 +59,6 @@ def test_task_interface():
         "Extraction-ReDocRED-Train",
         "Extraction-ReDocRED-Test",
         "Extraction-Heldout",
-        "Extraction-Modified-Heldout",
         "Linking-TREx-Train",
         "Linking-TREx-Test",
         "Linking-MAVE",

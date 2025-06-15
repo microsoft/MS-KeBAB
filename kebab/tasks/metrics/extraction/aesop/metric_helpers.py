@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -36,13 +37,31 @@ class MatchedPairInfo:
     distances: np.ndarray
 
 
+def get_full_class_name(obj: Any) -> str:  # noqa: ANN401
+    """
+    Get the class name of an object.
+
+    Args:
+        obj: The object to get the class name for.
+
+    Returns:
+        The class name of the object.
+    """
+    if obj is None:
+        return "NoneType"
+    return f"{obj.__class__.__module__}.{obj.__class__.__qualname__}"
+
+
 class EntityMatcher:
     """Matches entities in two disjoint sets based on a distance function and a matching score threshold."""
 
-    def __init__(self, entities_gt: list[Entity], entities_pred: list[Entity]) -> None:
+    def __init__(
+        self, entities_gt: list[Entity], entities_pred: list[Entity], logger: logging.Logger | None = None
+    ) -> None:
         """Initialize the EntityMatcher."""
         self.entities_gt = entities_gt
         self.entities_pred = entities_pred
+        self.logger = logger or logging.getLogger(get_full_class_name(self))
 
     def match(self, distance_function: Callable[[Entity, Entity], float], threshold: float = 1.0) -> MatchedPairInfo:
         """Match entities based on a distance function and a matching score threshold."""
@@ -224,6 +243,7 @@ class MatchedEntitiesScorer:
         entities_pred: list[Entity],
         matched_pair: MatchedPairInfo,
         property_schema: PropertySchema,
+        logger: logging.Logger | None = None,
     ) -> None:
         """Initialize the MatchedEntitiesScorer."""
         self.entities_gt = entities_gt
@@ -240,6 +260,7 @@ class MatchedEntitiesScorer:
             lambda: defaultdict(dict)
         )
         self.unmapped_property_ids: set[str] = set()
+        self.logger = logger or logging.getLogger(get_full_class_name(self))
 
     def score(
         self,
@@ -287,7 +308,7 @@ class MatchedEntitiesScorer:
                 )
         return evaluated_property_metrics
 
-    def get_debug_info(self) -> pd.DataFrame:
+    def get_debug_info(self) -> pd.DataFrame | None:
         """Collect debug information into a table."""
         dfs = []
         for gt_idx, pred_dict in self.debug_info.items():
@@ -352,10 +373,21 @@ class MatchedEntitiesScorer:
                             first_property_record,
                         )
                         records.append(record)
-                records[0]["entity_match_distance"] = entity_match_distance
-                entity_debug_info = pd.DataFrame.from_records(records)
-                dfs.append(entity_debug_info)
-        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+                if len(records) > 0:
+                    records[0]["entity_match_distance"] = entity_match_distance
+                    entity_debug_info = pd.DataFrame.from_records(records)
+                    if entity_debug_info.isna().to_numpy().all():
+                        self.logger.warning(
+                            f"All values are null for matched entities: {gt_entity_id} and {pred_entity_id}"
+                        )
+                    else:
+                        dfs.append(entity_debug_info)
+                else:
+                    self.logger.warning(f"No records found for matched entities: {gt_entity_id} and {pred_entity_id}")
+        if len(dfs) == 0:
+            self.logger.warning("No debug information collected for matched entities.")
+            return None
+        return pd.concat(dfs, ignore_index=True)
 
 
 def create_property_record(
@@ -384,6 +416,7 @@ def create_property_record(
         record["num_gt_values"] = total_gt_values
         record["num_pred_values"] = total_pred_values
         first_property_record = False
+
     return record, first_property_record
 
 
@@ -395,17 +428,19 @@ class MetricsComputer:
         ground_truth: list[Entity],
         predictions: list[Entity],
         property_schema: PropertySchema,
+        logger: logging.Logger | None = None,
     ) -> None:
         """Initialize the MetricsComputer."""
         self.ground_truth = ground_truth
         self.predictions = predictions
         self.property_schema = property_schema
+        self.logger = logger or logging.getLogger(get_full_class_name(self))
 
     def compute_bipartite_metrics(
         self,
         matched_pair: MatchedPairInfo,
         keys_to_score: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWihScores]],
-    ) -> tuple[MetricsAccumulator, pd.DataFrame]:
+    ) -> tuple[MetricsAccumulator, pd.DataFrame | None]:
         """Compute provided property scores for the matched entities."""
         metrics_accumulator = MetricsAccumulator()
         metrics_accumulator.matched_count = len(matched_pair.left_ind)
@@ -443,6 +478,7 @@ class MetricsComputer:
                     evaluated_property_metrics.property_value_count_gt
                 )
         matched_entities_debug_info = entities_scorer.get_debug_info()
+
         unmatched_gt_records = []
         unmatched_gt_indices = set(range(len(self.ground_truth))) - set(matched_pair.left_ind)
         for idx in unmatched_gt_indices:
@@ -463,7 +499,13 @@ class MetricsComputer:
                         first_property_record,
                     )
                     unmatched_gt_records.append(record)
-        unmatched_gt_entities_debug_info = pd.DataFrame.from_records(unmatched_gt_records)
+        unmatched_gt_entities_debug_info = (
+            pd.DataFrame.from_records(unmatched_gt_records) if unmatched_gt_records else None
+        )
+
+        if unmatched_gt_entities_debug_info is None or unmatched_gt_entities_debug_info.isna().to_numpy().all():
+            self.logger.warning("All values are null for unmatched ground truth entities.")
+            unmatched_gt_entities_debug_info = None
 
         unmatched_pred_records = []
         unmatched_pred_indices = set(range(len(self.predictions))) - set(matched_pair.right_ind)
@@ -490,12 +532,21 @@ class MetricsComputer:
                         first_property_record,
                     )
                     unmatched_pred_records.append(record)
-        unmatched_pred_entities_debug_info = pd.DataFrame.from_records(unmatched_pred_records)
-
-        return metrics_accumulator, pd.concat(
-            [matched_entities_debug_info, unmatched_gt_entities_debug_info, unmatched_pred_entities_debug_info],
-            ignore_index=True,
+        unmatched_pred_entities_debug_info = (
+            pd.DataFrame.from_records(unmatched_pred_records) if unmatched_pred_records else None
         )
+
+        if unmatched_pred_entities_debug_info is None or unmatched_pred_entities_debug_info.isna().to_numpy().all():
+            self.logger.warning("All values are null for unmatched prediction entities.")
+            unmatched_pred_entities_debug_info = None
+
+        debug_info_parts = [
+            matched_entities_debug_info,
+            unmatched_gt_entities_debug_info,
+            unmatched_pred_entities_debug_info,
+        ]
+        debug_info_parts = [df for df in debug_info_parts if df is not None]
+        return metrics_accumulator, pd.concat(debug_info_parts, ignore_index=True) if debug_info_parts else None
 
 
 def compute_properties_union(

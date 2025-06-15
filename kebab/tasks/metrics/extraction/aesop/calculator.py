@@ -101,9 +101,12 @@ def document_debug_output_to_excel(
         "num_pred_values",
         "entity_match_distance",
     ]
+
+    if "entity_match_distance" not in debug_info.columns:
+        debug_info["entity_match_distance"] = ""
+
     debug_info = debug_info[ordered_columns]  # type: ignore
     column_to_letter = {col: chr(65 + idx) for idx, col in enumerate(ordered_columns)}
-    print(f"Column to letter mapping: {column_to_letter}")
 
     def col(column_name: str, start: int = 2, end: int = num_rows + 1) -> str:
         """Get column letter for a given column name."""
@@ -131,7 +134,6 @@ def document_debug_output_to_excel(
         merge_format = workbook.add_format({"align": "left", "valign": "top", "text_wrap": True})
         first_row_idx = 2
         for group_count in debug_info.groupby("document_id").size().to_numpy():
-            print(f"Processing group with count: {group_count}")
             worksheet.merge_range(
                 f"{col('document_id', start=first_row_idx, end=first_row_idx + group_count - 1)}",
                 debug_info["document_id"].to_numpy()[first_row_idx],
@@ -142,11 +144,6 @@ def document_debug_output_to_excel(
                 debug_info["original_text"].to_numpy()[first_row_idx],
                 merge_format,
             )
-            # worksheet.merge_range(
-            #     f"{col('original_extraction', start=first_row_idx, end=first_row_idx + group_count - 1)}",
-            #     debug_info["original_extraction"].to_numpy()[first_row_idx],
-            #     merge_format,
-            # )
             first_row_idx += group_count
 
     metrics_start_col = chr(65 + len(ordered_columns) + 2)
@@ -155,8 +152,6 @@ def document_debug_output_to_excel(
     worksheet.write_row(f"{metrics_start_col}1", ["property_id", "property_precision", "property_recall"])
     for idx, property_id in enumerate(evaluated_properties):
         worksheet.write(f"{metrics_start_col}{idx + 2}", property_id)
-        print(property_precision_formula(property_id))
-        print(property_recall_formula(property_id))
         worksheet.write_formula(f"{precision_col}{idx + 2}", property_precision_formula(property_id))
         worksheet.write_formula(f"{recall_col}{idx + 2}", property_recall_formula(property_id))
     worksheet.write(f"{metrics_start_col}{len(evaluated_properties) + 2}", "Average")
@@ -210,13 +205,16 @@ class Statistics:
         """Log the entity statistics."""
         logger.info("Entity statistics:")
         logger.info(
-            f"Ground truth has {self.num_gt_entities} in {self.num_documents} documents ({self.num_gt_entities / self.num_documents:.2f} entities per document)"
+            f"Ground truth has {self.num_gt_entities} entities in {self.num_documents} documents ({self.num_gt_entities / self.num_documents:.2f} entities per document)"
         )
         logger.info(
-            f"After filtering, {self.num_gt_entities_after_filter} target entities remain ({self.num_gt_entities_after_filter / self.num_documents:.2f} entities per document)"
+            f"After filtering, {self.num_gt_entities_after_filter} ground truth entities remain ({self.num_gt_entities_after_filter / self.num_documents:.2f} entities per document)"
         )
         logger.info(
             f"Prediction has {self.num_predicted_entities} entities ({self.num_predicted_entities / self.num_documents:.2f} entities per document)"
+        )
+        logger.info(
+            f"After filtering, {self.num_predicted_entities_after_filter} predicted entities remain ({self.num_predicted_entities_after_filter / self.num_documents:.2f} entities per document)"
         )
         logger.info("Property statistics:")
         for key, value in self.gt_property_counts.items():
@@ -258,10 +256,10 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
 
         def process_document(
             input_: tuple[int, tuple[ExtractionOutput, ExtractionOutput]],
-        ) -> tuple[MetricsAccumulator, str, pd.DataFrame, Statistics]:
+        ) -> tuple[MetricsAccumulator, str, pd.DataFrame | None, Statistics]:
             """Compute metrics for a single document."""
             idx, (pred, gt) = input_
-            self.logger.info(f"Processing document {idx + 1}")
+            self.logger.info(f"Processing document {idx + 1} with ID {gt.document.document_id}")
 
             gt_entities = [
                 entity
@@ -288,16 +286,16 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 gt_property_counts=gt_property_counts,
                 pred_property_counts=pred_property_counts,
             )
-            entity_matcher = EntityMatcher(gt_entities, pred_entities)
+            entity_matcher = EntityMatcher(gt_entities, pred_entities, self.logger)
             self.logger.info(f"Document {idx + 1}: Matching entities")
             matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)
             self.logger.info(f"Document {idx + 1}: Computing metrics")
-            metrics_computer = MetricsComputer(gt_entities, pred_entities, self.config.property_schema)
+            metrics_computer = MetricsComputer(gt_entities, pred_entities, self.config.property_schema, self.logger)
             metrics, document_debug_info = metrics_computer.compute_bipartite_metrics(
                 matched_pairs, self.config.property_score_functions
             )
             self.logger.info(f"Document {idx + 1}: Done")
-            if not document_debug_info.empty:
+            if document_debug_info is not None:
                 document_debug_info["document_id"] = gt.document.document_id
                 document_debug_info["original_text"] = gt.document.data.get("text", "")
             return metrics, gt.document.document_id, document_debug_info, stats
@@ -315,7 +313,10 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             metrics["per_document_metrics"][doc_id] = document_metrics
             metrics_accumulator.update(document_metrics_accumulator)
             if self.config.debug_output_dir:
-                document_debug_info.to_csv(self.config.debug_output_dir / f"{doc_id}_debug_info.csv", index=False)
+                if document_debug_info is None:
+                    self.logger.warning(f"No debug info for document {doc_id}, skipping")
+                    continue
+                self.logger.info(f"Saving debug info for document {doc_id}")
                 document_debug_output_to_excel(
                     document_debug_info,
                     document_metrics["property_precision"].keys(),
@@ -335,15 +336,18 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         self.logger.info(f"Metrics accumulation time: {elapsed:.2f} seconds")
         entity_and_property_stats.log_statistics(self.logger)
         if self.config.debug_output_dir:
-            debug_info_df = pd.concat(debug_info.values(), ignore_index=True)
-            debug_info_df.to_csv(self.config.debug_output_dir / "all_debug_info.csv", index=False)
-            document_debug_output_to_excel(
-                debug_info_df,
-                metrics["dataset_metrics"]["property_precision"].keys(),
-                self.config.debug_output_dir / "debug_info.xlsx",
-                merge_rows=False,
-            )
-            self.logger.info(f"Debug info saved to {self.config.debug_output_dir / 'debug_info.csv'}")
+            if len(debug_info) == 0:
+                self.logger.warning("No debug info collected, skipping saving to XLSX")
+            else:
+                self.logger.info("Saving debug info to XLSX")
+                debug_info_df = pd.concat(debug_info.values(), ignore_index=True)
+                document_debug_output_to_excel(
+                    debug_info_df,
+                    metrics["dataset_metrics"]["property_precision"].keys(),
+                    self.config.debug_output_dir / "debug_info.xlsx",
+                    merge_rows=False,
+                )
+                self.logger.info(f"Debug info saved to {self.config.debug_output_dir / 'debug_info.csv'}")
         return metrics
 
 
