@@ -34,16 +34,23 @@ class Task(ABC):
 
     __name: str
     __schema: Path
+    __data_path: Path | None
 
-    def __init__(self, name: str, schema: str):
+    def __init__(self, name: str, schema: str, data_path: Path | None = None):
         """Initialize a task."""
         self.__name = name
-        self.__schema = resolve_path(schema)
+        self.__data_path = data_path
+        self.__schema = resolve_path(schema, data_path)
 
     @property
     def name(self) -> str:
         """Return task name."""
         return self.__name
+
+    @property
+    def data_path(self) -> Path | None:
+        """Return the path to the data root."""
+        return self.__data_path
 
     @property
     @abstractmethod

@@ -43,12 +43,13 @@ class ClusteringTask(Task):
         entity_fragments: str | Path,
         schema: str,
         ground_truth_labels: str | Path | None = None,
+        data_path: Path | None = None,
     ):
         """Initialize a new clustering task."""
-        super().__init__(name, schema)
-        self.__data_entity_fragments = resolve_path(entity_fragments)
+        super().__init__(name, schema, data_path=data_path)
+        self.__data_entity_fragments = resolve_path(entity_fragments, data_path)
         if ground_truth_labels is not None:
-            self.__data_ground_truth_labels = resolve_path(ground_truth_labels)
+            self.__data_ground_truth_labels = resolve_path(ground_truth_labels, data_path)
 
     def read_items(self) -> Iterable[tuple[Entity, str | None]]:
         """

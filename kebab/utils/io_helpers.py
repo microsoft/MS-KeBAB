@@ -497,7 +497,7 @@ def _shortcut_target(lnk: Path) -> Path:
         raise RuntimeError("Resolving *.lnk files requires either 'pywin32' or 'winshell'.") from None
 
 
-def resolve_path(path: str | Path) -> Path:
+def resolve_path(path: str | Path, working_dir: Path | None = None) -> Path:
     """
     Expand "~" to user home directory and resolve all Windows shortcuts (*.lnk).
 
@@ -505,7 +505,7 @@ def resolve_path(path: str | Path) -> Path:
     preserving any tail that comes after it.
     """
     path = Path(path)
-    cur = Path()  # empty base (relative) or will grow absolute
+    cur = working_dir or Path()
 
     for part in path.parts:
         next_part = cur / part if cur != Path() else Path(part)
@@ -513,15 +513,16 @@ def resolve_path(path: str | Path) -> Path:
         # use an absolute path (if needed) to test for existence & read target
         abs_path = next_part if next_part.is_absolute() else Path.cwd() / next_part
 
-        # see if it's actually a shortcut
+        # see if it's a Windows shortcut
         if not abs_path.exists() and abs_path.suffix.lower() != ".lnk":
-            abs_r_path = abs_path.with_suffix(".lnk")
-            if abs_r_path.exists() and abs_r_path.is_file():
-                abs_path = abs_r_path
+            as_shortcut = abs_path.with_suffix(".lnk")
+            if as_shortcut.exists() and as_shortcut.is_file():
+                abs_path = as_shortcut
             else:
                 # cannot resolve this part, return the original path
                 return path
 
+        # resolve the shortcut target
         if abs_path.suffix.lower() == ".lnk" and abs_path.is_file():
             cur = _shortcut_target(abs_path)
             continue

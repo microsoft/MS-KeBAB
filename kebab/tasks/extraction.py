@@ -55,13 +55,16 @@ class ExtractionTask(Task):
         schema: str,
         ground_truth_extracted_entities: str | None = None,
         metrics_config: str | None = None,
+        data_path: Path | None = None,
     ):
         """Initialize an extraction task."""
-        super().__init__(name, schema)
-        self.__data_extracts = resolve_path(extracts)
+        super().__init__(name, schema, data_path=data_path)
+        self.__data_extracts = resolve_path(extracts, data_path)
         if ground_truth_extracted_entities is not None:
-            self.__data_ground_truth_extracted_entities = resolve_path(ground_truth_extracted_entities)
-        self.metrics_config = load_dict_from_json(resolve_path(metrics_config or self.__default_metrics_config_path))
+            self.__data_ground_truth_extracted_entities = resolve_path(ground_truth_extracted_entities, data_path)
+        self.metrics_config = load_dict_from_json(
+            resolve_path(metrics_config or self.__default_metrics_config_path, data_path)
+        )
 
     def read_items(self) -> Iterable[ExtractionOutput]:
         """
