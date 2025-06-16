@@ -9,22 +9,6 @@ The recommended way to install the code is to clone the repository and install t
 pip install -e .[all]
 ```
 
-The recommended way to have the data available on a Windows dev machine:
-1. Navigate to the "Documents\Benchmark" page in the Project Alexandria SharePoint.
-2. Click "Add shortcut to OneDrive" to create a shortcut to this directory in your own OneDrive.
-3. In your local OneDrive folder (usually `%USERPROFILE%/OneDrive - Microsoft`), assuming it is synced, you will find the `Benchmark` folder.
-4. Create a shortcut to the `Benchmark` folder and place it in the root of this repository.
-
-You can run `test_benchmark_tasks_config` manually to verify that the data is available in the expected location.
-
-The recommended way to have the data available on a Linux VM:
-1. First, have the data available locally on your Windows machine as described above.
-2. On the VM, create a directory called `Benchmark` in the root of this repository.
-3. Use `rsync` to copy the data from your Windows machine to the VM:
-   ```bash
-   rsync -rz -e ssh --ignore-existing --progress --stats ./Benchmark/ <vm>:/path/to/your/repo/Benchmark/
-   ```
-
 ## Overview
 
 Our goal is to enable benchmarking of:
