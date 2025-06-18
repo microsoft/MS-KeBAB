@@ -22,7 +22,7 @@
       "schema": "./kebab/configs/extraction/default_property_schema.json"
     }
   },
-  "Linking-TREx-Train": {
+  "Linking-MAVE-TBD": {
     "task": "Linking",
     "data": {
       "entity_fragment_pairs": "https://some.public/download/link",
@@ -30,42 +30,57 @@
       "ground_truth_boolean": "https://some.public/download/link"
     }
   },
-  "Linking-TREx-Test": {
+  "Linking-REBEL-Train": {
     "task": "Linking",
     "data": {
-      "entity_fragment_pairs": "https://some.public/download/link",
-      "schema": "https://some.public/download/link",
-      "ground_truth_boolean": "https://some.public/download/link"
+      "schema": "./REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entity_fragment_pairs": "./REBEL/Linking Merged Train Dataset/rebel_linking_1000000_dataset.jsonl",
+      "ground_truth_boolean": "./REBEL/Linking Merged Train Dataset/rebel_linking_1000000_ground_truth.jsonl"
     }
   },
-  "Linking-MAVE": {
+  "Linking-REBEL-Validation": {
     "task": "Linking",
     "data": {
-      "entity_fragment_pairs": "https://some.public/download/link",
-      "schema": "https://some.public/download/link",
-      "ground_truth_boolean": "https://some.public/download/link"
+      "schema": "./REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entity_fragment_pairs": "./REBEL/Linking Merged Validation Dataset/rebel_linking_1000_dataset.jsonl",
+      "ground_truth_boolean": "./REBEL/Linking Merged Validation Dataset/rebel_linking_1000_ground_truth.jsonl"
     }
   },
-  "Linking-Heldout": {
+  "Linking-REBEL-Test": {
     "task": "Linking",
     "data": {
-      "entity_fragment_pairs": "https://some.public/download/link",
-      "schema": "https://some.public/download/link"
+      "schema": "./REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entity_fragment_pairs": "./REBEL/Linking Merged Test Dataset/rebel_linking_1000_dataset.jsonl",
+      "ground_truth_boolean": "./REBEL/Linking Merged Test Dataset/rebel_linking_1000_ground_truth.jsonl"
     }
   },
-  "Entity-Generation-REBEL": {
+  "EntityGeneration-REBEL-from-Linking-Train": {
     "task": "EntityGeneration",
     "data": {
-      "entities": "https://some.public/download/link",
-      "schema": "https://some.public/download/link"
+      "schema": "./REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entities": "./REBEL/EntityGeneration from Linking Merged Train/rebel_entity_generation_from_linking_dataset.jsonl"
     }
   },
-  "Linking-REBEL-Sampled": {
-    "task": "Linking",
+  "EntityGeneration-REBEL-from-Linking-Validation": {
+    "task": "EntityGeneration",
     "data": {
-      "schema": "~/code/MS-KeBAB/kebab/configs/kb_schemas/rebel_human_schema.json",
-      "entity_fragment_pairs": "~/data/rebel_sampled/sampled_rebel_linking_dataset.jsonl",
-      "ground_truth_boolean": "~/data/rebel_sampled/sampled_rebel_linking_ground_truth.jsonl"
+      "schema": "./REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entities": "./REBEL/EntityGeneration from Linking Merged Validation/rebel_entity_generation_from_linking_dataset.jsonl"
+    }
+  },
+  "EntityGeneration-REBEL-from-Linking-Test": {
+    "task": "EntityGeneration",
+    "data": {
+      "schema": "./REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entities": "./REBEL/EntityGeneration from Linking Merged Test/rebel_entity_generation_from_linking_dataset.jsonl"
+    }
+  },
+  "Clustering-REBEL-from-Linking-Test": {
+    "task": "Clustering",
+    "data": {
+      "schema": "./REBEL/kb_schemas/rebel_linking_properties_schema.json",
+      "entity_fragments": "./REBEL/Linking Merged Test Dataset/clustering/rebel_clustering_1000_dataset.jsonl",
+      "ground_truth_labels": "./REBEL/Linking Merged Test Dataset/clustering/rebel_clustering_1000_ground_truth.jsonl"
     }
   }
 }

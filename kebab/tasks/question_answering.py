@@ -40,9 +40,10 @@ class QuestionAnsweringTaskBase(Task):
         questions: str,
         ground_truth_answers: str,
         schema: str,
+        data_path: Path | None = None,
     ):
         """Initialize a question-answering task."""
-        super().__init__(name, schema=schema)
+        super().__init__(name, schema=schema, data_path=data_path)
         self.__data_questions = Path(questions)
         self.__data_ground_truth_answers = Path(ground_truth_answers)
 
@@ -122,10 +123,15 @@ class QuestionAnsweringUsingDocumentsTask(QuestionAnsweringTaskBase):
         documents: str,
         questions: str,
         ground_truth_answers: str,
+        data_path: Path | None = None,
     ):
         """Initialize an end-to-end question-answering completion task."""
         super().__init__(
-            name, questions=questions, ground_truth_answers=ground_truth_answers, schema=""
+            name,
+            questions=questions,
+            ground_truth_answers=ground_truth_answers,
+            schema="",
+            data_path=data_path,
         )  # kb schema is not used in this task
         self.__data_documents = Path(documents)
 
@@ -166,9 +172,12 @@ class QuestionAnsweringUsingKBTask(QuestionAnsweringTaskBase):
         questions: str,
         ground_truth_answers: str,
         schema: str,
+        data_path: Path | None = None,
     ):
         """Initialize a kb-augmented question-answering task."""
-        super().__init__(name, questions=questions, ground_truth_answers=ground_truth_answers, schema=schema)
+        super().__init__(
+            name, questions=questions, ground_truth_answers=ground_truth_answers, schema=schema, data_path=data_path
+        )
         self.__data_kb = Path(kb)
 
     def read_kb(self) -> Iterable[Entity]:

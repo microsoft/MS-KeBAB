@@ -468,3 +468,68 @@ def compare_files_ignore_linebreaks(file_1_path: Path, file_2_path: Path) -> boo
         lines2 = f2.read().splitlines()
 
     return lines1 == lines2
+
+
+def _shortcut_target(lnk: Path) -> Path:
+    """
+    Return the target path stored in a Windows *.lnk file.
+
+    Requires either `pywin32` (win32com) **or** `winshell`.
+    Raises RuntimeError if neither is available.
+    """
+    # try pywin32 (preferred)
+    try:
+        import win32com.client  # type: ignore
+
+        shell = win32com.client.Dispatch("WScript.Shell")
+        target = shell.CreateShortcut(str(lnk)).TargetPath
+        return Path(target)
+    except ImportError:
+        pass
+
+    # fall back to winshell
+    try:
+        import winshell  # type: ignore
+
+        with winshell.shortcut(str(lnk)) as sc:
+            return Path(sc.path)
+    except ImportError:
+        raise RuntimeError("Resolving *.lnk files requires either 'pywin32' or 'winshell'.") from None
+
+
+def resolve_path(path: str | Path, working_dir: Path | None = None) -> Path:
+    """
+    Expand "~" to user home directory and resolve all Windows shortcuts (*.lnk).
+
+    Replace every '*.lnk' segment that occurs in `path` with the shortcut's real target,
+    preserving any tail that comes after it.
+    """
+    if working_dir:
+        working_dir = resolve_path(working_dir)
+
+    path = Path(path)
+    cur = working_dir or Path()
+
+    for part in path.parts:
+        next_part = cur / part if cur != Path() else Path(part)
+
+        # use an absolute path (if needed) to test for existence & read target
+        abs_path = next_part if next_part.is_absolute() else Path.cwd() / next_part
+
+        # see if it's a Windows shortcut
+        if not abs_path.exists() and abs_path.suffix.lower() != ".lnk":
+            as_shortcut = abs_path.with_suffix(".lnk")
+            if as_shortcut.exists() and as_shortcut.is_file():
+                abs_path = as_shortcut
+            else:
+                # cannot resolve this part, return the original path
+                return path
+
+        # resolve the shortcut target
+        if abs_path.suffix.lower() == ".lnk" and abs_path.is_file():
+            cur = _shortcut_target(abs_path)
+            continue
+
+        cur = next_part
+
+    return cur

@@ -41,12 +41,14 @@ class Benchmark:
         """Return copy of task list."""
         return list(self.__tasks_by_name.values())
 
-    def __init__(self, path: Path):
+    def __init__(self, config_path: Path, data_path: Path | None = None):
         """Initialize entry point."""
+        self.data_path = data_path or Path.cwd()
+
         self.__tasks_by_type = {}
         self.__tasks_by_name = {}
 
-        with open(path) as f:
+        with open(config_path) as f:
             task_config = json.load(f)
 
         for task_instance_name, task_instance_config in task_config.items():
@@ -69,7 +71,8 @@ class Benchmark:
                     task_class = QuestionAnsweringUsingDocumentsTask
                 case TaskType.QuestionAnsweringUsingKB:
                     task_class = QuestionAnsweringUsingKBTask
-            task = task_class(task_instance_name, **task_instance_config["data"])
+
+            task = task_class(task_instance_name, **task_instance_config["data"], data_path=data_path)
             self.__tasks_by_name[task_instance_name] = task
             if task_type not in self.__tasks_by_type:
                 self.__tasks_by_type[task_type] = [task]

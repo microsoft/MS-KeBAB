@@ -9,10 +9,10 @@
     ],
     "properties": [
         {
-            "property_id": "names",
+            "property_id": "name",
             "data_type_id": "text",
             "description": "The name of the person.",
-            "display_name": "names"
+            "display_name": "name"
         },
         {
             "property_id": "date_of_birth",

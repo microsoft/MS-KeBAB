@@ -15,7 +15,13 @@ from pathlib import Path
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.utils.io_helpers import DocumentJsonlReader, EntityJsonlReader, ItemJsonlReader, save_dict_to_json
+from kebab.utils.io_helpers import (
+    DocumentJsonlReader,
+    EntityJsonlReader,
+    ItemJsonlReader,
+    resolve_path,
+    save_dict_to_json,
+)
 
 
 class TextCompletionTaskBase(Task):
@@ -38,10 +44,11 @@ class TextCompletionTaskBase(Task):
         name: str,
         documents: str,
         schema: str,
+        data_path: Path | None = None,
     ):
         """Initialize a text completion task."""
-        super().__init__(name, schema=schema)
-        self.__data_documents = Path(documents)
+        super().__init__(name, schema=schema, data_path=data_path)
+        self.__data_documents = resolve_path(documents, data_path)
 
     def read_items(self) -> Iterable[Document]:
         """
@@ -150,9 +157,12 @@ class TextCompletionUsingDocumentsTask(TextCompletionTaskBase):
         self,
         name: str,
         documents: str,
+        data_path: Path | None = None,
     ):
         """Initialize an end-to-end text completion task."""
-        super().__init__(name, documents=documents, schema="")  # kb schema is not used in this task
+        super().__init__(
+            name, documents=documents, schema="", data_path=data_path
+        )  # kb schema is not used in this task
 
 
 class TextCompletionUsingKBTask(TextCompletionTaskBase):
@@ -176,10 +186,11 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
         documents: str,
         kb: str,
         schema: str,
+        data_path: Path | None = None,
     ):
         """Initialize a kb-augmented text completion task."""
-        super().__init__(name, documents=documents, schema=schema)
-        self.__data_kb = Path(kb)
+        super().__init__(name, documents=documents, schema=schema, data_path=data_path)
+        self.__data_kb = resolve_path(kb, data_path)
 
     def read_kb(self) -> Iterable[Entity]:
         """

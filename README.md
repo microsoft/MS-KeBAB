@@ -9,7 +9,6 @@ The recommended way to install the code is to clone the repository and install t
 pip install -e .[all]
 ```
 
-
 ## Overview
 
 Our goal is to enable benchmarking of:
