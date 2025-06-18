@@ -504,6 +504,9 @@ def resolve_path(path: str | Path, working_dir: Path | None = None) -> Path:
     Replace every '*.lnk' segment that occurs in `path` with the shortcut's real target,
     preserving any tail that comes after it.
     """
+    if working_dir:
+        working_dir = resolve_path(working_dir)
+
     path = Path(path)
     cur = working_dir or Path()
 
