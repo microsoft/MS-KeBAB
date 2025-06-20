@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-import filecmp
 import math
 import shutil
 from collections.abc import Generator
@@ -10,6 +9,7 @@ from typing import Any
 
 import pytest
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
+from kebab.utils.io_helpers import compare_files_ignore_linebreaks
 
 
 @pytest.fixture
@@ -63,9 +63,9 @@ def test_text_completion_read_items_and_generate_queries(text_completion_task) -
         {"text_with_mask": "The capital of China <mask>", "target_content": "is", "document_id": "doc_1"},
         {"text_with_mask": "The capital of China is <mask>", "target_content": "Beijing", "document_id": "doc_1"},
     ]
-    assert filecmp.cmp(
-        str(predictions_file_path),
-        str(predictions_output_file_path),
+    assert compare_files_ignore_linebreaks(
+        predictions_file_path,
+        predictions_output_file_path,
     )
     assert metrics["mean_log_prob"] == -0.1
     assert metrics["variance_log_prob"] == 0.0
