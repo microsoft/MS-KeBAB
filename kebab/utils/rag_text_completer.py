@@ -12,7 +12,7 @@ from typing import Any, ClassVar
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from kebab.tasks.text_completion import TextCompletionTask
+from kebab.tasks.text_completion import TextCompletionTaskBase
 
 
 class BaseRAGTextCompleter(ABC):
@@ -220,11 +220,11 @@ Below is the context retrieved to help you make a better prediction. It is marke
 {augmented_context}
 <End Context>
 
-Now, complete the following text by predicting the missing word, represented by "{TextCompletionTask.MASK}". The text is marked between <Begin Text> and <End Text>:
+Now, complete the following text by predicting the missing word, represented by "{TextCompletionTaskBase.MASK}". The text is marked between <Begin Text> and <End Text>:
 <Begin Text>
 {text_with_mask} <the rest of the text is not visible to you>
 <End Text>
-What is the **single alphanumeric word** that best completes the masked position "{TextCompletionTask.MASK}"? Please respond strictly with **only** the word after "Answer: ".
+What is the **single alphanumeric word** that best completes the masked position "{TextCompletionTaskBase.MASK}"? Please respond strictly with **only** the word after "Answer: ".
 
 Answer: """
 

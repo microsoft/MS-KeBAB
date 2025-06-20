@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from kebab.tasks.text_completion import TextCompletionTask
+from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
 from kebab.utils.io_helpers import ItemJsonlReader
 from kebab.utils.rag_text_completer import BaseRAGTextCompleter
 
@@ -25,9 +25,9 @@ class MockRAGTextCompleter(BaseRAGTextCompleter):
 
 
 @pytest.fixture
-def text_completion_task() -> TextCompletionTask:
+def text_completion_task() -> TextCompletionUsingDocumentsTask:
     documents_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "documents.jsonl"
-    return TextCompletionTask(
+    return TextCompletionUsingDocumentsTask(
         "TextCompletion",
         str(documents_file_path),
     )

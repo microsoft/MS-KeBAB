@@ -15,14 +15,14 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
-from kebab.tasks.text_completion import TextCompletionTask
+from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
 from kebab.utils.rag_text_completer import BaseRAGTextCompleter, PhiRAGTextCompleter
 
 
 if __name__ == "__main__":
     # Create a text completion task instance.
     documents_file_path = Path(__file__).parents[2] / "tests" / "data" / "text_completion" / "documents.jsonl"
-    task_instance = TextCompletionTask(
+    task_instance = TextCompletionUsingDocumentsTask(
         "TextCompletion",
         str(documents_file_path),
     )
