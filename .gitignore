@@ -2,7 +2,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/Python.gitignore
 
 # Custom
-Datasets.lnk
+output/
 
 # logs
 log/
