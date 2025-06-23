@@ -6,11 +6,10 @@
 import random
 from collections import defaultdict
 from pathlib import Path
-from typing import Literal, cast
 
 import numpy as np
 import pytest
-from kebab.utils.dataset.rebel.rebel_dataset_builder import RebelDatasetBuilder
+from kebab.utils.dataset.rebel.rebel_dataset_builder import MergeDistributionMode, RebelDatasetBuilder
 from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
 
 
@@ -203,8 +202,8 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     assert "merge_count" in merged.metadata
     assert 1 <= merged.metadata["merge_count"] <= 3
 
-    # original names should be contained in the merged fragment
-    assert set(fragments[0].names).issubset(set(merged.names))
+    # merged fragment names should come from all fragments
+    assert set(merged.names).issubset({"A", "B", "C"})
 
     # when only one fragment exists for the entity, no merge occurs
     single = RebelDatasetBuilder.generate_merged_fragment(3, fragments, entity_idx, max_fragments=3)
@@ -212,8 +211,8 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     assert "merge_count" not in single.metadata
 
 
-@pytest.mark.parametrize("dist", ["zipf", "triangular"])
-def test_generate_merged_fragment_stats(dist: str) -> None:
+@pytest.mark.parametrize("dist", [MergeDistributionMode.ZIPF, MergeDistributionMode.TRIANGULAR])
+def test_generate_merged_fragment_stats(dist: MergeDistributionMode) -> None:
     """Test generate_merged_fragment - that the empirical distribution is close to the theoretical one."""
 
     def make_entity(num_frags: int = 10) -> tuple[list[ResolvedWikidataEntity], dict[str, list[int]]]:
@@ -247,17 +246,19 @@ def test_generate_merged_fragment_stats(dist: str) -> None:
 
     for _ in range(n_samples):
         merged = RebelDatasetBuilder.generate_merged_fragment(
-            0, fragments, mapping, max_fragments=n_frags, distribution=cast(Literal["zipf", "triangular"], dist)
+            0, fragments, mapping, max_fragments=n_frags, distribution=dist
         )
 
         counts[merged.metadata["merge_count"] - 1] += 1
 
     empirical = counts / counts.sum()
 
-    if dist == "zipf":
+    if dist == MergeDistributionMode.ZIPF:
         probs = 1 / np.arange(1, n_frags + 1, dtype=np.float32)
-    else:
+    elif dist == MergeDistributionMode.TRIANGULAR:
         probs = np.arange(n_frags, 0, -1, dtype=np.float32)
+    else:
+        raise ValueError(f"Unsupported distribution mode: {dist}")
 
     probs /= probs.sum()
 

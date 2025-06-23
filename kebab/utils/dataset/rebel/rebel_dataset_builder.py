@@ -49,11 +49,16 @@ import pathlib
 import random
 from collections import defaultdict
 from collections.abc import Iterable
+from enum import Enum
 from time import perf_counter as pc
-from typing import Literal
 
 import numpy as np
 from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
+
+
+class MergeDistributionMode(Enum):
+    ZIPF = "zipf"
+    TRIANGULAR = "triangular"
 
 
 class RebelDatasetBuilder:
@@ -71,7 +76,8 @@ class RebelDatasetBuilder:
         fragments_path: pathlib.Path,
         output_dir: pathlib.Path,
         max_count: int | None = None,
-        max_merge_fragments: int = 1,
+        max_merge_fragments: int = 10,
+        merge_distribution: MergeDistributionMode | None = None,
     ):
         """
         Initialize the dataset creator.
@@ -91,6 +97,7 @@ class RebelDatasetBuilder:
 
         self.max_count: int | None = max_count
         self.max_merge_fragments: int = max_merge_fragments
+        self.merge_distribution: MergeDistributionMode = merge_distribution or MergeDistributionMode.ZIPF
 
         self.clustering_dataset_output_path = self.output_dir / self.CLUSTERING_DATASET_FILENAME
         self.clustering_ground_truth_output_path = self.output_dir / self.CLUSTERING_GROUND_TRUTH_FILENAME
@@ -342,8 +349,20 @@ class RebelDatasetBuilder:
             open(self.linking_ground_truth_output_path, mode="w", encoding="utf-8") as f_gt,
         ):
             for pair in pairs:
-                left_fragment = self.generate_merged_fragment(pair[0], fragments, entity_id_to_fragment_indices)
-                right_fragment = self.generate_merged_fragment(pair[1], fragments, entity_id_to_fragment_indices)
+                left_fragment = self.generate_merged_fragment(
+                    pair[0],
+                    fragments,
+                    entity_id_to_fragment_indices,
+                    max_fragments=self.max_merge_fragments,
+                    distribution=self.merge_distribution,
+                )
+                right_fragment = self.generate_merged_fragment(
+                    pair[1],
+                    fragments,
+                    entity_id_to_fragment_indices,
+                    max_fragments=self.max_merge_fragments,
+                    distribution=self.merge_distribution,
+                )
 
                 # avoid writing duplicates
                 prop_str = tuple(sorted((left_fragment.property_values_str(), right_fragment.property_values_str())))
@@ -395,7 +414,7 @@ class RebelDatasetBuilder:
         fragments: list[ResolvedWikidataEntity],
         entity_id_to_fragment_indices: dict[str, list[int]],
         max_fragments: int = 10,
-        distribution: Literal["zipf", "triangular"] = "zipf",
+        distribution: MergeDistributionMode = MergeDistributionMode.ZIPF,
     ) -> ResolvedWikidataEntity:
         """
         Generate a merged fragment by merging up to `max_fragments` from the entity of the given fragment index.
@@ -418,11 +437,11 @@ class RebelDatasetBuilder:
 
         n = min(len(fragments), max_fragments)
 
-        if distribution == "zipf":
+        if distribution == MergeDistributionMode.ZIPF:
             p = np.arange(1, n + 1, dtype=np.float32)
-            p = 1 / p  # p will be proportional to 1, 1/2, 1/3, ..., 1/n
-        elif distribution == "triangular":
-            p = np.arange(n, 0, -1, dtype=np.float32)  # p will be proportional to n, n-1, n-2, ..., 1
+            p = 1 / p
+        elif distribution == MergeDistributionMode.TRIANGULAR:
+            p = np.arange(n, 0, -1, dtype=np.float32)
         else:
             raise ValueError(f"Unknown distribution: {distribution}")
 
