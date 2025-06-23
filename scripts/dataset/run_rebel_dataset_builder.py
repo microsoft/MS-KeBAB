@@ -20,7 +20,8 @@ from kebab.utils.dataset.rebel.rebel_dataset_builder import MergeDistributionMod
     / "Benchmark"
     / "Datasets"
     / "REBEL"
-    / "Fragments Resolved"
+    / "Fragments"
+    / "Resolved"
     # / "sample"
     / "rebel_entity_fragments.jsonl",
     help="Path to the file containing REBEL fragments.",
@@ -34,7 +35,7 @@ from kebab.utils.dataset.rebel.rebel_dataset_builder import MergeDistributionMod
 @click.option(
     "--max-count",
     type=int,
-    default=2_000_000,
+    default=5_000_000,
     help="The maximum number of pairs to include in the dataset. A negative value is ignored.",
 )
 @click.option(

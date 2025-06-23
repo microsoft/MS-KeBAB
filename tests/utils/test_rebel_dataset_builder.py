@@ -190,7 +190,7 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     """Test generate_merged_fragment method (sanity check)."""
     fragments, entity_idx = sample_fragments_for_merge
 
-    np.random.seed(0)
+    np.random.seed(0)  # noqa: NPY002
     random.seed(0)
     merged = RebelDatasetBuilder.generate_merged_fragment(0, fragments, entity_idx, max_fragments=3)
 
@@ -238,7 +238,7 @@ def test_generate_merged_fragment_stats(dist: MergeDistributionMode) -> None:
     n_samples = 20_000
     tol = 0.025
 
-    np.random.seed(0)
+    np.random.seed(0)  # noqa: NPY002
     random.seed(0)
 
     fragments, mapping = make_entity(n_frags)

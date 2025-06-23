@@ -57,6 +57,8 @@ from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
 
 
 class MergeDistributionMode(Enum):
+    """Enumeration of merge distribution modes for fragment merging."""
+
     ZIPF = "zipf"
     TRIANGULAR = "triangular"
 
@@ -87,6 +89,7 @@ class RebelDatasetBuilder:
             output_dir: Directory where output datasets will be written.
             max_count: Maximum number of pairs to sample for the linking dataset. If None, no limit.
             max_merge_fragments: Maximum number of fragments to merge when generating merged fragments for the datasets.
+            merge_distribution: Distribution mode for sampling the number of fragments to merge (ZIPF or TRIANGULAR).
         """
         self._logger: logging.Logger = logging.getLogger(__name__)
 
@@ -95,15 +98,19 @@ class RebelDatasetBuilder:
         self.output_dir: pathlib.Path = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+        self.clustering_output_dir: pathlib.Path = self.output_dir / "clustering"
+        self.clustering_output_dir.mkdir(parents=True, exist_ok=True)
+
         self.max_count: int | None = max_count
         self.max_merge_fragments: int = max_merge_fragments
         self.merge_distribution: MergeDistributionMode = merge_distribution or MergeDistributionMode.ZIPF
 
-        self.clustering_dataset_output_path = self.output_dir / self.CLUSTERING_DATASET_FILENAME
-        self.clustering_ground_truth_output_path = self.output_dir / self.CLUSTERING_GROUND_TRUTH_FILENAME
         self.linking_dataset_output_path = self.output_dir / self.LINKING_DATASET_FILENAME
         self.linking_ground_truth_output_path = self.output_dir / self.LINKING_GROUND_TRUTH_FILENAME
         self.fragment_to_entity_map_output_path = self.output_dir / self.FRAGMENT_TO_ENTITY_MAP_FILENAME
+
+        self.clustering_dataset_output_path = self.clustering_output_dir / self.CLUSTERING_DATASET_FILENAME
+        self.clustering_ground_truth_output_path = self.clustering_output_dir / self.CLUSTERING_GROUND_TRUTH_FILENAME
 
     def run(self) -> None:
         """Run the dataset building pipeline."""
@@ -446,7 +453,7 @@ class RebelDatasetBuilder:
             raise ValueError(f"Unknown distribution: {distribution}")
 
         p /= p.sum()
-        r = np.random.choice(n, p=p) + 1
+        r = np.random.choice(n, p=p) + 1  # noqa: NPY002
         indices = random.sample(range(n), r)
         selected_fragments = [fragments[i] for i in indices]
 
