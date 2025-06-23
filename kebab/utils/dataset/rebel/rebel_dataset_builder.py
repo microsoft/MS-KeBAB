@@ -46,9 +46,11 @@ from __future__ import annotations
 import json
 import logging
 import pathlib
+import random
 from collections import defaultdict
 from collections.abc import Iterable
 from time import perf_counter as pc
+from typing import Literal
 
 import numpy as np
 from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
@@ -69,8 +71,17 @@ class RebelDatasetBuilder:
         fragments_path: pathlib.Path,
         output_dir: pathlib.Path,
         max_count: int | None = None,
+        max_merge_fragments: int = 1,
     ):
-        """Initialize the dataset creator."""
+        r"""
+        Initialize the dataset creator.
+
+        Args:
+            fragments_path: Path to the input REBEL fragments file.
+            output_dir: Directory where output datasets will be written.
+            max_count: Maximum number of pairs to sample for the linking dataset. If None, no limit.
+            max_merge_fragments: Maximum number of fragments to merge when generating merged fragments for the datasets.
+        """
         self._logger: logging.Logger = logging.getLogger(__name__)
 
         self.fragments_path: pathlib.Path = fragments_path
@@ -79,6 +90,7 @@ class RebelDatasetBuilder:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.max_count: int | None = max_count
+        self.max_merge_fragments: int = max_merge_fragments
 
         self.clustering_dataset_output_path = self.output_dir / self.CLUSTERING_DATASET_FILENAME
         self.clustering_ground_truth_output_path = self.output_dir / self.CLUSTERING_GROUND_TRUTH_FILENAME
@@ -89,7 +101,12 @@ class RebelDatasetBuilder:
     def run(self) -> None:
         """Run the dataset building pipeline."""
         # load the input fragments
-        fragments = self.load_fragments()
+        fragments: list[ResolvedWikidataEntity] = self.load_fragments()
+
+        # construct fragment index to fragment-indices-of-the-same-entity map
+        entity_id_to_fragment_indices = defaultdict(list)
+        for i, fragment in enumerate(fragments):
+            entity_id_to_fragment_indices[fragment.entity_id].append(i)
 
         # get the confusing entities map
         conf_entities_map = self.get_confusing_entities_map(fragments)
@@ -98,7 +115,7 @@ class RebelDatasetBuilder:
         pairs = self.sample_pairs(fragments, conf_entities_map, max_count=self.max_count)
 
         # execute and write the dataset
-        self.write_datasets(fragments, pairs)
+        self.write_datasets(fragments, pairs, entity_id_to_fragment_indices)
 
     def load_fragments(self, fragments_path: pathlib.Path | None = None) -> list[ResolvedWikidataEntity]:
         """Load REBEL entity fragments from the file."""
@@ -189,7 +206,7 @@ class RebelDatasetBuilder:
         # we'll keep base collections (fragments, entity_ids) as lists, and maintain index->array(indices) dictionaries
         entity_ids = list(confusing_entities_map.keys())
 
-        # maps entity id to entity index in the flat list
+        # maps entity id (string) to entity index in the flat list
         entity_id_to_ent_index = {entity_id: i for i, entity_id in enumerate(entity_ids)}
 
         # maps fragment index to its entity index
@@ -302,9 +319,14 @@ class RebelDatasetBuilder:
             f"Final acceptance rate: {acc_rate.avg:.2f}, speed = {len(seen_pairs) / (pc() - start):,.2f} pairs/second"
         )
 
-    def write_datasets(self, fragments: list[ResolvedWikidataEntity], pairs: Iterable[tuple[int, int]]) -> None:
+    def write_datasets(
+        self,
+        fragments: list[ResolvedWikidataEntity],
+        pairs: Iterable[tuple[int, int]],
+        entity_id_to_fragment_indices: dict[str, list[int]],
+    ) -> None:
         """Write the pairwise linking and clustering datasets."""
-        # write the fragment to entity map as tuples
+        # write the fragment id to entity id map (as tuples)
         fragment_to_entity_map = {fragment.metadata["fragment_id"]: fragment.entity_id for fragment in fragments}
         with open(self.fragment_to_entity_map_output_path, mode="w", encoding="utf-8") as f:
             for fragment_id, entity_id in fragment_to_entity_map.items():
@@ -313,14 +335,26 @@ class RebelDatasetBuilder:
         # write the pairwise linking dataset
         entity_ids = set()
         count = 0
+        seen_prop_strings = set()
+
         with (
             open(self.linking_dataset_output_path, mode="w", encoding="utf-8") as f_ds,
             open(self.linking_ground_truth_output_path, mode="w", encoding="utf-8") as f_gt,
         ):
             for pair in pairs:
+                left_fragment = self.generate_merged_fragment(pair[0], fragments, entity_id_to_fragment_indices)
+                right_fragment = self.generate_merged_fragment(pair[1], fragments, entity_id_to_fragment_indices)
+
+                # avoid writing duplicates
+                prop_str = tuple(sorted((left_fragment.property_values_str(), right_fragment.property_values_str())))
+                if prop_str in seen_prop_strings:
+                    continue
+
+                seen_prop_strings.add(prop_str)
+
                 record = (
-                    fragments[pair[0]].without_entity_id().to_dict(minimal_repr=True),
-                    fragments[pair[1]].without_entity_id().to_dict(minimal_repr=True),
+                    left_fragment.without_entity_id().to_dict(minimal_repr=True),
+                    right_fragment.without_entity_id().to_dict(minimal_repr=True),
                 )
                 f_ds.write(json.dumps(record) + "\n")
 
@@ -353,6 +387,56 @@ class RebelDatasetBuilder:
         logging.info(
             f"Wrote {count:,} fragments from {len(entity_ids):,} entities to {self.clustering_dataset_output_path}"
         )
+
+    @classmethod
+    def generate_merged_fragment(
+        cls,
+        fragment: int,
+        fragments: list[ResolvedWikidataEntity],
+        entity_id_to_fragment_indices: dict[str, list[int]],
+        max_fragments: int = 10,
+        distribution: Literal["zipf", "triangular"] = "zipf",
+    ) -> ResolvedWikidataEntity:
+        """
+        Generate a merged fragment by merging up to `max_fragments` from the entity of the given fragment index.
+
+        Args:
+            fragment: Index of the base fragment to merge.
+            fragments: List of all fragments.
+            entity_id_to_fragment_indices: Mapping from entity IDs to their fragment indices.
+            max_fragments: Maximum number of fragments to include in the merge.
+            distribution: Probability distribution to sample merge count (`zipf` or `triangular`).
+
+        Returns:
+            A merged ResolvedWikidataEntity preserving original metadata.
+        """
+        original_fragment = fragments[fragment]
+        fragments = [fragments[i] for i in entity_id_to_fragment_indices[fragments[fragment].entity_id]]
+
+        if len(fragments) == 1:
+            return original_fragment
+
+        n = min(len(fragments), max_fragments)
+
+        if distribution == "zipf":
+            p = np.arange(1, n + 1, dtype=np.float32)
+            p = 1 / p  # p will be proportional to 1, 1/2, 1/3, ..., 1/n
+        elif distribution == "triangular":
+            p = np.arange(n, 0, -1, dtype=np.float32)  # p will be proportional to n, n-1, n-2, ..., 1
+        else:
+            raise ValueError(f"Unknown distribution: {distribution}")
+
+        p /= p.sum()
+        r = np.random.choice(n, p=p) + 1
+        indices = random.sample(range(n), r)
+        selected_fragments = [fragments[i] for i in indices]
+
+        merged_fragment = ResolvedWikidataEntity.merge(selected_fragments)
+        merged_fragment.metadata["fragment_id"] = original_fragment.metadata["fragment_id"]
+        merged_fragment.metadata["type"] = original_fragment.metadata["type"]
+        merged_fragment.metadata["merge_count"] = r
+
+        return merged_fragment
 
 
 class _RandomSet:
