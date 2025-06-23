@@ -73,7 +73,7 @@ class RebelDatasetBuilder:
         max_count: int | None = None,
         max_merge_fragments: int = 1,
     ):
-        r"""
+        """
         Initialize the dataset creator.
 
         Args:
