@@ -120,7 +120,7 @@ class LinkingTask(Task):
         pred_labels = [p > threshold for p in preds]
         baseline_labels = [p > threshold for p in baseline_preds] if baseline_preds else []
 
-        cm, log_prob = self._confusion_matrix(list(gt_labels), pred_labels, preds, threshold)
+        cm, log_prob = self._confusion_matrix(list(gt_labels), pred_labels, preds)
         metrics = {"log_prob": log_prob, **self._extra_metrics(cm)}
 
         # build detailed records
@@ -153,9 +153,7 @@ class LinkingTask(Task):
         if len(lengths) > 1:
             raise ValueError("Input streams have mismatched lengths.")
 
-    def _confusion_matrix(
-        self, gt: list[bool], preds: list[bool], log_odds: list[float], threshold: float
-    ) -> tuple[_ConfMatrix, float]:
+    def _confusion_matrix(self, gt: list[bool], preds: list[bool], log_odds: list[float]) -> tuple[_ConfMatrix, float]:
         """Compute confusion matrix and log-probability."""
         cm = _ConfMatrix()
         log_prob = 0.0
@@ -186,11 +184,14 @@ class LinkingTask(Task):
             false_negative=cm.fn,
             total=cm.total,
         )
+
         if precision is not None:
             metrics["precision"] = precision
             metrics["ppv"] = ppv
+
         if recall is not None:
             metrics["recall"] = recall
+
         if npv is not None:
             metrics["npv"] = npv
 
