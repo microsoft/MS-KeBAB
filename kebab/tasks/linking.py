@@ -89,8 +89,7 @@ class LinkingTask(Task):
         self,
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
-        threshold: float = 0,
-        baseline_model_output: Path | None = None,
+        output_dir: Path | None = None,
         logger: Logger | None = None,
     ) -> dict[str, float]:
         """
@@ -99,8 +98,7 @@ class LinkingTask(Task):
         Args:
             output_to_evaluate: Path to model output predictions.
             eval_result_path: Optional path to save evaluation metrics as JSON.
-            threshold: Threshold to convert predictions to boolean labels.
-            baseline_model_output: Optional path to baseline model predictions.
+            output_dir: Optional directory for saving metrics and evaluation outputs.
             logger: Optional logger for logging evaluation summaries.
 
         Returns:
@@ -110,15 +108,15 @@ class LinkingTask(Task):
             raise ValueError("Ground truth data is required for evaluation.")
 
         preds = self._load_predictions(output_to_evaluate)
-        baseline_preds = self._load_predictions(baseline_model_output) if baseline_model_output else []
-
         pairs, gt_labels = zip(*self.read_items(), strict=False)
         self._validate_lengths(preds, gt_labels)
-        if baseline_preds:
-            self._validate_lengths(preds, baseline_preds)
 
+        output_dir = output_dir or Path.cwd() / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # TODO(pmyshkov): this will be determined by calibration in the future
+        threshold = 0.0
         pred_labels = [p > threshold for p in preds]
-        baseline_labels = [p > threshold for p in baseline_preds] if baseline_preds else []
 
         cm, log_prob = self._confusion_matrix(list(gt_labels), pred_labels, preds)
         metrics = {"log_prob": log_prob, **self._extra_metrics(cm)}
@@ -130,11 +128,9 @@ class LinkingTask(Task):
             preds,
             pred_labels,
             threshold,
-            baseline_preds if baseline_preds else None,
-            baseline_labels if baseline_labels else None,
         )
 
-        self._write_side_outputs(detail_records, metrics, output_to_evaluate, eval_result_path)
+        self._write_side_outputs(output_to_evaluate, metrics, detail_records, eval_result_path, output_dir)
 
         if logger:
             logger.info("\t".join(metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in metrics.values()))
@@ -209,21 +205,14 @@ class LinkingTask(Task):
         log_odds: list[float],
         pred_labels: list[bool],
         threshold: float,
-        baseline_log_odds: list[float] | None = None,
-        baseline_pred_labels: list[bool] | None = None,
     ) -> list[dict]:
         """Create a per-sample dictionary describing the prediction outcome."""
-        baseline_log_odds = baseline_log_odds or []
-        baseline_pred_labels = baseline_pred_labels or []
-
         records: list[dict] = []
-        for (left, right), gt, lo, pl, blo, bpl in zip_longest(
+        for (left, right), gt, lo, pl in zip_longest(
             pairs,
             gt_labels,
             log_odds,
             pred_labels,
-            baseline_log_odds,
-            baseline_pred_labels,
         ):
             ent_type: set[str] = set(left.metadata.get("type", [])) | set(right.metadata.get("type", []))
 
@@ -253,8 +242,6 @@ class LinkingTask(Task):
                     "label": gt,
                     "cal_log_odds": lo - threshold,
                     "predicted_label": pl,
-                    "baseline_log_odds": blo if baseline_log_odds else None,
-                    "baseline_predicted_label": bpl if baseline_log_odds else None,
                     "left_entity_id": left.entity_id,
                     "right_entity_id": right.entity_id,
                 }
@@ -264,21 +251,18 @@ class LinkingTask(Task):
 
     def _write_side_outputs(
         self,
-        detail_records: list[dict],
-        metrics: dict[str, float],
         output_to_evaluate: Path,
+        metrics: dict[str, float],
+        detail_records: list[dict],
         eval_result_path: Path | None,
+        output_dir: Path | None = None,
     ) -> None:
         """Save evaluation metrics and detailed prediction records."""
         if eval_result_path:
             save_dict_to_json(metrics, eval_result_path)
 
-        # JSONL
-        ItemJsonlWriter[dict](output_to_evaluate.with_suffix(".detailed.jsonl")).write_items(detail_records)
-
-        # TSV
-        csv_path = output_to_evaluate.with_suffix(".detailed.csv")
-        with csv_path.open("w", encoding="utf-8") as f:
+        tsv_path = output_dir / "pairwise_predictions.tsv"
+        with tsv_path.open("w", encoding="utf-8") as f:
             headers = detail_records[0].keys()
             f.write("\t".join(headers) + "\n")
             for row in detail_records:
