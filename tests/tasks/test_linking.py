@@ -24,7 +24,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
 
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
 def test_linking_read_write_items_roundtrip() -> None:
-    # Arrange
+    """Test reading and writing items in the LinkingTask."""
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
     boolean_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
     schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
@@ -35,7 +35,7 @@ def test_linking_read_write_items_roundtrip() -> None:
         str(boolean_labels_file_path),
     )
 
-    # Act
+    # Prepare data
     items = list(task_instance.read_items())
     boolean_labels = [predicted_boolean for _, predicted_boolean in items if predicted_boolean is not None]
     boolean_labels_output_file_path = Path(__file__).parents[1] / "output" / "linking" / "boolean_labels.jsonl"
@@ -44,7 +44,7 @@ def test_linking_read_write_items_roundtrip() -> None:
         boolean_labels,
     )
 
-    # Assert
+    # Assert the output file is created and contains the expected data
     assert len(items) == 2
     first_entity_pair = items[0][0]
     assert isinstance(first_entity_pair, tuple)
@@ -63,7 +63,8 @@ def test_linking_read_write_items_roundtrip() -> None:
 
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
 def test_linking_read_int_labels() -> None:
-    # Arrange
+    """Test reading integer labels in the LinkingTask."""
+    # Prepare the data
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
     int_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "int_labels.jsonl"
     schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
@@ -74,7 +75,7 @@ def test_linking_read_int_labels() -> None:
         str(int_labels_file_path),
     )
 
-    # Act
+    # Assert the task instance is created and can read items
     items = list(task_instance.read_items())
     assert len(items) == 2
     assert isinstance(items[0][1], bool)
@@ -85,6 +86,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     """Test the linking metrics calculation."""
     # Prepare the data
     labels = [True, True, False, False, False]
+    pairs = [(Entity(f"frag_{i}_left"), Entity(f"frag_{i}_right")) for i in range(len(labels))]
     predictions = [True, False, False, False, True]
     prob_predictions = [0.9, 0.1, 0.1, 0.1, 0.9]
     odds = [p / (1 - p) for p in prob_predictions]
@@ -110,7 +112,10 @@ def test_linking_metrics(tmp_path: Path) -> None:
             f.write(json.dumps(prediction) + "\n")
 
     entity_pairs_path = tmp_path / "entity_pairs.jsonl"
-    entity_pairs_path.write_text("")
+    with open(entity_pairs_path, "w") as f:
+        for left_entity, right_entity in pairs:
+            pair = (left_entity.to_dict(), right_entity.to_dict())
+            f.write(json.dumps(pair) + "\n")
 
     schema_file_path = tmp_path / "schema.json"
     schema_file_path.write_text("")
@@ -123,6 +128,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
         str(labels_path),
     )
 
+    # Assert the metrics are calculated correctly
     metrics = task_instance.evaluate(predictions_path)
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 1
@@ -131,10 +137,9 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert metrics["true_negative"] == 2
     assert metrics["precision"] == 0.5
     assert metrics["recall"] == 0.5
-    assert metrics["tpr"] == 0.5
-    assert abs(metrics["tnr"] - 2 / 3) < 1e-6
-    assert abs(metrics["empirical_log_prob"] - -3.2966) < 1e-3
-    assert "log_prob" not in metrics
+    assert metrics["ppv"] == 0.5
+    assert abs(metrics["npv"] - 2 / 3) < 1e-6
+    assert math.isnan(metrics["log_prob"])
 
     metrics = task_instance.evaluate(prob_predictions_path)
     assert metrics["total"] == 5
@@ -144,7 +149,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert metrics["true_negative"] == 2
     assert metrics["precision"] == 0.5
     assert metrics["recall"] == 0.5
-    assert metrics["tpr"] == 0.5
-    assert abs(metrics["tnr"] - 2 / 3) < 1e-6
+    assert metrics["ppv"] == 0.5
+    assert abs(metrics["npv"] - 2 / 3) < 1e-6
     assert abs(metrics["empirical_log_prob"] - -3.296) < 1e-3
     assert abs(metrics["log_prob"] - log_prob_total) < 1e-3

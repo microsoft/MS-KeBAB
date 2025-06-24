@@ -22,45 +22,6 @@ from kebab.utils.io_helpers import (
 )
 
 
-@dataclass
-class ConfMatrix:
-    tp: int = 0
-    tn: int = 0
-    fp: int = 0
-    fn: int = 0
-
-    def update(self, gt: bool, pred: bool) -> None:
-        if pred == gt:
-            if pred:
-                self.tp += 1
-            else:
-                self.tn += 1
-        else:
-            if pred:
-                self.fp += 1
-            else:
-                self.fn += 1
-
-    @property
-    def total(self) -> int:
-        return self.tp + self.tn + self.fp + self.fn
-
-    def precision(self) -> float | None:
-        denom = self.tp + self.fp
-        return self.tp / denom if denom else None
-
-    def recall(self) -> float | None:
-        denom = self.tp + self.fn
-        return self.tp / denom if denom else None
-
-    def npv(self) -> float | None:
-        denom = self.tn + self.fn
-        return self.tn / denom if denom else None
-
-    def ppv(self) -> float | None:
-        return self.precision()
-
-
 class LinkingTask(Task):
     """Represents a linking benchmark task with its data files."""
 
@@ -162,8 +123,16 @@ class LinkingTask(Task):
         cm, log_prob = self._confusion_matrix(list(gt_labels), pred_labels, preds, threshold)
         metrics = {"log_prob": log_prob, **self._extra_metrics(cm)}
 
-        # Collect detailed records (unchanged logic, could be extracted too)
-        detail_records = []  # build as before …
+        # build detailed records
+        detail_records = self._build_detail_records(
+            pairs,
+            list(gt_labels),
+            preds,
+            pred_labels,
+            threshold,
+            baseline_preds if baseline_preds else None,
+            baseline_labels if baseline_labels else None,
+        )
 
         self._write_side_outputs(detail_records, metrics, output_to_evaluate, eval_result_path)
 
@@ -175,17 +144,20 @@ class LinkingTask(Task):
         return metrics
 
     def _load_predictions(self, path: Path) -> list[float]:
+        """Load numeric predictions from a JSONL file."""
         return list(ItemJsonlReader[float](path, converter=float).read_items())
 
     def _validate_lengths(self, *streams: list) -> None:
+        """Ensure all provided sequences have equal lengths."""
         lengths = {len(s) for s in streams}
         if len(lengths) > 1:
             raise ValueError("Input streams have mismatched lengths.")
 
     def _confusion_matrix(
         self, gt: list[bool], preds: list[bool], log_odds: list[float], threshold: float
-    ) -> tuple[ConfMatrix, float]:
-        cm = ConfMatrix()
+    ) -> tuple[_ConfMatrix, float]:
+        """Compute confusion matrix and log-probability."""
+        cm = _ConfMatrix()
         log_prob = 0.0
         probabilistic = sorted(set(log_odds)) != [0, 1]
 
@@ -199,7 +171,8 @@ class LinkingTask(Task):
 
         return cm, log_prob
 
-    def _extra_metrics(self, cm: ConfMatrix) -> dict[str, float]:
+    def _extra_metrics(self, cm: _ConfMatrix) -> dict[str, float]:
+        """Generate additional evaluation metrics from confusion matrix."""
         metrics: dict[str, float] = defaultdict(float)
         precision = cm.precision()
         recall = cm.recall()
@@ -228,6 +201,66 @@ class LinkingTask(Task):
 
         return metrics
 
+    def _build_detail_records(
+        self,
+        pairs: Iterable[tuple[Entity, Entity]],
+        gt_labels: list[bool],
+        log_odds: list[float],
+        pred_labels: list[bool],
+        threshold: float,
+        baseline_log_odds: list[float] | None = None,
+        baseline_pred_labels: list[bool] | None = None,
+    ) -> list[dict]:
+        """Create a per-sample dictionary describing the prediction outcome."""
+        baseline_log_odds = baseline_log_odds or []
+        baseline_pred_labels = baseline_pred_labels or []
+
+        records: list[dict] = []
+        for (left, right), gt, lo, pl, blo, bpl in zip_longest(
+            pairs,
+            gt_labels,
+            log_odds,
+            pred_labels,
+            baseline_log_odds,
+            baseline_pred_labels,
+        ):
+            ent_type: set[str] = set(left.metadata.get("type", [])) | set(right.metadata.get("type", []))
+
+            left_props = set(left.properties.keys())
+            right_props = set(right.properties.keys())
+            overlap_props = sorted(left_props & right_props)
+
+            prop_pattern = tuple(sorted([tuple(sorted(left.properties)), tuple(sorted(right.properties))]))
+
+            name_overlap = (
+                len(
+                    {n.lower() for n in left.properties.get("name", [])}
+                    & {n.lower() for n in right.properties.get("name", [])}
+                )
+                >= 1
+            )
+
+            records.append(
+                {
+                    "left": dict(left.properties),
+                    "right": dict(right.properties),
+                    "entity_type": sorted(ent_type),
+                    "overlap_props": overlap_props,
+                    "prop_overlap_num": len(overlap_props),
+                    "prop_pattern": prop_pattern,
+                    "name_overlap": name_overlap,
+                    "label": gt,
+                    "cal_log_odds": lo - threshold,
+                    "predicted_label": pl,
+                    "baseline_log_odds": blo if baseline_log_odds else None,
+                    "baseline_predicted_label": bpl if baseline_log_odds else None,
+                    "left_entity_id": left.entity_id,
+                    "right_entity_id": right.entity_id,
+                }
+            )
+
+        return records
+
     def _write_side_outputs(
         self,
         detail_records: list[dict],
@@ -235,6 +268,7 @@ class LinkingTask(Task):
         output_to_evaluate: Path,
         eval_result_path: Path | None,
     ) -> None:
+        """Save evaluation metrics and detailed prediction records."""
         if eval_result_path:
             save_dict_to_json(metrics, eval_result_path)
 
@@ -248,3 +282,66 @@ class LinkingTask(Task):
             f.write("\t".join(headers) + "\n")
             for row in detail_records:
                 f.write("\t".join(str(row.get(h, "")) for h in headers) + "\n")
+
+
+@dataclass
+class _ConfMatrix:
+    """Confusion matrix for binary classification."""
+
+    tp: int = 0
+    tn: int = 0
+    fp: int = 0
+    fn: int = 0
+
+    def update(self, gt: bool, pred: bool) -> None:
+        """Update confusion matrix counts based on ground truth and prediction."""
+        if pred == gt:
+            if pred:
+                self.tp += 1
+            else:
+                self.tn += 1
+        else:
+            if pred:
+                self.fp += 1
+            else:
+                self.fn += 1
+
+    @property
+    def total(self) -> int:
+        """Return total number of samples (sum of TP, TN, FP, FN)."""
+        return self.tp + self.tn + self.fp + self.fn
+
+    def precision(self) -> float | None:
+        """Compute precision (positive predictive value).
+
+        Returns:
+            float | None: Precision if (tp+fp)>0, else None.
+        """
+        denom = self.tp + self.fp
+        return self.tp / denom if denom else None
+
+    def recall(self) -> float | None:
+        """Compute recall (sensitivity).
+
+        Returns:
+            float | None: Recall if (tp+fn)>0, else None.
+        """
+        denom = self.tp + self.fn
+        return self.tp / denom if denom else None
+
+    def npv(self) -> float | None:
+        """Compute negative predictive value (P(negative | predicted negative)).
+
+        Returns:
+            float | None: NPV if (tn+fn)>0, else None.
+        """
+        denom = self.tn + self.fn
+        return self.tn / denom if denom else None
+
+    def ppv(self) -> float | None:
+        """Compute positive predictive value (P(positive | predicted positive)).
+
+        Returns:
+            float | None: PPV if (tp+fp)>0, else None.
+        """
+        return self.precision()
