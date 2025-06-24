@@ -119,7 +119,7 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     builder = RebelDatasetBuilder(fragments_path=rebel_sample_resolved_fragments_file_path, output_dir=tmp_path)
     builder.run()
 
-    output_file = tmp_path / RebelDatasetBuilder.LINKING_DATASET_FILENAME
+    output_file = builder.linking_dataset_output_path
     assert output_file.exists()
 
     with open(output_file, encoding="utf-8") as f:
@@ -127,7 +127,7 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
 
     assert len(lines) > 0
 
-    output_file = tmp_path / RebelDatasetBuilder.LINKING_GROUND_TRUTH_FILENAME
+    output_file = builder.linking_ground_truth_output_path
     assert output_file.exists()
 
     with open(output_file, encoding="utf-8") as f:
@@ -135,7 +135,7 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
 
     assert len(lines) > 0
 
-    output_file = tmp_path / RebelDatasetBuilder.CLUSTERING_DATASET_FILENAME
+    output_file = builder.clustering_dataset_output_path
     assert output_file.exists()
 
     with open(output_file, encoding="utf-8") as f:
@@ -143,7 +143,7 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
 
     assert len(lines) > 0
 
-    output_file = tmp_path / RebelDatasetBuilder.CLUSTERING_GROUND_TRUTH_FILENAME
+    output_file = builder.clustering_ground_truth_output_path
     assert output_file.exists()
 
     with open(output_file, encoding="utf-8") as f:
