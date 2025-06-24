@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-# ruff: noqa: S101
 """
 Extract simple entities (ID + names + types) from Wikidata, fetch all properties via API, etc.
 

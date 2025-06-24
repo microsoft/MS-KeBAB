@@ -3,7 +3,6 @@
 
 """This module contains the Entity class."""
 
-# ruff: noqa: ANN401
 # ANN401: typing.Any
 from __future__ import annotations
 

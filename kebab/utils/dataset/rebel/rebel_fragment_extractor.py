@@ -14,7 +14,6 @@ Example output:
 {"entity_id": "Q918448", "properties": {"name": ["denomination"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "1"}}
 """
 
-# ruff: noqa: S101
 
 from __future__ import annotations
 
