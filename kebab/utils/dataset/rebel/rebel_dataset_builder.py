@@ -80,6 +80,7 @@ class RebelDatasetBuilder:
         max_count: int | None = None,
         max_merge_fragments: int = 10,
         merge_distribution: MergeDistributionMode | None = None,
+        deduplicate_values: bool = True,
     ):
         """
         Initialize the dataset creator.
@@ -90,6 +91,7 @@ class RebelDatasetBuilder:
             max_count: Maximum number of pairs to sample for the linking dataset. If None, no limit.
             max_merge_fragments: Maximum number of fragments to merge when generating merged fragments for the datasets.
             merge_distribution: Distribution mode for sampling the number of fragments to merge (ZIPF or TRIANGULAR).
+            deduplicate_values: Whether to deduplicate property values in the merged fragments.
         """
         self._logger: logging.Logger = logging.getLogger(__name__)
 
@@ -104,6 +106,7 @@ class RebelDatasetBuilder:
         self.max_count: int | None = max_count
         self.max_merge_fragments: int = max_merge_fragments
         self.merge_distribution: MergeDistributionMode = merge_distribution or MergeDistributionMode.ZIPF
+        self.deduplicate_values: bool = deduplicate_values
 
         self.linking_dataset_output_path = self.output_dir / self.LINKING_DATASET_FILENAME
         self.linking_ground_truth_output_path = self.output_dir / self.LINKING_GROUND_TRUTH_FILENAME
@@ -362,6 +365,7 @@ class RebelDatasetBuilder:
                     entity_id_to_fragment_indices,
                     max_fragments=self.max_merge_fragments,
                     distribution=self.merge_distribution,
+                    deduplicate_values=self.deduplicate_values,
                 )
                 right_fragment = self.generate_merged_fragment(
                     pair[1],
@@ -369,6 +373,7 @@ class RebelDatasetBuilder:
                     entity_id_to_fragment_indices,
                     max_fragments=self.max_merge_fragments,
                     distribution=self.merge_distribution,
+                    deduplicate_values=self.deduplicate_values,
                 )
 
                 # avoid writing duplicates
@@ -422,6 +427,7 @@ class RebelDatasetBuilder:
         entity_id_to_fragment_indices: dict[str, list[int]],
         max_fragments: int = 10,
         distribution: MergeDistributionMode = MergeDistributionMode.ZIPF,
+        deduplicate_values: bool = True,
     ) -> ResolvedWikidataEntity:
         """
         Generate a merged fragment by merging up to `max_fragments` from the entity of the given fragment index.
@@ -432,6 +438,7 @@ class RebelDatasetBuilder:
             entity_id_to_fragment_indices: Mapping from entity IDs to their fragment indices.
             max_fragments: Maximum number of fragments to include in the merge.
             distribution: Probability distribution to sample merge count (`zipf` or `triangular`).
+            deduplicate_values: Whether to deduplicate property values in the merged fragment.
 
         Returns:
             A merged ResolvedWikidataEntity preserving original metadata.
@@ -457,7 +464,7 @@ class RebelDatasetBuilder:
         indices = random.sample(range(n), r)
         selected_fragments = [fragments[i] for i in indices]
 
-        merged_fragment = ResolvedWikidataEntity.merge(selected_fragments)
+        merged_fragment = ResolvedWikidataEntity.merge(selected_fragments, deduplicate_values=deduplicate_values)
         merged_fragment.metadata["fragment_id"] = original_fragment.metadata["fragment_id"]
         merged_fragment.metadata["type"] = original_fragment.metadata["type"]
         merged_fragment.metadata["merge_count"] = r

@@ -50,6 +50,12 @@ from kebab.utils.dataset.rebel.rebel_dataset_builder import MergeDistributionMod
     default=MergeDistributionMode.ZIPF.value,
     help="The distribution mode to use for merging fragments into entities.",
 )
+@click.option(
+    "--deduplicate/--no-deduplicate",
+    is_flag=True,
+    default=True,
+    help="Whether to deduplicate property values in the merged fragments. Default is True.",
+)
 @click.command()
 def main(
     rebel_fragments_path: pathlib.Path,
@@ -57,6 +63,7 @@ def main(
     max_count: int,
     max_merge_fragments: int,
     merge_distribution: str,
+    deduplicate: bool,
 ) -> None:
     """Run REBEL linking and clustering datasets building steps."""
     logging_helpers.configure_logging()
@@ -67,6 +74,7 @@ def main(
         max_count=max_count if max_count > 0 else None,
         max_merge_fragments=max_merge_fragments,
         merge_distribution=MergeDistributionMode(merge_distribution) if merge_distribution else None,
+        deduplicate_values=deduplicate,
     )
 
     builder.run()
