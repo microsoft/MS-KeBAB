@@ -294,11 +294,12 @@ class Entity:
         for prop_id, values in other.properties.items():
             self.properties[prop_id].extend(values)
 
-        self.source_ids += other.source_ids
-
         # TODO(pmyshkov): Handle evidence correctly instead of the below
         self.deduplicate_property_values()
-        self.deduplicate_source_ids()
+
+        if self.source_ids is not None and other.source_ids is not None:
+            self.source_ids += other.source_ids
+            self.deduplicate_source_ids()
 
         return self
 
