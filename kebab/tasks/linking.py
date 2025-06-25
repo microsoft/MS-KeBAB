@@ -118,8 +118,8 @@ class LinkingTask(Task):
         threshold = 0.0
         pred_labels = [p > threshold for p in preds]
 
-        cm, log_prob = self._confusion_matrix(list(gt_labels), pred_labels, preds)
-        metrics = {"log_prob": log_prob, **self._extra_metrics(cm)}
+        conf_matrix, log_prob = self._confusion_matrix(list(gt_labels), pred_labels, preds)
+        metrics = {"log_prob": log_prob, **self._extra_metrics(conf_matrix)}
 
         # build detailed records
         detail_records = self._build_detail_records(
@@ -130,7 +130,7 @@ class LinkingTask(Task):
             threshold,
         )
 
-        self._write_side_outputs(output_to_evaluate, metrics, detail_records, eval_result_path, output_dir)
+        self._write_side_outputs(metrics, detail_records, output_dir, eval_result_path)
 
         # report metrics in console or logger
         self._report_metrics(logger, metrics)
@@ -172,36 +172,40 @@ class LinkingTask(Task):
         if len(lengths) > 1:
             raise ValueError("Input streams have mismatched lengths.")
 
-    def _confusion_matrix(self, gt: list[bool], preds: list[bool], log_odds: list[float]) -> tuple[_ConfMatrix, float]:
+    def _confusion_matrix(
+        self, gt_labels: list[bool], preds: list[bool], log_odds: list[float]
+    ) -> tuple[_ConfMatrix, float]:
         """Compute confusion matrix and log-probability."""
-        cm = _ConfMatrix()
+        conf_matrix = _ConfMatrix()
         log_prob = 0.0
         probabilistic = sorted(set(log_odds)) != [0, 1]
 
-        for g, p, l in zip(gt, preds, log_odds, strict=False):
-            cm.update(g, p)
+        for gt_label, pred_label, log_odds in zip(gt_labels, preds, log_odds, strict=False):
+            conf_matrix.update(gt_label, pred_label)
             if probabilistic:
-                log_prob += math.log(1 / (1 + math.exp(-l))) if g else math.log(1 / (1 + math.exp(l)))
+                log_prob += (
+                    math.log(1 / (1 + math.exp(-log_odds))) if gt_label else math.log(1 / (1 + math.exp(log_odds)))
+                )
 
         if not probabilistic:
             log_prob = float("nan")
 
-        return cm, log_prob
+        return conf_matrix, log_prob
 
-    def _extra_metrics(self, cm: _ConfMatrix) -> dict[str, float]:
+    def _extra_metrics(self, conf_matrix: _ConfMatrix) -> dict[str, float]:
         """Generate additional evaluation metrics from confusion matrix."""
         metrics: dict[str, float] = defaultdict(float)
-        precision = cm.precision()
-        recall = cm.recall()
-        npv = cm.npv()
-        ppv = cm.ppv()
+        precision = conf_matrix.precision()
+        recall = conf_matrix.recall()
+        npv = conf_matrix.npv()
+        ppv = conf_matrix.ppv()
 
         metrics.update(
-            true_positive=cm.tp,
-            true_negative=cm.tn,
-            false_positive=cm.fp,
-            false_negative=cm.fn,
-            total=cm.total,
+            true_positive=conf_matrix.tp,
+            true_negative=conf_matrix.tn,
+            false_positive=conf_matrix.fp,
+            false_negative=conf_matrix.fn,
+            total=conf_matrix.total,
         )
 
         if precision is not None:
@@ -215,8 +219,8 @@ class LinkingTask(Task):
             metrics["npv"] = npv
 
         if ppv and npv and 0 < ppv < 1 and 0 < npv < 1:
-            log_prob = cm.tp * math.log(ppv) + cm.fp * math.log(1 - ppv)
-            log_prob += cm.tn * math.log(npv) + cm.fn * math.log(1 - npv)
+            log_prob = conf_matrix.tp * math.log(ppv) + conf_matrix.fp * math.log(1 - ppv)
+            log_prob += conf_matrix.tn * math.log(npv) + conf_matrix.fn * math.log(1 - npv)
             metrics["empirical_log_prob"] = log_prob
 
         return metrics
@@ -231,7 +235,7 @@ class LinkingTask(Task):
     ) -> list[dict]:
         """Create a per-sample dictionary describing the prediction outcome."""
         records: list[dict] = []
-        for (left, right), gt, lo, pl in zip_longest(
+        for (left, right), gt_label, log_odds, pred_label in zip_longest(
             pairs,
             gt_labels,
             log_odds,
@@ -247,8 +251,8 @@ class LinkingTask(Task):
 
             name_overlap = (
                 len(
-                    {n.lower() for n in left.properties.get("name", [])}
-                    & {n.lower() for n in right.properties.get("name", [])}
+                    {name.lower() for name in left.properties.get("name", [])}
+                    & {name.lower() for name in right.properties.get("name", [])}
                 )
                 >= 1
             )
@@ -262,9 +266,9 @@ class LinkingTask(Task):
                     "prop_overlap_num": len(overlap_props),
                     "prop_pattern": prop_pattern,
                     "name_overlap": name_overlap,
-                    "label": gt,
-                    "cal_log_odds": lo - threshold,
-                    "predicted_label": pl,
+                    "label": gt_label,
+                    "cal_log_odds": log_odds - threshold,
+                    "predicted_label": pred_label,
                     "left_entity_id": left.entity_id,
                     "right_entity_id": right.entity_id,
                 }
@@ -274,11 +278,10 @@ class LinkingTask(Task):
 
     def _write_side_outputs(
         self,
-        output_to_evaluate: Path,
         metrics: dict[str, float],
         detail_records: list[dict],
+        output_dir: Path,
         eval_result_path: Path | None,
-        output_dir: Path | None = None,
     ) -> None:
         """Save evaluation metrics and detailed prediction records."""
         if eval_result_path:
