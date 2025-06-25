@@ -62,6 +62,7 @@ exclude = [
     "**/venv*",
     "**/ENV",
     "**/env",
+    "build"
 ]
 pythonVersion = "3.12"
 
