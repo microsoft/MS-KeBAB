@@ -289,13 +289,14 @@ class Entity:
         """Deduplicate source IDs."""
         self.source_ids = list(set(self.source_ids))
 
-    def merge_with(self, other: Self) -> Self:
+    def merge_with(self, other: Self, deduplicate_values: bool = True) -> Self:
         """Merge the other entity into this entity."""
         for prop_id, values in other.properties.items():
             self.properties[prop_id].extend(values)
 
         # TODO(pmyshkov): Handle evidence correctly instead of the below
-        self.deduplicate_property_values()
+        if deduplicate_values:
+            self.deduplicate_property_values()
 
         if self.source_ids is not None and other.source_ids is not None:
             self.source_ids += other.source_ids
@@ -438,12 +439,12 @@ class Entity:
         return f"{self.entity_id} | {properties_str}"
 
     @classmethod
-    def merge(cls, entities: list[Self]) -> Self:
+    def merge(cls, entities: list[Self], deduplicate_values: bool = True) -> Self:
         """Merge multiple entities into a single entity."""
         merged = cls(entity_id=entities[0].entity_id)
 
         for entity in entities:
-            merged = merged.merge_with(entity)
+            merged = merged.merge_with(entity, deduplicate_values=deduplicate_values)
 
         return merged
 

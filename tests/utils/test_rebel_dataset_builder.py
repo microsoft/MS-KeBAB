@@ -168,7 +168,7 @@ def sample_fragments_for_merge() -> tuple[list[ResolvedWikidataEntity], dict[str
         },
         {
             "entity_id": "E1",
-            "properties": {"name": ["C"]},
+            "properties": {"name": ["C", "A"]},
             "metadata": {"fragment_id": "3", "type": ["t"]},
         },
         {  # single-fragment entity
@@ -209,6 +209,29 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     single = RebelDatasetBuilder.generate_merged_fragment(3, fragments, entity_idx, max_fragments=3)
     assert single is fragments[3]
     assert "merge_count" not in single.metadata
+
+    # no deduplication of values
+    # create new fragments collection where we take fragment 3, which has "C" and "A" in names, multiple times
+    fragments_with_duplicates = [fragments[2], fragments[2], fragments[2]]
+    entity_idx_with_duplicates = {"E1": [0, 1, 2]}
+    for _ in range(10):
+        merged = RebelDatasetBuilder.generate_merged_fragment(
+            0,
+            fragments_with_duplicates,
+            entity_idx_with_duplicates,
+            max_fragments=3,
+            deduplicate_values=False,
+        )
+
+        if merged.metadata["merge_count"] == 1:
+            continue
+
+        # assert names contain both "C" and "A" more than once
+        assert merged.names.count("A") > 1
+        assert merged.names.count("C") > 1
+        break
+    else:
+        pytest.fail("Expected to find a merged fragment, but did not.")
 
 
 @pytest.mark.parametrize("dist", [MergeDistributionMode.ZIPF, MergeDistributionMode.TRIANGULAR])
