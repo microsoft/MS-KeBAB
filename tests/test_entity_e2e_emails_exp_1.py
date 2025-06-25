@@ -3,7 +3,6 @@
 
 """Tests for the end-to-end workflow on the Emails Experiment 1."""
 
-
 from pathlib import Path
 
 from kebab.contracts.document import Document, DocumentSchema, DocumentUtilities
