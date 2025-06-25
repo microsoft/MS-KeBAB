@@ -231,7 +231,7 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
         assert merged.names.count("C") > 1
         break
     else:
-        assert False, "Expected to find a merged fragment, but did not."
+        pytest.fail("Expected to find a merged fragment, but did not.")
 
 
 @pytest.mark.parametrize("dist", [MergeDistributionMode.ZIPF, MergeDistributionMode.TRIANGULAR])
