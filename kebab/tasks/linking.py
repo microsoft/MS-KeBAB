@@ -132,12 +132,35 @@ class LinkingTask(Task):
 
         self._write_side_outputs(output_to_evaluate, metrics, detail_records, eval_result_path, output_dir)
 
-        if logger:
-            logger.info("\t".join(metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in metrics.values()))
-        else:
-            print("\t".join(metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in metrics.values()))
+        # report metrics in console or logger
+        self._report_metrics(logger, metrics)
 
         return metrics
+
+    def _report_metrics(self, logger, metrics):
+        """Report evaluation metrics in a structured format."""
+        order = (
+            "log_prob",
+            "empirical_log_prob",
+            "precision",
+            "recall",
+            "true_positive",
+            "true_negative",
+            "false_positive",
+            "false_negative",
+            "ppv",
+            "npv",
+            "total",
+        )
+
+        reported_metrics = {key: metrics[key] for key in order if key in metrics}
+
+        if logger:
+            logger.info(
+                "\t".join(reported_metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in reported_metrics.values())
+            )
+        else:
+            print("\t".join(reported_metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in reported_metrics.values()))
 
     def _load_predictions(self, path: Path) -> list[float]:
         """Load numeric predictions from a JSONL file."""

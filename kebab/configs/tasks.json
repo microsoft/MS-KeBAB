@@ -58,21 +58,21 @@
     "task": "EntityGeneration",
     "data": {
       "schema": "./REBEL/Schemas/rebel_linking_properties_schema.json",
-      "entities": "./REBEL/Entity Generation/Derived Linking Merged Train/rebel_entity_generation_from_linking_dataset.jsonl"
+      "entities": "./REBEL/Entity Generation/From Linking Merged Train/rebel_entity_generation_from_linking_dataset.jsonl"
     }
   },
   "EntityGeneration-REBEL-from-Linking-Validation": {
     "task": "EntityGeneration",
     "data": {
       "schema": "./REBEL/Schemas/rebel_linking_properties_schema.json",
-      "entities": "./REBEL/Entity Generation/Derived Linking Merged Validation/rebel_entity_generation_from_linking_dataset.jsonl"
+      "entities": "./REBEL/Entity Generation/From Linking Merged Validation/rebel_entity_generation_from_linking_dataset.jsonl"
     }
   },
   "EntityGeneration-REBEL-from-Linking-Test": {
     "task": "EntityGeneration",
     "data": {
       "schema": "./REBEL/Schemas/rebel_linking_properties_schema.json",
-      "entities": "./REBEL/Entity Generation/Derived Linking Merged Test/rebel_entity_generation_from_linking_dataset.jsonl"
+      "entities": "./REBEL/Entity Generation/From Linking Merged Test/rebel_entity_generation_from_linking_dataset.jsonl"
     }
   },
   "Clustering-REBEL-from-Linking-Test": {
