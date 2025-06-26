@@ -20,9 +20,11 @@ def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
         if isinstance(value1, dict):
             assert_dicts_equal(value1, dict2[key], epsilon)
         elif isinstance(value1, float):
-            if math.isnan(value1):
+            if math.isnan(value1) or math.isnan(dict2[key]):
                 assert math.isnan(dict2[key])
-            assert abs(value1 - dict2[key]) < epsilon
+                assert math.isnan(value1)
+            else:
+                assert abs(value1 - dict2[key]) < epsilon
         else:
             assert value1 == dict2[key]
 
