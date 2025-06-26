@@ -48,6 +48,11 @@ class Task(ABC):
         return self.__name
 
     @property
+    def path_safe_name(self) -> str:
+        """Return task name with path-safe characters."""
+        return self.name.translate(str.maketrans("", "", r'<>:"/\\|?*'))
+
+    @property
     def data_path(self) -> Path | None:
         """Return the path to the data root."""
         return self.__data_path

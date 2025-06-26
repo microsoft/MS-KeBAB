@@ -111,7 +111,7 @@ class LinkingTask(Task):
         pairs, gt_labels = zip(*self.read_items(), strict=False)
         self._validate_lengths(preds, gt_labels)
 
-        output_dir = output_dir or Path.cwd() / "output"
+        output_dir = output_dir or Path.cwd() / "output" / self.path_safe_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # TODO(pmyshkov): this will be determined by calibration in the future
@@ -287,7 +287,7 @@ class LinkingTask(Task):
         if eval_result_path:
             save_dict_to_json(metrics, eval_result_path)
 
-        tsv_path = output_dir / "pairwise_predictions.tsv"
+        tsv_path = output_dir / "linking_predictions.tsv"
         with tsv_path.open("w", encoding="utf-8") as f:
             headers = detail_records[0].keys()
             f.write("\t".join(headers) + "\n")
