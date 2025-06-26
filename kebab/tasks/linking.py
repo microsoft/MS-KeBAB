@@ -137,7 +137,7 @@ class LinkingTask(Task):
 
         return metrics
 
-    def _report_metrics(self, logger, metrics):
+    def _report_metrics(self, logger: Logger | None, metrics: dict[str, float]):
         """Report evaluation metrics in a structured format."""
         order = (
             "log_prob",
@@ -322,37 +322,37 @@ class _ConfMatrix:
         """Return total number of samples (sum of TP, TN, FP, FN)."""
         return self.tp + self.tn + self.fp + self.fn
 
-    def precision(self) -> float | None:
+    def precision(self) -> float:
         """Compute precision (positive predictive value).
 
         Returns:
-            float | None: Precision if (tp+fp)>0, else None.
+            float: Precision if (tp+fp)>0, else None.
         """
         denom = self.tp + self.fp
-        return self.tp / denom if denom else None
+        return self.tp / denom if denom else float("nan")
 
-    def recall(self) -> float | None:
+    def recall(self) -> float:
         """Compute recall (sensitivity).
 
         Returns:
-            float | None: Recall if (tp+fn)>0, else None.
+            float: Recall if (tp+fn)>0, else None.
         """
         denom = self.tp + self.fn
-        return self.tp / denom if denom else None
+        return self.tp / denom if denom else float("nan")
 
-    def npv(self) -> float | None:
+    def npv(self) -> float:
         """Compute negative predictive value (P(negative | predicted negative)).
 
         Returns:
-            float | None: NPV if (tn+fn)>0, else None.
+            float: NPV if (tn+fn)>0, else None.
         """
         denom = self.tn + self.fn
-        return self.tn / denom if denom else None
+        return self.tn / denom if denom else float("nan")
 
-    def ppv(self) -> float | None:
+    def ppv(self) -> float:
         """Compute positive predictive value (P(positive | predicted positive)).
 
         Returns:
-            float | None: PPV if (tp+fp)>0, else None.
+            float: PPV if (tp+fp)>0, else None.
         """
         return self.precision()
