@@ -180,12 +180,10 @@ class LinkingTask(Task):
         log_prob = 0.0
         probabilistic = sorted(set(log_odds)) != [0, 1]
 
-        for gt_label, pred_label, log_odds in zip(gt_labels, preds, log_odds, strict=False):
+        for gt_label, pred_label, l_odds in zip(gt_labels, preds, log_odds, strict=False):
             conf_matrix.update(gt_label, pred_label)
             if probabilistic:
-                log_prob += (
-                    math.log(1 / (1 + math.exp(-log_odds))) if gt_label else math.log(1 / (1 + math.exp(log_odds)))
-                )
+                log_prob += math.log(1 / (1 + math.exp(-l_odds))) if gt_label else math.log(1 / (1 + math.exp(l_odds)))
 
         if not probabilistic:
             log_prob = float("nan")
@@ -235,7 +233,7 @@ class LinkingTask(Task):
     ) -> list[dict]:
         """Create a per-sample dictionary describing the prediction outcome."""
         records: list[dict] = []
-        for (left, right), gt_label, log_odds, pred_label in zip_longest(
+        for (left, right), gt_label, l_odds, pred_label in zip_longest(
             pairs,
             gt_labels,
             log_odds,
@@ -267,7 +265,7 @@ class LinkingTask(Task):
                     "prop_pattern": prop_pattern,
                     "name_overlap": name_overlap,
                     "label": gt_label,
-                    "cal_log_odds": log_odds - threshold,
+                    "cal_log_odds": l_odds - threshold,
                     "predicted_label": pred_label,
                     "left_entity_id": left.entity_id,
                     "right_entity_id": right.entity_id,
