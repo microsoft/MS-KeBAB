@@ -89,8 +89,8 @@ class LinkingTask(Task):
         self,
         output_to_evaluate: Path,
         eval_result_path: Path | None = None,
-        output_dir: Path | None = None,
         logger: Logger | None = None,
+        output_dir: Path | None = None,
     ) -> dict[str, float]:
         """
         Evaluate an output for the linking task.
@@ -98,8 +98,8 @@ class LinkingTask(Task):
         Args:
             output_to_evaluate: Path to model output predictions.
             eval_result_path: Optional path to save evaluation metrics as JSON.
-            output_dir: Optional directory for saving metrics and evaluation outputs.
             logger: Optional logger for logging evaluation summaries.
+            output_dir: Optional directory for saving metrics and evaluation outputs.
 
         Returns:
             dict[str, float]: Evaluation metrics dictionary.
@@ -166,7 +166,7 @@ class LinkingTask(Task):
         """Load numeric predictions from a JSONL file."""
         return list(ItemJsonlReader[float](path, converter=float).read_items())
 
-    def _validate_lengths(self, *streams: list) -> None:
+    def _validate_lengths(self, *streams: list | tuple) -> None:
         """Ensure all provided sequences have equal lengths."""
         lengths = {len(s) for s in streams}
         if len(lengths) > 1:
