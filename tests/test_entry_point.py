@@ -3,11 +3,10 @@
 
 """Tests for the benchmark entry point."""
 
-# ruff: noqa: RUF015, PLR2004
-
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 from kebab import mskebab
@@ -21,7 +20,11 @@ def assert_dicts_equal(dict1: dict, dict2: dict, epsilon: float = 1e-6):
         if isinstance(value1, dict):
             assert_dicts_equal(value1, dict2[key], epsilon)
         elif isinstance(value1, float):
-            assert abs(value1 - dict2[key]) < epsilon
+            if math.isnan(value1) or math.isnan(dict2[key]):
+                assert math.isnan(dict2[key])
+                assert math.isnan(value1)
+            else:
+                assert abs(value1 - dict2[key]) < epsilon
         else:
             assert value1 == dict2[key]
 
@@ -87,13 +90,14 @@ def test_task_interface():
             "predictions": ["tests/data/linking/predictions.jsonl"],
             "metrics": [
                 {
+                    "log_prob": float("nan"),
                     "false_negative": 0.0,
                     "false_positive": 0.0,
                     "precision": 1.0,
                     "recall": 1.0,
-                    "tnr": 1.0,
+                    "npv": 1.0,
                     "total": 2.0,
-                    "tpr": 1.0,
+                    "ppv": 1.0,
                     "true_negative": 1.0,
                     "true_positive": 1.0,
                 }
