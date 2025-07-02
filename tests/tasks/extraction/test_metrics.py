@@ -2,7 +2,6 @@
 # Licensed under the MIT license.
 
 # pyright: reportOperatorIssue=false, reportArgumentType=false, reportCallIssue=false
-# ruff: noqa: PLR2004, D103
 
 """Tests for the extraction metrics module."""
 

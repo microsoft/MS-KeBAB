@@ -13,7 +13,6 @@ The workflow is as follows:
 2. Query Wikipedia for all entity_ids found in the input entities but not in the existing Wikipedia pages.
 3. Save the Wikipedia pages to a JSONL file, incrementally, querying Wikipedia in batches.
 """
-# ruff: noqa: S101
 
 from __future__ import annotations
 

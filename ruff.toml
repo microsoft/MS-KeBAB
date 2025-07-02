@@ -96,6 +96,7 @@ ignore = [
     "D301",    # escape-sequence-in-docstring - VS Code needs backslashes in argument descriptions
     "E501",    # line-too-long - handled by Black
     "PLC0414", # useless-import-alias - redundant import aliases are used for explicit re-exporting
+    "PLC0415", # import not at top level - we do that to avoid unnecessary imports based on tasks
     "PLR09",   # too-many-* - pylint design checker
     "PLR1702", # too-many-nested-blocks
     "PLR5501", # collapsible-else-if

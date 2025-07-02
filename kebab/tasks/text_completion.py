@@ -81,7 +81,7 @@ class TextCompletionTaskBase(Task):
                 # Skip the first word, non-alphanumeric words, and long words.
                 if i == 0 or not word.isalnum() or len(word) > max_word_length:
                     continue
-                text_with_mask = "".join(words[:i] + ["<mask>"])
+                text_with_mask = "".join([*words[:i], "<mask>"])
                 yield {
                     "text_with_mask": text_with_mask,
                     "target_content": word,
