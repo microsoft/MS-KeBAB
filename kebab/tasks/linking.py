@@ -12,6 +12,7 @@ from logging import Logger
 from pathlib import Path
 
 import numpy as np
+from sklearn.metrics import confusion_matrix
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
@@ -93,6 +94,7 @@ class LinkingTask(Task):
         eval_result_path: Path | None = None,
         logger: Logger | None = None,
         output_dir: Path | None = None,
+        calibrate: bool = True,
     ) -> dict[str, float]:
         """
         Evaluate an output for the linking task.
@@ -102,6 +104,7 @@ class LinkingTask(Task):
             eval_result_path: Optional path to save evaluation metrics as JSON.
             logger: Optional logger for logging evaluation summaries.
             output_dir: Optional directory for saving metrics and evaluation outputs.
+            calibrate: If True, calibrate the threshold based on ground truth data.
 
         Returns:
             dict[str, float]: Evaluation metrics dictionary.
@@ -109,25 +112,32 @@ class LinkingTask(Task):
         if self.data_ground_truth_boolean is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        predictions = np.asarray(self._load_predictions(output_to_evaluate))
+        log_odds = np.asarray(list(ItemJsonlReader[float](output_to_evaluate, converter=float).read_items()))
         pairs, gt_labels = zip(*self.read_items(), strict=False)
         gt_labels = np.asarray(gt_labels, dtype=bool)
-        self._validate_lengths(predictions, gt_labels)
+        if log_odds.shape != gt_labels.shape:
+            raise ValueError(
+                f"Log-odds shape {log_odds.shape} does not match ground truth labels shape {gt_labels.shape}."
+            )
 
         output_dir = output_dir or Path.cwd() / "output" / self.path_safe_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        pred_labels = [p > threshold for p in predictions]
+        threshold = self._calibrate(gt_labels, log_odds) if calibrate else 0.0
+        predictions = log_odds > threshold
 
-        conf_matrix, log_prob = self._confusion_matrix(list(gt_labels), pred_labels, predictions)
-        metrics = {"log_prob": log_prob, **self._extra_metrics(conf_matrix)}
+        conf_matrix = _ConfMatrix.from_arrays(gt_labels, predictions)
+        metrics = self._compute_metrics(conf_matrix, gt_labels, log_odds)
+
+        if calibrate:
+            metrics["threshold"] = threshold
 
         # build detailed records
         detail_records = self._build_detail_records(
             pairs,
-            list(gt_labels),
+            gt_labels,
+            log_odds,
             predictions,
-            pred_labels,
             threshold,
         )
 
@@ -137,6 +147,57 @@ class LinkingTask(Task):
         self._report_metrics(logger, metrics)
 
         return metrics
+
+    def _calibrate(self, gt_labels: np.ndarray, log_odds: np.ndarray, eps: float = 1e-15) -> float:
+        """
+        Determine the threshold that maximizes the empirical log-probability.
+
+        Args:
+            gt_labels: Ground truth boolean labels.
+            log_odds: Array of predicted scores (log-odds).
+
+        Returns:
+            float: Optimal threshold for classification.
+        """
+        # start from the highest log-odds, everything is predicted negative
+        order = np.argsort(log_odds)[::-1]
+        gt_labels = gt_labels[order].astype(int)
+        log_odds = log_odds[order]
+
+        n = len(gt_labels)
+        n_pos = gt_labels.sum()
+        n_neg = n - n_pos
+
+        tp = fp = 0
+        fn, tn = n_pos, n_neg
+
+        best_log_prob = -np.inf
+        best_threshold = log_odds[0] + eps  # => all predicted as negative
+
+        for k, (score, label) in enumerate(zip(log_odds, gt_labels, strict=True), 1):
+            # classify the k-th example as positive
+            if label:
+                tp += 1
+                fn -= 1
+            else:
+                fp += 1
+                tn -= 1
+
+            ppv = tp / k
+            npv = tn / (n - k) if k != n else 0.0
+
+            ppv = np.clip(ppv, eps, 1 - eps)
+            npv = np.clip(npv, eps, 1 - eps)
+
+            log_prob = tp * np.log(ppv) + fp * np.log(1 - ppv) + tn * np.log(npv) + fn * np.log(1 - npv)
+
+            if log_prob > best_log_prob:
+                best_log_prob = log_prob
+
+                # we want this example to be predicted as positive => threshold is just below the score
+                best_threshold = score - eps
+
+        return best_threshold
 
     def _report_metrics(self, logger: Logger | None, metrics: dict[str, float]):
         """Report evaluation metrics in a structured format."""
@@ -152,6 +213,7 @@ class LinkingTask(Task):
             "ppv",
             "npv",
             "total",
+            "threshold",
         )
 
         reported_metrics = {key: metrics[key] for key in order if key in metrics}
@@ -163,36 +225,11 @@ class LinkingTask(Task):
         else:
             print("\t".join(reported_metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in reported_metrics.values()))
 
-    def _load_predictions(self, path: Path) -> list[float]:
-        """Load numeric predictions from a JSONL file."""
-        return list(ItemJsonlReader[float](path, converter=float).read_items())
-
-    def _validate_lengths(self, *streams: np.array | list | tuple) -> None:
-        """Ensure all provided sequences have equal lengths."""
-        lengths = {len(s) for s in streams}
-        if len(lengths) > 1:
-            raise ValueError("Input streams have mismatched lengths.")
-
-    def _confusion_matrix(
-        self, gt_labels: np.array, predictions: np.array, log_odds: np.array
-    ) -> tuple[_ConfMatrix, float]:
-        """Compute confusion matrix and log-probability."""
-        conf_matrix = _ConfMatrix()
-        log_prob = 0.0
-        probabilistic = sorted(set(log_odds)) != [0, 1]
-
-        for gt_label, pred_label, l_odds in zip(gt_labels, predictions, log_odds, strict=False):
-            conf_matrix.update(gt_label, pred_label)
-            if probabilistic:
-                log_prob += math.log(1 / (1 + math.exp(-l_odds))) if gt_label else math.log(1 / (1 + math.exp(l_odds)))
-
-        if not probabilistic:
-            log_prob = float("nan")
-
-        return conf_matrix, log_prob
-
-    def _extra_metrics(self, conf_matrix: _ConfMatrix) -> dict[str, float]:
-        """Generate additional evaluation metrics from confusion matrix."""
+    def _compute_metrics(
+        self, conf_matrix: _ConfMatrix, gt_labels: np.ndarray, log_odds: np.ndarray
+    ) -> dict[str, float]:
+        """Compute evaluation metrics based on the confusion matrix and log-odds."""
+        # empirical log-prob
         metrics: dict[str, float] = defaultdict(float)
         precision = conf_matrix.precision()
         recall = conf_matrix.recall()
@@ -222,23 +259,35 @@ class LinkingTask(Task):
             log_prob += conf_matrix.tn * math.log(npv) + conf_matrix.fn * math.log(1 - npv)
             metrics["empirical_log_prob"] = log_prob
 
+        # log-prob
+        vals = np.unique(log_odds)
+        probabilistic = not (vals.size == 2 and np.allclose(np.sort(vals), [0.0, 1.0]))
+
+        if probabilistic:
+            probs = 1.0 / (1.0 + np.exp(-log_odds))
+            log_prob = float(np.sum(np.where(gt_labels, np.log(probs), np.log(1.0 - probs))))
+        else:
+            log_prob = float("nan")
+
+        metrics["log_prob"] = log_prob
+
         return metrics
 
     def _build_detail_records(
         self,
         pairs: Iterable[tuple[Entity, Entity]],
-        gt_labels: list[bool],
-        log_odds: list[float],
-        pred_labels: list[bool],
+        gt_labels: np.ndarray,
+        log_odds: np.ndarray,
+        predictions: np.ndarray,
         threshold: float,
     ) -> list[dict]:
         """Create a per-sample dictionary describing the prediction outcome."""
         records: list[dict] = []
-        for (left, right), gt_label, l_odds, pred_label in zip_longest(
+        for (left, right), gt_label, score, prediction in zip_longest(
             pairs,
             gt_labels,
             log_odds,
-            pred_labels,
+            predictions,
         ):
             ent_type: set[str] = set(left.metadata.get("type", [])) | set(right.metadata.get("type", []))
 
@@ -266,8 +315,9 @@ class LinkingTask(Task):
                     "prop_pattern": prop_pattern,
                     "name_overlap": name_overlap,
                     "label": gt_label,
-                    "cal_log_odds": l_odds - threshold,
-                    "predicted_label": pred_label,
+                    "log_odds": score,
+                    "cal_log_odds": score - threshold,
+                    "predicted_label": prediction,
                     "left_entity_id": left.entity_id,
                     "right_entity_id": right.entity_id,
                 }
@@ -302,19 +352,6 @@ class _ConfMatrix:
     tn: int = 0
     fp: int = 0
     fn: int = 0
-
-    def update(self, gt: bool, pred: bool) -> None:
-        """Update confusion matrix counts based on ground truth and prediction."""
-        if pred == gt:
-            if pred:
-                self.tp += 1
-            else:
-                self.tn += 1
-        else:
-            if pred:
-                self.fp += 1
-            else:
-                self.fn += 1
 
     @property
     def total(self) -> int:
@@ -355,3 +392,23 @@ class _ConfMatrix:
             float: PPV if (tp+fp)>0, else None.
         """
         return self.precision()
+
+    @staticmethod
+    def from_arrays(
+        gt_labels: np.ndarray,
+        predictions: np.ndarray,
+    ) -> _ConfMatrix:
+        """
+        Build a confusion-matrix instance from ground-truth and prediction arrays.
+
+        Args:
+            gt_labels: Ground-truth boolean labels.
+            predictions: Predicted boolean labels.
+
+        Returns:
+            _ConfMatrix: Populated confusion-matrix object.
+        """
+        cm = confusion_matrix(gt_labels, predictions)
+        tn, fp, fn, tp = cm.ravel()
+
+        return _ConfMatrix(tp=tp, tn=tn, fp=fp, fn=fn)

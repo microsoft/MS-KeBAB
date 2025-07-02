@@ -8,6 +8,7 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 from kebab.contracts.entity import Entity
 from kebab.tasks.linking import LinkingTask
@@ -129,7 +130,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     )
 
     # Assert the metrics are calculated correctly
-    metrics = task_instance.evaluate(predictions_path)
+    metrics = task_instance.evaluate(predictions_path, calibrate=False)
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 1
     assert metrics["false_positive"] == 1
@@ -141,7 +142,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert abs(metrics["npv"] - 2 / 3) < 1e-6
     assert math.isnan(metrics["log_prob"])
 
-    metrics = task_instance.evaluate(prob_predictions_path)
+    metrics = task_instance.evaluate(prob_predictions_path, calibrate=False)
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 1
     assert metrics["false_positive"] == 1
@@ -153,3 +154,41 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert abs(metrics["npv"] - 2 / 3) < 1e-6
     assert abs(metrics["empirical_log_prob"] - -3.296) < 1e-3
     assert abs(metrics["log_prob"] - log_prob_total) < 1e-3
+
+    metrics = task_instance.evaluate(prob_predictions_path, calibrate=True)
+    labels = np.array(labels, dtype=bool)
+
+    def obj_function(threshold):
+        pred_pos = log_odds >= threshold
+        pred_neg = ~pred_pos
+
+        tp = int(np.sum(pred_pos & labels))
+        fp = int(np.sum(pred_pos & labels))
+        tn = int(np.sum(pred_neg & labels))
+        fn = int(np.sum(pred_neg & labels))
+
+        ppv = tp / (tp + fp) if (tp + fp) else 0
+        npv = tn / (tn + fn) if (tn + fn) else 0
+        ppv = np.clip(ppv, 1e-10, 1 - 1e-10)
+        npv = np.clip(npv, 1e-10, 1 - 1e-10)
+
+        log_prob = tp * math.log(ppv) + fp * math.log(1 - ppv) + tn * math.log(npv) + fn * math.log(1 - npv)
+        return log_prob
+
+    thresholds = np.linspace(-5, 5, 5001)
+    best_threshold = None
+    best_log_prob = None
+
+    for threshold in thresholds:
+        log_prob = obj_function(threshold)
+
+        if log_prob == float("-inf"):
+            continue
+
+        if best_log_prob is None or log_prob > best_log_prob:
+            best_log_prob = log_prob
+            best_threshold = threshold
+
+    assert metrics["total"] == 5
+    assert np.isclose(metrics["threshold"], best_threshold)
+    assert np.isclose(metrics["empirical_log_prob"], best_log_prob)
