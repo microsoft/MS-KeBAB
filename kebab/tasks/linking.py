@@ -11,6 +11,8 @@ from itertools import zip_longest
 from logging import Logger
 from pathlib import Path
 
+import numpy as np
+
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
 from kebab.utils.io_helpers import (
@@ -107,25 +109,24 @@ class LinkingTask(Task):
         if self.data_ground_truth_boolean is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        preds = self._load_predictions(output_to_evaluate)
+        predictions = np.asarray(self._load_predictions(output_to_evaluate))
         pairs, gt_labels = zip(*self.read_items(), strict=False)
-        self._validate_lengths(preds, gt_labels)
+        gt_labels = np.asarray(gt_labels, dtype=bool)
+        self._validate_lengths(predictions, gt_labels)
 
         output_dir = output_dir or Path.cwd() / "output" / self.path_safe_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # TODO(pmyshkov): this will be determined by calibration in the future
-        threshold = 0.0
-        pred_labels = [p > threshold for p in preds]
+        pred_labels = [p > threshold for p in predictions]
 
-        conf_matrix, log_prob = self._confusion_matrix(list(gt_labels), pred_labels, preds)
+        conf_matrix, log_prob = self._confusion_matrix(list(gt_labels), pred_labels, predictions)
         metrics = {"log_prob": log_prob, **self._extra_metrics(conf_matrix)}
 
         # build detailed records
         detail_records = self._build_detail_records(
             pairs,
             list(gt_labels),
-            preds,
+            predictions,
             pred_labels,
             threshold,
         )
@@ -166,21 +167,21 @@ class LinkingTask(Task):
         """Load numeric predictions from a JSONL file."""
         return list(ItemJsonlReader[float](path, converter=float).read_items())
 
-    def _validate_lengths(self, *streams: list | tuple) -> None:
+    def _validate_lengths(self, *streams: np.array | list | tuple) -> None:
         """Ensure all provided sequences have equal lengths."""
         lengths = {len(s) for s in streams}
         if len(lengths) > 1:
             raise ValueError("Input streams have mismatched lengths.")
 
     def _confusion_matrix(
-        self, gt_labels: list[bool], preds: list[bool], log_odds: list[float]
+        self, gt_labels: np.array, predictions: np.array, log_odds: np.array
     ) -> tuple[_ConfMatrix, float]:
         """Compute confusion matrix and log-probability."""
         conf_matrix = _ConfMatrix()
         log_prob = 0.0
         probabilistic = sorted(set(log_odds)) != [0, 1]
 
-        for gt_label, pred_label, l_odds in zip(gt_labels, preds, log_odds, strict=False):
+        for gt_label, pred_label, l_odds in zip(gt_labels, predictions, log_odds, strict=False):
             conf_matrix.update(gt_label, pred_label)
             if probabilistic:
                 log_prob += math.log(1 / (1 + math.exp(-l_odds))) if gt_label else math.log(1 / (1 + math.exp(l_odds)))
