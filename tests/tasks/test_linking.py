@@ -6,7 +6,7 @@ import math
 import shutil
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -189,8 +189,8 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert metrics["recall"] == 0.5
     assert metrics["ppv"] == 0.5
     assert np.isclose(metrics["npv"], 2 / 3)
-    assert np.isclose(metrics["log_prob"], best_log_prob)
-    assert np.isclose(metrics["log_odds_adjustment"], best_adj, atol=1e-3, rtol=1e-3)
+    assert np.isclose(metrics["log_prob"], cast(float, best_log_prob))
+    assert np.isclose(metrics["log_odds_adjustment"], cast(float, best_adj), atol=1e-3, rtol=1e-3)
     assert np.isclose(metrics["optimistic_log_prob"], -3.2958, atol=1e-4, rtol=1e-4)
 
     opt_threshold = task_instance.maximize_optimistic_log_prob(np.asarray(log_odds), labels)

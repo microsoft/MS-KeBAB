@@ -96,6 +96,7 @@ class LinkingTask(Task):
         logger: Logger | None = None,
         output_dir: Path | None = None,
         adjust_to_test_prior: bool = True,
+        eps: float = 1e-15,
     ) -> dict[str, float]:
         """
         Evaluate an output for the linking task.
@@ -106,6 +107,7 @@ class LinkingTask(Task):
             logger: Optional logger for logging evaluation summaries.
             output_dir: Optional directory for saving metrics and evaluation outputs.
             adjust_to_test_prior: If True, adjust the log-odds to match the prior on the test set.
+            eps: Small value to avoid division by zero in log calculations.
 
         Returns:
             dict[str, float]: Evaluation metrics dictionary.
@@ -125,12 +127,12 @@ class LinkingTask(Task):
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # compute probabilistic metrics (and update the log-odds in-place if needed)
-        metrics = self._compute_probabilistic_metrics(log_odds, gt_labels, adjust_to_test_prior)
+        metrics = self._compute_probabilistic_metrics(log_odds, gt_labels, adjust_to_test_prior, eps=eps)
 
         # compute binary metrics
         predictions = log_odds > 0
         conf_matrix = _ConfMatrix.from_arrays(gt_labels, predictions)
-        metrics = {**metrics, **conf_matrix.get_metrics()}
+        metrics = {**metrics, **conf_matrix.get_metrics(eps=eps)}
 
         # build detailed records
         detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predictions)
@@ -164,7 +166,7 @@ class LinkingTask(Task):
         return c
 
     def _compute_probabilistic_metrics(
-        self, log_odds: np.ndarray, gt_labels: np.ndarray, adjust_to_test_prior: bool
+        self, log_odds: np.ndarray, gt_labels: np.ndarray, adjust_to_test_prior: bool, eps: float
     ) -> dict[str, float]:
         """Compute the probabilistic metrics based on log-odds and ground truth labels."""
         metrics = {"log_prob": float("nan"), "log_odds_adjustment": float("nan")}
@@ -182,6 +184,7 @@ class LinkingTask(Task):
             metrics["log_odds_adjustment"] = log_odds_adj
 
         probs = 1.0 / (1.0 + np.exp(-log_odds))
+        probs = np.clip(probs, eps, 1 - eps)
         log_prob = float(np.sum(np.where(gt_labels, np.log(probs), np.log(1.0 - probs))))
         metrics["log_prob"] = log_prob
 
@@ -191,7 +194,7 @@ class LinkingTask(Task):
         """Report evaluation metrics in a structured format."""
         order = (
             "log_prob",
-            "empirical_log_prob",
+            "optimistic_log_prob",
             "precision",
             "recall",
             "true_positive",
@@ -201,7 +204,7 @@ class LinkingTask(Task):
             "ppv",
             "npv",
             "total",
-            "threshold",
+            "log_odds_adjustment",
         )
 
         reported_metrics = {key: metrics[key] for key in order if key in metrics}
@@ -384,7 +387,7 @@ class _ConfMatrix:
         """
         return self.precision()
 
-    def optimistic_log_prob(self, eps: float = 1e-10) -> float:
+    def optimistic_log_prob(self, eps: float) -> float:
         """Compute the optimistic log-probability based on the confusion matrix."""
         ppv = self.precision()
         npv = self.npv()
@@ -404,7 +407,7 @@ class _ConfMatrix:
 
         return log_prob
 
-    def get_metrics(self) -> dict[str, float]:
+    def get_metrics(self, eps: float) -> dict[str, float]:
         """Get all metrics as a dictionary."""
         return {
             "true_positive": self.tp,
@@ -416,7 +419,7 @@ class _ConfMatrix:
             "recall": self.recall(),
             "npv": self.npv(),
             "ppv": self.ppv(),
-            "optimistic_log_prob": self.optimistic_log_prob(),
+            "optimistic_log_prob": self.optimistic_log_prob(eps=eps),
         }
 
     @staticmethod
