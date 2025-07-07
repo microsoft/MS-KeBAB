@@ -86,31 +86,32 @@ def test_linking_read_int_labels() -> None:
 def test_linking_metrics(tmp_path: Path) -> None:
     """Test the linking metrics calculation."""
     # Prepare the data
-    labels = [True, True, False, False, False]
+    labels = np.asarray([True, True, False, False, False])
     pairs = [(Entity(f"frag_{i}_left"), Entity(f"frag_{i}_right")) for i in range(len(labels))]
-    predictions = [True, False, False, False, True]
-    prob_predictions = [0.9, 0.1, 0.1, 0.1, 0.9]
-    odds = [p / (1 - p) for p in prob_predictions]
-    log_odds = [math.log(o) for o in odds]
-    log_probs = [
-        math.log(pred) if label else math.log(1 - pred) for pred, label in zip(prob_predictions, labels, strict=False)
-    ]
-    log_prob_total = sum(log_probs)
+    predictions = np.asarray([True, False, False, False, True])
+    prob_predictions = np.asarray([0.91, 0.3, 0.45, 0.45, 0.89])
+    odds = prob_predictions / (1 - prob_predictions)
+    log_odds = np.log(odds)
+    shift = 5
+    log_odds += shift
+    shifted_predictions = np.exp(log_odds) / (1 + np.exp(log_odds))
+    log_probs = np.where(labels, np.log(shifted_predictions), np.log(1 - shifted_predictions))
+    log_prob_total = log_probs.sum()
 
     labels_path = tmp_path / "labels.jsonl"
     with open(labels_path, "w") as f:
         for label in labels:
-            f.write(json.dumps(label) + "\n")
+            f.write(json.dumps(bool(label)) + "\n")
 
-    predictions_path = tmp_path / "predictions.jsonl"
-    with open(predictions_path, "w") as f:
+    binary_predictions_path = tmp_path / "predictions.jsonl"
+    with open(binary_predictions_path, "w") as f:
         for prediction in predictions:
-            f.write(json.dumps(prediction) + "\n")
+            f.write(json.dumps(float(prediction)) + "\n")
 
     prob_predictions_path = tmp_path / "prob_predictions.jsonl"
     with open(prob_predictions_path, "w") as f:
         for prediction in log_odds:
-            f.write(json.dumps(prediction) + "\n")
+            f.write(json.dumps(float(prediction)) + "\n")
 
     entity_pairs_path = tmp_path / "entity_pairs.jsonl"
     with open(entity_pairs_path, "w") as f:
@@ -129,8 +130,8 @@ def test_linking_metrics(tmp_path: Path) -> None:
         str(labels_path),
     )
 
-    # Assert the metrics are calculated correctly
-    metrics = task_instance.evaluate(predictions_path, calibrate=False)
+    # binary predictions
+    metrics = task_instance.evaluate(binary_predictions_path, adjust_to_test_prior=False)
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 1
     assert metrics["false_positive"] == 1
@@ -139,10 +140,46 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert metrics["precision"] == 0.5
     assert metrics["recall"] == 0.5
     assert metrics["ppv"] == 0.5
-    assert abs(metrics["npv"] - 2 / 3) < 1e-6
+    assert np.isclose(metrics["npv"], 2 / 3)
     assert math.isnan(metrics["log_prob"])
+    assert math.isnan(metrics["log_odds_adjustment"])
+    assert np.isclose(metrics["optimistic_log_prob"], -3.2958, atol=1e-4, rtol=1e-4)
 
-    metrics = task_instance.evaluate(prob_predictions_path, calibrate=False)
+    metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=False)
+    assert metrics["total"] == 5
+    assert metrics["true_positive"] == 2
+    assert metrics["false_positive"] == 3
+    assert metrics["false_negative"] == 0
+    assert metrics["true_negative"] == 0
+    assert metrics["precision"] == 0.4
+    assert metrics["recall"] == 1.0
+    assert metrics["ppv"] == 0.4
+    assert math.isnan(metrics["npv"])
+    assert np.isclose(metrics["log_prob"], log_prob_total)
+    assert math.isnan(metrics["log_odds_adjustment"])
+    assert math.isnan(metrics["optimistic_log_prob"])
+
+    # log odds adjustment
+    metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=True)
+
+    def adj_log_prob(adj: float) -> float:
+        adj_log_odds = log_odds + adj
+        adj_prob_predictions = np.exp(adj_log_odds) / (1 + np.exp(adj_log_odds))
+        log_probs = np.where(labels, np.log(adj_prob_predictions), np.log(1 - adj_prob_predictions))
+        log_prob_total = log_probs.sum()
+        return log_prob_total
+
+    adjustments = np.linspace(-10, 10, 20001)
+    best_adj = None
+    best_log_prob = None
+
+    for adj in adjustments:
+        log_prob = adj_log_prob(adj)
+
+        if best_log_prob is None or log_prob > best_log_prob:
+            best_log_prob = log_prob
+            best_adj = adj
+
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 1
     assert metrics["false_positive"] == 1
@@ -151,26 +188,26 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert metrics["precision"] == 0.5
     assert metrics["recall"] == 0.5
     assert metrics["ppv"] == 0.5
-    assert abs(metrics["npv"] - 2 / 3) < 1e-6
-    assert abs(metrics["empirical_log_prob"] - -3.296) < 1e-3
-    assert abs(metrics["log_prob"] - log_prob_total) < 1e-3
+    assert np.isclose(metrics["npv"], 2 / 3)
+    assert np.isclose(metrics["log_prob"], best_log_prob)
+    assert np.isclose(metrics["log_odds_adjustment"], best_adj, atol=1e-3, rtol=1e-3)
+    assert np.isclose(metrics["optimistic_log_prob"], -3.2958, atol=1e-4, rtol=1e-4)
 
-    metrics = task_instance.evaluate(prob_predictions_path, calibrate=True)
-    labels = np.array(labels, dtype=bool)
+    opt_threshold = task_instance.maximize_optimistic_log_prob(np.asarray(log_odds), labels)
 
-    def obj_function(threshold):
+    def optimistic_log_prob(threshold):
+        eps = 1e-15
         pred_pos = log_odds >= threshold
-        pred_neg = ~pred_pos
 
         tp = int(np.sum(pred_pos & labels))
-        fp = int(np.sum(pred_pos & labels))
-        tn = int(np.sum(pred_neg & labels))
-        fn = int(np.sum(pred_neg & labels))
+        fp = int(np.sum(pred_pos & ~labels))
+        tn = int(np.sum(~pred_pos & ~labels))
+        fn = int(np.sum(~pred_pos & labels))
 
         ppv = tp / (tp + fp) if (tp + fp) else 0
         npv = tn / (tn + fn) if (tn + fn) else 0
-        ppv = np.clip(ppv, 1e-10, 1 - 1e-10)
-        npv = np.clip(npv, 1e-10, 1 - 1e-10)
+        ppv = np.clip(ppv, eps, 1 - eps)
+        npv = np.clip(npv, eps, 1 - eps)
 
         log_prob = tp * math.log(ppv) + fp * math.log(1 - ppv) + tn * math.log(npv) + fn * math.log(1 - npv)
         return log_prob
@@ -180,7 +217,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     best_log_prob = None
 
     for threshold in thresholds:
-        log_prob = obj_function(threshold)
+        log_prob = optimistic_log_prob(threshold)
 
         if log_prob == float("-inf"):
             continue
@@ -189,6 +226,4 @@ def test_linking_metrics(tmp_path: Path) -> None:
             best_log_prob = log_prob
             best_threshold = threshold
 
-    assert metrics["total"] == 5
-    assert np.isclose(metrics["threshold"], best_threshold)
-    assert np.isclose(metrics["empirical_log_prob"], best_log_prob)
+    assert np.isclose(optimistic_log_prob(best_threshold), optimistic_log_prob(opt_threshold))

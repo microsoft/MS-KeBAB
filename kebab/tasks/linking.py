@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import math
-from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import zip_longest
@@ -12,6 +11,8 @@ from logging import Logger
 from pathlib import Path
 
 import numpy as np
+from scipy.optimize import brentq
+from scipy.special import expit
 from sklearn.metrics import confusion_matrix
 
 from kebab.contracts.entity import Entity
@@ -94,17 +95,17 @@ class LinkingTask(Task):
         eval_result_path: Path | None = None,
         logger: Logger | None = None,
         output_dir: Path | None = None,
-        calibrate: bool = True,
+        adjust_to_test_prior: bool = True,
     ) -> dict[str, float]:
         """
         Evaluate an output for the linking task.
 
         Args:
-            output_to_evaluate: Path to model output predictions.
+            output_to_evaluate: Path to model output predictions (log-odds or 0/1 predictions).
             eval_result_path: Optional path to save evaluation metrics as JSON.
             logger: Optional logger for logging evaluation summaries.
             output_dir: Optional directory for saving metrics and evaluation outputs.
-            calibrate: If True, calibrate the threshold based on ground truth data.
+            adjust_to_test_prior: If True, adjust the log-odds to match the prior on the test set.
 
         Returns:
             dict[str, float]: Evaluation metrics dictionary.
@@ -123,24 +124,16 @@ class LinkingTask(Task):
         output_dir = output_dir or Path.cwd() / "output" / self.path_safe_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        threshold = self._calibrate(gt_labels, log_odds) if calibrate else 0.0
-        predictions = log_odds > threshold
+        # compute probabilistic metrics (and update the log-odds in-place if needed)
+        metrics = self._compute_probabilistic_metrics(log_odds, gt_labels, adjust_to_test_prior)
 
+        # compute binary metrics
+        predictions = log_odds > 0
         conf_matrix = _ConfMatrix.from_arrays(gt_labels, predictions)
-        metrics = self._compute_metrics(conf_matrix, gt_labels, log_odds)
-
-        if calibrate:
-            metrics["threshold"] = threshold
+        metrics = {**metrics, **conf_matrix.get_metrics()}
 
         # build detailed records
-        detail_records = self._build_detail_records(
-            pairs,
-            gt_labels,
-            log_odds,
-            predictions,
-            threshold,
-        )
-
+        detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predictions)
         self._write_side_outputs(metrics, detail_records, output_dir, eval_result_path)
 
         # report metrics in console or logger
@@ -148,13 +141,155 @@ class LinkingTask(Task):
 
         return metrics
 
-    def _calibrate(self, gt_labels: np.ndarray, log_odds: np.ndarray, eps: float = 1e-15) -> float:
+    def _compute_log_odds_adjustment(self, log_odds: np.ndarray, gt_labels: np.ndarray) -> float:
+        """Compute the prior train->test log odds adjustment based on the ground truth labels."""
+        log_odds = np.asarray(log_odds, dtype=float)
+        gt_labels = np.asarray(gt_labels, dtype=float)
+
+        # ML estimate of the constant log-odds shift:
+        # d/dc L(l_odds + c) = 0
+        # => sum(y_i) - exp(log_odds + c) = 0
+        # i.e. the observed prevalence of the positive class should match the expected prevalence
+        def balance(c: float) -> float:
+            """Balance function to find the constant c."""
+            return gt_labels.sum() - expit(log_odds + c).sum()
+
+        # expand the interval until the balance function changes sign
+        lo, hi = -20.0, 20.0
+        while balance(lo) * balance(hi) > 0:
+            lo *= 2.0
+            hi *= 2.0
+
+        c = float(brentq(balance, lo, hi))
+        return c
+
+    def _compute_probabilistic_metrics(
+        self, log_odds: np.ndarray, gt_labels: np.ndarray, adjust_to_test_prior: bool
+    ) -> dict[str, float]:
+        """Compute the probabilistic metrics based on log-odds and ground truth labels."""
+        metrics = {"log_prob": float("nan"), "log_odds_adjustment": float("nan")}
+
+        # determine if the predictions are log-odds or binary
+        vals = np.unique(log_odds)
+        probabilistic = not (vals.size == 2 and np.allclose(np.sort(vals), [0.0, 1.0]))  # noqa: PLR2004
+
+        if not probabilistic:
+            return metrics
+
+        if adjust_to_test_prior:
+            log_odds_adj = self._compute_log_odds_adjustment(log_odds, gt_labels)
+            log_odds += log_odds_adj
+            metrics["log_odds_adjustment"] = log_odds_adj
+
+        probs = 1.0 / (1.0 + np.exp(-log_odds))
+        log_prob = float(np.sum(np.where(gt_labels, np.log(probs), np.log(1.0 - probs))))
+        metrics["log_prob"] = log_prob
+
+        return metrics
+
+    def _report_metrics(self, logger: Logger | None, metrics: dict[str, float]):
+        """Report evaluation metrics in a structured format."""
+        order = (
+            "log_prob",
+            "empirical_log_prob",
+            "precision",
+            "recall",
+            "true_positive",
+            "true_negative",
+            "false_positive",
+            "false_negative",
+            "ppv",
+            "npv",
+            "total",
+            "threshold",
+        )
+
+        reported_metrics = {key: metrics[key] for key in order if key in metrics}
+
+        if logger:
+            logger.info(
+                "\t".join(reported_metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in reported_metrics.values())
+            )
+        else:
+            print("\t".join(reported_metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in reported_metrics.values()))
+
+    def _build_detail_records(
+        self,
+        pairs: Iterable[tuple[Entity, Entity]],
+        gt_labels: np.ndarray,
+        log_odds: np.ndarray,
+        predictions: np.ndarray,
+    ) -> list[dict]:
+        """Create a per-sample dictionary describing the prediction outcome."""
+        records: list[dict] = []
+        for (left, right), gt_label, score, prediction in zip_longest(
+            pairs,
+            gt_labels,
+            log_odds,
+            predictions,
+        ):
+            ent_type: set[str] = set(left.metadata.get("type", [])) | set(right.metadata.get("type", []))
+
+            left_props = set(left.properties.keys())
+            right_props = set(right.properties.keys())
+            overlap_props = sorted(left_props & right_props)
+
+            prop_pattern = tuple(sorted([tuple(sorted(left.properties)), tuple(sorted(right.properties))]))
+
+            name_overlap = (
+                len(
+                    {name.lower() for name in left.properties.get("name", [])}
+                    & {name.lower() for name in right.properties.get("name", [])}
+                )
+                >= 1
+            )
+
+            records.append(
+                {
+                    "left": dict(left.properties),
+                    "right": dict(right.properties),
+                    "entity_type": sorted(ent_type),
+                    "overlap_props": overlap_props,
+                    "prop_overlap_num": len(overlap_props),
+                    "prop_pattern": prop_pattern,
+                    "name_overlap": name_overlap,
+                    "label": gt_label,
+                    "log_odds": score,
+                    "predicted_label": prediction,
+                    "left_entity_id": left.entity_id,
+                    "right_entity_id": right.entity_id,
+                }
+            )
+
+        return records
+
+    def _write_side_outputs(
+        self,
+        metrics: dict[str, float],
+        detail_records: list[dict],
+        output_dir: Path,
+        eval_result_path: Path | None,
+    ) -> None:
+        """Save evaluation metrics and detailed prediction records."""
+        if eval_result_path:
+            save_dict_to_json(metrics, eval_result_path)
+
+        tsv_path = output_dir / "linking_predictions.tsv"
+        with tsv_path.open("w", encoding="utf-8") as f:
+            headers = detail_records[0].keys()
+            f.write("\t".join(headers) + "\n")
+            for row in detail_records:
+                f.write("\t".join(str(row.get(h, "")) for h in headers) + "\n")
+
+    @classmethod
+    def maximize_optimistic_log_prob(cls, log_odds: np.ndarray, gt_labels: np.ndarray, eps: float = 1e-15) -> float:
         """
-        Determine the threshold that maximizes the empirical log-probability.
+        Determine the threshold that maximizes the optimistic log-probability.
 
         Args:
             gt_labels: Ground truth boolean labels.
             log_odds: Array of predicted scores (log-odds).
+            eps: Small value to avoid division by zero.
 
         Returns:
             float: Optimal threshold for classification.
@@ -198,150 +333,6 @@ class LinkingTask(Task):
                 best_threshold = score - eps
 
         return best_threshold
-
-    def _report_metrics(self, logger: Logger | None, metrics: dict[str, float]):
-        """Report evaluation metrics in a structured format."""
-        order = (
-            "log_prob",
-            "empirical_log_prob",
-            "precision",
-            "recall",
-            "true_positive",
-            "true_negative",
-            "false_positive",
-            "false_negative",
-            "ppv",
-            "npv",
-            "total",
-            "threshold",
-        )
-
-        reported_metrics = {key: metrics[key] for key in order if key in metrics}
-
-        if logger:
-            logger.info(
-                "\t".join(reported_metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in reported_metrics.values())
-            )
-        else:
-            print("\t".join(reported_metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in reported_metrics.values()))
-
-    def _compute_metrics(
-        self, conf_matrix: _ConfMatrix, gt_labels: np.ndarray, log_odds: np.ndarray
-    ) -> dict[str, float]:
-        """Compute evaluation metrics based on the confusion matrix and log-odds."""
-        # empirical log-prob
-        metrics: dict[str, float] = defaultdict(float)
-        precision = conf_matrix.precision()
-        recall = conf_matrix.recall()
-        npv = conf_matrix.npv()
-        ppv = conf_matrix.ppv()
-
-        metrics.update(
-            true_positive=conf_matrix.tp,
-            true_negative=conf_matrix.tn,
-            false_positive=conf_matrix.fp,
-            false_negative=conf_matrix.fn,
-            total=conf_matrix.total,
-        )
-
-        if precision is not None:
-            metrics["precision"] = precision
-            metrics["ppv"] = ppv
-
-        if recall is not None:
-            metrics["recall"] = recall
-
-        if npv is not None:
-            metrics["npv"] = npv
-
-        if ppv and npv and 0 < ppv < 1 and 0 < npv < 1:
-            log_prob = conf_matrix.tp * math.log(ppv) + conf_matrix.fp * math.log(1 - ppv)
-            log_prob += conf_matrix.tn * math.log(npv) + conf_matrix.fn * math.log(1 - npv)
-            metrics["empirical_log_prob"] = log_prob
-
-        # log-prob
-        vals = np.unique(log_odds)
-        probabilistic = not (vals.size == 2 and np.allclose(np.sort(vals), [0.0, 1.0]))
-
-        if probabilistic:
-            probs = 1.0 / (1.0 + np.exp(-log_odds))
-            log_prob = float(np.sum(np.where(gt_labels, np.log(probs), np.log(1.0 - probs))))
-        else:
-            log_prob = float("nan")
-
-        metrics["log_prob"] = log_prob
-
-        return metrics
-
-    def _build_detail_records(
-        self,
-        pairs: Iterable[tuple[Entity, Entity]],
-        gt_labels: np.ndarray,
-        log_odds: np.ndarray,
-        predictions: np.ndarray,
-        threshold: float,
-    ) -> list[dict]:
-        """Create a per-sample dictionary describing the prediction outcome."""
-        records: list[dict] = []
-        for (left, right), gt_label, score, prediction in zip_longest(
-            pairs,
-            gt_labels,
-            log_odds,
-            predictions,
-        ):
-            ent_type: set[str] = set(left.metadata.get("type", [])) | set(right.metadata.get("type", []))
-
-            left_props = set(left.properties.keys())
-            right_props = set(right.properties.keys())
-            overlap_props = sorted(left_props & right_props)
-
-            prop_pattern = tuple(sorted([tuple(sorted(left.properties)), tuple(sorted(right.properties))]))
-
-            name_overlap = (
-                len(
-                    {name.lower() for name in left.properties.get("name", [])}
-                    & {name.lower() for name in right.properties.get("name", [])}
-                )
-                >= 1
-            )
-
-            records.append(
-                {
-                    "left": dict(left.properties),
-                    "right": dict(right.properties),
-                    "entity_type": sorted(ent_type),
-                    "overlap_props": overlap_props,
-                    "prop_overlap_num": len(overlap_props),
-                    "prop_pattern": prop_pattern,
-                    "name_overlap": name_overlap,
-                    "label": gt_label,
-                    "log_odds": score,
-                    "cal_log_odds": score - threshold,
-                    "predicted_label": prediction,
-                    "left_entity_id": left.entity_id,
-                    "right_entity_id": right.entity_id,
-                }
-            )
-
-        return records
-
-    def _write_side_outputs(
-        self,
-        metrics: dict[str, float],
-        detail_records: list[dict],
-        output_dir: Path,
-        eval_result_path: Path | None,
-    ) -> None:
-        """Save evaluation metrics and detailed prediction records."""
-        if eval_result_path:
-            save_dict_to_json(metrics, eval_result_path)
-
-        tsv_path = output_dir / "linking_predictions.tsv"
-        with tsv_path.open("w", encoding="utf-8") as f:
-            headers = detail_records[0].keys()
-            f.write("\t".join(headers) + "\n")
-            for row in detail_records:
-                f.write("\t".join(str(row.get(h, "")) for h in headers) + "\n")
 
 
 @dataclass
@@ -392,6 +383,41 @@ class _ConfMatrix:
             float: PPV if (tp+fp)>0, else None.
         """
         return self.precision()
+
+    def optimistic_log_prob(self, eps: float = 1e-10) -> float:
+        """Compute the optimistic log-probability based on the confusion matrix."""
+        ppv = self.precision()
+        npv = self.npv()
+
+        if ppv is None or npv is None:
+            return float("nan")
+
+        ppv = np.clip(ppv, eps, 1 - eps)
+        npv = np.clip(npv, eps, 1 - eps)
+
+        log_prob = (
+            self.tp * math.log(ppv)
+            + self.fp * math.log(1 - ppv)
+            + self.tn * math.log(npv)
+            + self.fn * math.log(1 - npv)
+        )
+
+        return log_prob
+
+    def get_metrics(self) -> dict[str, float]:
+        """Get all metrics as a dictionary."""
+        return {
+            "true_positive": self.tp,
+            "true_negative": self.tn,
+            "false_positive": self.fp,
+            "false_negative": self.fn,
+            "total": self.total,
+            "precision": self.precision(),
+            "recall": self.recall(),
+            "npv": self.npv(),
+            "ppv": self.ppv(),
+            "optimistic_log_prob": self.optimistic_log_prob(),
+        }
 
     @staticmethod
     def from_arrays(
