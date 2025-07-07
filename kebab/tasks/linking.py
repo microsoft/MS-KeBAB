@@ -290,8 +290,8 @@ class LinkingTask(Task):
         Determine the threshold that maximizes the optimistic log-probability.
 
         Args:
-            gt_labels: Ground truth boolean labels.
             log_odds: Array of predicted scores (log-odds).
+            gt_labels: Ground truth boolean labels.
             eps: Small value to avoid division by zero.
 
         Returns:
