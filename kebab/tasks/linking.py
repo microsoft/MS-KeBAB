@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from itertools import zip_longest
 from logging import Logger
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 from scipy.optimize import brentq
@@ -162,7 +163,7 @@ class LinkingTask(Task):
             lo *= 2.0
             hi *= 2.0
 
-        c = float(brentq(balance, lo, hi))
+        c = float(cast(float, brentq(balance, lo, hi)))
         return c
 
     def _compute_probabilistic_metrics(
