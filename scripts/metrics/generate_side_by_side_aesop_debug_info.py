@@ -1,17 +1,10 @@
 from argparse import ArgumentParser
+from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
 
+
 import pandas as pd
-
-
-def to_list_of_strings(serialized_list: str) -> list[str]:
-    """Convert a serialized list of strings to a list of strings."""
-    return [item.strip().strip("'") for item in serialized_list.strip("[]").split(",") if item.strip().strip("'")]
-
-
-def to_list_of_float(serialized_list: str) -> list[float]:
-    """Convert a serialized list of floats to a list of floats."""
-    return [float(item.strip()) for item in serialized_list.strip("[]").split(",") if item.strip()]
 
 
 def empty_row(columns: list[str]) -> pd.DataFrame:
@@ -19,93 +12,175 @@ def empty_row(columns: list[str]) -> pd.DataFrame:
     return pd.DataFrame.from_records([dict.fromkeys(columns, "")])
 
 
-def load_debug_info(filename: str) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
-    """Load debug info from a CSV file and return a dictionary of DataFrames."""
-    debug_info = pd.read_csv(
-        filename,
-        converters={
-            "property_id": str,
-            "gt_values": to_list_of_strings,
-            "pred_values": to_list_of_strings,
-            "matched_scores": to_list_of_float,
-            "unmatched_gt_values": to_list_of_strings,
-            "unmatched_pred_values": to_list_of_strings,
-        },
+def drop_last_columns(df: pd.DataFrame, num_cols_to_drop: int) -> pd.DataFrame:
+    """Drop the last `num_cols_to_drop` columns from a DataFrame."""
+    if num_cols_to_drop <= 0:
+        return df
+    return df.drop(columns=df.columns[-num_cols_to_drop:], axis=1)
+
+
+def split_df_by_document_id(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Split a DataFrame into multiple DataFrames by document_id."""
+    split_dfs = {}
+    for document_id, group in df.groupby("document_id"):
+        group = group.reset_index(drop=True)
+        split_dfs[document_id] = group
+    return split_dfs
+
+def split_by_gt_entity(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Split a DataFrame into multiple DataFrames by entity_id."""
+    split_dfs = {}
+    for entity_id, group in df.groupby("gt_entity_id"):
+        group = group.reset_index(drop=True)
+        split_dfs[entity_id] = group
+    return split_dfs
+
+
+def split_by_pred_entity(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Split a DataFrame into multiple DataFrames by predicted entity_id."""
+    split_dfs = {}
+    for entity_id, group in df.groupby("pred_entity_id"):
+        group = group.reset_index(drop=True)
+        split_dfs[group["name"].values[0]] = group
+    return split_dfs
+
+
+def add_suffix_excluding_columns(
+    df: pd.DataFrame, suffix: str, excluded_columns: Iterable[str] | None = None
+) -> pd.DataFrame:
+    """Add a suffix to all columns except the excluded ones."""
+    if excluded_columns is None:
+        excluded_columns_set = set()
+    else:
+        excluded_columns_set = set(excluded_columns)
+
+    return df.rename(mapper=lambda x: x + suffix if x not in excluded_columns_set else x, axis=1)
+
+
+def drop_columns(df: pd.DataFrame, columns: Iterable[str]) -> pd.DataFrame:
+    """Drop specified columns from a DataFrame."""
+    return df.drop(columns=columns, errors="ignore")
+
+def merge_entity_dfs(df_left: pd.DataFrame, df_right: pd.DataFrame, suffixes: tuple[str, str]) -> pd.DataFrame:
+    excluded_columns = {"document_id", "original_text", "property_id", "gt_entity_id", "gt_values"}
+    # matched_pred_ids_left.update(value for value in df_part_1["pred_entity_id"].values if value != "")
+    # matched_pred_ids_right.update(value for value in df_part_2["pred_entity_id"].values if value != "")
+    df_left = add_suffix_excluding_columns(df_left, suffixes[0], excluded_columns)
+    df_right = add_suffix_excluding_columns(df_right, suffixes[1], excluded_columns)
+    matched = pd.merge(
+        df_left[df_left["property_id"].notna()],
+        df_right[df_right["property_id"].notna()],
+        on=list(excluded_columns),
+        suffixes=suffixes,
     )
-    entity_rows = []
-    gt_names_to_df = {}
-    gt_names = None
-    pred_values_idx = 0
-    for row in debug_info.itertuples(index=False):
-        if row.property_id == "" and gt_names is not None:  # type: ignore
-            entity_df = pd.DataFrame.from_records(sorted(entity_rows, key=lambda x: x["property_id"]))
-            entity_df["all_gt_names"] = str(gt_names)
-            gt_names_to_df[gt_names] = entity_df
-            entity_rows = []
-            gt_names = None
-        elif row.property_id == "name":  # type: ignore
-            gt_names = tuple(row.gt_values + row.unmatched_gt_values)  # type: ignore
-            if not gt_names:
-                # reached unmatched pred_values
-                gt_names = None
-                break
-            entity_rows.append(row._asdict())  # type: ignore
-        else:
-            entity_rows.append(row._asdict())  # type: ignore
-        pred_values_idx += 1
-    if gt_names is not None and entity_rows:
-        entity_df = pd.DataFrame.from_records(sorted(entity_rows, key=lambda x: x["property_id"]))
-        entity_df["all_gt_names"] = gt_names
-        gt_names_to_df[gt_names] = entity_df
-    unmatched_pred_df = debug_info.iloc[pred_values_idx:]
-    unmatched_pred_df["all_gt_names"] = str([])
-    return gt_names_to_df, unmatched_pred_df  # type: ignore
+    unmatched_right = df_right[df_right["property_id"].isna()].drop(columns=excluded_columns)
+    unmatched_left = df_left[df_left["property_id"].isna()]
+    unmatched = pd.merge(
+        unmatched_left,
+        unmatched_right,
+        left_on=[f"original_pred_property_id{suffixes[0]}", f"pred_values{suffixes[0]}"],
+        right_on=[f"original_pred_property_id{suffixes[1]}", f"pred_values{suffixes[1]}"],
+        how="outer",
+    )
+    result = pd.concat([matched, unmatched], ignore_index=True)
+    return result
+
+def split_into_gt_and_unmatched_pred(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    return df[df["gt_entity_id"].notna()], df[df["gt_entity_id"].isna()] # type: ignore
+
+def merge_document_dfs(document_dfs: list[pd.DataFrame], suffixes: tuple[str, str] | None = None) -> pd.DataFrame:
+    gt_left, unmatched_pred_left = split_into_gt_and_unmatched_pred(document_dfs[0])
+    gt_right, unmatched_pred_right = split_into_gt_and_unmatched_pred(document_dfs[1])
+    common_columns = ["document_id", "original_text", "gt_entity_id", "property_id", "gt_values"]
+
+    if suffixes is None:
+        suffixes = ("_1", "_2")
+
+    columns_left = list(add_suffix_excluding_columns(document_dfs[0], suffixes[0], set(common_columns)).columns)
+    columns_right = list(add_suffix_excluding_columns(document_dfs[1], suffixes[1], set(common_columns)).columns)
+    gt_id_to_entity_left = split_by_gt_entity(gt_left)
+    gt_id_to_entity_right = split_by_gt_entity(gt_right)
+
+    all_gt_ids = gt_id_to_entity_left.keys()
+
+    merged_gt = []
+    for gt_entity_id in all_gt_ids:
+        merged_gt.append(
+            merge_entity_dfs(gt_id_to_entity_left[gt_entity_id], gt_id_to_entity_right[gt_entity_id], suffixes)
+        )
+
+    merged_gt_df = None
+    if merged_gt:
+        merged_gt_df = pd.concat(merged_gt, ignore_index=True)
+
+    name_to_entity_left = split_by_pred_entity(unmatched_pred_left)
+    name_to_entity_right = split_by_pred_entity(unmatched_pred_right)
+
+    matched_names = set(name_to_entity_left.keys()) & set(name_to_entity_right.keys())
+
+    merged_unmatched_pred = []
+    for name in matched_names:
+        merged_unmatched_pred.append(merge_entity_dfs(name_to_entity_left[name], name_to_entity_right[name], suffixes))
+
+    merged_unmatched_pred_df = None
+    if merged_unmatched_pred:
+        merged_unmatched_pred_df = pd.concat(merged_unmatched_pred)
+
+    left_unmatched_names = [entity for name, entity in name_to_entity_left.items() if name not in matched_names]
+    right_unmatched_names = [entity for name, entity in name_to_entity_right.items() if name not in matched_names]
+    if left_unmatched_names:
+        unmatched_pred_left_remainder = pd.concat(left_unmatched_names, ignore_index=True)
+        unmatched_pred_left_remainder = add_suffix_excluding_columns(unmatched_pred_left_remainder, suffixes[0], common_columns)
+    else:
+        unmatched_pred_left_remainder = empty_row(columns_left)
+
+    if right_unmatched_names:
+        unmatched_pred_right_remainder = pd.concat(right_unmatched_names, ignore_index=True)
+        unmatched_pred_right_remainder = add_suffix_excluding_columns(unmatched_pred_right_remainder, suffixes[1], common_columns)
+    else:
+        unmatched_pred_right_remainder = empty_row(columns_right)
+
+    unmatched_pred_right_remainder = drop_columns(unmatched_pred_right_remainder, common_columns)
+
+    unmatched_df = pd.concat([unmatched_pred_left_remainder, unmatched_pred_right_remainder], axis=1)
+
+    result = pd.concat(
+        [df for df in [merged_gt_df, merged_unmatched_pred_df, unmatched_df] if df is not None], ignore_index=True
+    )
+    return result
 
 
-def generate_side_by_side_comparison(
-    filename1: str, filename2: str, output_filename: str, suffixes: tuple[str, str] = ("_1", "_2")
-) -> None:
-    """Generate a side-by-side comparison of two debug info CSV files."""
-    gt_names_to_df1, unmatched_pred_df1 = load_debug_info(filename1)
-    gt_names_to_df2, unmatched_pred_df2 = load_debug_info(filename2)
-
-    dfs = []
-    columns = ["gt_values", "pred_values", "matched_scores", "unmatched_gt_values", "unmatched_pred_values"]
-    merged_columns = ["property_id", "all_gt_names"] + [col + suffix for col in columns for suffix in suffixes]
-    key_intersection = set(gt_names_to_df1.keys()).intersection(set(gt_names_to_df2.keys()))
-    suffixes = ("_phi4", "_phi3")
-    for key in key_intersection:
-        df1 = gt_names_to_df1[key]
-        df2 = gt_names_to_df2[key]
-        dfs.append(df1.merge(df2, on=["property_id", "all_gt_names"], suffixes=suffixes)[merged_columns])
-        dfs.append(empty_row(merged_columns))
-    unmatched_pred_df1 = unmatched_pred_df1.rename(mapper={col: col + suffixes[0] for col in columns}, axis=1)
-    unmatched_pred_df2 = unmatched_pred_df2.rename(mapper={col: col + suffixes[1] for col in columns}, axis=1)
-    for column in columns:
-        unmatched_pred_df1[column + suffixes[1]] = ""
-        unmatched_pred_df2[column + suffixes[0]] = ""
-    dfs.append(unmatched_pred_df1)
-    dfs.append(unmatched_pred_df2)
-    return pd.concat(dfs, ignore_index=True).to_csv(output_filename, index=False)
-
+def generate_side_by_side_comparison(filename1: str, filename2: str, output_filename: str, suffixes: tuple[str, str] | None = None) -> None:
+    num_cols_to_drop = 5  # Assuming the last 5 columns are metrics
+    dfs = [drop_last_columns(pd.read_excel(filename), num_cols_to_drop) for filename in [filename1, filename2]]
+    doc_id_to_dfs = defaultdict(list)
+    for df in dfs:
+        split_dfs = split_df_by_document_id(df)
+        for document_id, split_df in split_dfs.items():
+            doc_id_to_dfs[document_id].append(split_df)
+    merged_doc_dfs = []
+    for document_id, document_dfs in doc_id_to_dfs.items():
+        merged_doc_df = merge_document_dfs(document_dfs, suffixes)
+        merged_doc_dfs.append(merged_doc_df)
+    result = pd.concat(merged_doc_dfs, ignore_index=True)
+    result.to_excel(output_filename, index=False)
 
 def main():
-    """Entry point for the script to generate side-by-side comparison of debug info CSV files."""
-    parser = ArgumentParser(description="Generate side-by-side comparison of debug info CSV files.")
-    parser.add_argument("dir1", type=Path, help="Directory containing the first set of debug info CSV files.")
-    parser.add_argument("dir2", type=Path, help="Directory containing the second set of debug info CSV files.")
-    parser.add_argument("output_dir", type=Path, help="Directory to save the comparison CSV files.")
+    """Entry point for the script to generate side-by-side comparison of debug info XLSX files."""
+    parser = ArgumentParser(description="Generate side-by-side comparison of debug info XLSX files.")
+    parser.add_argument("dir1", type=Path, help="Directories containing sets of debug info XSLX files.")
+    parser.add_argument("dir2", type=Path, help="Directories containing sets of debug info XLSX files.")
+    parser.add_argument("output_dir", type=Path, help="Directory to save the comparison XLSX files.")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    for file1 in args.dir1.glob("*.csv"):
+    for dir in [args.dir1, args.dir2]:
+        if not dir.is_dir():
+            raise ValueError(f"Provided path {dir} is not a directory.")
+    for file1 in args.dir1.glob("*.xlsx"):
         file2 = args.dir2 / file1.name
-        if file2.exists():
-            output_filename = args.output_dir / file1.name.replace(".csv", "_comparison.csv")
-            generate_side_by_side_comparison(file1, file2, output_filename, suffixes=("_phi4", "_phi3"))
-            print(f"Generated comparison for {file1.name} and {file2.name} at {output_filename}.")
-        else:
-            print(f"File {file2} does not exist. Skipping comparison.")
-
-
-if __name__ == "__main__":
-    main()
+        if not file2.is_file():
+            print(f"File {file2} does not exist. Skipping.")
+            continue
+        output_filename = args.output_dir / file1.name.replace(".xlsx", "_comparison.xlsx")
+        generate_side_by_side_comparison(file1, file2, output_filename, suffixes=("_1", "_2"))
+        print(f"Comparison file for {file1.name} saved to {args.output_dir}")
