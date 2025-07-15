@@ -4,17 +4,16 @@
 # Exit immediately if anything goes wrong
 set -e
 
-# Create and activate virtual environment
+# Install uv
 rm -rf .venv/
-python3 -m venv .venv
-source .venv/bin/activate
+pipx install --python "$(which python3)" uv
 
-# Install dependencies
-pip install --upgrade pip setuptools wheel
-pip install -e .[dev]
+# Install the package
+uv sync
 
+# Run the tests
 chmod +x ./test.sh
 ./test.sh
 
-deactivate
+# Clean up
 rm -rf .venv/
