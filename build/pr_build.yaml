@@ -6,23 +6,24 @@ name: PR.$(date:yyyyMMdd)$(rev:.r)
 trigger: none
 
 pr:
-- main
+  - main
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: "ubuntu-latest"
 
 steps:
-- checkout: self
-  clean: true
-  persistCredentials: true
+  - checkout: self
+    clean: true
+    persistCredentials: true
 
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '3.12'
-    addToPath: true
-  displayName: Use python 3.12.x
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.12"
+      addToPath: true
+    displayName: Use python 3.12.x
 
-- bash: |
-    chmod +x ./build_and_test.sh
-    ./build_and_test.sh
-  displayName: Run tests and checks
+  - bash: |
+      rm -rf .venv/
+      pipx install --python "$(which python3)" uv
+      ./build_and_test.sh
+    displayName: Run tests and checks

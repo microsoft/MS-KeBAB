@@ -5,16 +5,16 @@
 set -e
 
 # Style check
-ruff format --check 
+uv run ruff format --check 
 
 # Organise imports
-ruff check --select I 
+uv run ruff check --select I 
 
 # Lint
-ruff check
+uv run ruff check
 
 # Type check
-pyright
+uv run pyright
 
-# Run tests
-python3 -m pytest
+# Tests
+uv run pytest
