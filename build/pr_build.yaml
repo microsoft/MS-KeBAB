@@ -23,5 +23,7 @@ steps:
     displayName: Use python 3.12.x
 
   - bash: |
+      rm -rf .venv/
+      pipx install --python "$(which python3)" uv
       ./build_and_test.sh
     displayName: Run tests and checks
