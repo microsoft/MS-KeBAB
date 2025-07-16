@@ -12,7 +12,6 @@ pipx install --python "$(which python3)" uv
 uv sync --locked
 
 # Run the tests
-chmod +x ./test.sh
 ./test.sh
 
 # Clean up
