@@ -323,6 +323,7 @@ def query_single_entity_via_api(wikidata_id: str, english_only: bool = True) -> 
     entities = query_entities_via_api([wikidata_id], english_only=english_only)
     return entities.get(wikidata_id) if entities else None
 
+
 def get_id_from_wikidata_claim(claim: dict) -> str | None:
     """Extract the ID from a Wikidata claim."""
     if "mainsnak" in claim and "datavalue" in claim["mainsnak"]:
@@ -331,9 +332,11 @@ def get_id_from_wikidata_claim(claim: dict) -> str | None:
             return value["id"]
     return None
 
+
 def get_entity_label(entity: dict) -> str:
     """Extract the English label from a Wikidata entity."""
     return entity.get("labels", {}).get("en", {}).get("value", "")
+
 
 def get_entity_aliases(entity: dict) -> set[str]:
     """Extract aliases from a Wikidata entity."""
@@ -341,6 +344,7 @@ def get_entity_aliases(entity: dict) -> set[str]:
     if "aliases" in entity:
         aliases = {v["value"] for v in entity["aliases"].get("en", []) if "value" in v}
     return aliases
+
 
 def fetch_properties_via_api(
     start: int = 1,
@@ -387,20 +391,24 @@ def fetch_properties_via_api(
             wikidata_item_links = entity.get("claims", {}).get("P1629", [])
             if wikidata_item_links:
                 wikidata_item_ids = [get_id_from_wikidata_claim(claim) for claim in wikidata_item_links]
-                wikidata_item_ids = [id for id in wikidata_item_ids if id is not None]
+                wikidata_item_ids = [id_ for id_ in wikidata_item_ids if id_ is not None]
                 if wikidata_item_ids:
                     wikidata_items = query_entities_via_api(wikidata_item_ids)
                     for wikidata_item in wikidata_items.values():
                         label = get_entity_label(wikidata_item)
                         aliases = get_entity_aliases(wikidata_item)
-                        logging.info(f"Found Wikidata item '{label}' with aliases {aliases} for property '{prop_record['label']}'")
+                        logging.info(
+                            f"Found Wikidata item '{label}' with aliases {aliases} for property '{prop_record['label']}'"
+                        )
                         num_labels = len(prop_record["aliases"])
                         prop_record["aliases"].add(label)
                         prop_record["aliases"].update(aliases)
                         num_additional_aliases = len(prop_record["aliases"]) - num_labels
                         total_num_additional_aliases += num_additional_aliases
                         if num_additional_aliases > 0:
-                            logging.info(f"Added {num_additional_aliases} new aliases from Wikidata item '{label}' to property '{prop_record['label']}'")
+                            logging.info(
+                                f"Added {num_additional_aliases} new aliases from Wikidata item '{label}' to property '{prop_record['label']}'"
+                            )
 
             prop_record["subproperty_of"] = parent_properties
             prop_record["aliases"] = list(prop_record["aliases"]) if prop_record["aliases"] else []
@@ -413,7 +421,9 @@ def fetch_properties_via_api(
         logging.warning(f"Encountered {error_count} errors while querying Wikidata")
 
     logging.info(f"Finished processing {end - start + 1} records, found {len(properties)} properties")
-    logging.info(f"Total number of additional aliases added from property 'Wikidata item of this property': {total_num_additional_aliases}")
+    logging.info(
+        f"Total number of additional aliases added from property 'Wikidata item of this property': {total_num_additional_aliases}"
+    )
     for k, v in properties.items():
         logging.info(f"{k}: {v}")
 
