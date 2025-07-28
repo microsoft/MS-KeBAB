@@ -108,16 +108,16 @@ def test_linking_metrics(tmp_path: Path) -> None:
                 f.write(json.dumps(item) + "\n")
 
     labels_path = tmp_path / "labels.jsonl"
-    write_jsonl(labels_path, (bool(l) for l in labels))
+    write_jsonl(labels_path, (bool(label) for label in labels))
 
     binary_predictions_path = tmp_path / "predictions.jsonl"
-    write_jsonl(binary_predictions_path, (float(p) for p in predictions))
+    write_jsonl(binary_predictions_path, (float(pred) for pred in predictions))
 
     prob_predictions_path = tmp_path / "prob_predictions.jsonl"
-    write_jsonl(prob_predictions_path, (float(l) for l in log_odds))
+    write_jsonl(prob_predictions_path, (float(label) for label in log_odds))
 
     entity_pairs_path = tmp_path / "entity_pairs.jsonl"
-    write_jsonl(entity_pairs_path, ((l.to_dict(), r.to_dict()) for l, r in pairs))
+    write_jsonl(entity_pairs_path, ((left.to_dict(), right.to_dict()) for left, right in pairs))
 
     schema_file_path = tmp_path / "schema.json"
     schema_file_path.write_text("")
@@ -194,8 +194,8 @@ def test_linking_metrics(tmp_path: Path) -> None:
     # test corner cases
     labels = np.asarray([True, False, True, False])
     pairs = [(Entity(f"frag_{i}_left"), Entity(f"frag_{i}_right")) for i in range(len(labels))]
-    write_jsonl(labels_path, (bool(l) for l in labels))
-    write_jsonl(entity_pairs_path, ((l.to_dict(), r.to_dict()) for l, r in pairs))
+    write_jsonl(labels_path, (bool(label) for label in labels))
+    write_jsonl(entity_pairs_path, ((left.to_dict(), right.to_dict()) for left, right in pairs))
 
     # test corner cases
     def test_case_1_zero(
@@ -211,7 +211,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
         opt_log_prob: float,
     ) -> None:
         """Helper function to test case 1 with zero FN."""
-        write_jsonl(binary_predictions_path, (float(p) for p in predictions))
+        write_jsonl(binary_predictions_path, (float(pred) for pred in predictions))
         task_instance = LinkingTask(
             "Linking-Metrics-Train", str(entity_pairs_path), str(schema_file_path), str(labels_path)
         )
