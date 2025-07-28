@@ -92,7 +92,7 @@ def test_task_interface():
                 {
                     "log_prob": float("nan"),
                     "log_odds_adjustment": float("nan"),
-                    "optimistic_log_prob": -2.000000165580742e-10,
+                    "optimistic_log_prob": -2.000000165580742e-10 / 2,
                     "false_negative": 0.0,
                     "false_positive": 0.0,
                     "precision": 1.0,

@@ -87,6 +87,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     """Test the linking metrics calculation."""
     # labels
     labels = np.asarray([True, True, False, False, False])
+    total = len(labels)
     pairs = [(Entity(f"frag_{i}_left"), Entity(f"frag_{i}_right")) for i in range(len(labels))]
 
     # binary predictions
@@ -98,7 +99,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     log_odds = np.log(odds)
 
     log_probs = np.where(labels, np.log(prob_predictions), np.log(1 - prob_predictions))
-    log_prob_total = log_probs.sum()
+    log_prob_avg = log_probs.mean()
 
     def write_jsonl(file_path: Path, data: Iterable[Any]) -> None:
         """Helper function to write a list of data to a JSONL file."""
@@ -139,7 +140,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert np.isclose(metrics["npv"], 2 / 3)
     assert math.isnan(metrics["log_prob"])
     assert math.isnan(metrics["log_odds_adjustment"])
-    assert np.isclose(metrics["optimistic_log_prob"], -3.2958, atol=1e-4, rtol=1e-4)
+    assert np.isclose(metrics["optimistic_log_prob"], -3.2958 / total, atol=1e-4, rtol=1e-4)
 
     # probabilistic predictions
     metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=False)
@@ -152,7 +153,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert metrics["recall"] == 0.5
     assert metrics["ppv"] == 0.5
     assert np.isclose(metrics["npv"], 2 / 3)
-    assert np.isclose(metrics["log_prob"], log_prob_total)
+    assert np.isclose(metrics["log_prob"], log_prob_avg)
     assert math.isnan(metrics["log_odds_adjustment"])
     assert math.isnan(metrics["optimistic_log_prob"])
 
@@ -163,8 +164,8 @@ def test_linking_metrics(tmp_path: Path) -> None:
         adj_log_odds = log_odds + adj
         adj_prob_predictions = np.exp(adj_log_odds) / (1 + np.exp(adj_log_odds))
         log_probs = np.where(labels, np.log(adj_prob_predictions), np.log(1 - adj_prob_predictions))
-        log_prob_total = log_probs.sum()
-        return log_prob_total
+        log_prob_avg = log_probs.mean()
+        return log_prob_avg
 
     adjustments = np.linspace(-10, 10, 20001)
     best_adj = None
@@ -227,7 +228,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
         assert np.isclose(metrics["ppv"], ppv)
         assert np.isclose(metrics["npv"], npv)
 
-        assert np.isclose(metrics["optimistic_log_prob"], opt_log_prob)
+        assert np.isclose(metrics["optimistic_log_prob"], opt_log_prob / 4)
 
     # FN = 0
     test_case_1_zero(

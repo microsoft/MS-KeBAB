@@ -187,6 +187,8 @@ class LinkingTask(Task):
             metrics["log_odds_adjustment"] = log_odds_adj
 
         log_prob = float(np.sum(np.where(gt_labels, log_expit(log_odds), log_expit(-log_odds))))
+        log_prob /= len(gt_labels)
+
         metrics["log_prob"] = log_prob
 
         return metrics
@@ -357,7 +359,7 @@ class _ConfMatrix:
         if self.fn > 0:
             log_prob += self.fn * math.log(1 - npv)
 
-        return log_prob
+        return log_prob / self.total
 
     def get_metrics(self) -> dict[str, float]:
         """Get all metrics as a dictionary."""
