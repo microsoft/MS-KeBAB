@@ -10,7 +10,7 @@ Inputs:
 
 Example outputs:
 - `wikidata_simple_entities.jsonl`, each line like:
-{"entity_id": "Q31", "properties": {"P31": ["Q3624078", "Q43702", "Q6256", "Q20181813", "Q1250464"], "name": ["Belgium", "Kingdom of Belgium", "BEL", "be", "\ud83c\udde7\ud83c\uddea", "BE"]}}
+{"entity_id": "Q31", "properties": {"P31": ["Q3624078", "Q43702", "Q6256", "Q20181813", "Q1250464"], "name": ["Belgium", "Kingdom of Belgium"]}}
 {"entity_id": "Q8", "properties": {"P31": ["Q331769", "Q60539479"], "name": ["happiness", "joy", "happy"]}}
 """
 

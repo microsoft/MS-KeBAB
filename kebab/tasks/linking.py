@@ -13,7 +13,7 @@ from typing import cast
 
 import numpy as np
 from scipy.optimize import brentq
-from scipy.special import expit
+from scipy.special import expit, log_expit
 from sklearn.metrics import confusion_matrix
 
 from kebab.contracts.entity import Entity
@@ -97,7 +97,6 @@ class LinkingTask(Task):
         logger: Logger | None = None,
         output_dir: Path | None = None,
         adjust_to_test_prior: bool = True,
-        eps: float = 1e-15,
     ) -> dict[str, float]:
         """
         Evaluate an output for the linking task.
@@ -108,7 +107,6 @@ class LinkingTask(Task):
             logger: Optional logger for logging evaluation summaries.
             output_dir: Optional directory for saving metrics and evaluation outputs.
             adjust_to_test_prior: If True, adjust the log-odds to match the prior on the test set.
-            eps: Small value to avoid division by zero in log calculations.
 
         Returns:
             dict[str, float]: Evaluation metrics dictionary.
@@ -128,12 +126,16 @@ class LinkingTask(Task):
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # compute probabilistic metrics (and update the log-odds in-place if needed)
-        metrics = self._compute_probabilistic_metrics(log_odds, gt_labels, adjust_to_test_prior, eps=eps)
+        metrics = self._compute_probabilistic_metrics(log_odds, gt_labels, adjust_to_test_prior)
 
         # compute binary metrics
         predictions = log_odds > 0
         conf_matrix = _ConfMatrix.from_arrays(gt_labels, predictions)
-        metrics = {**metrics, **conf_matrix.get_metrics(eps=eps)}
+        metrics = {**metrics, **conf_matrix.get_metrics()}
+
+        # no need for optimistic log-prob if log_prob is available
+        if not math.isnan(metrics["log_prob"]):
+            metrics["optimistic_log_prob"] = float("nan")
 
         # build detailed records
         detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predictions)
@@ -167,7 +169,7 @@ class LinkingTask(Task):
         return c
 
     def _compute_probabilistic_metrics(
-        self, log_odds: np.ndarray, gt_labels: np.ndarray, adjust_to_test_prior: bool, eps: float
+        self, log_odds: np.ndarray, gt_labels: np.ndarray, adjust_to_test_prior: bool
     ) -> dict[str, float]:
         """Compute the probabilistic metrics based on log-odds and ground truth labels."""
         metrics = {"log_prob": float("nan"), "log_odds_adjustment": float("nan")}
@@ -184,9 +186,7 @@ class LinkingTask(Task):
             log_odds += log_odds_adj
             metrics["log_odds_adjustment"] = log_odds_adj
 
-        probs = 1.0 / (1.0 + np.exp(-log_odds))
-        probs = np.clip(probs, eps, 1 - eps)
-        log_prob = float(np.sum(np.where(gt_labels, np.log(probs), np.log(1.0 - probs))))
+        log_prob = float(np.sum(np.where(gt_labels, log_expit(log_odds), log_expit(-log_odds))))
         metrics["log_prob"] = log_prob
 
         return metrics
@@ -285,59 +285,6 @@ class LinkingTask(Task):
             for row in detail_records:
                 f.write("\t".join(str(row.get(h, "")) for h in headers) + "\n")
 
-    @classmethod
-    def maximize_optimistic_log_prob(cls, log_odds: np.ndarray, gt_labels: np.ndarray, eps: float = 1e-15) -> float:
-        """
-        Determine the threshold that maximizes the optimistic log-probability.
-
-        Args:
-            log_odds: Array of predicted scores (log-odds).
-            gt_labels: Ground truth boolean labels.
-            eps: Small value to avoid division by zero.
-
-        Returns:
-            float: Optimal threshold for classification.
-        """
-        # start from the highest log-odds, everything is predicted negative
-        order = np.argsort(log_odds)[::-1]
-        gt_labels = gt_labels[order].astype(int)
-        log_odds = log_odds[order]
-
-        n = len(gt_labels)
-        n_pos = gt_labels.sum()
-        n_neg = n - n_pos
-
-        tp = fp = 0
-        fn, tn = n_pos, n_neg
-
-        best_log_prob = -np.inf
-        best_threshold = log_odds[0] + eps  # => all predicted as negative
-
-        for k, (score, label) in enumerate(zip(log_odds, gt_labels, strict=True), 1):
-            # classify the k-th example as positive
-            if label:
-                tp += 1
-                fn -= 1
-            else:
-                fp += 1
-                tn -= 1
-
-            ppv = tp / k
-            npv = tn / (n - k) if k != n else 0.0
-
-            ppv = np.clip(ppv, eps, 1 - eps)
-            npv = np.clip(npv, eps, 1 - eps)
-
-            log_prob = tp * np.log(ppv) + fp * np.log(1 - ppv) + tn * np.log(npv) + fn * np.log(1 - npv)
-
-            if log_prob > best_log_prob:
-                best_log_prob = log_prob
-
-                # we want this example to be predicted as positive => threshold is just below the score
-                best_threshold = score - eps
-
-        return best_threshold
-
 
 @dataclass
 class _ConfMatrix:
@@ -388,7 +335,7 @@ class _ConfMatrix:
         """
         return self.precision()
 
-    def optimistic_log_prob(self, eps: float) -> float:
+    def optimistic_log_prob(self) -> float:
         """Compute the optimistic log-probability based on the confusion matrix."""
         ppv = self.precision()
         npv = self.npv()
@@ -396,19 +343,23 @@ class _ConfMatrix:
         if ppv is None or npv is None:
             return float("nan")
 
-        ppv = np.clip(ppv, eps, 1 - eps)
-        npv = np.clip(npv, eps, 1 - eps)
+        log_prob = 0
 
-        log_prob = (
-            self.tp * math.log(ppv)
-            + self.fp * math.log(1 - ppv)
-            + self.tn * math.log(npv)
-            + self.fn * math.log(1 - npv)
-        )
+        if self.tp > 0:
+            log_prob += self.tp * math.log(ppv)
+
+        if self.fp > 0:
+            log_prob += self.fp * math.log(1 - ppv)
+
+        if self.tn > 0:
+            log_prob += self.tn * math.log(npv)
+
+        if self.fn > 0:
+            log_prob += self.fn * math.log(1 - npv)
 
         return log_prob
 
-    def get_metrics(self, eps: float) -> dict[str, float]:
+    def get_metrics(self) -> dict[str, float]:
         """Get all metrics as a dictionary."""
         return {
             "true_positive": self.tp,
@@ -420,7 +371,7 @@ class _ConfMatrix:
             "recall": self.recall(),
             "npv": self.npv(),
             "ppv": self.ppv(),
-            "optimistic_log_prob": self.optimistic_log_prob(eps=eps),
+            "optimistic_log_prob": self.optimistic_log_prob(),
         }
 
     @staticmethod

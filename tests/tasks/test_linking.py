@@ -145,6 +145,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert math.isnan(metrics["log_odds_adjustment"])
     assert np.isclose(metrics["optimistic_log_prob"], -3.2958, atol=1e-4, rtol=1e-4)
 
+    # probabilistic predictions
     metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=False)
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 2
@@ -191,39 +192,4 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert np.isclose(metrics["npv"], 2 / 3)
     assert np.isclose(metrics["log_prob"], cast(float, best_log_prob))
     assert np.isclose(metrics["log_odds_adjustment"], cast(float, best_adj), atol=1e-3, rtol=1e-3)
-    assert np.isclose(metrics["optimistic_log_prob"], -3.2958, atol=1e-4, rtol=1e-4)
-
-    opt_threshold = task_instance.maximize_optimistic_log_prob(np.asarray(log_odds), labels)
-
-    def optimistic_log_prob(threshold):
-        eps = 1e-15
-        pred_pos = log_odds >= threshold
-
-        tp = int(np.sum(pred_pos & labels))
-        fp = int(np.sum(pred_pos & ~labels))
-        tn = int(np.sum(~pred_pos & ~labels))
-        fn = int(np.sum(~pred_pos & labels))
-
-        ppv = tp / (tp + fp) if (tp + fp) else 0
-        npv = tn / (tn + fn) if (tn + fn) else 0
-        ppv = np.clip(ppv, eps, 1 - eps)
-        npv = np.clip(npv, eps, 1 - eps)
-
-        log_prob = tp * math.log(ppv) + fp * math.log(1 - ppv) + tn * math.log(npv) + fn * math.log(1 - npv)
-        return log_prob
-
-    thresholds = np.linspace(-5, 5, 5001)
-    best_threshold = None
-    best_log_prob = None
-
-    for threshold in thresholds:
-        log_prob = optimistic_log_prob(threshold)
-
-        if log_prob == float("-inf"):
-            continue
-
-        if best_log_prob is None or log_prob > best_log_prob:
-            best_log_prob = log_prob
-            best_threshold = threshold
-
-    assert np.isclose(optimistic_log_prob(best_threshold), optimistic_log_prob(opt_threshold))
+    assert math.isnan(metrics["optimistic_log_prob"])
