@@ -4,12 +4,17 @@
 from __future__ import annotations
 
 import math
-from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import zip_longest
 from logging import Logger
 from pathlib import Path
+from typing import cast
+
+import numpy as np
+from scipy.optimize import brentq
+from scipy.special import expit, log_expit
+from sklearn.metrics import confusion_matrix
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
@@ -91,15 +96,17 @@ class LinkingTask(Task):
         eval_result_path: Path | None = None,
         logger: Logger | None = None,
         output_dir: Path | None = None,
+        adjust_to_test_prior: bool = True,
     ) -> dict[str, float]:
         """
         Evaluate an output for the linking task.
 
         Args:
-            output_to_evaluate: Path to model output predictions.
+            output_to_evaluate: Path to model output predictions (log-odds or 0/1 predictions).
             eval_result_path: Optional path to save evaluation metrics as JSON.
             logger: Optional logger for logging evaluation summaries.
             output_dir: Optional directory for saving metrics and evaluation outputs.
+            adjust_to_test_prior: If True, adjust the log-odds to match the prior on the test set.
 
         Returns:
             dict[str, float]: Evaluation metrics dictionary.
@@ -107,29 +114,31 @@ class LinkingTask(Task):
         if self.data_ground_truth_boolean is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        preds = self._load_predictions(output_to_evaluate)
+        log_odds = np.asarray(list(ItemJsonlReader[float](output_to_evaluate, converter=float).read_items()))
         pairs, gt_labels = zip(*self.read_items(), strict=False)
-        self._validate_lengths(preds, gt_labels)
+        gt_labels = np.asarray(gt_labels, dtype=bool)
+        if log_odds.shape != gt_labels.shape:
+            raise ValueError(
+                f"Log-odds shape {log_odds.shape} does not match ground truth labels shape {gt_labels.shape}."
+            )
 
         output_dir = output_dir or Path.cwd() / "output" / self.path_safe_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # TODO(pmyshkov): this will be determined by calibration in the future
-        threshold = 0.0
-        pred_labels = [p > threshold for p in preds]
+        # compute probabilistic metrics (and update the log-odds in-place if needed)
+        metrics = self._compute_probabilistic_metrics(log_odds, gt_labels, adjust_to_test_prior)
 
-        conf_matrix, log_prob = self._confusion_matrix(list(gt_labels), pred_labels, preds)
-        metrics = {"log_prob": log_prob, **self._extra_metrics(conf_matrix)}
+        # compute binary metrics
+        predictions = log_odds > 0
+        conf_matrix = _ConfMatrix.from_arrays(gt_labels, predictions)
+        metrics = {**metrics, **conf_matrix.get_metrics()}
+
+        # no need for optimistic log-prob if log_prob is available
+        if not math.isnan(metrics["log_prob"]):
+            metrics["optimistic_log_prob"] = float("nan")
 
         # build detailed records
-        detail_records = self._build_detail_records(
-            pairs,
-            list(gt_labels),
-            preds,
-            pred_labels,
-            threshold,
-        )
-
+        detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predictions)
         self._write_side_outputs(metrics, detail_records, output_dir, eval_result_path)
 
         # report metrics in console or logger
@@ -137,11 +146,58 @@ class LinkingTask(Task):
 
         return metrics
 
+    def _compute_log_odds_adjustment(self, log_odds: np.ndarray, gt_labels: np.ndarray) -> float:
+        """Compute the prior train->test log odds adjustment based on the ground truth labels."""
+        log_odds = np.asarray(log_odds, dtype=float)
+        gt_labels = np.asarray(gt_labels, dtype=float)
+
+        # ML estimate of the constant log-odds shift:
+        # d/dc L(l_odds + c) = 0
+        # => sum(y_i) - exp(log_odds + c) = 0
+        # i.e. the observed prevalence of the positive class should match the expected prevalence
+        def balance(c: float) -> float:
+            """Balance function to find the constant c."""
+            return gt_labels.sum() - expit(log_odds + c).sum()
+
+        # expand the interval until the balance function changes sign
+        lo, hi = -20.0, 20.0
+        while balance(lo) * balance(hi) > 0:
+            lo *= 2.0
+            hi *= 2.0
+
+        c = float(cast(float, brentq(balance, lo, hi)))
+        return c
+
+    def _compute_probabilistic_metrics(
+        self, log_odds: np.ndarray, gt_labels: np.ndarray, adjust_to_test_prior: bool
+    ) -> dict[str, float]:
+        """Compute the probabilistic metrics based on log-odds and ground truth labels."""
+        metrics = {"log_prob": float("nan"), "log_odds_adjustment": float("nan")}
+
+        # determine if the predictions are log-odds or binary
+        vals = np.unique(log_odds)
+        probabilistic = not (vals.size == 2 and np.allclose(np.sort(vals), [0.0, 1.0]))  # noqa: PLR2004
+
+        if not probabilistic:
+            return metrics
+
+        if adjust_to_test_prior:
+            log_odds_adj = self._compute_log_odds_adjustment(log_odds, gt_labels)
+            log_odds += log_odds_adj
+            metrics["log_odds_adjustment"] = log_odds_adj
+
+        log_prob = float(np.sum(np.where(gt_labels, log_expit(log_odds), log_expit(-log_odds))))
+        log_prob /= len(gt_labels)
+
+        metrics["log_prob"] = log_prob
+
+        return metrics
+
     def _report_metrics(self, logger: Logger | None, metrics: dict[str, float]):
         """Report evaluation metrics in a structured format."""
         order = (
             "log_prob",
-            "empirical_log_prob",
+            "optimistic_log_prob",
             "precision",
             "recall",
             "true_positive",
@@ -151,6 +207,7 @@ class LinkingTask(Task):
             "ppv",
             "npv",
             "total",
+            "log_odds_adjustment",
         )
 
         reported_metrics = {key: metrics[key] for key in order if key in metrics}
@@ -162,82 +219,20 @@ class LinkingTask(Task):
         else:
             print("\t".join(reported_metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in reported_metrics.values()))
 
-    def _load_predictions(self, path: Path) -> list[float]:
-        """Load numeric predictions from a JSONL file."""
-        return list(ItemJsonlReader[float](path, converter=float).read_items())
-
-    def _validate_lengths(self, *streams: list | tuple) -> None:
-        """Ensure all provided sequences have equal lengths."""
-        lengths = {len(s) for s in streams}
-        if len(lengths) > 1:
-            raise ValueError("Input streams have mismatched lengths.")
-
-    def _confusion_matrix(
-        self, gt_labels: list[bool], preds: list[bool], log_odds: list[float]
-    ) -> tuple[_ConfMatrix, float]:
-        """Compute confusion matrix and log-probability."""
-        conf_matrix = _ConfMatrix()
-        log_prob = 0.0
-        probabilistic = sorted(set(log_odds)) != [0, 1]
-
-        for gt_label, pred_label, l_odds in zip(gt_labels, preds, log_odds, strict=False):
-            conf_matrix.update(gt_label, pred_label)
-            if probabilistic:
-                log_prob += math.log(1 / (1 + math.exp(-l_odds))) if gt_label else math.log(1 / (1 + math.exp(l_odds)))
-
-        if not probabilistic:
-            log_prob = float("nan")
-
-        return conf_matrix, log_prob
-
-    def _extra_metrics(self, conf_matrix: _ConfMatrix) -> dict[str, float]:
-        """Generate additional evaluation metrics from confusion matrix."""
-        metrics: dict[str, float] = defaultdict(float)
-        precision = conf_matrix.precision()
-        recall = conf_matrix.recall()
-        npv = conf_matrix.npv()
-        ppv = conf_matrix.ppv()
-
-        metrics.update(
-            true_positive=conf_matrix.tp,
-            true_negative=conf_matrix.tn,
-            false_positive=conf_matrix.fp,
-            false_negative=conf_matrix.fn,
-            total=conf_matrix.total,
-        )
-
-        if precision is not None:
-            metrics["precision"] = precision
-            metrics["ppv"] = ppv
-
-        if recall is not None:
-            metrics["recall"] = recall
-
-        if npv is not None:
-            metrics["npv"] = npv
-
-        if ppv and npv and 0 < ppv < 1 and 0 < npv < 1:
-            log_prob = conf_matrix.tp * math.log(ppv) + conf_matrix.fp * math.log(1 - ppv)
-            log_prob += conf_matrix.tn * math.log(npv) + conf_matrix.fn * math.log(1 - npv)
-            metrics["empirical_log_prob"] = log_prob
-
-        return metrics
-
     def _build_detail_records(
         self,
         pairs: Iterable[tuple[Entity, Entity]],
-        gt_labels: list[bool],
-        log_odds: list[float],
-        pred_labels: list[bool],
-        threshold: float,
+        gt_labels: np.ndarray,
+        log_odds: np.ndarray,
+        predictions: np.ndarray,
     ) -> list[dict]:
         """Create a per-sample dictionary describing the prediction outcome."""
         records: list[dict] = []
-        for (left, right), gt_label, l_odds, pred_label in zip_longest(
+        for (left, right), gt_label, score, prediction in zip_longest(
             pairs,
             gt_labels,
             log_odds,
-            pred_labels,
+            predictions,
         ):
             ent_type: set[str] = set(left.metadata.get("type", [])) | set(right.metadata.get("type", []))
 
@@ -265,8 +260,8 @@ class LinkingTask(Task):
                     "prop_pattern": prop_pattern,
                     "name_overlap": name_overlap,
                     "label": gt_label,
-                    "cal_log_odds": l_odds - threshold,
-                    "predicted_label": pred_label,
+                    "log_odds": score,
+                    "predicted_label": prediction,
                     "left_entity_id": left.entity_id,
                     "right_entity_id": right.entity_id,
                 }
@@ -301,19 +296,6 @@ class _ConfMatrix:
     tn: int = 0
     fp: int = 0
     fn: int = 0
-
-    def update(self, gt: bool, pred: bool) -> None:
-        """Update confusion matrix counts based on ground truth and prediction."""
-        if pred == gt:
-            if pred:
-                self.tp += 1
-            else:
-                self.tn += 1
-        else:
-            if pred:
-                self.fp += 1
-            else:
-                self.fn += 1
 
     @property
     def total(self) -> int:
@@ -354,3 +336,62 @@ class _ConfMatrix:
             float: PPV if (tp+fp)>0, else None.
         """
         return self.precision()
+
+    def optimistic_log_prob(self) -> float:
+        """Compute the optimistic log-probability based on the confusion matrix."""
+        ppv = self.precision()
+        npv = self.npv()
+
+        if ppv is None or npv is None:
+            return float("nan")
+
+        log_prob = 0
+
+        if self.tp > 0:
+            log_prob += self.tp * math.log(ppv)
+
+        if self.fp > 0:
+            log_prob += self.fp * math.log(1 - ppv)
+
+        if self.tn > 0:
+            log_prob += self.tn * math.log(npv)
+
+        if self.fn > 0:
+            log_prob += self.fn * math.log(1 - npv)
+
+        return log_prob / self.total
+
+    def get_metrics(self) -> dict[str, float]:
+        """Get all metrics as a dictionary."""
+        return {
+            "true_positive": self.tp,
+            "true_negative": self.tn,
+            "false_positive": self.fp,
+            "false_negative": self.fn,
+            "total": self.total,
+            "precision": self.precision(),
+            "recall": self.recall(),
+            "npv": self.npv(),
+            "ppv": self.ppv(),
+            "optimistic_log_prob": self.optimistic_log_prob(),
+        }
+
+    @staticmethod
+    def from_arrays(
+        gt_labels: np.ndarray,
+        predictions: np.ndarray,
+    ) -> _ConfMatrix:
+        """
+        Build a confusion-matrix instance from ground-truth and prediction arrays.
+
+        Args:
+            gt_labels: Ground-truth boolean labels.
+            predictions: Predicted boolean labels.
+
+        Returns:
+            _ConfMatrix: Populated confusion-matrix object.
+        """
+        cm = confusion_matrix(gt_labels, predictions)
+        tn, fp, fn, tp = cm.ravel()
+
+        return _ConfMatrix(tp=tp, tn=tn, fp=fp, fn=fn)

@@ -4,10 +4,11 @@
 import json
 import math
 import shutil
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+import numpy as np
 import pytest
 from kebab.contracts.entity import Entity
 from kebab.tasks.linking import LinkingTask
@@ -84,72 +85,203 @@ def test_linking_read_int_labels() -> None:
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
 def test_linking_metrics(tmp_path: Path) -> None:
     """Test the linking metrics calculation."""
-    # Prepare the data
-    labels = [True, True, False, False, False]
+    # labels
+    labels = np.asarray([True, True, False, False, False])
+    total = len(labels)
     pairs = [(Entity(f"frag_{i}_left"), Entity(f"frag_{i}_right")) for i in range(len(labels))]
-    predictions = [True, False, False, False, True]
-    prob_predictions = [0.9, 0.1, 0.1, 0.1, 0.9]
-    odds = [p / (1 - p) for p in prob_predictions]
-    log_odds = [math.log(o) for o in odds]
-    log_probs = [
-        math.log(pred) if label else math.log(1 - pred) for pred, label in zip(prob_predictions, labels, strict=False)
-    ]
-    log_prob_total = sum(log_probs)
+
+    # binary predictions
+    predictions = np.asarray([True, False, False, False, True])
+
+    # probabilistic predictions
+    prob_predictions = np.asarray([0.91, 0.3, 0.45, 0.45, 0.89])
+    odds = prob_predictions / (1 - prob_predictions)
+    log_odds = np.log(odds)
+
+    log_probs = np.where(labels, np.log(prob_predictions), np.log(1 - prob_predictions))
+    log_prob_avg = log_probs.mean()
+
+    def write_jsonl(file_path: Path, data: Iterable[Any]) -> None:
+        """Helper function to write a list of data to a JSONL file."""
+        with open(file_path, "w", encoding="utf-8") as f:
+            for item in data:
+                f.write(json.dumps(item) + "\n")
 
     labels_path = tmp_path / "labels.jsonl"
-    with open(labels_path, "w") as f:
-        for label in labels:
-            f.write(json.dumps(label) + "\n")
+    write_jsonl(labels_path, (bool(label) for label in labels))
 
-    predictions_path = tmp_path / "predictions.jsonl"
-    with open(predictions_path, "w") as f:
-        for prediction in predictions:
-            f.write(json.dumps(prediction) + "\n")
+    binary_predictions_path = tmp_path / "predictions.jsonl"
+    write_jsonl(binary_predictions_path, (float(pred) for pred in predictions))
 
     prob_predictions_path = tmp_path / "prob_predictions.jsonl"
-    with open(prob_predictions_path, "w") as f:
-        for prediction in log_odds:
-            f.write(json.dumps(prediction) + "\n")
+    write_jsonl(prob_predictions_path, (float(label) for label in log_odds))
 
     entity_pairs_path = tmp_path / "entity_pairs.jsonl"
-    with open(entity_pairs_path, "w") as f:
-        for left_entity, right_entity in pairs:
-            pair = (left_entity.to_dict(), right_entity.to_dict())
-            f.write(json.dumps(pair) + "\n")
+    write_jsonl(entity_pairs_path, ((left.to_dict(), right.to_dict()) for left, right in pairs))
 
     schema_file_path = tmp_path / "schema.json"
     schema_file_path.write_text("")
 
     # Evaluate
     task_instance = LinkingTask(
-        "Linking-Metrics-Train",
-        str(entity_pairs_path),
-        str(schema_file_path),
-        str(labels_path),
+        "Linking-Metrics-Train", str(entity_pairs_path), str(schema_file_path), str(labels_path)
     )
 
-    # Assert the metrics are calculated correctly
-    metrics = task_instance.evaluate(predictions_path)
+    # binary predictions
+    metrics = task_instance.evaluate(binary_predictions_path, adjust_to_test_prior=False)
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 1
     assert metrics["false_positive"] == 1
-    assert metrics["false_negative"] == 1
     assert metrics["true_negative"] == 2
+    assert metrics["false_negative"] == 1
     assert metrics["precision"] == 0.5
     assert metrics["recall"] == 0.5
     assert metrics["ppv"] == 0.5
-    assert abs(metrics["npv"] - 2 / 3) < 1e-6
+    assert np.isclose(metrics["npv"], 2 / 3)
     assert math.isnan(metrics["log_prob"])
+    assert math.isnan(metrics["log_odds_adjustment"])
+    assert np.isclose(metrics["optimistic_log_prob"], -3.2958 / total, atol=1e-4, rtol=1e-4)
 
-    metrics = task_instance.evaluate(prob_predictions_path)
+    # probabilistic predictions
+    metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=False)
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 1
     assert metrics["false_positive"] == 1
-    assert metrics["false_negative"] == 1
     assert metrics["true_negative"] == 2
+    assert metrics["false_negative"] == 1
     assert metrics["precision"] == 0.5
     assert metrics["recall"] == 0.5
     assert metrics["ppv"] == 0.5
-    assert abs(metrics["npv"] - 2 / 3) < 1e-6
-    assert abs(metrics["empirical_log_prob"] - -3.296) < 1e-3
-    assert abs(metrics["log_prob"] - log_prob_total) < 1e-3
+    assert np.isclose(metrics["npv"], 2 / 3)
+    assert np.isclose(metrics["log_prob"], log_prob_avg)
+    assert math.isnan(metrics["log_odds_adjustment"])
+    assert math.isnan(metrics["optimistic_log_prob"])
+
+    # log odds adjustment
+    metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=True)
+
+    def adj_log_prob(adj: float) -> float:
+        adj_log_odds = log_odds + adj
+        adj_prob_predictions = np.exp(adj_log_odds) / (1 + np.exp(adj_log_odds))
+        log_probs = np.where(labels, np.log(adj_prob_predictions), np.log(1 - adj_prob_predictions))
+        log_prob_avg = log_probs.mean()
+        return log_prob_avg
+
+    adjustments = np.linspace(-10, 10, 20001)
+    best_adj = None
+    best_log_prob = None
+
+    for adj in adjustments:
+        log_prob = adj_log_prob(adj)
+
+        if best_log_prob is None or log_prob > best_log_prob:
+            best_log_prob = log_prob
+            best_adj = adj
+
+    assert metrics["total"] == 5
+    assert metrics["true_positive"] == 1
+    assert metrics["false_positive"] == 1
+    assert metrics["true_negative"] == 2
+    assert metrics["false_negative"] == 1
+    assert metrics["precision"] == 0.5
+    assert metrics["recall"] == 0.5
+    assert metrics["ppv"] == 0.5
+    assert np.isclose(metrics["npv"], 2 / 3)
+    assert np.isclose(metrics["log_prob"], cast(float, best_log_prob))
+    assert np.isclose(metrics["log_odds_adjustment"], cast(float, best_adj), atol=1e-3, rtol=1e-3)
+    assert math.isnan(metrics["optimistic_log_prob"])
+
+    # test corner cases
+    labels = np.asarray([True, False, True, False])
+    pairs = [(Entity(f"frag_{i}_left"), Entity(f"frag_{i}_right")) for i in range(len(labels))]
+    write_jsonl(labels_path, (bool(label) for label in labels))
+    write_jsonl(entity_pairs_path, ((left.to_dict(), right.to_dict()) for left, right in pairs))
+
+    # test corner cases
+    def test_case_1_zero(
+        predictions: np.ndarray,
+        tp: int,
+        fp: int,
+        tn: int,
+        fn: int,
+        precision: float,
+        recall: float,
+        ppv: float,
+        npv: float,
+        opt_log_prob: float,
+    ) -> None:
+        """Helper function to test case 1 with zero FN."""
+        write_jsonl(binary_predictions_path, (float(pred) for pred in predictions))
+        task_instance = LinkingTask(
+            "Linking-Metrics-Train", str(entity_pairs_path), str(schema_file_path), str(labels_path)
+        )
+
+        metrics = task_instance.evaluate(binary_predictions_path, adjust_to_test_prior=False)
+        assert metrics["total"] == 4
+        assert metrics["true_positive"] == tp
+        assert metrics["false_positive"] == fp
+        assert metrics["true_negative"] == tn
+        assert metrics["false_negative"] == fn
+
+        assert np.isclose(metrics["precision"], precision)
+        assert np.isclose(metrics["recall"], recall)
+        assert np.isclose(metrics["ppv"], ppv)
+        assert np.isclose(metrics["npv"], npv)
+
+        assert np.isclose(metrics["optimistic_log_prob"], opt_log_prob / 4)
+
+    # FN = 0
+    test_case_1_zero(
+        np.asarray([True, False, True, True]),
+        tp=2,
+        fp=1,
+        tn=1,
+        fn=0,
+        precision=2 / 3,
+        recall=1.0,
+        ppv=2 / 3,
+        npv=1.0,
+        opt_log_prob=2 * np.log(2 / 3) + 1 * np.log(1 / 3),
+    )
+
+    # TN = 0
+    test_case_1_zero(
+        np.asarray([True, True, False, True]),
+        tp=1,
+        fp=2,
+        tn=0,
+        fn=1,
+        precision=1 / 3,
+        recall=1 / 2,
+        ppv=1 / 3,
+        npv=0,
+        opt_log_prob=1 * np.log(1 / 3) + 2 * np.log(2 / 3),
+    )
+
+    # TP = 0
+    test_case_1_zero(
+        np.asarray([False, False, False, True]),
+        tp=0,
+        fp=1,
+        tn=1,
+        fn=2,
+        precision=0,
+        recall=0,
+        ppv=0,
+        npv=1 / 3,
+        opt_log_prob=1 * np.log(1 / 3) + 2 * np.log(2 / 3),
+    )
+
+    # FP = 0
+    test_case_1_zero(
+        np.asarray([True, False, False, False]),
+        tp=1,
+        fp=0,
+        tn=2,
+        fn=1,
+        precision=1,
+        recall=1 / 2,
+        ppv=1,
+        npv=2 / 3,
+        opt_log_prob=2 * np.log(2 / 3) + 1 * np.log(1 / 3),
+    )
