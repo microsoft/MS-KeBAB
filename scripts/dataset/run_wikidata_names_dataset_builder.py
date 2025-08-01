@@ -16,10 +16,8 @@ from kebab.utils.dataset.wikidata.wikidata_names_dataset_builder import Wikidata
 @click.option(
     "--wikidata-simple-entities-path",
     type=pathlib.Path,
-    default=pathlib.Path.home()
-    / "OneDrive - Microsoft"
-    / "Benchmark"
-    / "Datasets"
+    default=pathlib.Path.cwd()
+    / "data"
     / "Wikidata"
     / "Simple Entities"
     / "2024-06-27"
@@ -29,10 +27,8 @@ from kebab.utils.dataset.wikidata.wikidata_names_dataset_builder import Wikidata
 @click.option(
     "--wikidata-type-hierarchy-path",
     type=pathlib.Path,
-    default=pathlib.Path.home()
-    / "OneDrive - Microsoft"
-    / "Benchmark"
-    / "Datasets"
+    default=pathlib.Path.cwd()
+    / "data"
     / "Wikidata"
     / "Type Hierarchy"
     / "2024-06-27"

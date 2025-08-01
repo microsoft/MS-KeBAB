@@ -499,7 +499,7 @@ def _shortcut_target(lnk: Path) -> Path:
 
 def resolve_path(path: str | Path, working_dir: Path | None = None) -> Path:
     """
-    Expand "~" to user home directory and resolve all Windows shortcuts (*.lnk).
+    Resolve all Windows shortcuts (*.lnk) in the path.
 
     Replace every '*.lnk' segment that occurs in `path` with the shortcut's real target,
     preserving any tail that comes after it.

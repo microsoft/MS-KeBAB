@@ -15,30 +15,13 @@ from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedData
 @click.option(
     "--re-docred-dir",
     type=pathlib.Path,
-    default=pathlib.Path.home()
-    / "OneDrive - Microsoft"
-    / "Benchmark"
-    / "Datasets"
-    / "Re-DocRED"
-    / "Original Dataset"
-    / "full",
-    # / "dev",
-    # / "test",
-    # / "train",
-    # / "single",
+    default=pathlib.Path.cwd() / "data" / "Re-DocRED" / "Original Dataset" / "full",
     help="Path to the Re-DocRED data directory (will be *.json-globbed against).",
 )
 @click.option(
     "--wikidata-properties-path",
     type=pathlib.Path,
-    default=pathlib.Path.home()
-    / "OneDrive - Microsoft"
-    / "Benchmark"
-    / "Datasets"
-    / "Wikidata"
-    / "Properties"
-    / "2024-06-27"
-    / "wikidata_properties.json",
+    default=pathlib.Path.cwd() / "data" / "Wikidata" / "Properties" / "2024-06-27" / "wikidata_properties.json",
     help="Path to the Wikidata properties file.",
 )
 @click.option(

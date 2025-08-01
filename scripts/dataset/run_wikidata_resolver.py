@@ -15,50 +15,31 @@ from kebab.utils.dataset.wikidata.wikidata_resolver import WikidataResolver
 @click.option(
     "--entities-path",
     type=pathlib.Path,
-    default=pathlib.Path.home()
-    / "OneDrive - Microsoft"
-    / "Benchmark"
-    / "Datasets"
-    / "REBEL"
-    / "Fragments"
-    # / "sample"
-    / "rebel_entity_fragments.jsonl",
+    default=pathlib.Path.cwd() / "data" / "REBEL" / "Fragments" / "rebel_entity_fragments.jsonl",
     help="Path to the input entities file.",
 )
 @click.option(
     "--wikidata-simple-entities-path",
     type=pathlib.Path,
-    default=pathlib.Path.home()
-    / "OneDrive - Microsoft"
-    / "Benchmark"
-    / "Datasets"
+    default=pathlib.Path.cwd()
+    / "data"
     / "Wikidata"
     / "Simple Entities"
     / "2025-01-30"
-    # / "sample"
     / "wikidata_simple_entities.jsonl",
     help="The path to the extracted Wikidata simple entities.",
 )
 @click.option(
     "--wikidata-properties-path",
     type=pathlib.Path,
-    default=pathlib.Path.home()
-    / "OneDrive - Microsoft"
-    / "Benchmark"
-    / "Datasets"
-    / "Wikidata"
-    / "Properties"
-    / "2025-01-30"
-    / "wikidata_properties.json",
+    default=pathlib.Path.cwd() / "data" / "Wikidata" / "Properties" / "2025-01-30" / "wikidata_properties.json",
     help="Path to the Wikidata properties file.",
 )
 @click.option(
     "--wikidata-type-hierarchy-path",
     type=pathlib.Path,
-    default=pathlib.Path.home()
-    / "OneDrive - Microsoft"
-    / "Benchmark"
-    / "Datasets"
+    default=pathlib.Path.cwd()
+    / "data"
     / "Wikidata"
     / "Type Hierarchy"
     / "2025-01-30"
