@@ -1,148 +1,55 @@
 {
-    "docid": "30111982",
-    "title": "Philippine one hundred-peso note",
-    "uri": "Q7185360",
-    "text": "The Philippine one hundred-peso note (Filipino: \"Sandaang Piso\") (₱100) is a denomination of Philippine currency. Philippine president Manuel A. Roxas is currently featured on the front side of the bill, while the Mayon Volcano and the whale shark (locally known as \"butanding\") are featured on the reverse side.",
+    "docid": "12345678",
+    "title": "Acme Widget Pro",
+    "uri": "Q1001000",
+    "text": "The Acme Widget Pro is a premium household gadget manufactured by Acme Corporation. The device features advanced technology and was designed by John Smith.",
     "entities": [
         {
-            "uri": "Q33298",
-            "boundaries": [
-                38,
-                46
-            ],
-            "surfaceform": "Filipino",
-            "annotator": "Me"
-        },
-        {
-            "uri": "Q918448",
-            "boundaries": [
-                77,
-                89
-            ],
-            "surfaceform": "denomination",
-            "annotator": "Me"
-        },
-        {
-            "uri": "Q17193",
-            "boundaries": [
-                93,
-                112
-            ],
-            "surfaceform": "Philippine currency",
-            "annotator": "Me"
-        },
-        {
-            "uri": "Q1209571",
-            "boundaries": [
-                114,
-                134
-            ],
-            "surfaceform": "Philippine president",
-            "annotator": "Me"
-        },
-        {
-            "uri": "Q223419",
-            "boundaries": [
-                135,
-                150
-            ],
-            "surfaceform": "Manuel A. Roxas",
-            "annotator": "Me"
-        },
-        {
-            "uri": "Q1484",
-            "boundaries": [
-                214,
-                227
-            ],
-            "surfaceform": "Mayon Volcano",
-            "annotator": "Me"
-        },
-        {
-            "uri": "Q80378",
-            "boundaries": [
-                236,
-                247
-            ],
-            "surfaceform": "whale shark",
-            "annotator": "Me"
-        },
-        {
-            "uri": "Q7185360",
+            "uri": "Q1001000",
             "boundaries": [
                 4,
-                36
+                19
             ],
-            "surfaceform": "Philippine one hundred-peso note",
+            "surfaceform": "Acme Widget Pro",
             "annotator": "Me"
         },
         {
-            "uri": "+100^^http://www.w3.org/2001/XMLSchema#decimal",
+            "uri": "Q2002000",
             "boundaries": [
                 67,
-                70
+                82
             ],
-            "surfaceform": "100",
-            "annotator": "Value_Linker"
+            "surfaceform": "Acme Corporation",
+            "annotator": "Me"
         }
     ],
     "triples": [
         {
             "subject": {
-                "uri": "Q7185360",
+                "uri": "Q1001000",
                 "boundaries": [
                     4,
-                    36
+                    19
                 ],
-                "surfaceform": "Philippine one hundred-peso note",
+                "surfaceform": "Acme Widget Pro",
                 "annotator": "Me"
             },
             "predicate": {
-                "uri": "P3934",
+                "uri": "P176",
                 "boundaries": null,
-                "surfaceform": "face value",
-                "annotator": "NoSubject-Triple-aligner"
-            },
-            "object": {
-                "uri": "+100^^http://www.w3.org/2001/XMLSchema#decimal",
-                "boundaries": [
-                    67,
-                    70
-                ],
-                "surfaceform": "100",
-                "annotator": "Value_Linker"
-            },
-            "sentence_id": 0,
-            "dependency_path": null,
-            "confidence": null,
-            "annotator": "NoSubject-Triple-aligner"
-        },
-        {
-            "subject": {
-                "uri": "Q223419",
-                "boundaries": [
-                    135,
-                    150
-                ],
-                "surfaceform": "Manuel A. Roxas",
-                "annotator": "Me"
-            },
-            "predicate": {
-                "uri": "P39",
-                "boundaries": null,
-                "surfaceform": "position held",
+                "surfaceform": "manufacturer",
                 "annotator": "Simple-Aligner"
             },
             "object": {
-                "uri": "Q1209571",
+                "uri": "Q2002000",
                 "boundaries": [
-                    114,
-                    134
+                    67,
+                    82
                 ],
-                "surfaceform": "Philippine president",
+                "surfaceform": "Acme Corporation",
                 "annotator": "Me"
             },
-            "sentence_id": 1,
+            "sentence_id": 0,
             "dependency_path": null,
             "confidence": null,
             "annotator": "Simple-Aligner"

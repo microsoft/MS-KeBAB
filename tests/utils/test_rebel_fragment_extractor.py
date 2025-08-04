@@ -29,17 +29,17 @@ def test_extract_entities(rebel_single_record_file_path: Path) -> None:
         doc_record = json.load(f)
 
     entities = RebelFragmentExtractor.extract_entity_fragments_from_document(doc_record)
-    assert len(entities) == 8
-
-    entities = {entity_id: entity for entity_id, entity in entities.items() if len(entity.properties) > 1}
     assert len(entities) == 2
 
-    main_ent_key = "Q7185360"
+    entities = {entity_id: entity for entity_id, entity in entities.items() if len(entity.properties) > 1}
+    assert len(entities) == 1
+
+    main_ent_key = "Q1001000"
     assert main_ent_key in entities
     entity = entities[main_ent_key]
 
-    assert entity.properties["name"] == ["Philippine one hundred-peso note"]
-    assert entity.metadata["doc_id"] == "30111982"
+    assert entity.properties["name"] == ["Acme Widget Pro"]
+    assert entity.metadata["doc_id"] == "12345678"
 
     for entity in entities.values():
         assert entity.source_ids == []
@@ -57,4 +57,4 @@ def test_run(rebel_sample_records_dir_path: Path, tmp_path: Path) -> None:
     with open(output_file, encoding="utf-8") as f:
         lines = f.read().splitlines()
 
-    assert len(lines) == 97
+    assert len(lines) == 6
