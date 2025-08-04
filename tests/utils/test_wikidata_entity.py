@@ -7,42 +7,48 @@ from kebab.utils.dataset.wikidata.wikidata_utils import TypeProperties, Wikidata
 
 @pytest.fixture
 def sample_wikidata_entity_belgium() -> WikidataEntity:
-    """A sample Wikidata entity 1 for testing."""
-    entity = WikidataEntity(entity_id="Q31")
-    entity.properties["name"] = ["Belgium", "BE", "be", "BEL", "Kingdom of Belgium"]
+    """A sample Wikidata entity for testing."""
+    entity = WikidataEntity(entity_id="Q12345")
+    entity.properties["name"] = ["Fictional Republic", "FR", "fr", "FRE", "Republic of Fiction"]
     entity.properties[TypeProperties.INSTANCE_OF.value] = [
-        "Q6256",
-        "Q20181813",
-        "Q185441",
-        "Q1250464",
-        "Q3624078",
-        "Q43702",
+        "Q7777",
+        "Q8888",
+        "Q9999",
+        "Q1111",
+        "Q2222",
+        "Q3333",
     ]
     entity.source_ids = ["source1"]
-    entity.description = "Belgium is a country in Western Europe."
-    entity.wikipedia_title = "Belgium"
+    entity.description = "Fictional Republic is a made-up country for testing purposes."
+    entity.wikipedia_title = "Fictional_Republic"
     return entity
 
 
 def test_wikidata_entity_fields(sample_wikidata_entity_belgium: WikidataEntity) -> None:
     """Test the fields of the WikidataEntity."""
-    assert sample_wikidata_entity_belgium.entity_id == "Q31"
-    assert sample_wikidata_entity_belgium.properties["name"] == ["Belgium", "BE", "be", "BEL", "Kingdom of Belgium"]
-    assert sample_wikidata_entity_belgium.name == "Belgium"
-    assert sample_wikidata_entity_belgium.aliases == ["BE", "be", "BEL", "Kingdom of Belgium"]
-    assert sample_wikidata_entity_belgium.type == ["Q6256", "Q20181813", "Q185441", "Q1250464", "Q3624078", "Q43702"]
-    assert sample_wikidata_entity_belgium.description == "Belgium is a country in Western Europe."
-    assert sample_wikidata_entity_belgium.wikipedia_title == "Belgium"
+    assert sample_wikidata_entity_belgium.entity_id == "Q12345"
+    assert sample_wikidata_entity_belgium.properties["name"] == [
+        "Fictional Republic",
+        "FR",
+        "fr",
+        "FRE",
+        "Republic of Fiction",
+    ]
+    assert sample_wikidata_entity_belgium.name == "Fictional Republic"
+    assert sample_wikidata_entity_belgium.aliases == ["FR", "fr", "FRE", "Republic of Fiction"]
+    assert sample_wikidata_entity_belgium.type == ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"]
+    assert sample_wikidata_entity_belgium.description == "Fictional Republic is a made-up country for testing purposes."
+    assert sample_wikidata_entity_belgium.wikipedia_title == "Fictional_Republic"
 
     # copy
     entity = WikidataEntity.from_dict(sample_wikidata_entity_belgium.to_dict())
-    assert entity.entity_id == "Q31"
-    assert entity.properties["name"] == ["Belgium", "BE", "be", "BEL", "Kingdom of Belgium"]
-    assert entity.name == "Belgium"
-    assert entity.aliases == ["BE", "be", "BEL", "Kingdom of Belgium"]
-    assert entity.type == ["Q6256", "Q20181813", "Q185441", "Q1250464", "Q3624078", "Q43702"]
-    assert entity.description == "Belgium is a country in Western Europe."
-    assert entity.wikipedia_title == "Belgium"
+    assert entity.entity_id == "Q12345"
+    assert entity.properties["name"] == ["Fictional Republic", "FR", "fr", "FRE", "Republic of Fiction"]
+    assert entity.name == "Fictional Republic"
+    assert entity.aliases == ["FR", "fr", "FRE", "Republic of Fiction"]
+    assert entity.type == ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"]
+    assert entity.description == "Fictional Republic is a made-up country for testing purposes."
+    assert entity.wikipedia_title == "Fictional_Republic"
 
     # minimal repr
     entity.description = ""
@@ -50,57 +56,57 @@ def test_wikidata_entity_fields(sample_wikidata_entity_belgium: WikidataEntity) 
     entity_dict = entity.to_dict(minimal_repr=True)
 
     assert entity_dict == {
-        "entity_id": "Q31",
+        "entity_id": "Q12345",
         "properties": {
-            "name": ["Belgium", "BE", "be", "BEL", "Kingdom of Belgium"],
-            "P31": ["Q6256", "Q20181813", "Q185441", "Q1250464", "Q3624078", "Q43702"],
+            "name": ["Fictional Republic", "FR", "fr", "FRE", "Republic of Fiction"],
+            "P31": ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"],
         },
         "source_ids": ["source1"],
     }
 
     # modify fields
-    entity.aliases = ["Belgien"]
+    entity.aliases = ["Fiction Land"]
     entity.type = []
-    entity.wikipedia_title = "Belgien"
+    entity.wikipedia_title = "Fiction_Land"
 
-    assert entity.properties["name"] == ["Belgium", "Belgien"]
+    assert entity.properties["name"] == ["Fictional Republic", "Fiction Land"]
     assert entity.properties[TypeProperties.INSTANCE_OF.value] == []
-    assert entity.name == "Belgium"
-    assert entity.aliases == ["Belgien"]
+    assert entity.name == "Fictional Republic"
+    assert entity.aliases == ["Fiction Land"]
     assert entity.type == []
-    assert entity.wikipedia_title == "Belgien"
+    assert entity.wikipedia_title == "Fiction_Land"
 
 
 def test_wikidata_entity_formats() -> None:
     """Test the Wikidata entity serialisation and deserialisation."""
     # load old format entity
-    old_entity_json = '{"id": "Q31", "name": "Belgium", "aliases": ["BE", "be", "BEL", "Kingdom of Belgium"], "types": ["Q6256", "Q20181813", "Q185441", "Q1250464", "Q3624078", "Q43702"], "wikipedia": "Belgium"}'
+    old_entity_json = '{"id": "Q12345", "name": "Fictional Republic", "aliases": ["FR", "fr", "FRE", "Republic of Fiction"], "types": ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"], "wikipedia": "Fictional_Republic"}'
     entity = WikidataEntity.from_json(old_entity_json)
-    assert entity.entity_id == "Q31"
-    assert entity.name == "Belgium"
-    assert entity.aliases == ["BE", "be", "BEL", "Kingdom of Belgium"]
-    assert entity.type == ["Q6256", "Q20181813", "Q185441", "Q1250464", "Q3624078", "Q43702"]
-    assert entity.wikipedia_title == "Belgium"
+    assert entity.entity_id == "Q12345"
+    assert entity.name == "Fictional Republic"
+    assert entity.aliases == ["FR", "fr", "FRE", "Republic of Fiction"]
+    assert entity.type == ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"]
+    assert entity.wikipedia_title == "Fictional_Republic"
 
     entity_dict = entity.to_dict(minimal_repr=True)
     assert entity_dict == {
-        "entity_id": "Q31",
+        "entity_id": "Q12345",
         "properties": {
-            "name": ["Belgium", "BE", "be", "BEL", "Kingdom of Belgium"],
-            "P31": ["Q6256", "Q20181813", "Q185441", "Q1250464", "Q3624078", "Q43702"],
+            "name": ["Fictional Republic", "FR", "fr", "FRE", "Republic of Fiction"],
+            "P31": ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"],
         },
-        "metadata": {"wikipedia_title": "Belgium"},
+        "metadata": {"wikipedia_title": "Fictional_Republic"},
     }
 
-    old_entity_json = '{"id": "Q31", "name": "Belgium", "aliases": ["BE", "be", "BEL", "Kingdom of Belgium"], "types": ["Q6256", "Q20181813", "Q185441", "Q1250464", "Q3624078", "Q43702"]}'
+    old_entity_json = '{"id": "Q12345", "name": "Fictional Republic", "aliases": ["FR", "fr", "FRE", "Republic of Fiction"], "types": ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"]}'
     entity = WikidataEntity.from_json(old_entity_json)
     assert entity.wikipedia_title == ""
     entity_dict = entity.to_dict(minimal_repr=True)
     assert entity_dict == {
-        "entity_id": "Q31",
+        "entity_id": "Q12345",
         "properties": {
-            "name": ["Belgium", "BE", "be", "BEL", "Kingdom of Belgium"],
-            "P31": ["Q6256", "Q20181813", "Q185441", "Q1250464", "Q3624078", "Q43702"],
+            "name": ["Fictional Republic", "FR", "fr", "FRE", "Republic of Fiction"],
+            "P31": ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"],
         },
     }
 

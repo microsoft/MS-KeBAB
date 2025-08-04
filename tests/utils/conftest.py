@@ -11,14 +11,14 @@ from kebab.utils.dataset.wikidata.wikidata_utils import WikidataEntity
 
 @pytest.fixture
 def wikidata_entity() -> WikidataEntity:
-    """Get a Wikidata entity for testing."""
+    """Get a fictitious Wikidata entity for testing."""
     entity_dict = {
-        "entity_id": "Q31",
+        "entity_id": "Q12345",
         "properties": {
-            "name": ["Belgium", "BE", "be", "BEL", "Kingdom of Belgium"],
-            "P31": ["Q6256", "Q20181813", "Q185441", "Q1250464", "Q3624078", "Q43702"],
+            "name": ["Fictional Republic", "FR", "fr", "FRE", "Republic of Fiction"],
+            "P31": ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"],
         },
-        "metadata": {"wikipedia": "Belgium"},
+        "metadata": {"wikipedia": "Fictional_Republic"},
     }
 
     return WikidataEntity.from_dict(entity_dict)
