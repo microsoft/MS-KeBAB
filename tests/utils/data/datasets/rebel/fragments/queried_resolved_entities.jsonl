@@ -1,3 +1,3 @@
-{"entity_id": "Q223419", "properties": {"P31": ["Q5"], "name": ["Manuel Roxas"]}, "source_ids": [], "evidence_map": {}, "metadata": {"wikipedia_title": "Manuel Roxas"}}
-{"entity_id": "Q1484", "properties": {"P31": ["Q8502", "Q169358", "Q207326"], "name": ["Mayon Volcano", "mount Mayon", "Mayon", "Mt. Mayon"]}, "source_ids": [], "evidence_map": {}, "metadata": {"wikipedia_title": "Mayon"}}
-{"entity_id": "Q1209571", "properties": {"name": ["President of the Philippines"]}, "source_ids": [], "evidence_map": {}, "metadata": {"wikipedia_title": "President of the Philippines"}}
+{"entity_id": "Q223419", "properties": {"P31": ["Q5"], "name": ["Alexander Johnson"]}, "source_ids": [], "evidence_map": {}, "metadata": {"wikipedia_title": "Alexander Johnson"}}
+{"entity_id": "Q1484", "properties": {"P31": ["Q8502", "Q169358", "Q207326"], "name": ["Crystal Peak Mountain", "Crystal Peak", "Crystal Mountain", "Mt. Crystal"]}, "source_ids": [], "evidence_map": {}, "metadata": {"wikipedia_title": "Crystal Peak"}}
+{"entity_id": "Q1209571", "properties": {"name": ["Chief Executive Officer"]}, "source_ids": [], "evidence_map": {}, "metadata": {"wikipedia_title": "Chief Executive Officer"}}

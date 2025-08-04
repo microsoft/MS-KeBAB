@@ -61,5 +61,5 @@ def test_resolve_rebel_fragments(
     assert len(lines) == 2
     entity = ResolvedWikidataEntity.from_json(lines[0])
     assert entity.entity_id == "Q223419"
-    assert entity.properties["position held"] == ["President of the Philippines"]
+    assert entity.properties["position held"] == ["Chief Executive Officer"]
     assert entity.wikidata_type == ["human"]

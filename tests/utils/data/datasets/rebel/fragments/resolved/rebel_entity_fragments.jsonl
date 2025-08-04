@@ -1,2 +1,3 @@
-{"entity_id": "Q223419", "properties": {"name": ["Manuel A. Roxas"], "position held": ["President of the Philippines"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "4", "type": ["human"]}}
-{"entity_id": "Q1484", "properties": {"name": ["Mayon Volcano"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "5", "type": ["Kuppe", "stratovolcano", "summit"]}}
+{"entity_id": "Q223419", "properties": {"name": ["Alexander Johnson"], "position held": ["President"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "4", "type": ["human"]}}
+{"entity_id": "Q1484", "properties": {"name": ["Crystal Peak Mountain"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "5"}}
+{"entity_id": "Q223419", "properties": {"name": ["Alexander"], "position held": ["President"]}, "metadata": {"doc_id": "30111984", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba010", "fragment_id": "6", "type": ["human"]}}
