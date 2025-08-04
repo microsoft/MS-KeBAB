@@ -15,15 +15,7 @@ from kebab.utils.dataset.rebel.rebel_fragment_extractor import RebelFragmentExtr
 @click.option(
     "--rebel-dir",
     type=pathlib.Path,
-    default=pathlib.Path.home()
-    / "OneDrive - Microsoft"
-    / "Benchmark"
-    / "Datasets"
-    / "REBEL"
-    / "Original Dataset"
-    # / "single",
-    # / "sample",
-    / "full",
+    default=pathlib.Path.cwd() / "data" / "REBEL" / "Original Dataset" / "full",
     help="Path to the REBEL data directory (will be *json/*.jsonl-globbed against).",
 )
 @click.option(

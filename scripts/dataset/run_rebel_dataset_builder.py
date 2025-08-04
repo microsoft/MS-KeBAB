@@ -15,15 +15,7 @@ from kebab.utils.dataset.rebel.rebel_dataset_builder import MergeDistributionMod
 @click.option(
     "--rebel-fragments-path",
     type=pathlib.Path,
-    default=pathlib.Path.home()
-    / "OneDrive - Microsoft"
-    / "Benchmark"
-    / "Datasets"
-    / "REBEL"
-    / "Fragments"
-    / "Resolved"
-    # / "sample"
-    / "rebel_entity_fragments.jsonl",
+    default=pathlib.Path.cwd() / "data" / "REBEL" / "Fragments" / "Resolved" / "rebel_entity_fragments.jsonl",
     help="Path to the file containing REBEL fragments.",
 )
 @click.option(

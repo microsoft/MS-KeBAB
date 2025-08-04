@@ -15,7 +15,7 @@ from kebab.utils.dataset.wikidata.wikidata_type_hierarchy_extractor import Wikid
 @click.option(
     "--wikidata-json-dump-path",
     type=pathlib.Path,
-    default=pathlib.Path.home() / "latest-all.json",
+    default=pathlib.Path.cwd() / "data" / "latest-all.json",
     help="The path to the standard Wikidata JSON dump file.",
 )
 @click.option(
