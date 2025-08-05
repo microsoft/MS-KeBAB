@@ -61,18 +61,12 @@ def test_extract_sub_documents(t_rex_single_doc_file_path: Path) -> None:
         all_triples.extend(sub_doc["triples"])
 
     assert len(all_entities) == len(doc_record["entities"])
-    # Note: Sub-document extraction may create duplicate triples across sentence boundaries
-    # so we check that we have at least the original number of triples
-    assert len(all_triples) >= len(doc_record["triples"])
+    assert len(all_triples) == len(doc_record["triples"])
 
-    # Verify that all original entities are represented
     all_ent_json = {json.dumps(entity, sort_keys=True) for entity in all_entities}
     ent_json = {json.dumps(entity, sort_keys=True) for entity in doc_record["entities"]}
-    # The entities should contain at least the original entities
-    assert ent_json.issubset(all_ent_json)
+    assert all_ent_json == ent_json
 
-    # Verify that all original triples are represented
     all_triples_json = {json.dumps(triple, sort_keys=True) for triple in all_triples}
     triples_json = {json.dumps(triple, sort_keys=True) for triple in doc_record["triples"]}
-    # The triples should contain at least the original triples
-    assert triples_json.issubset(all_triples_json)
+    assert all_triples_json == triples_json
