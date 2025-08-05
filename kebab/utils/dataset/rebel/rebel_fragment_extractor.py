@@ -250,7 +250,7 @@ class RebelFragmentExtractor:
         entity_count = 0
         triple_count = 0
 
-        # TODO(pmyshkov): update boundaries (if we decide to use them, and to this method to begin with)
+        # TODO(pmyshkov): update boundaries (if we decide to use them, and this method to begin with)
 
         for sentence_boundary in record["sentences_boundaries"]:
             sub_document = template.copy()

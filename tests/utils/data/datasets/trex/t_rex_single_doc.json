@@ -2,7 +2,7 @@
     {
         "docid": "http://www.wikidata.org/entity/Q12345",
         "title": "FictionalLang programming language",
-        "text": "FictionalLang is a modern programming language designed for educational purposes. It was created in ExampleCity by a team of computer scientists who wanted to provide students with an intuitive learning experience.",
+        "text": "FictionalLang is a modern programming language designed for educational purposes. FictionalLang was created in ExampleCity by a team of computer scientists who wanted to provide students with an intuitive learning experience.",
         "uri": "http://www.wikidata.org/entity/Q12345",
         "entities": [
             {
@@ -25,8 +25,17 @@
             },
             {
                 "boundaries": [
-                    87,
-                    98
+                    81,
+                    93
+                ],
+                "surfaceform": "FictionalLang",
+                "uri": "http://www.wikidata.org/entity/Q12345",
+                "annotator": "Wikidata_Spotlight_Entity_Linker"
+            },
+            {
+                "boundaries": [
+                    109,
+                    120
                 ],
                 "surfaceform": "ExampleCity",
                 "uri": "http://www.wikidata.org/entity/Q11111",
@@ -80,91 +89,87 @@
             ],
             [
                 81,
-                83
+                93
             ],
             [
-                84,
-                87
+                94,
+                97
             ],
             [
-                88,
-                95
+                98,
+                105
             ],
             [
-                96,
-                98
+                106,
+                108
             ],
             [
-                99,
-                109
+                109,
+                120
             ],
             [
-                110,
-                112
+                121,
+                123
             ],
             [
-                113,
-                114
+                124,
+                125
             ],
             [
-                115,
-                119
+                126,
+                130
             ],
             [
-                120,
-                122
+                131,
+                133
             ],
             [
-                123,
-                131
-            ],
-            [
-                132,
+                134,
                 142
             ],
             [
                 143,
-                146
+                152
             ],
             [
-                147,
-                153
-            ],
-            [
-                154,
+                153,
                 156
             ],
             [
                 157,
-                164
+                163
             ],
             [
-                165,
-                173
+                164,
+                166
             ],
             [
-                174,
-                178
+                167,
+                174
             ],
             [
-                179,
-                181
+                175,
+                183
             ],
             [
-                182,
-                191
+                184,
+                188
             ],
             [
-                192,
-                200
+                189,
+                198
             ],
             [
-                201,
-                211
+                199,
+                207
             ],
             [
-                211,
-                212
+                208,
+                218
+            ],
+            [
+                218,
+                219
             ]
         ],
         "triples": [
@@ -208,8 +213,8 @@
                 },
                 "object": {
                     "boundaries": [
-                        87,
-                        98
+                        109,
+                        120
                     ],
                     "surfaceform": "ExampleCity",
                     "uri": "http://www.wikidata.org/entity/Q11111",
@@ -219,8 +224,8 @@
                 "confidence": null,
                 "subject": {
                     "boundaries": [
-                        0,
-                        12
+                        81,
+                        93
                     ],
                     "surfaceform": "FictionalLang",
                     "uri": "http://www.wikidata.org/entity/Q12345",
@@ -236,7 +241,7 @@
             ],
             [
                 81,
-                212
+                219
             ]
         ]
     }

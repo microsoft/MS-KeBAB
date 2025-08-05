@@ -63,10 +63,10 @@ def test_extract_sub_documents(t_rex_single_doc_file_path: Path) -> None:
     assert len(all_entities) == len(doc_record["entities"])
     assert len(all_triples) == len(doc_record["triples"])
 
-    all_ent_json = {json.dumps(entity, sort_keys=True) for entity in all_entities}
-    ent_json = {json.dumps(entity, sort_keys=True) for entity in doc_record["entities"]}
+    all_ent_json = {json.dumps(entity) for entity in all_entities}
+    ent_json = {json.dumps(entity) for entity in doc_record["entities"]}
     assert all_ent_json == ent_json
 
-    all_triples_json = {json.dumps(triple, sort_keys=True) for triple in all_triples}
-    triples_json = {json.dumps(triple, sort_keys=True) for triple in doc_record["triples"]}
+    all_triples_json = {json.dumps(triple) for triple in all_triples}
+    triples_json = {json.dumps(triple) for triple in doc_record["triples"]}
     assert all_triples_json == triples_json
