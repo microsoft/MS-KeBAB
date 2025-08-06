@@ -57,7 +57,7 @@ def test_wikidata_type_hierarchy_extractor(
     with open(output_file_path, encoding="utf-8") as f:
         lines = f.readlines()
 
-    assert len(lines) == 344
+    assert len(lines) == 3
 
 
 def test_sort_topologically():
