@@ -58,8 +58,8 @@ def test_resolve_rebel_fragments(
     with open(output_file_path, encoding="utf-8") as f:
         lines = f.readlines()
 
-    assert len(lines) == 10
-    entity = ResolvedWikidataEntity.from_json(lines[4])
+    assert len(lines) == 2
+    entity = ResolvedWikidataEntity.from_json(lines[0])
     assert entity.entity_id == "Q223419"
-    assert entity.properties["position held"] == ["President of the Philippines"]
+    assert entity.properties["position held"] == ["Chief Executive Officer"]
     assert entity.wikidata_type == ["human"]

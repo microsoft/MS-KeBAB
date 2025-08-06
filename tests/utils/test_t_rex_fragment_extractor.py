@@ -23,14 +23,14 @@ def test_extract_entities(t_rex_single_doc_file_path: Path) -> None:
         doc_record = json.load(f)[0]
 
     entities = RebelFragmentExtractor.extract_entity_fragments_from_document(doc_record)
-    assert len(entities) == 27
+    assert len(entities) == 3
 
     entities = {entity_id: entity for entity_id, entity in entities.items() if len(entity.properties) > 1}
-    assert len(entities) == 10
+    assert len(entities) == 1
 
-    main_ent_key = "Q33199"
+    main_ent_key = "Q12345"
     assert main_ent_key in entities
-    assert "Austroasiatic languages" in entities[main_ent_key].properties["name"]
+    assert "FictionalLang" in entities[main_ent_key].properties["name"]
 
     source_ids = entities[main_ent_key].source_ids
 

@@ -15,11 +15,11 @@ def test_fetch_wikipedia_pages(wikidata_entity: WikidataEntity, mocker: MockerFi
     """Test the fetch_wikipedia_pages method."""
     mock_intro_response = Mock()
     mock_intro_response.json.return_value = {
-        "query": {"pages": {"12345": {"pageid": 31, "title": "Test title", "extract": "Test intro text"}}}
+        "query": {"pages": {"12345": {"pageid": 12345, "title": "Test title", "extract": "Test intro text"}}}
     }
 
     mock_title_response = Mock()
-    mock_title_response.json.return_value = {"entities": {"Q31": {"sitelinks": {"enwiki": {"title": "Test title"}}}}}
+    mock_title_response.json.return_value = {"entities": {"Q12345": {"sitelinks": {"enwiki": {"title": "Test title"}}}}}
 
     def mock_get(_, params, **__):
         if params.get("action") == "wbgetentities":
@@ -42,7 +42,7 @@ def test_fetch_wikipedia_pages(wikidata_entity: WikidataEntity, mocker: MockerFi
 
     results = [json.loads(line) for line in output_file.read_text(encoding="utf-8").splitlines()]
     assert len(results) == 1
-    assert results[0]["entity_id"] == "Q31"
+    assert results[0]["entity_id"] == "Q12345"
     assert "Test title" in results[0]["text"]
 
     # test intros
@@ -52,5 +52,5 @@ def test_fetch_wikipedia_pages(wikidata_entity: WikidataEntity, mocker: MockerFi
 
     results = [json.loads(line) for line in output_file.read_text(encoding="utf-8").splitlines()]
     assert len(results) == 1
-    assert results[0]["entity_id"] == "Q31"
+    assert results[0]["entity_id"] == "Q12345"
     assert "Test intro text" in results[0]["text"]
