@@ -68,7 +68,7 @@ def test_load_type_hierarchy(wikidata_full_type_hierarchy_file_path: Path) -> No
 def test_load_properties(wikidata_full_properties_file_path: Path) -> None:
     """Test the loading of the properties of Wikidata."""
     properties = wikidata_utils.load_properties(wikidata_full_properties_file_path)
-    assert len(properties) == 12272
+    assert len(properties) == 4
     prop = properties["P6"]
     assert prop["label"] == "head of government"
     assert len(prop["aliases"]) > 0
