@@ -1,2 +1,4 @@
-{"id": "Q31", "name": "Belgium", "aliases": ["\ud83c\udde7\ud83c\uddea", "Kingdom of Belgium", "BEL", "be", "BE"], "types": ["Q185441", "Q6256", "Q3624078", "Q20181813", "Q1250464", "Q43702"]}
-{"id": "Q23", "name": "George Washington", "aliases": ["The American Fabius", "American Fabius", "Father of the United States"], "types": ["Q5"]}
+{"entity_id": "Q31", "properties": {"name": ["Westfield", "Republic of Westfield", "WF"], "P31": ["Q6256"]}}
+{"entity_id": "Q23", "properties": {"name": ["Robert Harrison", "Rob Harrison", "The Statesman"], "P31": ["Q5"]}}
+{"entity_id": "Q42", "properties": {"name": ["Sarah Mitchell"], "P31": ["Q5"]}}
+{"entity_id": "Q99", "properties": {"name": ["Northbrook", "NB", "Northbrook State"], "P31": ["Q35657"]}}

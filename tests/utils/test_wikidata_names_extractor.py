@@ -64,4 +64,5 @@ def test_extract_names(
         lines = f.readlines()
 
     assert len(lines) == 1
+    assert "Robert Harrison" in lines[0]
     assert lines[0].strip().startswith('{"entity_id": "Q23"')
