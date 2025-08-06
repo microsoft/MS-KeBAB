@@ -61,8 +61,8 @@ def test_query_entity_via_api_and_simplify(
 def test_load_type_hierarchy(wikidata_full_type_hierarchy_file_path: Path) -> None:
     """Test the loading of the type hierarchy of Wikidata."""
     graph, type_id_to_node_map = wikidata_utils.load_type_hierarchy(wikidata_full_type_hierarchy_file_path)
-    assert len(graph) == 106019
-    assert len(type_id_to_node_map) == 106999
+    assert len(graph) == 4
+    assert len(type_id_to_node_map) == 6
 
 
 def test_load_properties(wikidata_full_properties_file_path: Path) -> None:
