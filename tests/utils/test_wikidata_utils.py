@@ -36,10 +36,10 @@ def test_extract_properties_from_dump(wikidata_dump_sample_prop_records_file_pat
     assert len(entities) == 1
 
     p = entities[0]
-    assert p.entity_id == "P19"
-    assert p.name == "place of birth"
+    assert p.entity_id == "P123"
+    assert p.name == "dummy property"
     assert p.wikipedia_title == ""
-    assert p.description.startswith("most specific known")
+    assert p.description.startswith("a fake property")
 
 
 def test_query_entity_via_api_and_simplify(
@@ -53,7 +53,7 @@ def test_query_entity_via_api_and_simplify(
     query_func = wikidata_utils._query_entities_via_api  # noqa: SLF001
     mocker.patch(f"{query_func.__module__}.{query_func.__qualname__}", return_value=entities_dict)
 
-    queried_entity = wikidata_utils.query_single_entity_via_api("P19")
+    queried_entity = wikidata_utils.query_single_entity_via_api("P123")
 
     assert queried_entity == entities[0]
 
