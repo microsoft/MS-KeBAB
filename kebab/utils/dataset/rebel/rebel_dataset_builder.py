@@ -54,6 +54,7 @@ from time import perf_counter as pc
 
 import numpy as np
 from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
+from kebab.utils.io_helpers import resolve_path
 
 
 class MergeDistributionMode(Enum):
@@ -95,7 +96,7 @@ class RebelDatasetBuilder:
         """
         self._logger: logging.Logger = logging.getLogger(__name__)
 
-        self.fragments_path: pathlib.Path = fragments_path
+        self.fragments_path: pathlib.Path = resolve_path(fragments_path)
 
         self.output_dir: pathlib.Path = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)

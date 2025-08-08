@@ -15,7 +15,7 @@ from kebab.utils.dataset.wikidata.wikidata_resolver import WikidataResolver
 @click.option(
     "--entities-path",
     type=pathlib.Path,
-    default=pathlib.Path.cwd() / "data" / "REBEL" / "Fragments" / "rebel_entity_fragments.jsonl",
+    default=pathlib.Path.cwd() / "data" / "REBEL" / "Fragments" / "Surface Forms" / "rebel_entity_fragments.jsonl",
     help="Path to the input entities file.",
 )
 @click.option(
