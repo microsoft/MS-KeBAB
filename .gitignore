@@ -3,7 +3,7 @@
 
 # Custom
 output/
-Datasets.lnk
+**/*.lnk
 
 # logs
 log/

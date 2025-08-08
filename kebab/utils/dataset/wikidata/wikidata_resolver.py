@@ -18,6 +18,7 @@ from collections import defaultdict
 
 from kebab.contracts.entity import Entity
 from kebab.utils.dataset.wikidata import wikidata_utils
+from kebab.utils.io_helpers import resolve_path
 
 
 class WikidataResolver:
@@ -41,10 +42,10 @@ class WikidataResolver:
         """Initialize the Wikidata resolver."""
         self._logger: logging.Logger = logging.getLogger(__name__)
 
-        self.entities_path: pathlib.Path = entities_path
-        self.wikidata_simple_entities_path: pathlib.Path = wikidata_simple_entities_path
-        self.wikidata_properties_path: pathlib.Path = wikidata_properties_path
-        self.wikidata_type_hierarchy_path: pathlib.Path = wikidata_type_hierarchy_path
+        self.entities_path: pathlib.Path = resolve_path(entities_path)
+        self.wikidata_simple_entities_path: pathlib.Path = resolve_path(wikidata_simple_entities_path)
+        self.wikidata_properties_path: pathlib.Path = resolve_path(wikidata_properties_path)
+        self.wikidata_type_hierarchy_path: pathlib.Path = resolve_path(wikidata_type_hierarchy_path)
 
         self.resolve_property_names: bool = resolve_property_names
         self.resolve_property_values: bool = resolve_property_values

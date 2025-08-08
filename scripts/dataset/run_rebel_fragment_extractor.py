@@ -24,10 +24,17 @@ from kebab.utils.dataset.rebel.rebel_fragment_extractor import RebelFragmentExtr
     default=pathlib.Path.cwd() / "output",
     help="Path to the output directory ('rebel_entity_fragments.jsonl' will be created there).",
 )
+@click.option(
+    "--extract-surface-forms",
+    is_flag=True,
+    default=True,
+    help="Extract surface forms instead of URIs for property values.",
+)
 @click.command()
 def main(
     rebel_dir: pathlib.Path,
     output_dir: pathlib.Path,
+    extract_surface_forms: bool,
 ) -> None:
     """Run REBEL fragment extraction steps."""
     logging_helpers.configure_logging()
@@ -35,6 +42,7 @@ def main(
     extractor = RebelFragmentExtractor(
         rebel_dir=rebel_dir,
         output_dir=output_dir,
+        extract_surface_forms=extract_surface_forms,
     )
 
     extractor.run()
