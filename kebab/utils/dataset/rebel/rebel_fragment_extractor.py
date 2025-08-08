@@ -25,6 +25,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from kebab.utils.dataset.wikidata.wikidata_utils import WikidataEntity
+from kebab.utils.io_helpers import resolve_path
 
 
 class RebelFragmentExtractor:
@@ -49,17 +50,19 @@ class RebelFragmentExtractor:
 
     _UNSAFE_FRAGMENT_COUNTER: int = 0
 
-    def __init__(self, *, rebel_dir: Path, output_dir: Path) -> None:
+    def __init__(self, *, rebel_dir: Path, output_dir: Path, extract_surface_forms: bool = False) -> None:
         """
         Initialize the fragment extractor.
 
         Args:
             rebel_dir: Path to the REBEL data directory (will be *.json-globbed against).
             output_dir: Path to the output directory ("all_entities_fragments.jsonl" will be created there).
+            extract_surface_forms: If True, extract surface forms instead of URIs for property values.
         """
         self._logger: logging.Logger = logging.getLogger(__name__)
 
-        self.rebel_dir: Path = rebel_dir
+        self.rebel_dir: Path = resolve_path(rebel_dir)
+        self.extract_surface_forms: bool = extract_surface_forms
 
         self.output_dir: Path = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -86,7 +89,9 @@ class RebelFragmentExtractor:
                 else:
                     # TODO(pmyshkov): inefficient, should be done in a single pass, but it's nontrivial due to the need
                     # to remove duplicates -- revisit if we decide we need this
-                    temp_result = self.extract_entity_fragments_from_document(rec)
+                    temp_result = self.extract_entity_fragments_from_document(
+                        rec, extract_surface_forms=self.extract_surface_forms
+                    )
                     if not temp_result:
                         continue
 
@@ -94,7 +99,10 @@ class RebelFragmentExtractor:
 
                 for record in sub_docs:
                     fragments = self.extract_entity_fragments_from_document(
-                        record, apply_filter=not self.SPLIT_INTO_SUB_DOCUMENTS, stats=stats
+                        record,
+                        apply_filter=not self.SPLIT_INTO_SUB_DOCUMENTS,
+                        stats=stats,
+                        extract_surface_forms=self.extract_surface_forms,
                     )
                     for fragment in fragments.values():
                         if remove_duplicates:
@@ -135,9 +143,25 @@ class RebelFragmentExtractor:
 
     @classmethod
     def extract_entity_fragments_from_document(
-        cls, record: dict, drop_empty: bool = True, apply_filter: bool = True, stats: Counter | None = None
+        cls,
+        record: dict,
+        drop_empty: bool = True,
+        apply_filter: bool = True,
+        stats: Counter | None = None,
+        extract_surface_forms: bool = False,
     ) -> dict[str, WikidataEntity]:
-        """Extract entity fragments and properties from a single REBEL document record."""
+        """Extract entity fragments and properties from a single REBEL document record.
+
+        Args:
+            record: The REBEL document record to process.
+            drop_empty: Whether to drop fragments with no names.
+            apply_filter: Whether to apply filtering (skip disambiguation pages, short texts, etc.).
+            stats: Counter object to track statistics.
+            extract_surface_forms: If True, extract surface forms instead of URIs for property values.
+
+        Returns:
+            Dictionary mapping entity IDs to WikidataEntity fragments.
+        """
         if stats is None:
             stats = Counter()
 
@@ -206,15 +230,25 @@ class RebelFragmentExtractor:
         # process property records
         for item in record["triples"]:
             property_id = cls.get_property_id_from_uri(item["predicate"]["uri"])
-            object_id = cls.get_entity_id_from_uri(item["object"]["uri"])
             subject_id = cls.get_entity_id_from_uri(item["subject"]["uri"])
 
-            if property_id is None or object_id is None or subject_id is None:
+            if property_id is None or subject_id is None:
                 continue
+
+            # Determine what value to use for the object based on extract_surface_forms flag
+            if extract_surface_forms:
+                object_value = item["object"]["surfaceform"]
+                if not object_value:
+                    continue
+            else:
+                object_id = cls.get_entity_id_from_uri(item["object"]["uri"])
+                if object_id is None:
+                    continue
+                object_value = object_id
 
             # only take triplets where the entity we are creating the properties for is the subject of the triplet
             if subject_id in fragments:
-                fragments[subject_id].properties[property_id].append(object_id)
+                fragments[subject_id].properties[property_id].append(object_value)
             else:
                 not_found_objects += 1
 

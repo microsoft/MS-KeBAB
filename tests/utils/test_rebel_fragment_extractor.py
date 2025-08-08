@@ -22,8 +22,60 @@ def rebel_sample_records_dir_path() -> Path:
     return Path(__file__).parent / "data" / "datasets" / "rebel" / "sample"
 
 
+def test_extract_entities_uri_mode(rebel_single_record_file_path: Path) -> None:
+    """Test the extraction of entities and properties from a single REBEL JSON document record using URI mode."""
+    # load a single REBEL document
+    with open(rebel_single_record_file_path, encoding="utf-8") as f:
+        doc_record = json.load(f)
+
+    entities = RebelFragmentExtractor.extract_entity_fragments_from_document(doc_record, extract_surface_forms=False)
+    assert len(entities) == 2
+
+    entities = {entity_id: entity for entity_id, entity in entities.items() if len(entity.properties) > 1}
+    assert len(entities) == 1
+
+    main_ent_key = "Q1001000"
+    assert main_ent_key in entities
+    entity = entities[main_ent_key]
+
+    assert entity.properties["name"] == ["Acme Widget Pro"]
+    assert entity.metadata["doc_id"] == "12345678"
+    # In URI mode, property values should be entity IDs
+    assert entity.properties["P176"] == ["Q2002000"]  # manufacturer -> Acme Corporation (as URI)
+
+    for entity in entities.values():
+        assert entity.source_ids == []
+        assert len(entity.properties) > 0
+
+
+def test_extract_entities_surface_form_mode(rebel_single_record_file_path: Path) -> None:
+    """Test the extraction of entities and properties from a single REBEL JSON document record using surface form mode."""
+    # load a single REBEL document
+    with open(rebel_single_record_file_path, encoding="utf-8") as f:
+        doc_record = json.load(f)
+
+    entities = RebelFragmentExtractor.extract_entity_fragments_from_document(doc_record, extract_surface_forms=True)
+    assert len(entities) == 2
+
+    entities = {entity_id: entity for entity_id, entity in entities.items() if len(entity.properties) > 1}
+    assert len(entities) == 1
+
+    main_ent_key = "Q1001000"
+    assert main_ent_key in entities
+    entity = entities[main_ent_key]
+
+    assert entity.properties["name"] == ["Acme Widget Pro"]
+    assert entity.metadata["doc_id"] == "12345678"
+    # In surface form mode, property values should be surface forms
+    assert entity.properties["P176"] == ["Acme Corporation"]  # manufacturer -> Acme Corporation (as surface form)
+
+    for entity in entities.values():
+        assert entity.source_ids == []
+        assert len(entity.properties) > 0
+
+
 def test_extract_entities(rebel_single_record_file_path: Path) -> None:
-    """Test the extraction of entities and properties from a single REBEL JSON document record."""
+    """Test the extraction of entities and properties from a single REBEL JSON document record (backwards compatibility)."""
     # load a single REBEL document
     with open(rebel_single_record_file_path, encoding="utf-8") as f:
         doc_record = json.load(f)
