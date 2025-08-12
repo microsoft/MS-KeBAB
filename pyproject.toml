@@ -37,7 +37,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.12.0",
+    "ruff==0.12.8",
 ]
 
 [tool.uv.build-backend]
