@@ -21,7 +21,7 @@ dependencies = [
     "evaluate",
     "rouge-score",
     "bert_score",
-    "xlsxwriter"
+    "xlsxwriter",
 ]
 
 [build-system]

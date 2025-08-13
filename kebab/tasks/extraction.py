@@ -127,7 +127,9 @@ class ExtractionTask(Task):
         self.__metric_config_cls["aesop"] = ValueAveragedAesopConfig
 
         for metric_name, metric_config_dict in self.metrics_config.items():
-            print(metric_config_dict)
+            if logger is not None:
+                logger.info(f"Evaluating metric: {metric_name}")
+                logger.info(metric_config_dict)
             metric_calculator_cls = self.__metric_calculator_cls[metric_name]
             metric_config = self.__metric_config_cls[metric_name].from_dict(metric_config_dict, self.read_schema())
             metric_results = metric_calculator_cls(metric_config, logger).run(pred_extractions, self.read_items())  # type: ignore

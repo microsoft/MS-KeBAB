@@ -15,7 +15,7 @@ def drop_last_columns(df: pd.DataFrame, num_cols_to_drop: int) -> pd.DataFrame:
     """Drop the last `num_cols_to_drop` columns from a DataFrame."""
     if num_cols_to_drop <= 0:
         return df
-    return df.drop(columns=df.columns[-num_cols_to_drop:], axis=1)  # type: ignore
+    return df.drop(columns=df.columns[-num_cols_to_drop:].tolist(), axis=1)
 
 
 def split_df_by_document_id(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -58,8 +58,6 @@ def drop_columns(df: pd.DataFrame, columns: Iterable[str]) -> pd.DataFrame:
 def merge_entity_dfs(df_left: pd.DataFrame, df_right: pd.DataFrame, suffixes: tuple[str, str]) -> pd.DataFrame:
     """Merge two DataFrames containing entity information."""
     excluded_columns = {"document_id", "original_text", "property_id", "gt_entity_id", "gt_values"}
-    # matched_pred_ids_left.update(value for value in df_part_1["pred_entity_id"].values if value != "")
-    # matched_pred_ids_right.update(value for value in df_part_2["pred_entity_id"].values if value != "")
     df_left = add_suffix_excluding_columns(df_left, suffixes[0], excluded_columns)
     df_right = add_suffix_excluding_columns(df_right, suffixes[1], excluded_columns)
     matched = df_left[df_left["property_id"].notna()].merge(
@@ -67,7 +65,7 @@ def merge_entity_dfs(df_left: pd.DataFrame, df_right: pd.DataFrame, suffixes: tu
         on=list(excluded_columns),
         suffixes=suffixes,
     )
-    unmatched_right = df_right[df_right["property_id"].isna()].drop(columns=excluded_columns)  # type: ignore
+    unmatched_right = df_right[df_right["property_id"].isna()].drop(columns=list(excluded_columns))
     unmatched_left = df_left[df_left["property_id"].isna()]
     unmatched = unmatched_left.merge(
         unmatched_right,
@@ -81,7 +79,7 @@ def merge_entity_dfs(df_left: pd.DataFrame, df_right: pd.DataFrame, suffixes: tu
 
 def split_into_gt_and_unmatched_pred(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Split a DataFrame into two rowwise: for ground truth entities and unmatched predicted entities."""
-    return df[df["gt_entity_id"].notna()], df[df["gt_entity_id"].isna()]  # type: ignore
+    return pd.DataFrame(df[df["gt_entity_id"].notna()]), pd.DataFrame(df[df["gt_entity_id"].isna()])
 
 
 def merge_document_dfs(document_dfs: list[pd.DataFrame], suffixes: tuple[str, str] | None = None) -> pd.DataFrame:

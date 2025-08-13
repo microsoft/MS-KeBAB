@@ -33,6 +33,7 @@ class TypeProperties(Enum):
     PART_OF = "P361"
     FACET_OF = "P1269"
     SUB_PROPERTY_OF = "P1647"
+    WIKIDATA_ITEM_OF_THIS_PROPERTY = "P1629"
 
 
 @dataclass
@@ -388,7 +389,7 @@ def fetch_properties_via_api(
             parent_properties = [get_id_from_wikidata_claim(claim) for claim in parent_properties]
             parent_properties = [p for p in parent_properties if p is not None]
 
-            wikidata_item_links = entity.get("claims", {}).get("P1629", [])
+            wikidata_item_links = entity.get("claims", {}).get(TypeProperties.WIKIDATA_ITEM_OF_THIS_PROPERTY, [])
             if wikidata_item_links:
                 wikidata_item_ids = [get_id_from_wikidata_claim(claim) for claim in wikidata_item_links]
                 wikidata_item_ids = [id_ for id_ in wikidata_item_ids if id_ is not None]

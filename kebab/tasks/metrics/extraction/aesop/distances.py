@@ -184,7 +184,7 @@ class ValueMatchingRecordWithDistances:
 
 
 @dataclass
-class ValueMatchingRecordWihScores:
+class ValueMatchingRecordWithScores:
     """Value matching record with scores for pairs of matched values.
     Scores are between 0 and 1.
     The higher the score, the more similar the values are.
@@ -273,13 +273,13 @@ class PropertyScore:
         """Initialize property score."""
         self.property_distance = property_distance
 
-    def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> ValueMatchingRecordWihScores:
+    def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> ValueMatchingRecordWithScores:
         """Compute the score for a given property."""
         value_matching_record = self.property_distance(gt_entity, pred_entity, property_)
         for distance in value_matching_record.matched_distances:
             if distance < 0 or distance > 1:
                 raise ValueError(f"Distance value {distance} is out of range [0, 1].")
-        return ValueMatchingRecordWihScores(
+        return ValueMatchingRecordWithScores(
             value_matching_record.gt_values,
             value_matching_record.pred_values,
             [1.0 - d for d in value_matching_record.matched_distances],

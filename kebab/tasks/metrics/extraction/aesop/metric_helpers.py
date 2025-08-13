@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from kebab.contracts.entity import Entity, Property, PropertySchema
-from kebab.tasks.metrics.extraction.aesop.distances import ValueMatchingRecordWihScores, match_items
+from kebab.tasks.metrics.extraction.aesop.distances import ValueMatchingRecordWithScores, match_items
 
 
 @dataclass
@@ -37,7 +37,7 @@ class MatchedPairInfo:
     distances: np.ndarray
 
 
-def get_full_class_name(obj: Any) -> str:  # noqa: ANN401
+def get_full_class_name(obj: object) -> str:
     """
     Get the class name of an object.
 
@@ -256,7 +256,7 @@ class MatchedEntitiesScorer:
         self.pred_ind = matched_pair.right_ind
         self.distances = matched_pair.distances
         self.property_schema = property_schema
-        self.debug_info: defaultdict[int, defaultdict[int, dict[str, ValueMatchingRecordWihScores]]] = defaultdict(
+        self.debug_info: defaultdict[int, defaultdict[int, dict[str, ValueMatchingRecordWithScores]]] = defaultdict(
             lambda: defaultdict(dict)
         )
         self.unmapped_property_ids: set[str] = set()
@@ -264,7 +264,7 @@ class MatchedEntitiesScorer:
 
     def score(
         self,
-        score_function: Callable[[Entity, Entity, Property], ValueMatchingRecordWihScores],
+        score_function: Callable[[Entity, Entity, Property], ValueMatchingRecordWithScores],
         property_id: str,
     ) -> EvaluatedPropertyMetrics:
         """Compute scores for a given property for matched entities."""
@@ -277,7 +277,7 @@ class MatchedEntitiesScorer:
             for gt_idx, pred_idx in zip(self.gt_ind, self.pred_ind, strict=True):
                 if property_id in self.entities_pred[pred_idx].properties:
                     pred_values = self.entities_pred[pred_idx].properties[property_id]
-                    self.debug_info[gt_idx][pred_idx][property_id] = ValueMatchingRecordWihScores(
+                    self.debug_info[gt_idx][pred_idx][property_id] = ValueMatchingRecordWithScores(
                         [], [], [], [], pred_values
                     )
                     self.unmapped_property_ids.add(property_id)
@@ -296,14 +296,14 @@ class MatchedEntitiesScorer:
                     evaluated_property_metrics.unmatched_count += len(value_matching_record.unmatched_pred_values)
                 else:
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
-                    self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWihScores(
+                    self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWithScores(
                         [], [], [], self.entities_gt[gt_idx][property_], []
                     )
 
                 evaluated_property_metrics.property_value_count_gt[gt_idx] += len(self.entities_gt[gt_idx][property_])
             elif property_ in self.entities_pred[pred_idx]:
                 pred_values = self.entities_pred[pred_idx][property_]
-                self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWihScores(
+                self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWithScores(
                     [], [], [], [], pred_values
                 )
         return evaluated_property_metrics
@@ -439,7 +439,7 @@ class MetricsComputer:
     def compute_bipartite_metrics(
         self,
         matched_pair: MatchedPairInfo,
-        keys_to_score: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWihScores]],
+        keys_to_score: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWithScores]],
     ) -> tuple[MetricsAccumulator, pd.DataFrame | None]:
         """Compute provided property scores for the matched entities."""
         metrics_accumulator = MetricsAccumulator()

@@ -26,7 +26,7 @@ from kebab.tasks.metrics.extraction.aesop.distances import (
     SetPropertyDistance,
     SingleValuePropertyDistance,
     TokenDistance,
-    ValueMatchingRecordWihScores,
+    ValueMatchingRecordWithScores,
 )
 from kebab.tasks.metrics.extraction.aesop.metric_helpers import EntityMatcher, MetricsAccumulator, MetricsComputer
 from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator, MetricConfig
@@ -38,7 +38,7 @@ class ValueAveragedAesopConfig(MetricConfig):
 
     matching_score_function: Callable[[Entity, Entity], float]
     matching_threshold: float
-    property_score_functions: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWihScores]]
+    property_score_functions: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWithScores]]
     property_schema: PropertySchema
     debug_output_dir: Path | None = None
 
@@ -105,7 +105,7 @@ def document_debug_output_to_excel(
     if "entity_match_distance" not in debug_info.columns:
         debug_info["entity_match_distance"] = ""
 
-    debug_info = debug_info[ordered_columns]  # type: ignore
+    debug_info = pd.DataFrame(debug_info[ordered_columns])
     column_to_letter = {col: chr(65 + idx) for idx, col in enumerate(ordered_columns)}
 
     def col(column_name: str, start: int = 2, end: int = num_rows + 1) -> str:
@@ -168,14 +168,10 @@ def document_debug_output_to_excel(
     header_format = workbook.add_format({"bold": True})
     worksheet.set_row(0, None, header_format)  # Set header format
     last_col = column_to_letter[ordered_columns[-1]]
-    if merge_rows:
-        worksheet.conditional_format(
-            f"D2:{last_col}{num_rows + 1}", {"type": "formula", "criteria": "=ISEVEN(ROW())", "format": green_row}
-        )
-    else:
-        worksheet.conditional_format(
-            f"A2:{last_col}{num_rows + 1}", {"type": "formula", "criteria": "=ISEVEN(ROW())", "format": green_row}
-        )
+    first_col = "D" if merge_rows else "A"
+    worksheet.conditional_format(
+        f"{first_col}2:{last_col}{num_rows + 1}", {"type": "formula", "criteria": "=ISEVEN(ROW())", "format": green_row}
+    )
     worksheet.autofit(300)  # Adjust column widths to fit content
     writer.close()  # Save the Excel file
 
@@ -261,16 +257,8 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1} with ID {gt.document.document_id}")
 
-            gt_entities = [
-                entity
-                for entity in gt.entities
-                if not entity.properties.get("type") or "time" not in entity.properties["type"]
-            ]
-            pred_entities = [
-                entity
-                for entity in pred.entities
-                if not entity.properties.get("type") or "time" not in entity.properties["type"]
-            ]
+            gt_entities = [entity for entity in gt.entities if "time" not in entity.properties.get("type", [])]
+            pred_entities = [entity for entity in pred.entities if "time" not in entity.properties.get("type", [])]
             gt_property_counts = Counter()
             for entity in gt_entities:
                 gt_property_counts.update(entity.properties.keys())
