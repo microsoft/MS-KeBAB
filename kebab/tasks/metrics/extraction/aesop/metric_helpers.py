@@ -58,13 +58,27 @@ class EntityMatcher:
     def __init__(
         self, entities_gt: list[Entity], entities_pred: list[Entity], logger: logging.Logger | None = None
     ) -> None:
-        """Initialize the EntityMatcher."""
+        """Initialize the EntityMatcher.
+
+        Args:
+            entities_gt: List of ground truth entities to match.
+            entities_pred: List of predicted entities to match.
+            logger: Optional logger instance for logging matching progress.
+        """
         self.entities_gt = entities_gt
         self.entities_pred = entities_pred
         self.logger = logger or logging.getLogger(get_full_class_name(self))
 
     def match(self, distance_function: Callable[[Entity, Entity], float], threshold: float = 1.0) -> MatchedPairInfo:
-        """Match entities based on a distance function and a matching score threshold."""
+        """Match entities based on a distance function and a matching score threshold.
+
+        Args:
+            distance_function: Function that computes distance between two entities.
+            threshold: Maximum distance threshold for considering entities as matched.
+
+        Returns:
+            MatchedPairInfo containing indices of matched and unmatched entities.
+        """
         distances = self._compute_distances(distance_function)
         matched_indices = match_items(distances, threshold)
         return MatchedPairInfo(
@@ -245,7 +259,15 @@ class MatchedEntitiesScorer:
         property_schema: PropertySchema,
         logger: logging.Logger | None = None,
     ) -> None:
-        """Initialize the MatchedEntitiesScorer."""
+        """Initialize the MatchedEntitiesScorer.
+
+        Args:
+            entities_gt: List of ground truth entities.
+            entities_pred: List of predicted entities.
+            matched_pair: Information about matched entity pairs.
+            property_schema: Schema defining properties and their data types.
+            logger: Optional logger instance for logging scoring progress.
+        """
         self.entities_gt = entities_gt
         self.entities_pred = entities_pred
 
@@ -267,7 +289,15 @@ class MatchedEntitiesScorer:
         score_function: Callable[[Entity, Entity, Property], ValueMatchingRecordWithScores],
         property_id: str,
     ) -> EvaluatedPropertyMetrics:
-        """Compute scores for a given property for matched entities."""
+        """Compute scores for a given property for matched entities.
+
+        Args:
+            score_function: Function that computes scores for matched property values of 2 entities.
+            property_id: ID of the property to evaluate.
+
+        Returns:
+            EvaluatedPropertyMetrics containing scores for the property.
+        """
         evaluated_property_metrics = EvaluatedPropertyMetrics(len(self.entities_gt))
 
         property_ = self.property_schema.properties.get(property_id)
@@ -402,7 +432,23 @@ def create_property_record(
     total_pred_values: int,
     first_property_record: bool = False,
 ) -> tuple[dict, bool]:
-    """Create a property evaluation record."""
+    """Create a property evaluation record.
+
+    Args:
+        gt_entity_id: ID of the ground truth entity.
+        pred_entity_id: ID of the predicted entity.
+        original_property_id: Original property ID from the prediction.
+        property_id: Standardized property ID.
+        gt_value: Ground truth property value.
+        pred_value: Predicted property value.
+        score: Similarity score between the values.
+        total_gt_values: Total number of ground truth values for this property.
+        total_pred_values: Total number of predicted values for this property.
+        first_property_record: Whether this is the first record for this property.
+
+    Returns:
+        Tuple of the property record dictionary and updated first_property_record flag.
+    """
     record = {
         "gt_entity_id": gt_entity_id,
         "pred_entity_id": pred_entity_id,
@@ -430,7 +476,14 @@ class MetricsComputer:
         property_schema: PropertySchema,
         logger: logging.Logger | None = None,
     ) -> None:
-        """Initialize the MetricsComputer."""
+        """Initialize the MetricsComputer.
+
+        Args:
+            ground_truth: List of ground truth entities.
+            predictions: List of predicted entities.
+            property_schema: Schema defining properties and their data types.
+            logger: Optional logger instance for logging computation progress.
+        """
         self.ground_truth = ground_truth
         self.predictions = predictions
         self.property_schema = property_schema
@@ -441,7 +494,15 @@ class MetricsComputer:
         matched_pair: MatchedPairInfo,
         keys_to_score: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWithScores]],
     ) -> tuple[MetricsAccumulator, pd.DataFrame | None]:
-        """Compute provided property scores for the matched entities."""
+        """Compute provided property scores for the matched entities.
+
+        Args:
+            matched_pair: Information about matched and unmatched entity pairs.
+            keys_to_score: Dictionary mapping property IDs to scoring functions.
+
+        Returns:
+            Tuple of MetricsAccumulator with computed scores and optional debug DataFrame.
+        """
         metrics_accumulator = MetricsAccumulator()
         metrics_accumulator.matched_count = len(matched_pair.left_ind)
         metrics_accumulator.unmatched_pair_count = len(matched_pair.left_unmatched)
@@ -554,7 +615,16 @@ def compute_properties_union(
     predictions: list[Entity],
     matched_pair: MatchedPairInfo,
 ) -> set[str]:
-    """Compute the union of the properties of the ground truth and the predictions ignoring properties only present in unmatched entities."""
+    """Compute the union of the properties occuring in matched entities from both ground truth and predictions.
+
+    Args:
+        ground_truth: List of ground truth entities.
+        predictions: List of predicted entities.
+        matched_pair: Information about matched entity pairs.
+
+    Returns:
+        Set of property IDs that appear in matched entities from either ground truth or predictions.
+    """
     ground_truth_keys = {
         key for idx, entity in enumerate(ground_truth) if idx in matched_pair.left_ind for key in entity.properties
     }

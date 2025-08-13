@@ -78,7 +78,14 @@ class ValueAveragedAesopConfig(MetricConfig):
 def document_debug_output_to_excel(
     debug_info: pd.DataFrame, evaluated_properties: list[str], output_path: Path, merge_rows: bool = True
 ) -> None:
-    """Convert debug information to an Excel file."""
+    """Convert debug information to an Excel file.
+
+    Args:
+        debug_info: DataFrame containing debug information with entity and property data.
+        evaluated_properties: List of property names to include in metrics calculations.
+        output_path: Path where the Excel file should be saved.
+        merge_rows: Whether to merge rows with same document_id for better readability.
+    """
     # Create a Pandas Excel writer using XlsxWriter as the engine.
     writer = pd.ExcelWriter(output_path, engine="xlsxwriter")
 
@@ -235,7 +242,12 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
     """
 
     def __init__(self, config: ValueAveragedAesopConfig, logger: logging.Logger | None = None):
-        """Configure value-averaged-AESOP metric calculator."""
+        """Configure value-averaged-AESOP metric calculator.
+
+        Args:
+            config: Configuration object containing AESOP metric parameters.
+            logger: Optional logger instance for logging metric computation progress.
+        """
         self.config = config
         self.logger = logger or logging.getLogger("Value-Averaged-AESOP")
 
@@ -342,7 +354,16 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
 def make_default_value_averaged_aesop_config(
     property_schema: PropertySchema, matching_threshold: float = 1.0, embed_model: SentenceTransformer | None = None
 ) -> ValueAveragedAesopConfig:
-    """Create default value-averaged-AESOP metric config."""
+    """Create default value-averaged-AESOP metric config.
+
+    Args:
+        property_schema: Schema defining properties and their data types for entities.
+        matching_threshold: Threshold for entity matching (default: 1.0).
+        embed_model: Optional pre-trained sentence transformer model for embeddings.
+
+    Returns:
+        Configured ValueAveragedAesopConfig instance with default settings.
+    """
     # Set score functions are used for properties for which we expect multiple values.
     # Score function always returns a list of scores, even if there is only one value.
     if embed_model is None:
