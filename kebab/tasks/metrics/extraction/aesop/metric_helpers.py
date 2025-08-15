@@ -516,7 +516,6 @@ class MetricsComputer:
             metrics_accumulator.unmatched_extra_pred_count = -diff
 
         properties_union = compute_properties_union(self.ground_truth, self.predictions, matched_pair)
-        # properties_union = properties_union.intersection(self.property_schema.properties.keys())
         entities_scorer = MatchedEntitiesScorer(self.ground_truth, self.predictions, matched_pair, self.property_schema)
 
         for key in properties_union:
