@@ -17,7 +17,7 @@
             },
             "default_property_weight": 0
         },
-        "matching_threshold": 0.5,
+        "matching_threshold": 0.1,
         "default_property_distance": {
             "name": "TokenDistance",
             "params": {
@@ -46,6 +46,7 @@
             "email": {
                 "name": "BinaryMatchDistance"
             }
-        }
+        },
+        "debug_output_dir": "./tests/data/extraction/debug_output"
     }
 }

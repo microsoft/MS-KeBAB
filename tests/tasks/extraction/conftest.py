@@ -12,4 +12,6 @@ from kebab.contracts.entity import PropertySchema
 @pytest.fixture
 def property_schema() -> PropertySchema:
     """Load extraction PropertySchema for testing."""
-    return PropertySchema.from_file(pathlib.Path(__file__).parents[2] / "data" / "extraction" / "property_schema.json")
+    return PropertySchema.from_file(
+        pathlib.Path(__file__).parents[2] / "data" / "extraction" / "property_schema_metrics.json"
+    )

@@ -6,16 +6,18 @@ from __future__ import annotations
 
 import abc
 import sys
+from dataclasses import dataclass
 from typing import Any
 
 import nltk
 import numpy as np
 import tiktoken
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import min_weight_full_bipartite_matching
 from scipy.spatial.distance import cosine
 from sentence_transformers import SentenceTransformer
 
 from kebab.contracts.entity import Entity, Property, PropertySchema, ValueType
-from kebab.tasks.metrics.extraction.aesop.metric_helpers import match_items
 from kebab.tasks.metrics.extraction.utils import normalize_property_value, normalize_string
 
 
@@ -51,7 +53,11 @@ class TokenDistance(ElementDistance):
     __default_encoding: str = "cl100k_base"
 
     def __init__(self, encoder: tiktoken.Encoding | None = None):
-        """Initialize token distance."""
+        """Initialize token distance.
+
+        Args:
+            encoder: Optional tiktoken encoding instance for tokenization.
+        """
         if encoder is None:
             encoder = tiktoken.get_encoding(self.__default_encoding)
         self.encoder = encoder
@@ -77,7 +83,11 @@ class EmbeddingDistance(ElementDistance):
     __default_model: str = "paraphrase-MiniLM-L6-v2"
 
     def __init__(self, model: SentenceTransformer | None = None):
-        """Initialize embedding distance."""
+        """Initialize embedding distance.
+
+        Args:
+            model: Optional pre-trained SentenceTransformer model for generating embeddings.
+        """
         if model is None:
             model = SentenceTransformer(self.__default_model)  # type: ignore
         self.model = model
@@ -147,7 +157,7 @@ class PropertyDistance(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyDistanceValue:
+    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> ValueMatchingRecordWithDistances:
         """Compute distance between two entities for a given property id.
 
         Returns:
@@ -156,7 +166,7 @@ class PropertyDistance(abc.ABC):
         """
         raise NotImplementedError
 
-    def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyDistanceValue:
+    def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> ValueMatchingRecordWithDistances:
         """Compute distance between two entities for a given property id.
 
         Returns:
@@ -165,6 +175,34 @@ class PropertyDistance(abc.ABC):
         """
         self.check_constraints(property_)
         return self.compute(gt_entity, pred_entity, property_)
+
+
+@dataclass
+class ValueMatchingRecordWithDistances:
+    """Value matching record containing distances between matched values.
+    Distances are between 0 and 1.
+    The lower the distance, the more similar the values are.
+    """
+
+    gt_values: list[Any]
+    pred_values: list[Any]
+    matched_distances: list[float]
+    unmatched_gt_values: list[Any]
+    unmatched_pred_values: list[Any]
+
+
+@dataclass
+class ValueMatchingRecordWithScores:
+    """Value matching record with scores for pairs of matched values.
+    Scores are between 0 and 1.
+    The higher the score, the more similar the values are.
+    """
+
+    gt_values: list[Any]
+    pred_values: list[Any]
+    matched_scores: list[float]
+    unmatched_gt_values: list[Any]
+    unmatched_pred_values: list[Any]
 
 
 class SingleValuePropertyDistance(PropertyDistance):
@@ -179,16 +217,24 @@ class SingleValuePropertyDistance(PropertyDistance):
         if property_.is_collection:
             raise ValueError("Collection properties are not supported.")
 
-    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyDistanceValue:
+    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> ValueMatchingRecordWithDistances:
         """Compute distance between two entities for a given property id.
 
+        Args:
+            gt_entity: Ground truth entity.
+            pred_entity: Predicted entity.
+            property_: Property to compute distance for.
+
         Returns:
-            - list of distances between matched property values of ground truth and prediction entity
-            - number of unmatched property values in prediction entity (always 0 for single value properties)"
+            ValueMatchingRecordWithDistances containing list of distances between matched property values
         """
+        gt_values = gt_entity[property_] if property_ in gt_entity else []  # noqa: SIM401
+        pred_values = pred_entity[property_] if property_ in pred_entity else []  # noqa: SIM401
         if property_ not in gt_entity or property_ not in pred_entity:
-            return [1], 0
-        return [self.element_distance(gt_entity[property_][0], pred_entity[property_][0], property_)], 0
+            score = 1
+        else:
+            score = self.element_distance(gt_entity[property_][0], pred_entity[property_][0], property_)
+        return ValueMatchingRecordWithDistances(gt_values, pred_values, [score], [], [])
 
 
 class SetPropertyDistance(PropertyDistance):
@@ -202,28 +248,37 @@ class SetPropertyDistance(PropertyDistance):
         """Check constraints for set distance."""
         return None
 
-    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyDistanceValue:
+    def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> ValueMatchingRecordWithDistances:
         """Compute distances between two sets of values for a given property.
 
-        Returns:
-            - list of distances between matched property values of ground truth
-                and prediction entity (needed for aggregation across entities)
-            - number of unmatched property values in prediction entity.
-        """
-        if property_ not in gt_entity or property_ not in pred_entity:
-            return [1], 0
+        Args:
+            gt_entity: Ground truth entity.
+            pred_entity: Predicted entity.
+            property_: Property to compute distances for.
 
-        gt_values = gt_entity[property_]
-        pred_values = pred_entity[property_]
+        Returns:
+            ValueMatchingRecordWithDistances containing distances between matched property values
+        """
+        gt_values = np.array(gt_entity[property_] if property_ in gt_entity else [])  # noqa: SIM401
+        pred_values = np.array(pred_entity[property_] if property_ in pred_entity else [])  # noqa: SIM401
+        if property_ not in gt_entity or property_ not in pred_entity:
+            return ValueMatchingRecordWithDistances([], [], [1], list(gt_values), list(pred_values))
 
         distances = np.zeros((len(gt_values), len(pred_values)))
         for i, value1 in enumerate(gt_values):
             for j, value2 in enumerate(pred_values):
                 distances[i, j] = self.element_distance(value1, value2, property_)
-        matched_indices = match_items(distances)
-        matched_scores = list(distances[matched_indices.left_ind, matched_indices.right_ind])
-        unmatched_pred_count = len(pred_values) - len(matched_indices.right_ind)
-        return matched_scores, unmatched_pred_count
+        result = match_items(distances)
+        matched_scores = list(distances[result.left_ind, result.right_ind])
+        unmatched_gt_indices = list(set(range(len(gt_values))) - set(result.left_ind))
+        unmatched_pred_indices = list(set(range(len(pred_values))) - set(result.right_ind))
+        return ValueMatchingRecordWithDistances(
+            list(gt_values[result.left_ind]),
+            list(pred_values[result.right_ind]),
+            list(matched_scores),
+            list(gt_values[unmatched_gt_indices]),
+            list(pred_values[unmatched_pred_indices]),
+        )
 
 
 class PropertyScore:
@@ -233,13 +288,28 @@ class PropertyScore:
         """Initialize property score."""
         self.property_distance = property_distance
 
-    def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> PropertyScoreValue:
-        """Compute the score for a given property."""
-        distances, unmatched_count = self.property_distance(gt_entity, pred_entity, property_)
-        for distance in distances:
+    def __call__(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> ValueMatchingRecordWithScores:
+        """Compute the score for a given property.
+
+        Args:
+            gt_entity: Ground truth entity.
+            pred_entity: Predicted entity.
+            property_: Property to compute score for.
+
+        Returns:
+            ValueMatchingRecordWithScores containing scores for matched property values
+        """
+        value_matching_record = self.property_distance(gt_entity, pred_entity, property_)
+        for distance in value_matching_record.matched_distances:
             if distance < 0 or distance > 1:
                 raise ValueError(f"Distance value {distance} is out of range [0, 1].")
-        return [1.0 - d for d in distances], unmatched_count
+        return ValueMatchingRecordWithScores(
+            value_matching_record.gt_values,
+            value_matching_record.pred_values,
+            [1.0 - d for d in value_matching_record.matched_distances],
+            value_matching_record.unmatched_gt_values,
+            value_matching_record.unmatched_pred_values,
+        )
 
 
 class EntityDistance:
@@ -258,7 +328,14 @@ class EntityDistance:
         default_property_distance: PropertyDistance,
         default_property_weight: float = DEFAULT_PROPERTY_WEIGHT,
     ):
-        """Initialize entity distance."""
+        """Initialize entity distance.
+
+        Args:
+            property_schema: Schema defining properties and their data types.
+            property_to_distance_function_and_weight: Mapping of property names to distance functions and weights.
+            default_property_distance: Default distance function for properties not explicitly configured.
+            default_property_weight: Default weight for properties not explicitly configured.
+        """
         self.property_to_distance_function_and_weight = property_to_distance_function_and_weight
         self.property_schema = property_schema
         self.default_property_distance = default_property_distance
@@ -269,8 +346,10 @@ class EntityDistance:
         """Compute distance between two entities."""
         distance = 0.0
         for property_id, (property_distance, weight) in self.property_to_distance_function_and_weight.items():
-            value_distances, _ = property_distance(gt_entity, pred_entity, self.property_schema.properties[property_id])
-            distance += float(np.mean(value_distances)) * weight
+            value_matching_record = property_distance(
+                gt_entity, pred_entity, self.property_schema.properties[property_id]
+            )
+            distance += float(np.mean(value_matching_record.matched_distances)) * weight
         return distance
 
     def __normalize_weights(self):
@@ -337,6 +416,14 @@ def jaccard_distance(tokens1: list[int], tokens2: list[int]) -> float:
 def token_distance_between_strings(value1: str, value2: str, encoder: tiktoken.Encoding) -> float:
     """Compute token distance between two string values.
     Distance value is between 0 and 1.
+
+    Args:
+        value1: First string value to compare.
+        value2: Second string value to compare.
+        encoder: Tiktoken encoding instance for tokenization.
+
+    Returns:
+        Jaccard distance between token sets of the two strings.
     """
     tokens1 = encoder.encode(normalize_string(value1))
     tokens2 = encoder.encode(normalize_string(value2))
@@ -346,11 +433,60 @@ def token_distance_between_strings(value1: str, value2: str, encoder: tiktoken.E
 def embeddings_distance_between_strings(value1: str, value2: str, model: SentenceTransformer) -> float:
     """Compute embedding distance between two string values.
     Distance value is between 0 and 1.
+
+    Args:
+        value1: First string value to compare.
+        value2: Second string value to compare.
+        model: Pre-trained SentenceTransformer model for generating embeddings.
+
+    Returns:
+        Cosine distance between embeddings of the two strings.
     """
     embeds = model.encode([value1, value2])
     return 0.5 * float(cosine(embeds[0], embeds[1]))  # scipy.spatial.distance.cosine is between 0 and 2
 
 
 def normalized_edit_distance(value1: str, value2: str) -> float:
-    """Compute edit distance between 2 strings and normalize it by length of the longest string."""
+    """Compute edit distance between 2 strings and normalize it by length of the longest string.
+
+    Args:
+        value1: First string to compare.
+        value2: Second string to compare.
+
+    Returns:
+        Normalized edit distance between 0 and 1.
+    """
     return abs(nltk.edit_distance(value1, value2)) / (max(len(value1), len(value2)))
+
+
+@dataclass
+class MatchedIndices:
+    """Stores the indices of matched items and unmatched items in ground truth and prediction."""
+
+    left_ind: list[int]
+    right_ind: list[int]
+    left_unmatched: list[int]
+    right_unmatched: list[int]
+
+
+def match_items(distances: np.ndarray, threshold: float = 1.0) -> MatchedIndices:
+    """Match items from two sets of items based on a distance matrix if the distance is within a threshold.
+
+    Args:
+        distances: 2D array where distances[i,j] is the distance between item i and item j.
+        threshold: Maximum distance threshold for considering items as matched.
+
+    Returns:
+        MatchedIndices object containing indices of matched and unmatched items.
+    """
+    epsilon = 0.01
+    left_ind, right_ind = min_weight_full_bipartite_matching(csr_matrix(distances + epsilon))
+
+    matched_dists = distances[left_ind, right_ind]
+    indices_within_threshold = np.where(matched_dists <= threshold)
+    unmatched_ind = np.where(matched_dists > threshold)
+    left_ind_matched = left_ind[indices_within_threshold]
+    right_ind_matched = right_ind[indices_within_threshold]
+    left_ind_unmatched = left_ind[unmatched_ind]
+    right_ind_unmatched = right_ind[unmatched_ind]
+    return MatchedIndices(left_ind_matched, right_ind_matched, left_ind_unmatched, right_ind_unmatched)
