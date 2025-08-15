@@ -1131,7 +1131,7 @@ wheels = [
 
 [[package]]
 name = "kebab"
-version = "0.0.4rc9"
+version = "0.0.4"
 source = { editable = "." }
 dependencies = [
     { name = "bert-score" },
