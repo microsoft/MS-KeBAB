@@ -177,7 +177,7 @@ class TextCompletionTaskBase(Task):
     @staticmethod
     def __calculate_metrics(metrics: dict[str, Any], log_probs: list[float]) -> None:
         """
-        Fill the metrics dictionary with based on the provided log probabilities.
+        Fill the metrics dictionary based on the provided log probabilities.
 
         Args:
             metrics: The dictionary to fill with metrics.
