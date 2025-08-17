@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import pytest
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
@@ -11,11 +11,16 @@ from kebab.utils.rag_text_completer import BaseRAGTextCompleter
 
 
 class MockRAGTextCompleter(BaseRAGTextCompleter):
+    @override
+    def get_augmented_context(self, query: dict[str, str]) -> str:
+        return ""
+
+    @override
     def complete_single_partial_query(
         self,
-        text_with_mask: str,  # noqa: ARG002 Unused method argument
+        text_with_mask: str,
         target_content: str,
-        augmented_context: str = "",  # noqa: ARG002 Unused method argument
+        augmented_context: str = "",
     ) -> dict[str, Any]:
         # Dummy logic for testing.
         return {
@@ -41,16 +46,14 @@ def test_rag_text_completer(text_completion_task) -> None:
 
     # Act
     partial_queries = text_completion_task.generate_partial_queries()
-    predictions = list(text_completer.complete_partial_queries(partial_queries, get_augmented_context=lambda _: ""))
+    predictions = list(text_completer.complete_partial_queries(partial_queries))
 
     # Assert
     assert predictions == expected_predictions
 
     # Act
     verbose_partial_queries = text_completion_task.generate_partial_queries(verbose=True)
-    predictions = list(
-        text_completer.complete_partial_queries(verbose_partial_queries, get_augmented_context=lambda _: "")
-    )
+    predictions = list(text_completer.complete_partial_queries(verbose_partial_queries))
 
     # Assert
     assert predictions == expected_predictions

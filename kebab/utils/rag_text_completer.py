@@ -6,8 +6,8 @@ from __future__ import annotations
 import copy
 import os
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
-from typing import Any, ClassVar
+from collections.abc import Iterable
+from typing import Any, ClassVar, override
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -18,9 +18,25 @@ from kebab.tasks.text_completion import TextCompletionTaskBase
 class BaseRAGTextCompleter(ABC):
     """
     A base class for RAG text completers, which provides a common interface for different RAG text
-    completion models. The derived classes should implement the `complete_single_partial_query`
-    method.
+    completion models. The derived classes should implement the `get_augmented_context` and
+    `complete_single_partial_query` methods.
     """
+
+    @abstractmethod
+    def get_augmented_context(self, query: dict[str, str]) -> str:
+        """
+        Retrieves augmented context for a given partial query, i.e., a RAG (Retrieval-Augmented
+        Generation) function.
+
+        Args:
+            query: A dictionary containing the partial query, typically including fields like
+            "text_with_mask" and "target_content".
+
+        Returns:
+            str: The augmented context as a string that provides relevant background information
+            to assist with text completion.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def complete_single_partial_query(
@@ -47,7 +63,6 @@ class BaseRAGTextCompleter(ABC):
     def complete_partial_queries(
         self,
         partial_queries: Iterable[dict[str, Any]],
-        get_augmented_context: Callable[[dict[str, str]], str],
         verbose: bool = False,
     ) -> Iterable[dict[str, Any]]:
         """
@@ -57,8 +72,6 @@ class BaseRAGTextCompleter(ABC):
         Args:
             partial_queries: An iterable of dictionaries, where each dictionary represents a partial
             query to complete.
-            get_augmented_context: A function that takes a partial query and returns the augmented
-            context as a string.
             verbose: Defaults to False. If True, includes additional information such as the
             original partial query and augmented context in the results for debugging.
 
@@ -80,7 +93,7 @@ class BaseRAGTextCompleter(ABC):
                 continue
 
             # Run RAG to augment a partial query with context.
-            augmented_context = get_augmented_context(query)
+            augmented_context = self.get_augmented_context(query)
             if verbose:
                 result["augmented_context"] = augmented_context
 
@@ -161,8 +174,12 @@ class BaseRAGTextCompleter(ABC):
         print(f"HTML file generated: {os.path.abspath(output_path)}")
 
 
-class PhiRAGTextCompleter(BaseRAGTextCompleter):
-    """An implementation of a RAG text completer using the Phi model."""
+class BasePhiRAGTextCompleter(BaseRAGTextCompleter):
+    """
+    A base implementation of a RAG text completer using the Phi model. This class does not implement
+    the `get_augmented_context` method, which should be provided by concrete subclasses to define
+    how augmented context is retrieved.
+    """
 
     TOKENS_TO_EXCLUDE: ClassVar[list[str]] = ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
     """Tokens that are excluded from the model's predictions."""
@@ -178,7 +195,7 @@ class PhiRAGTextCompleter(BaseRAGTextCompleter):
         self.model_id = model_id
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         self.token_ids_to_exclude = [
-            self.tokenizer.convert_tokens_to_ids(token) for token in PhiRAGTextCompleter.TOKENS_TO_EXCLUDE
+            self.tokenizer.convert_tokens_to_ids(token) for token in BasePhiRAGTextCompleter.TOKENS_TO_EXCLUDE
         ]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = AutoModelForCausalLM.from_pretrained(
@@ -188,6 +205,7 @@ class PhiRAGTextCompleter(BaseRAGTextCompleter):
         ).to(self.device)
         self.model.eval()
 
+    @override
     def complete_single_partial_query(
         self,
         text_with_mask: str,

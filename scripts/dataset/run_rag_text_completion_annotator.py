@@ -14,9 +14,10 @@ import json
 import os
 from collections import defaultdict
 from pathlib import Path
+from typing import override
 
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
-from kebab.utils.rag_text_completer import BaseRAGTextCompleter, PhiRAGTextCompleter
+from kebab.utils.rag_text_completer import BasePhiRAGTextCompleter, BaseRAGTextCompleter
 
 
 if __name__ == "__main__":
@@ -30,12 +31,18 @@ if __name__ == "__main__":
     # Prepare partial queries.
     queries = task_instance.generate_partial_queries(verbose=True)
 
+    class DummyPhiRAGTextCompleter(BasePhiRAGTextCompleter):
+        """A local class with a dummy RAG function."""
+
+        @override
+        def get_augmented_context(self, query: dict[str, str]) -> str:
+            return ""
+
     # Run the text completer.
-    phi_annotator = PhiRAGTextCompleter()
+    phi_annotator = DummyPhiRAGTextCompleter()
     results = list(
         phi_annotator.complete_partial_queries(
             partial_queries=queries,
-            get_augmented_context=lambda _: "",  # A dummy RAG that always returns empty context.
             verbose=True,
         )
     )
