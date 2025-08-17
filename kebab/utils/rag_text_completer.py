@@ -268,31 +268,22 @@ Answer: """
         top_logprobs, top_indices = torch.topk(log_probs, top_k)
         top_tokens = [self.tokenizer.decode([idx]).strip() for idx in top_indices]
 
+        target_content_logprob = float("-inf")
         # When the target content contains multiple tokens, LLM can return the target content
         # through multiple tokenization paths. For example, LLM can return "Beijing" as two tokens
         # ["Be", "ijing"] or just a single token ["Beijing"]; `self.tokenizer.encode` only returns
         # the former. We will approximately calculate the combined log prob by summing the
-        # probabilities of "Beijing" and "Be", where the log prob of "Be" is the upper bound of the
-        # log prob of "Be"+"ijing".
+        # probabilities of all prefixes of the target content in `top_tokens`.
         # TODO (allenwang-ms): account for all possible tokenization paths; calculate the accurate
         # log prob of a sequence of tokens by multiple forward passes.
-        target_content_id = -1
-        target_content_logprob = float("-inf")
-        # First look for the target content as a whole in the top tokens.
-        if target_content in top_tokens:
-            target_content_index = top_tokens.index(target_content)
-            target_content_logprob = top_logprobs[target_content_index].item()
-            target_content_id = top_indices[target_content_index].item()
-        # Second, tokenize the target content and look for the first token's log prob.
-        target_content_token_ids = self.tokenizer.encode(target_content, add_special_tokens=False)
-        # If the first token is not the same as the target content, we combine the target content's
-        # log prob and its first token's log prob. In the case of "Beijing", we are summing the
-        # probs of "Beijing" and "Be".
-        if target_content_token_ids[0] != target_content_id:
-            first_token_log_prob = log_probs[target_content_token_ids[0]]
-            target_content_logprob = torch.logaddexp(
-                torch.tensor(target_content_logprob, device=self.device), first_token_log_prob
-            ).item()
+        prefix_logprobs = []
+        for i, token in enumerate(top_tokens):
+            if target_content.startswith(token) and token.strip():  # Ensure non-empty token.
+                prefix_logprobs.append(top_logprobs[i])
+        if prefix_logprobs:
+            # Convert to tensors for logaddexp operations.
+            prefix_tensor = torch.stack(prefix_logprobs)
+            target_content_logprob = torch.logsumexp(prefix_tensor, dim=0).item()
 
         # Output results.
         top_logprobs = [
