@@ -100,6 +100,7 @@ class BaseRAGTextCompleter(ABC):
 
             yield result
 
+    # Thresholds for categorizing log probabilities, used for color-coding text in HTML visualization.
     LOGPROB_THRESHOLDS: ClassVar[list[float]] = [-4, -8, -12]
 
     @staticmethod
