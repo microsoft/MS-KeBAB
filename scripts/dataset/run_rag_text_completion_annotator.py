@@ -14,7 +14,7 @@ import json
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import override
+from typing import Any, override
 
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
 from kebab.utils.rag_text_completer import BasePhiRAGTextCompleter, BaseRAGTextCompleter
@@ -35,7 +35,7 @@ if __name__ == "__main__":
         """A local class with a dummy RAG function."""
 
         @override
-        def get_augmented_context(self, query: dict[str, str]) -> str:
+        def get_augmented_context(self, query: dict[str, Any]) -> str:
             return ""
 
     # Run the text completer.

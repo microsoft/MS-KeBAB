@@ -23,7 +23,7 @@ class BaseRAGTextCompleter(ABC):
     """
 
     @abstractmethod
-    def get_augmented_context(self, query: dict[str, str]) -> str:
+    def get_augmented_context(self, query: dict[str, Any]) -> str:
         """
         Retrieves augmented context for a given partial query, i.e., a RAG (Retrieval-Augmented
         Generation) function.

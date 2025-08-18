@@ -12,7 +12,7 @@ from kebab.utils.rag_text_completer import BaseRAGTextCompleter
 
 class MockRAGTextCompleter(BaseRAGTextCompleter):
     @override
-    def get_augmented_context(self, query: dict[str, str]) -> str:
+    def get_augmented_context(self, query: dict[str, Any]) -> str:
         return ""
 
     @override
