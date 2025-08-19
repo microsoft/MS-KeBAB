@@ -261,7 +261,7 @@ def _query_entities_via_api(wikidata_ids: Iterable[str], english_only: bool = Tr
         params["languages"] = "en"
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, headers={"User-Agent": "KeBAB/WikidataExtractor"})
     except requests.exceptions.RequestException as e:
         logging.error(f"Error querying Wikidata for IDs {wikidata_ids}: {e}")
         return None

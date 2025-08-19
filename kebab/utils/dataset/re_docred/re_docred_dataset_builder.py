@@ -183,7 +183,7 @@ class ReDocRedDatasetBuilder:
         """Extract an example from the Re-DocRED dataset."""
         entities = cls.extract_entities(entry)
         entities = cls.extract_properties(entry, entities, wikidata_properties)
-        entities = [Entity(str(i), {k: list(v) for k, v in entity.items()}) for i, entity in enumerate(entities)]
+        entities = [Entity(str(i), {k: sorted(v) for k, v in entity.items()}) for i, entity in enumerate(entities)]
         entities = cls.filter_small_entities(entities)
         document = cls.get_document(entry)
         return {"document": document, "entities": entities}

@@ -1,0 +1,6 @@
+36090cfbf9c30ad8fbd37586f6c4d8d4  ./data/Re-DocRED/Extraction/train/extracts.jsonl
+1a8575925e5f7e70a8b233d6d85e2ee8  ./data/Re-DocRED/Extraction/train/entities.jsonl
+bf15777695014c134a52a6e7a21a46d6  ./data/Re-DocRED/Extraction/dev/entities.jsonl
+44a56f26a28364cda6aa543d49636ab7  ./data/Re-DocRED/Extraction/dev/extracts.jsonl
+959e9e01f93e0deacc0179c6e6f3ac6c  ./data/Re-DocRED/Extraction/test/extracts.jsonl
+4e0d5068655f07035a50a4d88f40fe86  ./data/Re-DocRED/Extraction/test/entities.jsonl
