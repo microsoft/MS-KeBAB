@@ -108,7 +108,7 @@ class LinkingTask(Task):
             logger: Optional logger for logging evaluation summaries.
             output_dir: Optional directory for saving metrics and evaluation outputs.
             adjust_to_test_prior: If True, adjust the log-odds to match the prior on the test set.
-            debugging_info_path: Optional path for saving debugging information, where each line
+            debugging_info_path: Optional path for loading debugging information, where each line
             contains the debugging info for each prediction in the same order.
 
         Returns:
