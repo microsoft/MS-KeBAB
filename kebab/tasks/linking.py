@@ -97,6 +97,7 @@ class LinkingTask(Task):
         logger: Logger | None = None,
         output_dir: Path | None = None,
         adjust_to_test_prior: bool = True,
+        debugging_info_path: Path | None = None,
     ) -> dict[str, float]:
         """
         Evaluate an output for the linking task.
@@ -107,6 +108,9 @@ class LinkingTask(Task):
             logger: Optional logger for logging evaluation summaries.
             output_dir: Optional directory for saving metrics and evaluation outputs.
             adjust_to_test_prior: If True, adjust the log-odds to match the prior on the test set.
+            debugging_info_path: Optional path for loading debugging information, where each line
+            contains the debugging info for each prediction in the same order. If available, the
+            info will be written to the spreadsheet.
 
         Returns:
             dict[str, float]: Evaluation metrics dictionary.
@@ -138,7 +142,7 @@ class LinkingTask(Task):
             metrics["optimistic_log_prob"] = float("nan")
 
         # build detailed records
-        detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predictions)
+        detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predictions, debugging_info_path)
         self._write_side_outputs(metrics, detail_records, output_dir, eval_result_path)
 
         # report metrics in console or logger
@@ -225,14 +229,21 @@ class LinkingTask(Task):
         gt_labels: np.ndarray,
         log_odds: np.ndarray,
         predictions: np.ndarray,
+        debugging_info_path: Path | None = None,
     ) -> list[dict]:
         """Create a per-sample dictionary describing the prediction outcome."""
+        if debugging_info_path:
+            debugging_infos = ItemJsonlReader[str](debugging_info_path, converter=str).read_items()
+        else:
+            debugging_infos = []
+
         records: list[dict] = []
-        for (left, right), gt_label, score, prediction in zip_longest(
+        for (left, right), gt_label, score, prediction, debugging_info in zip_longest(
             pairs,
             gt_labels,
             log_odds,
             predictions,
+            debugging_infos,
         ):
             ent_type: set[str] = set(left.metadata.get("type", [])) | set(right.metadata.get("type", []))
 
@@ -264,6 +275,7 @@ class LinkingTask(Task):
                     "predicted_label": prediction,
                     "left_entity_id": left.entity_id,
                     "right_entity_id": right.entity_id,
+                    "debugging_info": debugging_info if debugging_info else "",
                 }
             )
 
