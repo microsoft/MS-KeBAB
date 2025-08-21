@@ -130,30 +130,27 @@ class ReDocRedDatasetBuilder:
         schema = cls.SCHEMAS["plain_text"]
         return Document(text_id, schema, data)
 
-    @classmethod
-    def merge_entities(cls, entities: list[dict]) -> dict[str, set[str]]:
+    def merge_entities(self, entities: list[dict]) -> dict[str, set[str]]:
         """Merge the entity names and types into a single entity."""
         merged_entity = {}
         for entity in entities:
             for k, v in entity.items():
-                if k not in cls.PROPERTIES_TO_DROP:
+                if k not in self.PROPERTIES_TO_DROP:
                     if k not in merged_entity:
                         merged_entity[k] = set()
 
                     merged_entity[k].add(str(v))
 
-        merged_entity["type"] = {cls.TYPE_MAP.get(t, t) for t in merged_entity["type"]}
+        merged_entity["type"] = {self.TYPE_MAP.get(t, t) for t in merged_entity["type"]}
 
         return merged_entity
 
-    @classmethod
-    def extract_entities(cls, entry: dict) -> list[dict[str, set[str]]]:
+    def extract_entities(self, entry: dict) -> list[dict[str, set[str]]]:
         """Extract the names of the entities from an entry."""
-        return [cls.merge_entities(value) for value in entry["vertexSet"]]
+        return [self.merge_entities(value) for value in entry["vertexSet"]]
 
-    @classmethod
     def extract_properties(
-        cls, entry: dict, entities: list[dict[str, set[str]]], wikidata_properties: dict
+        self, entry: dict, entities: list[dict[str, set[str]]], wikidata_properties: dict
     ) -> list[dict[str, set[str]]]:
         """Augment the entities with corresponding properties."""
         for prop in entry["labels"]:
@@ -164,28 +161,26 @@ class ReDocRedDatasetBuilder:
             entities[entity_index][property_label].update(entities[rel_entity_index]["name"])
         return entities
 
-    @classmethod
-    def filter_small_entities(cls, entities: list[Entity]) -> list[Entity]:
+    def filter_small_entities(self, entities: list[Entity]) -> list[Entity]:
         """Filter out entities that contain only name and type properties."""
         filtered_entities = []
         for entity in entities:
-            if len(entity.properties) < cls.MIN_PROPERTY_COUNT:
-                print(f"filtering {entity.to_json()}: num_properties < {cls.MIN_PROPERTY_COUNT}")
+            if len(entity.properties) < self.MIN_PROPERTY_COUNT:
+                self._logger.debug(f"filtering {entity.to_json()}: num_properties < {self.MIN_PROPERTY_COUNT}")
                 continue
-            if any((entity_type in cls.TYPES_TO_DROP) for entity_type in entity.properties["type"]):
-                print(f"filtering {entity.to_json()}: has type in types_to_drop.")
+            if any((entity_type in self.TYPES_TO_DROP) for entity_type in entity.properties["type"]):
+                self._logger.debug(f"filtering {entity.to_json()}: has type in types_to_drop.")
                 continue
             filtered_entities.append(entity)
         return filtered_entities
 
-    @classmethod
-    def extract_example(cls, entry: dict, wikidata_properties: dict) -> dict:
+    def extract_example(self, entry: dict, wikidata_properties: dict) -> dict:
         """Extract an example from the Re-DocRED dataset."""
-        entities = cls.extract_entities(entry)
-        entities = cls.extract_properties(entry, entities, wikidata_properties)
+        entities = self.extract_entities(entry)
+        entities = self.extract_properties(entry, entities, wikidata_properties)
         entities = [Entity(str(i), {k: sorted(v) for k, v in entity.items()}) for i, entity in enumerate(entities)]
-        entities = cls.filter_small_entities(entities)
-        document = cls.get_document(entry)
+        entities = self.filter_small_entities(entities)
+        document = self.get_document(entry)
         return {"document": document, "entities": entities}
 
     def _load_dataset(self) -> Iterable[dict]:

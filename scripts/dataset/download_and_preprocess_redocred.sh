@@ -1,24 +1,24 @@
 #! /usr/bin/env bash
 
-set -euxo pipefail
+set -euo pipefail
 
 # This script downloads and preprocesses the Redocred dataset.
 
-# Usage: ./preprocess_redocred.sh [--fetch-wikidata-properties]
+# Usage: ./download_and_preprocess_redocred.sh [-f]
 
-data_dir="${PWD}/data/"
+data_dir="./data"
 wikidata_output_dir="${data_dir}/Wikidata"
 redocred_output_dir="${data_dir}/Re-DocRED"
 mkdir -p "$wikidata_output_dir"
 wikidata_properties_file="wikidata_properties.json"
 wikidata_properties_path="${wikidata_output_dir}/${wikidata_properties_file}"
-fetch_properties=false
+regenerate_everything=false
 
-if [[ "$#" -eq 1 ]] && [[ "$1" = "--fetch-wikidata-properties" ]]; then
-    fetch_properties=true
+if [[ "$#" -eq 1 ]] && [[ "$1" = "-f" ]]; then
+    regenerate_everything=true
 fi
 
-if [ $fetch_properties = "true" ] || [ ! -f $wikidata_properties_path ]; then
+if [ $regenerate_everything = "true" ] || [ ! -f $wikidata_properties_path ]; then
     echo "Fetching Wikidata properties..."
     uv run ./scripts/dataset/run_wikidata_simple_extractor.py --run-property-fetch --output-dir "$wikidata_output_dir"
 else
@@ -30,7 +30,7 @@ echo "Downloading Redocred dataset..."
 for split in train dev test; do
     mkdir -p "${redocred_output_dir}/${split}"
     split_filename="${redocred_output_dir}/${split}/${split}.json"
-    if [ ! -f $split_filename ]; then
+    if [ $regenerate_everything = "true" ] || [ ! -f $split_filename ]; then
         curl -X GET "https://raw.githubusercontent.com/tonytan48/Re-DocRED/refs/heads/main/data/${split}_revised.json" \
         -o $split_filename
     else
@@ -43,6 +43,13 @@ echo "Redocred dataset downloaded to ${redocred_output_dir}"
 echo "Preprocessing Redocred dataset..."
 for split in train dev test; do
     echo "Processing split: $split"
+    if [ $regenerate_everything = "true" ] || [ ! -d "${redocred_output_dir}/Extraction/${split}" ]; then
+        rm -rf "${redocred_output_dir}/Extraction/${split}"
+        mkdir -p "${redocred_output_dir}/Extraction/${split}"
+    else
+        echo "Extraction directory for ${split} already exists. Skipping preprocessing."
+        continue
+    fi
     uv run ./scripts/dataset/run_re_docred_dataset_builder.py \
     --re-docred-dir "${redocred_output_dir}/${split}" \
     --wikidata-properties-path "$wikidata_properties_path" \
@@ -50,4 +57,9 @@ for split in train dev test; do
 done
 
 echo "Checking md5 of generated data..."
-md5sum -c ./data/Re-DocRED/extraction.md5 --status
+if md5sum -c ${data_dir}/Re-DocRED/extraction.md5 --status; then
+    echo "MD5 check passed. All files are correctly generated."
+else
+    echo "MD5 check failed. Please check the generated files."
+    exit 1
+fi
