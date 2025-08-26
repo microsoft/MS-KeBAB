@@ -14,7 +14,7 @@ dependencies = [
     "requests",
     "tqdm",
     "tiktoken",
-    "transformers==4.50.3",
+    "transformers==4.55.4",
     "sentence-transformers",
     "nltk", # TODO(atorunova): replace with editdistance?
     "scipy",
