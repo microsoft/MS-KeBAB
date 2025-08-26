@@ -30,7 +30,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "accelerate==1.6.0",
+    "accelerate==1.10.1",
     "jupyter",
     "matplotlib",
     "pandas",
