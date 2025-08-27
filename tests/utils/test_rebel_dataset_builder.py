@@ -151,6 +151,22 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
 
     assert len(lines) > 0
 
+    output_file = builder.entity_generation_dataset_output_path
+    assert output_file.exists()
+
+    with open(output_file, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+
+    assert len(lines) > 0
+
+    output_file = builder.fragment_generation_dataset_output_path
+    assert output_file.exists()
+
+    with open(output_file, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+
+    assert len(lines) > 0
+
 
 @pytest.fixture
 def sample_fragments_for_merge() -> tuple[list[ResolvedWikidataEntity], dict[str, list[int]]]:
@@ -194,8 +210,10 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     random.seed(0)
     merged = RebelDatasetBuilder.generate_merged_fragment(0, fragments, entity_idx, max_fragments=3)
 
+    # base fragment included
+    assert fragments[0].metadata["fragment_id"] in merged.metadata["fragment_id"]
+
     # original metadata fields preserved
-    assert merged.metadata["fragment_id"] == fragments[0].metadata["fragment_id"]
     assert merged.metadata["type"] == fragments[0].metadata["type"]
 
     # merge_count present and within expected range
