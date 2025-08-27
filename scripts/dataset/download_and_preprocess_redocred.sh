@@ -7,8 +7,7 @@ set -euo pipefail
 # Usage: ./download_and_preprocess_redocred.sh [-f]
 
 data_dir="./data"
-date=$(date -u "+%Y-%m-%d")
-wikidata_output_dir="${data_dir}/Wikidata/${date}"
+wikidata_output_dir="${data_dir}/Wikidata/Properties"
 redocred_output_dir="${data_dir}/Re-DocRED"
 mkdir -p "$wikidata_output_dir"
 wikidata_properties_file="wikidata_properties.json"
@@ -44,7 +43,7 @@ echo "Redocred dataset downloaded to ${redocred_output_dir}/Original Dataset"
 echo "Preprocessing Redocred dataset..."
 for split in train dev test; do
     echo "Processing split: $split"
-    extractions_path="${redocred_output_dir}/Extractions/${date}/${split}"
+    extractions_path="${redocred_output_dir}/Extractions/${split}"
     if [ $regenerate_everything = "true" ] || [ ! -d $extractions_path ]; then
         rm -rf $extractions_path
         mkdir -p $extractions_path
@@ -61,7 +60,7 @@ done
 echo "Checking md5 of generated data..."
 while IFS= read -r line || [[ -n "$line" ]]; do
     file=$(echo "$line" | awk '{print $2}')
-    file_path=${redocred_output_dir}/Extractions/${date}/${file}
+    file_path=${redocred_output_dir}/Extractions/${file}
     expected_md5=$(echo "$line" | awk '{print $1}')
     actual_md5=$(tr -d "\r" < $file_path | md5sum | awk '{print $1}')
 
