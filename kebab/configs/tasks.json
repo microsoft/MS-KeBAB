@@ -4,7 +4,7 @@
     "data": {
       "extracts": "./Re-DocRED/Extractions/train/extracts.jsonl",
       "schema": "./kebab/configs/extraction/default_property_schema.json",
-      "ground_truth_extracted_entities": "./Re-DocRED/Extractions/2025-08-21/train/entities.jsonl"
+      "ground_truth_extracted_entities": "./Re-DocRED/Extractions/train/entities.jsonl"
     }
   },
   "Extraction-ReDocRED-Test": {
@@ -12,7 +12,7 @@
     "data": {
       "extracts": "./Re-DocRED/Extractions/test/extracts.jsonl",
       "schema": "./kebab/configs/extraction/default_property_schema.json",
-      "ground_truth_extracted_entities": "./Re-DocRED/Extractions/2025-08-21/test/entities.jsonl"
+      "ground_truth_extracted_entities": "./Re-DocRED/Extractions/test/entities.jsonl"
     }
   },
   "Extraction-Heldout": {
