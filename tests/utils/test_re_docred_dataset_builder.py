@@ -27,13 +27,25 @@ def re_docred_input_file_path() -> Path:
     return Path(__file__).parent / "data" / "datasets" / "re-docred" / "re_docred_single_example.json"
 
 
-def test_build_dataset(re_docred_input_file_path: Path) -> None:
+@pytest.fixture
+def wikidata_properties_path() -> Path:
+    """Return the path to the Wikidata properties file."""
+    return Path(__file__).parent / "data" / "datasets" / "wikidata" / "wikidata_properties.json"
+
+
+def test_build_dataset(re_docred_input_file_path: Path, wikidata_properties_path: Path) -> None:
     """Test the extraction of entities and properties from a single Re-DocRED JSON document record."""
     # load a single Re-DocRED document
     with open(re_docred_input_file_path, encoding="utf-8") as f:
         doc_record = json.load(f)[0]
 
-    example = ReDocRedDatasetBuilder.extract_example(doc_record, properties_map)
+    builder = ReDocRedDatasetBuilder(
+        re_docred_dir=re_docred_input_file_path,
+        wikidata_properties_path=wikidata_properties_path,
+        output_dir=Path.cwd(),
+    )
+
+    example = builder.extract_example(doc_record, properties_map)
     assert len(example["entities"]) == 15
     assert len(example["document"].document_id) == 64
     assert example["document"].document_id == "f5734628a85470a424f1a3d960fe1df2d12159baf43db94f1ae629ad091596bd"

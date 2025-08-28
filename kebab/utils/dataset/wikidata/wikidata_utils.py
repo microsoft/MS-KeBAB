@@ -261,7 +261,7 @@ def _query_entities_via_api(wikidata_ids: Iterable[str], english_only: bool = Tr
         params["languages"] = "en"
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, headers={"User-Agent": "KeBAB/WikidataExtractor"})
     except requests.exceptions.RequestException as e:
         logging.error(f"Error querying Wikidata for IDs {wikidata_ids}: {e}")
         return None
@@ -398,7 +398,7 @@ def fetch_properties_via_api(
                     for wikidata_item in wikidata_items.values():
                         label = get_entity_label(wikidata_item)
                         aliases = get_entity_aliases(wikidata_item)
-                        logging.info(
+                        logging.debug(
                             f"Found Wikidata item '{label}' with aliases {aliases} for property '{prop_record['label']}'"
                         )
                         num_labels = len(prop_record["aliases"])
@@ -407,7 +407,7 @@ def fetch_properties_via_api(
                         num_additional_aliases = len(prop_record["aliases"]) - num_labels
                         total_num_additional_aliases += num_additional_aliases
                         if num_additional_aliases > 0:
-                            logging.info(
+                            logging.debug(
                                 f"Added {num_additional_aliases} new aliases from Wikidata item '{label}' to property '{prop_record['label']}'"
                             )
 
@@ -426,7 +426,7 @@ def fetch_properties_via_api(
         f"Total number of additional aliases added from property 'Wikidata item of this property': {total_num_additional_aliases}"
     )
     for k, v in properties.items():
-        logging.info(f"{k}: {v}")
+        logging.debug(f"{k}: {v}")
 
     with open(output_path, mode="w", encoding="utf-8") as f:
         json.dump(properties, f)

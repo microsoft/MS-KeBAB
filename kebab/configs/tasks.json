@@ -2,23 +2,23 @@
   "Extraction-ReDocRED-Train": {
     "task": "Extraction",
     "data": {
-      "extracts": "https://some.public/download/link",
+      "extracts": "./Re-DocRED/Extractions/train/extracts.jsonl",
       "schema": "./kebab/configs/extraction/default_property_schema.json",
-      "ground_truth_extracted_entities": "https://some.public/download/link"
+      "ground_truth_extracted_entities": "./Re-DocRED/Extractions/train/entities.jsonl"
     }
   },
   "Extraction-ReDocRED-Test": {
     "task": "Extraction",
     "data": {
-      "extracts": "https://some.public/download/link",
+      "extracts": "./Re-DocRED/Extractions/test/extracts.jsonl",
       "schema": "./kebab/configs/extraction/default_property_schema.json",
-      "ground_truth_extracted_entities": "https://some.public/download/link"
+      "ground_truth_extracted_entities": "./Re-DocRED/Extractions/test/entities.jsonl"
     }
   },
   "Extraction-Heldout": {
     "task": "Extraction",
     "data": {
-      "extracts": "https://some.public/download/link",
+      "extracts": "./Re-DocRED/Extractions/dev/extracts.jsonl",
       "schema": "./kebab/configs/extraction/default_property_schema.json"
     }
   },

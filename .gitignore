@@ -11,6 +11,9 @@ log/
 # data
 scripts/output
 .local_cache
+data/Re-DocRED/**/*.jsonl
+data/Re-DocRED/**/*.json
+data/Wikidata/Properties/wikidata_properties.json
 
 # visual studio
 .vs/*
