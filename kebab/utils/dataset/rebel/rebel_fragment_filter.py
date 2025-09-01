@@ -1,0 +1,90 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+"""
+Filter entity fragments coming from REBEL dataset to remove entries (values or fragments) that tend to be degenerate.
+
+- Process all fragments sequentially and apply a set of filters.
+
+Example output:
+{"entity_id": "Q33298", "properties": {"name": ["Filipino"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "0"}}
+{"entity_id": "Q918448", "properties": {"name": ["denomination"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "1"}}
+"""
+
+from __future__ import annotations
+
+import logging
+import pathlib
+from collections import Counter
+
+from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
+from kebab.utils.io_helpers import resolve_path
+
+
+class RebelFragmentFilter:
+    """Filter entity fragments that come from REBEL dataset."""
+
+    ENTITY_FRAGMENTS_FILENAME: str = "rebel_entity_fragments.jsonl"
+
+    def __init__(
+        self,
+        *,
+        fragments_path: pathlib.Path,
+        output_dir: pathlib.Path,
+    ):
+        """
+        Initialize the fragment filter.
+
+        Args:
+            fragments_path: Path to the input REBEL fragments file.
+            output_dir: Directory where output datasets will be written.
+        """
+        self._logger: logging.Logger = logging.getLogger(__name__)
+
+        self.fragments_path: pathlib.Path = resolve_path(fragments_path)
+
+        self.output_dir: pathlib.Path = output_dir
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def run(self) -> None:
+        """Run the dataset filter pipeline."""
+        fragments_output_path = self.output_dir / self.fragments_path.name
+        counter = Counter()
+
+        with (
+            open(fragments_output_path, mode="w", encoding="utf-8") as f_out,
+            open(self.fragments_path, encoding="utf-8") as f_in,
+        ):
+            for line in f_in:
+                fragment = ResolvedWikidataEntity.from_json(line)
+                counter["total"] += 1
+
+                if counter["total"] % 100_000 == 0:
+                    self._logger.info(f"Processed {counter['total']:,} fragments...")
+
+                for values in fragment.properties.values():
+                    for value in values:
+                        if not value.strip():
+                            counter["empty_values"] += 1
+
+                # Remove values that are empty strings and remove properties that have empty values
+                fragment.properties = {
+                    prop: [value for value in values if value.strip()]
+                    for prop, values in fragment.properties.items()
+                    if any(value.strip() for value in values)
+                }
+
+                if not fragment.properties:
+                    counter["empty_properties"] += 1
+                    continue
+
+                # Remove fragments that have no WikiData type in the metadata
+                if not fragment.wikidata_type:
+                    counter["no_wikidata_types"] += 1
+                    continue
+
+                counter["valid"] += 1
+                f_out.write(fragment.to_json(minimal_repr=True) + "\n")
+
+        for key, value in counter.items():
+            self._logger.info(f"{key.replace('_', ' ').title()}: {value:,}")

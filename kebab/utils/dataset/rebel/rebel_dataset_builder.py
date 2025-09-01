@@ -1,7 +1,9 @@
 """
 Build datasets based on REBEL and Wikidata:
-- Pairwise linking dataset that contains pairs of entity fragments from REBEL.
-- Clustering dataset that contains merged fragments from REBEL.
+- Pairwise linking dataset that contains pairs of entity fragments (ZipF-sampled and merged) from REBEL.
+- Clustering dataset that contains all fragments of all entities included in the pairwise linking dataset.
+- Entity generation dataset that contains merged fragments of all entities included in the clustering dataset.
+
 
 The linking dataset contains pairs of fragments that either belong to the same entity or not.
 The ground truth (a boolean indicating whether the fragments belong to the same entity) is stored in a separate file.
@@ -71,6 +73,8 @@ class RebelDatasetBuilder:
     LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_ground_truth.jsonl"
     CLUSTERING_DATASET_FILENAME: str = "rebel_clustering_dataset.jsonl"
     CLUSTERING_GROUND_TRUTH_FILENAME: str = "rebel_clustering_ground_truth.jsonl"
+    ENTITY_GENERATION_DATASET_FILENAME: str = "rebel_entity_generation_dataset.jsonl"
+    FRAGMENT_GENERATION_DATASET_FILENAME: str = "rebel_fragment_generation_dataset.jsonl"
     FRAGMENT_TO_ENTITY_MAP_FILENAME: str = "rebel_fragment_to_entity_map.jsonl"
 
     def __init__(
@@ -101,9 +105,6 @@ class RebelDatasetBuilder:
         self.output_dir: pathlib.Path = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.clustering_output_dir: pathlib.Path = self.output_dir / "clustering"
-        self.clustering_output_dir.mkdir(parents=True, exist_ok=True)
-
         self.max_count: int | None = max_count
         self.max_merge_fragments: int = max_merge_fragments
         self.merge_distribution: MergeDistributionMode = merge_distribution or MergeDistributionMode.ZIPF
@@ -113,13 +114,28 @@ class RebelDatasetBuilder:
         self.linking_ground_truth_output_path = self.output_dir / self.LINKING_GROUND_TRUTH_FILENAME
         self.fragment_to_entity_map_output_path = self.output_dir / self.FRAGMENT_TO_ENTITY_MAP_FILENAME
 
+        self.clustering_output_dir: pathlib.Path = self.output_dir / "clustering"
+        self.clustering_output_dir.mkdir(parents=True, exist_ok=True)
         self.clustering_dataset_output_path = self.clustering_output_dir / self.CLUSTERING_DATASET_FILENAME
         self.clustering_ground_truth_output_path = self.clustering_output_dir / self.CLUSTERING_GROUND_TRUTH_FILENAME
+
+        self.entity_generation_output_dir: pathlib.Path = self.output_dir / "entity_generation"
+        self.entity_generation_output_dir.mkdir(parents=True, exist_ok=True)
+        self.entity_generation_dataset_output_path = (
+            self.entity_generation_output_dir / self.ENTITY_GENERATION_DATASET_FILENAME
+        )
+
+        self.fragment_generation_output_dir: pathlib.Path = self.output_dir / "fragment_generation"
+        self.fragment_generation_output_dir.mkdir(parents=True, exist_ok=True)
+        self.fragment_generation_dataset_output_path = (
+            self.fragment_generation_output_dir / self.FRAGMENT_GENERATION_DATASET_FILENAME
+        )
 
     def run(self) -> None:
         """Run the dataset building pipeline."""
         # load the input fragments
         fragments: list[ResolvedWikidataEntity] = self.load_fragments()
+        fragments = sorted(fragments, key=lambda f: f.entity_id)
 
         # construct fragment index to fragment-indices-of-the-same-entity map
         entity_id_to_fragment_indices = defaultdict(list)
@@ -420,37 +436,77 @@ class RebelDatasetBuilder:
             f"Wrote {count:,} fragments from {len(entity_ids):,} entities to {self.clustering_dataset_output_path}"
         )
 
+        # write the entity generation dataset
+        count = 0
+        with open(self.entity_generation_dataset_output_path, mode="w", encoding="utf-8") as f_out:
+            for entity_id in entity_ids:
+                merged = self.generate_merged_fragment(
+                    entity_id_to_fragment_indices[entity_id][0],
+                    fragments,
+                    entity_id_to_fragment_indices,
+                    max_fragments=None,
+                    distribution=None,  # take all fragments for entity generation
+                    deduplicate_values=self.deduplicate_values,
+                )
+
+                f_out.write(merged.to_json(minimal_repr=True) + "\n")
+                count += 1
+
+        logging.info(f"Wrote {count:,} merged fragments to {self.entity_generation_dataset_output_path}")
+
+        # write the fragment generation dataset
+        count = 0
+        with open(self.fragment_generation_dataset_output_path, mode="w", encoding="utf-8") as f_out:
+            for entity_id in entity_ids:
+                merged = self.generate_merged_fragment(
+                    entity_id_to_fragment_indices[entity_id][0],
+                    fragments,
+                    entity_id_to_fragment_indices,
+                    max_fragments=None,
+                    include_base_fragment=False,
+                    deduplicate_values=self.deduplicate_values,
+                )
+
+                f_out.write(merged.to_json(minimal_repr=True) + "\n")
+                count += 1
+
     @classmethod
     def generate_merged_fragment(
         cls,
-        fragment: int,
+        fragment_idx: int,
         fragments: list[ResolvedWikidataEntity],
         entity_id_to_fragment_indices: dict[str, list[int]],
-        max_fragments: int = 10,
-        distribution: MergeDistributionMode = MergeDistributionMode.ZIPF,
+        max_fragments: int | None = 10,
+        distribution: MergeDistributionMode | None = MergeDistributionMode.ZIPF,
+        include_base_fragment: bool = True,
         deduplicate_values: bool = True,
     ) -> ResolvedWikidataEntity:
         """
-        Generate a merged fragment by merging up to `max_fragments` from the entity of the given fragment index.
+        Generate a merged fragment by merging up to `max_fragments` from the list of fragments.
 
         Args:
-            fragment: Index of the base fragment to merge.
+            fragment_idx: Index of the main fragment to merge.
             fragments: List of all fragments.
             entity_id_to_fragment_indices: Mapping from entity IDs to their fragment indices.
             max_fragments: Maximum number of fragments to include in the merge.
             distribution: Probability distribution to sample merge count (`zipf` or `triangular`).
+            include_base_fragment: Whether to always include the base fragment in the merge.
             deduplicate_values: Whether to deduplicate property values in the merged fragment.
 
         Returns:
             A merged ResolvedWikidataEntity preserving original metadata.
         """
-        original_fragment = fragments[fragment]
-        fragments = [fragments[i] for i in entity_id_to_fragment_indices[fragments[fragment].entity_id]]
+        fragment = fragments[fragment_idx]
+        entity_id = fragment.entity_id
+        fragment_indices = [fragment_idx]  # start with the base fragment
+        fragment_indices.extend(i for i in entity_id_to_fragment_indices[entity_id] if i != fragment_idx)
 
-        if len(fragments) == 1:
-            return original_fragment
+        if len(fragment_indices) == 1:
+            return fragment
 
-        n = min(len(fragments), max_fragments)
+        n = len(fragment_indices)
+        if max_fragments:
+            n = min(n, max_fragments)
 
         if distribution == MergeDistributionMode.ZIPF:
             p = np.arange(1, n + 1, dtype=np.float32)
@@ -458,16 +514,24 @@ class RebelDatasetBuilder:
         elif distribution == MergeDistributionMode.TRIANGULAR:
             p = np.arange(n, 0, -1, dtype=np.float32)
         else:
-            raise ValueError(f"Unknown distribution: {distribution}")
+            p = None
 
-        p /= p.sum()
-        r = np.random.choice(n, p=p) + 1  # noqa: NPY002
-        indices = random.sample(range(n), r)
-        selected_fragments = [fragments[i] for i in indices]
+        if p is not None:
+            p /= p.sum()
+            r = np.random.choice(n, p=p) + 1  # noqa: NPY002
+            indices = random.sample(range(n), r)
 
+            if include_base_fragment and 0 not in indices:
+                indices[0] = 0  # ensure the base fragment is always included
+        else:
+            indices = list(range(n))
+            r = n
+
+        selected_fragments = [fragments[fragment_indices[i]] for i in indices]
         merged_fragment = ResolvedWikidataEntity.merge(selected_fragments, deduplicate_values=deduplicate_values)
-        merged_fragment.metadata["fragment_id"] = original_fragment.metadata["fragment_id"]
-        merged_fragment.metadata["type"] = original_fragment.metadata["type"]
+        merged_fragment.metadata["fragment_id"] = selected_fragments[0].metadata["fragment_id"]
+        merged_fragment.metadata["fragment_ids"] = [f.metadata["fragment_id"] for f in selected_fragments]
+        merged_fragment.metadata["type"] = fragment.wikidata_type
         merged_fragment.metadata["merge_count"] = r
 
         return merged_fragment
