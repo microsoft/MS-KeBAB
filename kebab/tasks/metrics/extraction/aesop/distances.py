@@ -143,6 +143,7 @@ class EditDistance(ElementDistance):
         """Create edit distance from dictionary."""
         return EditDistance()
 
+
 class TypeNameDistance(ElementDistance):
     """Type name distance class."""
 
@@ -165,14 +166,16 @@ class TypeNameDistance(ElementDistance):
 
     def compute(self, value1: Any, value2: Any, property_: Property) -> float:  # noqa: ARG002
         """Compute type name distance between two type name property values."""
-        if value1 == self.MISCELLANEOUS_TYPE_NAME or value2 == self.MISCELLANEOUS_TYPE_NAME:
+        if str(value1) == str(value2):
+            return 0.0
+        if self.MISCELLANEOUS_TYPE_NAME in {str(value1), str(value2)}:
             return self.miscellaneous_distance
-        return 0.0 if str(value1) == str(value2) else 1.0
+        return 1.0
 
     @classmethod
-    def from_dict(cls, config: dict[str, Any]) -> TypeNameDistance:  # noqa: ARG003
+    def from_dict(cls, config: dict[str, Any]) -> TypeNameDistance:
         """Create type name distance from dictionary."""
-        return TypeNameDistance(config.get("miscellaneous_distance", None))
+        return TypeNameDistance(config.get("miscellaneous_distance"))
 
 
 PropertyDistanceValue = tuple[list[float], int]

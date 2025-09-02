@@ -43,7 +43,6 @@ class ValueAveragedAesopConfig(MetricConfig):
     properties_to_skip: set[str] = field(default_factory=set)
     debug_output_dir: Path | None = None
 
-
     @staticmethod
     def from_dict(config: dict[str, Any], property_schema: PropertySchema) -> ValueAveragedAesopConfig:
         """Create value-averaged-AESOP metric configuration from dictionary."""
@@ -69,7 +68,7 @@ class ValueAveragedAesopConfig(MetricConfig):
                     SetPropertyDistance(element_distance)
                     if property_schema.properties[property_name].is_collection
                     else SingleValuePropertyDistance(element_distance)
-            )
+                )
         debug_output_dir = config.get("debug_output_dir")
         return ValueAveragedAesopConfig(
             matching_score_function=EntityDistance.from_dict(config["entity_distance"], property_schema),
