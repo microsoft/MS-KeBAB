@@ -22,12 +22,16 @@
             "name": {
                 "name": "EmbeddingDistance"
             },
+            "type": {
+                "name": "TypeNameDistance"
+            },
             "descriptions": {
                 "name": "EmbeddingDistance"
             },
             "definitions": {
                 "name": "EmbeddingDistance"
             }
-        }
+        },
+        "properties_to_skip": []
     }
 }

@@ -143,6 +143,37 @@ class EditDistance(ElementDistance):
         """Create edit distance from dictionary."""
         return EditDistance()
 
+class TypeNameDistance(ElementDistance):
+    """Type name distance class."""
+
+    MISCELLANEOUS_TYPE_NAME = "miscellaneous"
+    DEFAULT_MISCELLANEOUS_DISTANCE = 0.0
+
+    def __init__(self, miscellaneous_distance: float | None = None):
+        """Initialize type name distance."""
+        if miscellaneous_distance is not None:
+            if miscellaneous_distance < 0 or miscellaneous_distance > 1:
+                raise ValueError("Miscellaneous distance must be between 0 and 1.")
+            self.miscellaneous_distance = miscellaneous_distance
+        else:
+            self.miscellaneous_distance = self.DEFAULT_MISCELLANEOUS_DISTANCE
+
+    def check_constraints(self, property_: Property) -> None:
+        """Check constraints for type name distance."""
+        if property_.data_type.value_type is not ValueType.TEXT:
+            raise ValueError("Only ValueType.TEXT properties are supported.")
+
+    def compute(self, value1: Any, value2: Any, property_: Property) -> float:  # noqa: ARG002
+        """Compute type name distance between two type name property values."""
+        if value1 == self.MISCELLANEOUS_TYPE_NAME or value2 == self.MISCELLANEOUS_TYPE_NAME:
+            return self.miscellaneous_distance
+        return 0.0 if str(value1) == str(value2) else 1.0
+
+    @classmethod
+    def from_dict(cls, config: dict[str, Any]) -> TypeNameDistance:  # noqa: ARG003
+        """Create type name distance from dictionary."""
+        return TypeNameDistance(config.get("miscellaneous_distance", None))
+
 
 PropertyDistanceValue = tuple[list[float], int]
 PropertyScoreValue = tuple[list[float], int]
