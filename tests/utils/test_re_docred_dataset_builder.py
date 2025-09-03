@@ -39,6 +39,7 @@ def re_docred_input_file_path() -> Path:
     """Return the path to a single Re-DocRED JSON document record."""
     return Path(__file__).parent / "data" / "datasets" / "re-docred" / "re_docred_single_example.json"
 
+
 @pytest.fixture
 def re_docred_input_with_unicode_characters_path() -> Path:
     """Return the path to a single Re-DocRED JSON document record with unicode characters."""
