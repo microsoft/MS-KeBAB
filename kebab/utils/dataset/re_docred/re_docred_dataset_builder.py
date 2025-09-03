@@ -112,7 +112,7 @@ class ReDocRedDatasetBuilder:
         for sentence in entry["sents"]:
             for token in sentence:
                 try:
-                    decoded_token = token.encode().decode("unicode-escape")
+                    decoded_token = token.encode("unicode-escape").decode("unicode-escape")
                 except UnicodeDecodeError:
                     decoded_token = token
                 if text == "":

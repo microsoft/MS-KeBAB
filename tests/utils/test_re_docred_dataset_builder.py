@@ -12,19 +12,37 @@ from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedData
 
 properties_map: dict[str, dict[str, str]] = {
     "P17": {"label": "country"},
+    "P27": {"label": "country of citizenship"},
+    "P35": {"label": "head of state"},
     "P131": {"label": "located in the administrative territorial entity"},
     "P150": {"label": "contains administrative territorial entity"},
     "P159": {"label": "headquarters location"},
+    "P241": {"label": "military branch"},
+    "P276": {"label": "location"},
     "P355": {"label": "subsidiary"},
+    "P361": {"label": "part of"},
+    "P527": {"label": "has part(s)"},
+    "P569": {"label": "date of birth"},
+    "P570": {"label": "date of death"},
     "P576": {"label": "date of founding or creation"},
+    "P585": {"label": "point in time"},
+    "P607": {"label": "participated in conflict"},
+    "P710": {"label": "participant"},
     "P749": {"label": "parent organization"},
+    "P1001": {"label": "applies to jurisdiction"},
+    "P1344": {"label": "participant in"},
 }
 
 
 @pytest.fixture
 def re_docred_input_file_path() -> Path:
-    """Return the path to a single T-REx JSON document record."""
+    """Return the path to a single Re-DocRED JSON document record."""
     return Path(__file__).parent / "data" / "datasets" / "re-docred" / "re_docred_single_example.json"
+
+@pytest.fixture
+def re_docred_input_with_unicode_characters_path() -> Path:
+    """Return the path to a single Re-DocRED JSON document record with unicode characters."""
+    return Path(__file__).parent / "data" / "datasets" / "re-docred" / "re_docred_single_example_with_unicode.json"
 
 
 @pytest.fixture
@@ -72,4 +90,42 @@ def test_build_dataset(re_docred_input_file_path: Path, wikidata_properties_path
         "country",
         "located in the administrative territorial entity",
         "headquarters location",
+    }
+
+
+def test_build_dataset_with_unicode_characters(
+    re_docred_input_with_unicode_characters_path: Path,
+    wikidata_properties_path: Path,
+) -> None:
+    """Test the extraction of entities and properties from a single Re-DocRED JSON document record with unicode characters."""
+    # load a single Re-DocRED document
+    with open(re_docred_input_with_unicode_characters_path, encoding="utf-8") as f:
+        doc_record = json.load(f)[0]
+    builder = ReDocRedDatasetBuilder(
+        re_docred_dir=re_docred_input_with_unicode_characters_path,
+        wikidata_properties_path=wikidata_properties_path,
+        output_dir=Path.cwd(),
+    )
+
+    example = builder.extract_example(doc_record, properties_map)
+    assert len(example["entities"]) == 18
+    assert len(example["document"].document_id) == 64
+    assert example["document"].document_id == "1bad3abc89f7c5b1bb839f75362955bcf46c255d342b1092bca84464b8b1edcf"
+    assert example["document"].schema.schema_id == "plain_text"
+    assert example["document"].data["title"] == "Jirō Shiizaki"
+    assert len(example["document"].data["text"]) == 1373
+    entity = example["entities"][0]
+    assert len(entity.properties["name"]) == 3
+    assert set(entity.properties["name"]) == {"Jirō Shiizaki", "Shiizaki", "椎崎二郎,Shiizaki Jirō"}
+    assert entity.properties["type"] == ["person"]
+    assert len(entity.properties) == 8
+    assert entity.properties.keys() == {
+        "name",
+        "type",
+        "participated in conflict",
+        "country of citizenship",
+        "date of birth",
+        "date of death",
+        "military branch",
+        "participant in",
     }
