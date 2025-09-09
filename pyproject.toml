@@ -3,7 +3,7 @@
 
 [project]
 name = "kebab"
-version = "0.0.4"
+version = "0.0.5"
 description = "Knowledge Base construction and Access Benchmark (KeBAB)."
 readme = "README.md"
 requires-python = ">=3.12"
