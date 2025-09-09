@@ -40,6 +40,7 @@ class ValueAveragedAesopConfig(MetricConfig):
     matching_threshold: float
     property_score_functions: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWithScores]]
     property_schema: PropertySchema
+    properties_to_skip: set[str] = field(default_factory=set)
     debug_output_dir: Path | None = None
 
     @staticmethod
@@ -55,22 +56,26 @@ class ValueAveragedAesopConfig(MetricConfig):
             SetPropertyDistance(get_element_distance(config["default_property_distance"]))
         )
 
+        properties_to_skip = set(config.get("properties_to_skip", []))
+
         property_score_functions = defaultdict(lambda: default_property_score)
         for property_name, score_config in config["property_distance_functions"].items():
             if property_name not in property_schema.properties:
                 raise ValueError(f"Property '{property_name}' is not present in the property schema.")
-            element_distance = get_element_distance(score_config)
-            property_score_functions[property_name] = PropertyScore(
-                SetPropertyDistance(element_distance)
-                if property_schema.properties[property_name].is_collection
-                else SingleValuePropertyDistance(element_distance)
-            )
+            if property_name not in properties_to_skip:
+                element_distance = get_element_distance(score_config)
+                property_score_functions[property_name] = PropertyScore(
+                    SetPropertyDistance(element_distance)
+                    if property_schema.properties[property_name].is_collection
+                    else SingleValuePropertyDistance(element_distance)
+                )
         debug_output_dir = config.get("debug_output_dir")
         return ValueAveragedAesopConfig(
             matching_score_function=EntityDistance.from_dict(config["entity_distance"], property_schema),
             matching_threshold=config["matching_threshold"],
             property_score_functions=property_score_functions,
             property_schema=property_schema,
+            properties_to_skip=properties_to_skip,
             debug_output_dir=Path(debug_output_dir) if debug_output_dir else None,
         )
 
@@ -271,6 +276,13 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
 
             gt_entities = [entity for entity in gt.entities if "time" not in entity.properties.get("type", [])]
             pred_entities = [entity for entity in pred.entities if "time" not in entity.properties.get("type", [])]
+            for property_to_skip in self.config.properties_to_skip:
+                for entity in gt_entities:
+                    if property_to_skip in entity.properties:
+                        del entity.properties[property_to_skip]
+                for entity in pred_entities:
+                    if property_to_skip in entity.properties:
+                        del entity.properties[property_to_skip]
             gt_property_counts = Counter()
             for entity in gt_entities:
                 gt_property_counts.update(entity.properties.keys())
