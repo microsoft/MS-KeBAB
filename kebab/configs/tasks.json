@@ -26,61 +26,85 @@
     "task": "Linking",
     "data": {
       "entity_fragment_pairs": "https://some.public/download/link",
-      "schema": "https://some.public/download/link",
       "ground_truth_boolean": "https://some.public/download/link"
     }
   },
   "Linking-REBEL-Train": {
     "task": "Linking",
     "data": {
-      "schema": "./REBEL/Schemas/rebel_linking_properties_schema.json",
-      "entity_fragment_pairs": "./REBEL/Linking Merged/Train Dataset/rebel_linking_1000000_dataset.jsonl",
-      "ground_truth_boolean": "./REBEL/Linking Merged/Train Dataset/rebel_linking_1000000_ground_truth.jsonl"
+      "entity_fragment_pairs": "./REBEL/Linking/Train/rebel_linking_dataset.jsonl",
+      "ground_truth_boolean": "./REBEL/Linking/Train/rebel_linking_ground_truth.jsonl"
     }
   },
   "Linking-REBEL-Validation": {
     "task": "Linking",
     "data": {
-      "schema": "./REBEL/Schemas/rebel_linking_properties_schema.json",
-      "entity_fragment_pairs": "./REBEL/Linking Merged/Validation Dataset/rebel_linking_1000_dataset.jsonl",
-      "ground_truth_boolean": "./REBEL/Linking Merged/Validation Dataset/rebel_linking_1000_ground_truth.jsonl"
+      "entity_fragment_pairs": "./REBEL/Linking/Validation/rebel_linking_dataset.jsonl",
+      "ground_truth_boolean": "./REBEL/Linking/Validation/rebel_linking_ground_truth.jsonl"
     }
   },
   "Linking-REBEL-Test": {
     "task": "Linking",
     "data": {
-      "schema": "./REBEL/Schemas/rebel_linking_properties_schema.json",
-      "entity_fragment_pairs": "./REBEL/Linking Merged/Test Dataset/rebel_linking_1000_dataset.jsonl",
-      "ground_truth_boolean": "./REBEL/Linking Merged/Test Dataset/rebel_linking_1000_ground_truth.jsonl"
+      "entity_fragment_pairs": "./REBEL/Linking/Test/rebel_linking_dataset.jsonl",
+      "ground_truth_boolean": "./REBEL/Linking/Test/rebel_linking_ground_truth.jsonl"
     }
   },
-  "EntityGeneration-REBEL-from-Linking-Train": {
-    "task": "EntityGeneration",
-    "data": {
-      "schema": "./REBEL/Schemas/rebel_linking_properties_schema.json",
-      "entities": "./REBEL/Entity Generation/From Linking Merged Train/rebel_entity_generation_from_linking_dataset.jsonl"
-    }
-  },
-  "EntityGeneration-REBEL-from-Linking-Validation": {
-    "task": "EntityGeneration",
-    "data": {
-      "schema": "./REBEL/Schemas/rebel_linking_properties_schema.json",
-      "entities": "./REBEL/Entity Generation/From Linking Merged Validation/rebel_entity_generation_from_linking_dataset.jsonl"
-    }
-  },
-  "EntityGeneration-REBEL-from-Linking-Test": {
-    "task": "EntityGeneration",
-    "data": {
-      "schema": "./REBEL/Schemas/rebel_linking_properties_schema.json",
-      "entities": "./REBEL/Entity Generation/From Linking Merged Test/rebel_entity_generation_from_linking_dataset.jsonl"
-    }
-  },
-  "Clustering-REBEL-from-Linking-Test": {
+  "Clustering-REBEL-Train": {
     "task": "Clustering",
     "data": {
-      "schema": "./REBEL/Schemas/rebel_linking_properties_schema.json",
-      "entity_fragments": "./REBEL/Linking Merged/Test Dataset/clustering/rebel_clustering_1000_dataset.jsonl",
-      "ground_truth_labels": "./REBEL/Linking Merged/Test Dataset/clustering/rebel_clustering_1000_ground_truth.jsonl"
+      "entity_fragments": "./REBEL/Clustering/Train/rebel_clustering_dataset.jsonl",
+      "ground_truth_labels": "./REBEL/Clustering/Train/rebel_clustering_ground_truth.jsonl"
+    }
+  },
+  "Clustering-REBEL-Validation": {
+    "task": "Clustering",
+    "data": {
+      "entity_fragments": "./REBEL/Clustering/Validation/rebel_clustering_dataset.jsonl",
+      "ground_truth_labels": "./REBEL/Clustering/Validation/rebel_clustering_ground_truth.jsonl"
+    }
+  },
+  "Clustering-REBEL-Test": {
+    "task": "Clustering",
+    "data": {
+      "entity_fragments": "./REBEL/Clustering/Test/rebel_clustering_dataset.jsonl",
+      "ground_truth_labels": "./REBEL/Clustering/Test/rebel_clustering_ground_truth.jsonl"
+    }
+  },
+  "EntityGeneration-REBEL-Train": {
+    "task": "EntityGeneration",
+    "data": {
+      "entities": "./REBEL/Entity Generation/Train/rebel_entity_generation_dataset.jsonl"
+    }
+  },
+  "EntityGeneration-REBEL-Validation": {
+    "task": "EntityGeneration",
+    "data": {
+      "entities": "./REBEL/Entity Generation/Validation/rebel_entity_generation_dataset.jsonl"
+    }
+  },
+  "EntityGeneration-REBEL-Test": {
+    "task": "EntityGeneration",
+    "data": {
+      "entities": "./REBEL/Entity Generation/Test/rebel_entity_generation_dataset.jsonl"
+    }
+  },
+  "FragmentGeneration-REBEL-Train": {
+    "task": "EntityGeneration",
+    "data": {
+      "entities": "./REBEL/Fragment Generation/Train/rebel_fragment_generation_dataset.jsonl"
+    }
+  },
+  "FragmentGeneration-REBEL-Validation": {
+    "task": "EntityGeneration",
+    "data": {
+      "entities": "./REBEL/Fragment Generation/Validation/rebel_fragment_generation_dataset.jsonl"
+    }
+  },
+  "FragmentGeneration-REBEL-Test": {
+    "task": "EntityGeneration",
+    "data": {
+      "entities": "./REBEL/Fragment Generation/Test/rebel_fragment_generation_dataset.jsonl"
     }
   }
 }
