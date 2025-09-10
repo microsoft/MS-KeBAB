@@ -52,7 +52,7 @@ class LinkingTask(Task):
         self,
         name: str,
         entity_fragment_pairs: str,
-        schema: str,
+        schema: str | None = None,
         ground_truth_boolean: str | None = None,
         data_path: Path | None = None,
     ):

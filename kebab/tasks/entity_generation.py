@@ -32,7 +32,7 @@ class EntityGenerationTask(Task):
         self,
         name: str,
         entities: str,
-        schema: str,
+        schema: str | None = None,
         data_path: Path | None = None,
     ):
         """Initialize an entity generation task."""

@@ -33,14 +33,14 @@ class Task(ABC):
     """Represents a benchmark task with its data files."""
 
     __name: str
-    __schema: Path
+    __schema: Path | None
     __data_path: Path | None
 
-    def __init__(self, name: str, schema: str, data_path: Path | None = None):
+    def __init__(self, name: str, schema: str | None = None, data_path: Path | None = None):
         """Initialize a task."""
         self.__name = name
         self.__data_path = data_path
-        self.__schema = resolve_path(schema, data_path)
+        self.__schema = resolve_path(schema, data_path) if schema else None
 
     @property
     def name(self) -> str:
@@ -99,12 +99,15 @@ class Task(ABC):
             dict[str, float]: A dictionary containing the evaluation metrics.
         """
 
-    def read_schema(self) -> PropertySchema:
+    def read_schema(self) -> PropertySchema | None:
         """
         Read property schema from a file.
 
         Returns:
             PropertySchema: A PropertySchema read from a file.
         """
+        if not self.__schema or not self.__schema.exists():
+            return None
+
         schema = PropertySchema.from_file(self.__schema)
         return schema

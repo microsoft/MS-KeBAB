@@ -26,14 +26,12 @@
     "task": "Linking",
     "data": {
       "entity_fragment_pairs": "https://some.public/download/link",
-      "schema": "https://some.public/download/link",
       "ground_truth_boolean": "https://some.public/download/link"
     }
   },
   "Linking-REBEL-Train": {
     "task": "Linking",
     "data": {
-      "schema": "https://some.public/download/link",
       "entity_fragment_pairs": "./REBEL/Linking/Train/rebel_linking_dataset.jsonl",
       "ground_truth_boolean": "./REBEL/Linking/Train/rebel_linking_ground_truth.jsonl"
     }
@@ -41,7 +39,6 @@
   "Linking-REBEL-Validation": {
     "task": "Linking",
     "data": {
-      "schema": "https://some.public/download/link",
       "entity_fragment_pairs": "./REBEL/Linking/Validation/rebel_linking_dataset.jsonl",
       "ground_truth_boolean": "./REBEL/Linking/Validation/rebel_linking_ground_truth.jsonl"
     }
@@ -49,7 +46,6 @@
   "Linking-REBEL-Test": {
     "task": "Linking",
     "data": {
-      "schema": "https://some.public/download/link",
       "entity_fragment_pairs": "./REBEL/Linking/Test/rebel_linking_dataset.jsonl",
       "ground_truth_boolean": "./REBEL/Linking/Test/rebel_linking_ground_truth.jsonl"
     }
@@ -57,7 +53,6 @@
   "Clustering-REBEL-Train": {
     "task": "Clustering",
     "data": {
-      "schema": "https://some.public/download/link",
       "entity_fragments": "./REBEL/Clustering/Train/rebel_clustering_dataset.jsonl",
       "ground_truth_labels": "./REBEL/Clustering/Train/rebel_clustering_ground_truth.jsonl"
     }
@@ -65,7 +60,6 @@
   "Clustering-REBEL-Validation": {
     "task": "Clustering",
     "data": {
-      "schema": "https://some.public/download/link",
       "entity_fragments": "./REBEL/Clustering/Validation/rebel_clustering_dataset.jsonl",
       "ground_truth_labels": "./REBEL/Clustering/Validation/rebel_clustering_ground_truth.jsonl"
     }
@@ -73,7 +67,6 @@
   "Clustering-REBEL-Test": {
     "task": "Clustering",
     "data": {
-      "schema": "https://some.public/download/link",
       "entity_fragments": "./REBEL/Clustering/Test/rebel_clustering_dataset.jsonl",
       "ground_truth_labels": "./REBEL/Clustering/Test/rebel_clustering_ground_truth.jsonl"
     }
@@ -81,42 +74,36 @@
   "EntityGeneration-REBEL-Train": {
     "task": "EntityGeneration",
     "data": {
-      "schema": "https://some.public/download/link",
       "entities": "./REBEL/Entity Generation/Train/rebel_entity_generation_dataset.jsonl"
     }
   },
   "EntityGeneration-REBEL-Validation": {
     "task": "EntityGeneration",
     "data": {
-      "schema": "https://some.public/download/link",
       "entities": "./REBEL/Entity Generation/Validation/rebel_entity_generation_dataset.jsonl"
     }
   },
   "EntityGeneration-REBEL-Test": {
     "task": "EntityGeneration",
     "data": {
-      "schema": "https://some.public/download/link",
       "entities": "./REBEL/Entity Generation/Test/rebel_entity_generation_dataset.jsonl"
     }
   },
   "FragmentGeneration-REBEL-Train": {
     "task": "EntityGeneration",
     "data": {
-      "schema": "https://some.public/download/link",
       "entities": "./REBEL/Fragment Generation/Train/rebel_fragment_generation_dataset.jsonl"
     }
   },
   "FragmentGeneration-REBEL-Validation": {
     "task": "EntityGeneration",
     "data": {
-      "schema": "https://some.public/download/link",
       "entities": "./REBEL/Fragment Generation/Validation/rebel_fragment_generation_dataset.jsonl"
     }
   },
   "FragmentGeneration-REBEL-Test": {
     "task": "EntityGeneration",
     "data": {
-      "schema": "https://some.public/download/link",
       "entities": "./REBEL/Fragment Generation/Test/rebel_fragment_generation_dataset.jsonl"
     }
   }

@@ -41,7 +41,7 @@ class ClusteringTask(Task):
         self,
         name: str,
         entity_fragments: str | Path,
-        schema: str,
+        schema: str | None = None,
         ground_truth_labels: str | Path | None = None,
         data_path: Path | None = None,
     ):
