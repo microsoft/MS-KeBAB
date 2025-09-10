@@ -3,10 +3,10 @@
 
 This repository contains the backend implementation for the **K**nowledg**e** **B**ase construction and **A**ccess **B**enchmark (KeBAB🍢).
 
-The recommended way to install the code is to clone the repository and install the package in editable mode:
+The recommended way to work with the code is to clone the repository and install it via `uv`:
 
 ```bash
-pip install -e .[all]
+uv sync --locked
 ```
 
 ## Overview
