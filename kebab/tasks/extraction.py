@@ -7,9 +7,9 @@ import logging
 from collections.abc import Iterable
 from itertools import zip_longest
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, cast
 
-from kebab.contracts.entity import Entity
+from kebab.contracts.entity import Entity, PropertySchema
 from kebab.contracts.task import Task, TaskType
 from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator, MetricConfig
 from kebab.utils.io_helpers import (
@@ -131,7 +131,10 @@ class ExtractionTask(Task):
                 logger.info(f"Evaluating metric: {metric_name}")
                 logger.info(metric_config_dict)
             metric_calculator_cls = self.__metric_calculator_cls[metric_name]
-            metric_config = self.__metric_config_cls[metric_name].from_dict(metric_config_dict, self.read_schema())
+            metric_config = self.__metric_config_cls[metric_name].from_dict(
+                metric_config_dict,
+                cast(PropertySchema, self.read_schema()),  # in extraction, schema is not optional
+            )
             metric_results = metric_calculator_cls(metric_config, logger).run(pred_extractions, self.read_items())  # type: ignore
             metrics[metric_name] = metric_results
         if eval_result_path:
