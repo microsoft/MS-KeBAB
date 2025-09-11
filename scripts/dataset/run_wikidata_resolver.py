@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import pathlib
+from pathlib import Path
 
 import click
 from kebab.utils import logging_helpers
@@ -14,36 +14,26 @@ from kebab.utils.dataset.wikidata.wikidata_resolver import WikidataResolver
 
 @click.option(
     "--entities-path",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "data" / "REBEL" / "Fragments" / "Surface Forms" / "rebel_entity_fragments.jsonl",
+    type=Path,
+    default=Path.cwd() / "data" / "REBEL" / "Fragments" / "Surface Forms" / "rebel_entity_fragments.jsonl",
     help="Path to the input entities file.",
 )
 @click.option(
     "--wikidata-simple-entities-path",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd()
-    / "data"
-    / "Wikidata"
-    / "Simple Entities"
-    / "2025-01-30"
-    / "wikidata_simple_entities.jsonl",
+    type=Path,
+    default=Path.cwd() / "data" / "Wikidata" / "Simple Entities" / "2025-01-30" / "wikidata_simple_entities.jsonl",
     help="The path to the extracted Wikidata simple entities.",
 )
 @click.option(
     "--wikidata-properties-path",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "data" / "Wikidata" / "Properties" / "2025-01-30" / "wikidata_properties.json",
+    type=Path,
+    default=Path.cwd() / "data" / "Wikidata" / "Properties" / "2025-01-30" / "wikidata_properties.json",
     help="Path to the Wikidata properties file.",
 )
 @click.option(
     "--wikidata-type-hierarchy-path",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd()
-    / "data"
-    / "Wikidata"
-    / "Type Hierarchy"
-    / "2025-01-30"
-    / "wikidata_type_hierarchy.jsonl",
+    type=Path,
+    default=Path.cwd() / "data" / "Wikidata" / "Type Hierarchy" / "2025-01-30" / "wikidata_type_hierarchy.jsonl",
     help="The path to the Wikidata type hierarchy.",
 )
 @click.option(
@@ -73,22 +63,22 @@ from kebab.utils.dataset.wikidata.wikidata_resolver import WikidataResolver
 )
 @click.option(
     "--output-dir",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "output" / "resolved_entities",
+    type=Path,
+    default=Path.cwd() / "output" / "resolved_entities",
     help="Path to the output directory (the output jsonl file will be created there).",
 )
 @click.command()
 def main(
-    entities_path: pathlib.Path,
-    wikidata_simple_entities_path: pathlib.Path,
-    wikidata_properties_path: pathlib.Path,
-    wikidata_type_hierarchy_path: pathlib.Path,
+    entities_path: Path,
+    wikidata_simple_entities_path: Path,
+    wikidata_properties_path: Path,
+    wikidata_type_hierarchy_path: Path,
     attach_types: bool,
     resolve_types: bool,
     resolve_property_names: bool,
     resolve_property_values: bool,
     query_api: bool,
-    output_dir: pathlib.Path,
+    output_dir: Path,
 ) -> None:
     """Run the Wikidata Resolver to substitute property names and actual property values into entities."""
     logging_helpers.configure_logging()

@@ -26,22 +26,22 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
 def test_linking_read_write_items_roundtrip() -> None:
     """Test reading and writing items in the LinkingTask."""
-    entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
-    boolean_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
-    schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
+    entity_pairs_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
+    boolean_labels_path = Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
+    schema_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
     task_instance = LinkingTask(
         "Linking-Alexandria-Train",
-        str(entity_pairs_file_path),
-        str(schema_file_path),
-        str(boolean_labels_file_path),
+        str(entity_pairs_path),
+        str(schema_path),
+        str(boolean_labels_path),
     )
 
     # Prepare data
     items = list(task_instance.read_items())
     boolean_labels = [predicted_boolean for _, predicted_boolean in items if predicted_boolean is not None]
-    boolean_labels_output_file_path = Path(__file__).parents[1] / "output" / "linking" / "boolean_labels.jsonl"
+    boolean_labels_output_path = Path(__file__).parents[1] / "output" / "linking" / "boolean_labels.jsonl"
     task_instance.write_items(
-        boolean_labels_output_file_path,
+        boolean_labels_output_path,
         boolean_labels,
     )
 
@@ -57,8 +57,8 @@ def test_linking_read_write_items_roundtrip() -> None:
     assert isinstance(first_boolean_label, bool)
     assert first_boolean_label
     assert compare_files_ignore_linebreaks(
-        boolean_labels_file_path,
-        boolean_labels_output_file_path,
+        boolean_labels_path,
+        boolean_labels_output_path,
     )
 
 
@@ -66,14 +66,14 @@ def test_linking_read_write_items_roundtrip() -> None:
 def test_linking_read_int_labels() -> None:
     """Test reading integer labels in the LinkingTask."""
     # Prepare the data
-    entity_pairs_file_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
-    int_labels_file_path = Path(__file__).parents[1] / "data" / "linking" / "int_labels.jsonl"
-    schema_file_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
+    entity_pairs_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
+    int_labels_path = Path(__file__).parents[1] / "data" / "linking" / "int_labels.jsonl"
+    schema_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
     task_instance = LinkingTask(
         "Linking-Alexandria-UnitTest",
-        str(entity_pairs_file_path),
-        str(schema_file_path),
-        str(int_labels_file_path),
+        str(entity_pairs_path),
+        str(schema_path),
+        str(int_labels_path),
     )
 
     # Assert the task instance is created and can read items
@@ -101,9 +101,9 @@ def test_linking_metrics(tmp_path: Path) -> None:
     log_probs = np.where(labels, np.log(prob_predictions), np.log(1 - prob_predictions))
     log_prob_avg = log_probs.mean()
 
-    def write_jsonl(file_path: Path, data: Iterable[Any]) -> None:
+    def write_jsonl(path: Path, data: Iterable[Any]) -> None:
         """Helper function to write a list of data to a JSONL file."""
-        with open(file_path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8") as f:
             for item in data:
                 f.write(json.dumps(item) + "\n")
 
@@ -119,16 +119,18 @@ def test_linking_metrics(tmp_path: Path) -> None:
     entity_pairs_path = tmp_path / "entity_pairs.jsonl"
     write_jsonl(entity_pairs_path, ((left.to_dict(), right.to_dict()) for left, right in pairs))
 
-    schema_file_path = tmp_path / "schema.json"
-    schema_file_path.write_text("")
+    schema_path = tmp_path / "schema.json"
+    schema_path.write_text("")
 
     # Evaluate
-    task_instance = LinkingTask(
-        "Linking-Metrics-Train", str(entity_pairs_path), str(schema_file_path), str(labels_path)
-    )
+    task_instance = LinkingTask("Linking-Metrics-Train", str(entity_pairs_path), str(schema_path), str(labels_path))
 
     # binary predictions
+    # TODO: add eval result path and check it contains the json
     metrics = task_instance.evaluate(binary_predictions_path, adjust_to_test_prior=False)
+    for value in metrics.values():
+        assert isinstance(value, (int | float)) or value is None
+
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 1
     assert metrics["false_positive"] == 1
@@ -144,6 +146,9 @@ def test_linking_metrics(tmp_path: Path) -> None:
 
     # probabilistic predictions
     metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=False)
+    for value in metrics.values():
+        assert isinstance(value, (int | float)) or value is None
+
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 1
     assert metrics["false_positive"] == 1
@@ -212,9 +217,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     ) -> None:
         """Helper function to test case 1 with zero FN."""
         write_jsonl(binary_predictions_path, (float(pred) for pred in predictions))
-        task_instance = LinkingTask(
-            "Linking-Metrics-Train", str(entity_pairs_path), str(schema_file_path), str(labels_path)
-        )
+        task_instance = LinkingTask("Linking-Metrics-Train", str(entity_pairs_path), str(schema_path), str(labels_path))
 
         metrics = task_instance.evaluate(binary_predictions_path, adjust_to_test_prior=False)
         assert metrics["total"] == 4
