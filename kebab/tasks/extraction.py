@@ -27,7 +27,7 @@ class ExtractionTask(Task):
 
     __extracts: Path
     __ground_truth: Path | None = None
-    __default_metrics_config_path: Path = (
+    __default_metrics_config: Path = (
         Path(__file__).parents[1] / "configs" / "extraction" / "default_metrics_config.json"
     )
     __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {}
@@ -54,7 +54,7 @@ class ExtractionTask(Task):
         extracts: Path,
         schema: Path,
         ground_truth: Path | None = None,
-        metrics_config: str | None = None,
+        metrics_config: Path | None = None,
         data: Path | None = None,
     ):
         """Initialize an extraction task."""
@@ -62,9 +62,7 @@ class ExtractionTask(Task):
         self.__extracts = resolve_path(extracts)
         if ground_truth is not None:
             self.__ground_truth = resolve_path(ground_truth, data)
-        self.metrics_config = load_dict_from_json(
-            resolve_path(metrics_config or self.__default_metrics_config_path, data)
-        )
+        self.metrics_config = load_dict_from_json(resolve_path(metrics_config or self.__default_metrics_config, data))
 
     def read_items(self) -> Iterable[ExtractionOutput]:
         """

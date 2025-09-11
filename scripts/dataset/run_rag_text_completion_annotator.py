@@ -25,7 +25,7 @@ if __name__ == "__main__":
     documents_file_path = Path(__file__).parents[2] / "tests" / "data" / "text_completion" / "documents.jsonl"
     task_instance = TextCompletionUsingDocumentsTask(
         "TextCompletion",
-        str(documents_file_path),
+        documents_file_path,
     )
 
     # Prepare partial queries.

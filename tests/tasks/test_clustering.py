@@ -29,9 +29,9 @@ def test_clustering_read_write_items_roundtrip() -> None:
     schema_file_path = Path(__file__).parents[1] / "data" / "clustering" / "property_schema.json"
     task_instance = ClusteringTask(
         "Clustering-Roundtrip-Train",
-        str(entity_pairs_file_path),
-        str(schema_file_path),
-        str(labels_file_path),
+        entity_pairs_file_path,
+        schema_file_path,
+        labels_file_path,
     )
 
     # Act
@@ -101,9 +101,9 @@ def test_clustering_metrics(tmp_path: Path) -> None:
     # Evaluate
     task_instance = ClusteringTask(
         "Clustering-Metrics-Train",
-        str(entity_fragments_path),
-        str(schema_file_path),
-        str(labels_path),
+        entity_fragments_path,
+        schema_file_path,
+        labels_path,
     )
 
     metrics = task_instance.evaluate(predictions_all_good_path)

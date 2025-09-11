@@ -25,7 +25,7 @@ def text_completion_task() -> TextCompletionUsingDocumentsTask:
     documents_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "documents.jsonl"
     return TextCompletionUsingDocumentsTask(
         "TextCompletion",
-        str(documents_file_path),
+        documents_file_path,
     )
 
 

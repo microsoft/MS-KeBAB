@@ -135,9 +135,9 @@ class TextCompletionTaskBase(Task):
         if logger:
             logger.info("Starting evaluation for the text completion task.")
 
-        predictions = ItemJsonlReader[dict[str, str | float]](predictions).read_items()
+        predicted_vals = ItemJsonlReader[dict[str, str | float]](predictions).read_items()
         queries = self.generate_partial_queries()
-        predictions_and_queries = zip(predictions, queries, strict=True)
+        predictions_and_queries = zip(predicted_vals, queries, strict=True)
 
         log_probs = []
         log_probs_by_doc = defaultdict(list)

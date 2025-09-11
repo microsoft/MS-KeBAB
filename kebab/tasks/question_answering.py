@@ -77,23 +77,23 @@ class QuestionAnsweringTaskBase(Task):
         if logger:
             logger.info("Starting evaluation for the question-answering task.")
 
-        predictions = StringLineReader(predictions).read_items()
+        predicted_vals = StringLineReader(predictions).read_items()
         targets = StringLineReader(self.__ground_truth).read_items()
-        predictions_and_targets = zip(predictions, targets, strict=True)
+        predictions_and_targets = zip(predicted_vals, targets, strict=True)
         accuracy = [1 if item[0] == item[1] else 0 for item in predictions_and_targets]
 
         metrics = {}
         metrics["exact_match_accuracy"] = statistics.mean(accuracy)
 
         rouge = evaluate.load("rouge")
-        rouge_metrics = rouge.compute(predictions=predictions, references=targets)
+        rouge_metrics = rouge.compute(predictions=predicted_vals, references=targets)
         if rouge_metrics is not None:
             metrics |= rouge_metrics
 
         bertscore = evaluate.load("bertscore")
         model_type = "microsoft/deberta-xlarge-mnli"
         bertscore_metrics = bertscore.compute(
-            predictions=predictions, references=targets, lang="en", model_type=model_type
+            predictions=predicted_vals, references=targets, lang="en", model_type=model_type
         )
         if bertscore_metrics is not None:
             metrics["bertscore_model"] = model_type

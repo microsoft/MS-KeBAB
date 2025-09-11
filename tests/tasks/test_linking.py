@@ -71,9 +71,9 @@ def test_linking_read_int_labels() -> None:
     schema_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
     task_instance = LinkingTask(
         "Linking-Alexandria-UnitTest",
-        str(entity_pairs_path),
-        str(schema_path),
-        str(int_labels_path),
+        entity_pairs_path,
+        schema_path,
+        int_labels_path,
     )
 
     # Assert the task instance is created and can read items
@@ -123,14 +123,36 @@ def test_linking_metrics(tmp_path: Path) -> None:
     schema_path.write_text("")
 
     # Evaluate
-    task_instance = LinkingTask("Linking-Metrics-Train", str(entity_pairs_path), str(schema_path), str(labels_path))
+    task_instance = LinkingTask("Linking-Metrics-Train", entity_pairs_path, schema_path, labels_path)
 
     # binary predictions
-    # TODO: add eval result path and check it contains the json
-    metrics = task_instance.evaluate(binary_predictions_path, adjust_to_test_prior=False)
+    binary_metrics_path = tmp_path / "binary_metrics.json"
+    metrics = task_instance.evaluate(
+        binary_predictions_path, result_output_path=binary_metrics_path, adjust_to_test_prior=False
+    )
+
     for value in metrics.values():
         assert isinstance(value, (int | float)) or value is None
 
+    # validate metrics were written correctly
+    with open(binary_metrics_path, encoding="utf-8") as f:
+        loaded_metrics = json.load(f)
+
+    def _equal(a: Any, b: Any) -> bool:
+        """Check equality of two values, treating NaNs as equal."""
+        if isinstance(a, float) and isinstance(b, float):
+            if math.isnan(a) and math.isnan(b):
+                return True
+            return a == b
+        if isinstance(a, dict) and isinstance(b, dict):
+            if a.keys() != b.keys():
+                return False
+            return all(_equal(a[k], b[k]) for k in a)
+        return a == b
+
+    assert _equal(loaded_metrics, metrics)
+
+    # validate metrics
     assert metrics["total"] == 5
     assert metrics["true_positive"] == 1
     assert metrics["false_positive"] == 1
@@ -217,7 +239,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     ) -> None:
         """Helper function to test case 1 with zero FN."""
         write_jsonl(binary_predictions_path, (float(pred) for pred in predictions))
-        task_instance = LinkingTask("Linking-Metrics-Train", str(entity_pairs_path), str(schema_path), str(labels_path))
+        task_instance = LinkingTask("Linking-Metrics-Train", entity_pairs_path, schema_path, labels_path)
 
         metrics = task_instance.evaluate(binary_predictions_path, adjust_to_test_prior=False)
         assert metrics["total"] == 4

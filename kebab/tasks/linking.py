@@ -133,8 +133,8 @@ class LinkingTask(Task):
         metrics = self._compute_probabilistic_metrics(log_odds, gt_labels, adjust_to_test_prior)
 
         # compute binary metrics
-        predictions = log_odds > 0
-        conf_matrix = _ConfMatrix.from_arrays(gt_labels, predictions)
+        predicted_vals = log_odds > 0
+        conf_matrix = _ConfMatrix.from_arrays(gt_labels, predicted_vals)
         metrics = {**metrics, **conf_matrix.get_metrics()}
 
         # no need for optimistic log-prob if log_prob is available
@@ -142,7 +142,7 @@ class LinkingTask(Task):
             metrics["optimistic_log_prob"] = float("nan")
 
         # build detailed records
-        detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predictions, debugging_info_path)
+        detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predicted_vals, debugging_info_path)
         self._write_side_outputs(metrics, detail_records, output_dir, result_output_path)
 
         # report metrics in console or logger

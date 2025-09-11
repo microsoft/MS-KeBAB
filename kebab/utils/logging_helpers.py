@@ -1,8 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
+from __future__ import annotations
 
 import datetime
 import logging
+from pathlib import Path
 
 
 def configure_logging(

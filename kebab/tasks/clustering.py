@@ -41,7 +41,7 @@ class ClusteringTask(Task):
         self,
         name: str,
         entity_fragments: Path,
-        schema: None = None,
+        schema: Path | None = None,
         ground_truth: Path | None = None,
         data: Path | None = None,
     ):
@@ -89,17 +89,17 @@ class ClusteringTask(Task):
         if self.ground_truth is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        predictions = list(ItemJsonlReader[str](predictions, converter=str).read_items())
+        predicted_vals = list(ItemJsonlReader[str](predictions, converter=str).read_items())
         ground_truth = list(ItemJsonlReader[str](self.ground_truth).read_items())
 
-        fragment_count = len(predictions)
+        fragment_count = len(predicted_vals)
         metrics = defaultdict(float)
         metrics["fragments"] = fragment_count
 
         # construct the predicted {element_idx -> set of element_idx} map
         pred_clusters = defaultdict(set)
         pred_cluster_map = {}
-        for i, cluster_id in enumerate(predictions):
+        for i, cluster_id in enumerate(predicted_vals):
             cluster = pred_clusters[cluster_id]
             cluster.add(i)
             pred_cluster_map[i] = cluster
