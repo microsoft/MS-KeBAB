@@ -16,7 +16,7 @@ from kebab.utils.io_helpers import EntityJsonlReader, resolve_path
 class EntityGenerationTask(Task):
     """Represents an entity generation benchmark task with its data files."""
 
-    __data_entities: Path
+    __entities: Path
 
     @property
     def task_type(self) -> TaskType:
@@ -24,20 +24,20 @@ class EntityGenerationTask(Task):
         return TaskType.EntityGeneration
 
     @property
-    def data_entities(self) -> Path:
+    def entities(self) -> Path:
         """Return path to entities."""
-        return self.__data_entities
+        return self.__entities
 
     def __init__(
         self,
         name: str,
-        entities: str,
-        schema: str | None = None,
-        data_path: Path | None = None,
+        entities: Path,
+        schema: Path | None = None,
+        data: Path | None = None,
     ):
         """Initialize an entity generation task."""
-        super().__init__(name, schema, data_path=data_path)
-        self.__data_entities = resolve_path(entities, data_path)
+        super().__init__(name, schema, data=data)
+        self.__entities = resolve_path(entities, data)
 
     def read_items(self) -> Iterable[Entity]:
         """
@@ -46,7 +46,7 @@ class EntityGenerationTask(Task):
         Returns:
             Iterable[Entity]: An iterable of entities.
         """
-        entities = EntityJsonlReader(self.data_entities).read_items()
+        entities = EntityJsonlReader(self.entities).read_items()
         return entities
 
     def write_items(self, path: Path, items: Iterable[Any]) -> None:

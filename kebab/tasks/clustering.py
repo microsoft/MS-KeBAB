@@ -19,8 +19,8 @@ from kebab.utils.io_helpers import EntityJsonlReader, ItemJsonlReader, ItemJsonl
 class ClusteringTask(Task):
     """Represents a clustering benchmark task with its data files."""
 
-    __data_entity_fragments: Path
-    __data_ground_truth_labels: Path | None
+    __entity_fragments: Path
+    __ground_truth: Path | None
 
     @property
     def task_type(self) -> TaskType:
@@ -28,28 +28,28 @@ class ClusteringTask(Task):
         return TaskType.Clustering
 
     @property
-    def data_entity_fragments(self) -> Path:
+    def entity_fragments(self) -> Path:
         """Return the path to the file containing entity fragments."""
-        return self.__data_entity_fragments
+        return self.__entity_fragments
 
     @property
-    def data_ground_truth_labels(self) -> Path | None:
+    def ground_truth(self) -> Path | None:
         """Return the path to the ground truth labels representing cluster IDs."""
-        return self.__data_ground_truth_labels
+        return self.__ground_truth
 
     def __init__(
         self,
         name: str,
-        entity_fragments: str | Path,
-        schema: str | None = None,
-        ground_truth_labels: str | Path | None = None,
-        data_path: Path | None = None,
+        entity_fragments: Path,
+        schema: None = None,
+        ground_truth: Path | None = None,
+        data: Path | None = None,
     ):
         """Initialize a new clustering task."""
-        super().__init__(name, schema, data_path=data_path)
-        self.__data_entity_fragments = resolve_path(entity_fragments, data_path)
-        if ground_truth_labels is not None:
-            self.__data_ground_truth_labels = resolve_path(ground_truth_labels, data_path)
+        super().__init__(name, schema, data=data)
+        self.__entity_fragments = resolve_path(entity_fragments, data)
+        if ground_truth is not None:
+            self.__ground_truth = resolve_path(ground_truth, data)
 
     def read_items(self) -> Iterable[tuple[Entity, str | None]]:
         """
@@ -61,10 +61,10 @@ class ClusteringTask(Task):
                 - An `Entity` object describing an entity fragment.
                 - A string value providing the ground-truth label (cluster ID).
         """
-        entities = EntityJsonlReader(self.data_entity_fragments).read_items()
+        entities = EntityJsonlReader(self.entity_fragments).read_items()
         labels = (
-            ItemJsonlReader[str](self.data_ground_truth_labels, converter=str).read_items()
-            if self.data_ground_truth_labels is not None
+            ItemJsonlReader[str](self.ground_truth, converter=str).read_items()
+            if self.ground_truth is not None
             else iter([])
         )
         return zip_longest(entities, labels)
@@ -86,11 +86,11 @@ class ClusteringTask(Task):
         logger: Logger | None = None,  # noqa: ARG002
     ) -> dict[str, float]:
         """Evaluate an output for the clustering task."""
-        if self.data_ground_truth_labels is None:
+        if self.ground_truth is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
         predictions = list(ItemJsonlReader[str](output_to_evaluate, converter=str).read_items())
-        ground_truth = list(ItemJsonlReader[str](self.data_ground_truth_labels).read_items())
+        ground_truth = list(ItemJsonlReader[str](self.ground_truth).read_items())
 
         fragment_count = len(predictions)
         metrics = defaultdict(float)

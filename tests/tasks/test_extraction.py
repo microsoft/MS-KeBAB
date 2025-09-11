@@ -34,7 +34,7 @@ def test_extraction_read_write_items_roundtrip() -> None:
         "Extraction-Alexandria-Train",
         extracts=str(items_file_path),
         schema=str(property_schema_file_path),
-        ground_truth_extracted_entities=str(extracted_entities_file_path),
+        ground_truth=str(extracted_entities_file_path),
         metrics_config=str(metrics_config_file_path),
     )
 

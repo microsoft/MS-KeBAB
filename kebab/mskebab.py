@@ -41,9 +41,9 @@ class Benchmark:
         """Return copy of task list."""
         return list(self.__tasks_by_name.values())
 
-    def __init__(self, config_path: Path, data_path: Path | None = None):
+    def __init__(self, config_path: Path, data: Path | None = None):
         """Initialize entry point."""
-        self.data_path = data_path or Path.cwd()
+        self.data = data or Path.cwd()
 
         self.__tasks_by_type = {}
         self.__tasks_by_name = {}
@@ -72,7 +72,7 @@ class Benchmark:
                 case TaskType.QuestionAnsweringUsingKB:
                     task_class = QuestionAnsweringUsingKBTask
 
-            task = task_class(task_instance_name, **task_instance_config["data"], data_path=data_path)
+            task = task_class(task_instance_name, **task_instance_config["data"], data=data)
             self.__tasks_by_name[task_instance_name] = task
             if task_type not in self.__tasks_by_type:
                 self.__tasks_by_type[task_type] = [task]

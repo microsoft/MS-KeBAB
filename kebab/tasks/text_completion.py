@@ -32,7 +32,7 @@ class TextCompletionTaskBase(Task):
     MASK: str = "<mask>"
     """The token used to mask the text in text completion tasks."""
 
-    __data_documents: Path
+    __documents: Path
 
     @property
     @abstractmethod
@@ -40,20 +40,20 @@ class TextCompletionTaskBase(Task):
         """Return task type."""
 
     @property
-    def data_documents(self) -> Path:
+    def documents(self) -> Path:
         """Return path to documents."""
-        return self.__data_documents
+        return self.__documents
 
     def __init__(
         self,
         name: str,
-        documents: str,
-        schema: str,
-        data_path: Path | None = None,
+        documents: Path,
+        schema: Path | None = None,
+        data: Path | None = None,
     ):
         """Initialize a text completion task."""
-        super().__init__(name, schema=schema, data_path=data_path)
-        self.__data_documents = resolve_path(documents, data_path)
+        super().__init__(name, schema=schema, data=data)
+        self.__documents = resolve_path(documents, data)
 
     def read_items(self) -> Iterable[Document]:
         """
@@ -62,7 +62,7 @@ class TextCompletionTaskBase(Task):
         Returns:
             Iterable[Document]: An iterable of `Document` objects.
         """
-        return DocumentJsonlReader(self.__data_documents).read_items()
+        return DocumentJsonlReader(self.__documents).read_items()
 
     def generate_partial_queries(self, verbose: bool = False) -> Iterable[dict[str, str]]:
         """
@@ -200,13 +200,11 @@ class TextCompletionUsingDocumentsTask(TextCompletionTaskBase):
     def __init__(
         self,
         name: str,
-        documents: str,
-        data_path: Path | None = None,
+        documents: Path,
+        data: Path | None = None,
     ):
         """Initialize an end-to-end text completion task."""
-        super().__init__(
-            name, documents=documents, schema="", data_path=data_path
-        )  # kb schema is not used in this task
+        super().__init__(name, documents=documents, schema=None, data=data)  # kb schema is not used in this task
 
 
 class TextCompletionUsingKBTask(TextCompletionTaskBase):
@@ -227,14 +225,14 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
     def __init__(
         self,
         name: str,
-        documents: str,
-        kb: str,
-        schema: str,
-        data_path: Path | None = None,
+        documents: Path,
+        kb: Path,
+        schema: Path | None = None,
+        data: Path | None = None,
     ):
         """Initialize a kb-augmented text completion task."""
-        super().__init__(name, documents=documents, schema=schema, data_path=data_path)
-        self.__data_kb = resolve_path(kb, data_path)
+        super().__init__(name, documents=documents, schema=schema, data=data)
+        self.__data_kb = resolve_path(kb, data)
 
     def read_kb(self) -> Iterable[Entity]:
         """

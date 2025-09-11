@@ -4,7 +4,7 @@
     "data": {
       "extracts": "./tests/utils/data/datasets/re-docred/train_small/extracts.jsonl",
       "schema": "./tests/data/extraction/property_schema.json",
-      "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/train_small/entities.jsonl",
+      "ground_truth": "./tests/utils/data/datasets/re-docred/train_small/entities.jsonl",
       "metrics_config": "./tests/data/extraction/metrics_config.json"
     }
   },
@@ -13,7 +13,7 @@
     "data": {
       "extracts": "./tests/utils/data/datasets/re-docred/test_small/extracts.jsonl",
       "schema": "./tests/data/extraction/property_schema.json",
-      "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/test_small/entities.jsonl",
+      "ground_truth": "./tests/utils/data/datasets/re-docred/test_small/entities.jsonl",
       "metrics_config": "./tests/data/extraction/metrics_config.json"
     }
   },
@@ -22,7 +22,7 @@
     "data": {
       "extracts": "./tests/utils/data/datasets/re-docred/dev_small/extracts.jsonl",
       "schema": "./tests/data/extraction/property_schema.json",
-      "ground_truth_extracted_entities": "./tests/utils/data/datasets/re-docred/dev_small/entities.jsonl",
+      "ground_truth": "./tests/utils/data/datasets/re-docred/dev_small/entities.jsonl",
       "metrics_config": "./tests/data/extraction/metrics_config.json"
     }
   },
@@ -31,7 +31,7 @@
     "data": {
       "entity_fragment_pairs": "https://some.public/download/link",
       "schema": "https://some.public/download/link",
-      "ground_truth_boolean": "https://some.public/download/link"
+      "ground_truth": "https://some.public/download/link"
     }
   },
   "Linking-TREx-Test": {
@@ -39,7 +39,7 @@
     "data": {
       "entity_fragment_pairs": "https://some.public/download/link",
       "schema": "https://some.public/download/link",
-      "ground_truth_boolean": "https://some.public/download/link"
+      "ground_truth": "https://some.public/download/link"
     }
   },
   "Linking-MAVE": {
@@ -47,14 +47,14 @@
     "data": {
       "entity_fragment_pairs": "https://some.public/download/link",
       "schema": "https://some.public/download/link",
-      "ground_truth_boolean": "https://some.public/download/link"
+      "ground_truth": "https://some.public/download/link"
     }
   },
   "Linking-Heldout": {
     "task": "Linking",
     "data": {
       "entity_fragment_pairs": "./tests/data/linking/entity_pairs.jsonl",
-      "ground_truth_boolean": "./tests/data/linking/boolean_labels.jsonl"
+      "ground_truth": "./tests/data/linking/boolean_labels.jsonl"
     }
   },
   "Entity-Generation-REBEL": {
@@ -69,7 +69,7 @@
     "data": {
       "entity_fragments": "./tests/data/clustering/entity_fragments.jsonl",
       "schema": "https://some.public/download/link",
-      "ground_truth_labels": "./tests/data/clustering/labels.jsonl"
+      "ground_truth": "./tests/data/clustering/labels.jsonl"
     }
   },
   "TextCompletionUsingDocuments-Test": {
@@ -91,7 +91,7 @@
     "data": {
       "documents": "https://some.public/download/link",
       "questions": "https://some.public/download/link",
-      "ground_truth_answers": "https://some.public/download/link"
+      "ground_truth": "https://some.public/download/link"
     }
   },
   "QuestionAnsweringUsingKB-Test": {
@@ -100,7 +100,7 @@
       "kb": "https://some.public/download/link",
       "schema": "https://some.public/download/link",
       "questions": "https://some.public/download/link",
-      "ground_truth_answers": "https://some.public/download/link"
+      "ground_truth": "https://some.public/download/link"
     }
   }
 }
