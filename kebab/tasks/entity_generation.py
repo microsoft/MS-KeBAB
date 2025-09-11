@@ -33,11 +33,11 @@ class EntityGenerationTask(Task):
         name: str,
         entities: Path,
         schema: Path | None = None,
-        data: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize an entity generation task."""
-        super().__init__(name, schema, data=data)
-        self.__entities = resolve_path(entities, data)
+        super().__init__(name, schema, root_for_relative_paths=root_for_relative_paths)
+        self.__entities = resolve_path(entities, root_for_relative_paths)
 
     def read_items(self) -> Iterable[Entity]:
         """

@@ -49,11 +49,11 @@ class TextCompletionTaskBase(Task):
         name: str,
         documents: Path,
         schema: Path | None = None,
-        data: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a text completion task."""
-        super().__init__(name, schema=schema, data=data)
-        self.__documents = resolve_path(documents, data)
+        super().__init__(name, schema=schema, root_for_relative_paths=root_for_relative_paths)
+        self.__documents = resolve_path(documents, root_for_relative_paths)
 
     def read_items(self) -> Iterable[Document]:
         """
@@ -201,16 +201,18 @@ class TextCompletionUsingDocumentsTask(TextCompletionTaskBase):
         self,
         name: str,
         documents: Path,
-        data: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize an end-to-end text completion task."""
-        super().__init__(name, documents=documents, schema=None, data=data)  # kb schema is not used in this task
+        super().__init__(
+            name, documents=documents, schema=None, root_for_relative_paths=root_for_relative_paths
+        )  # kb schema is not used in this task
 
 
 class TextCompletionUsingKBTask(TextCompletionTaskBase):
     """Represents a kb-augmented text completion benchmark task with its data files."""
 
-    __data_kb: Path
+    __kb: Path
 
     @property
     def task_type(self) -> TaskType:
@@ -218,9 +220,9 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
         return TaskType.TextCompletionUsingKB
 
     @property
-    def data_kb(self) -> Path:
+    def kb(self) -> Path:
         """Return path to knowledge base."""
-        return self.__data_kb
+        return self.__kb
 
     def __init__(
         self,
@@ -228,11 +230,11 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
         documents: Path,
         kb: Path,
         schema: Path | None = None,
-        data: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a kb-augmented text completion task."""
-        super().__init__(name, documents=documents, schema=schema, data=data)
-        self.__data_kb = resolve_path(kb, data)
+        super().__init__(name, documents=documents, schema=schema, root_for_relative_paths=root_for_relative_paths)
+        self.__kb = resolve_path(kb, root_for_relative_paths)
 
     def read_kb(self) -> Iterable[Entity]:
         """
@@ -241,7 +243,7 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
         Returns:
             Iterable[Entity]: An iterable of `Entity` objects.
         """
-        return EntityJsonlReader(self.__data_kb).read_items()
+        return EntityJsonlReader(self.__kb).read_items()
 
     def remove_sources_from_kb(self, kb: list[Entity], remove_sources_list: list[str]) -> list[Entity]:
         """Return a new KB after removing property values corresponding to specified sources from all entities.

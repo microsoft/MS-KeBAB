@@ -34,13 +34,13 @@ class Task(ABC):
 
     __name: str
     __schema: Path | None
-    __data: Path | None
+    __root_for_relative_paths: Path | None
 
-    def __init__(self, name: str, schema: Path | None = None, data: Path | None = None):
+    def __init__(self, name: str, schema: Path | None = None, root_for_relative_paths: Path | None = None):
         """Initialize a task."""
         self.__name = name
-        self.__data = resolve_path(data) if data else None
-        self.__schema = resolve_path(schema, data) if schema is not None else None
+        self.__root_for_relative_paths = resolve_path(root_for_relative_paths) if root_for_relative_paths else None
+        self.__schema = resolve_path(schema, root_for_relative_paths) if schema is not None else None
 
     @property
     def name(self) -> str:
@@ -53,9 +53,9 @@ class Task(ABC):
         return self.name.translate(str.maketrans("", "", r'<>:"/\\|?*'))
 
     @property
-    def data(self) -> Path | None:
+    def root_for_relative_paths(self) -> Path | None:
         """Return the path to the data root."""
-        return self.__data
+        return self.__root_for_relative_paths
 
     @property
     @abstractmethod

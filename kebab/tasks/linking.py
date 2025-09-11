@@ -54,13 +54,13 @@ class LinkingTask(Task):
         entity_fragment_pairs: Path,
         schema: Path | None = None,
         ground_truth: Path | None = None,
-        data: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a linking task."""
-        super().__init__(name, schema, data=data)
-        self.__entity_fragment = resolve_path(entity_fragment_pairs, data)
+        super().__init__(name, schema, root_for_relative_paths=root_for_relative_paths)
+        self.__entity_fragment = resolve_path(entity_fragment_pairs, root_for_relative_paths)
         if ground_truth is not None:
-            self.__ground_truth = resolve_path(ground_truth, data)
+            self.__ground_truth = resolve_path(ground_truth, root_for_relative_paths)
 
     def read_items(self) -> Iterable[tuple[tuple[Entity, Entity], bool | None]]:
         """

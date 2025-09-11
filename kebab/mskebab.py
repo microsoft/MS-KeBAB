@@ -25,7 +25,7 @@ class Benchmark:
 
     __tasks_by_type: dict[TaskType, list[Task]]
     __tasks_by_name: dict[str, Task]
-    data: Path | None
+    root_for_relative_paths: Path | None
 
     @property
     def tasks_by_type(self) -> dict[TaskType, list[Task]]:
@@ -42,9 +42,9 @@ class Benchmark:
         """Return copy of task list."""
         return list(self.__tasks_by_name.values())
 
-    def __init__(self, config_path: Path, data: Path | None = None):
+    def __init__(self, config_path: Path, root_for_relative_paths: Path | None = None):
         """Initialize entry point."""
-        self.data = data or Path.cwd()
+        self.root_for_relative_paths = root_for_relative_paths or Path.cwd()
         self.__tasks_by_type = {}
         self.__tasks_by_name = {}
 
@@ -72,7 +72,9 @@ class Benchmark:
                 case TaskType.QuestionAnsweringUsingKB:
                     task_class = QuestionAnsweringUsingKBTask
 
-            task = task_class(task_instance_name, **task_instance_config["data"], data=data)
+            task = task_class(
+                task_instance_name, **task_instance_config["data"], root_for_relative_paths=root_for_relative_paths
+            )
             self.__tasks_by_name[task_instance_name] = task
             if task_type not in self.__tasks_by_type:
                 self.__tasks_by_type[task_type] = [task]

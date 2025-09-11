@@ -41,10 +41,10 @@ class QuestionAnsweringTaskBase(Task):
         questions: Path,
         ground_truth: Path,
         schema: Path | None,
-        data: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a question-answering task."""
-        super().__init__(name, schema=schema, data=data)
+        super().__init__(name, schema=schema, root_for_relative_paths=root_for_relative_paths)
         self.__questions = resolve_path(questions)
         self.__ground_truth = resolve_path(ground_truth)
 
@@ -124,7 +124,7 @@ class QuestionAnsweringUsingDocumentsTask(QuestionAnsweringTaskBase):
         documents: Path,
         questions: Path,
         ground_truth: Path,
-        data: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize an end-to-end question-answering completion task."""
         super().__init__(
@@ -132,7 +132,7 @@ class QuestionAnsweringUsingDocumentsTask(QuestionAnsweringTaskBase):
             questions=questions,
             ground_truth=ground_truth,
             schema=None,
-            data=data,
+            root_for_relative_paths=root_for_relative_paths,
         )  # kb schema is not used in this task
         self.__documents = Path(documents)
 
@@ -173,10 +173,16 @@ class QuestionAnsweringUsingKBTask(QuestionAnsweringTaskBase):
         questions: Path,
         ground_truth: Path,
         schema: Path | None = None,
-        data: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a kb-augmented question-answering task."""
-        super().__init__(name, questions=questions, ground_truth=ground_truth, schema=schema, data=data)
+        super().__init__(
+            name,
+            questions=questions,
+            ground_truth=ground_truth,
+            schema=schema,
+            root_for_relative_paths=root_for_relative_paths,
+        )
         self.__kb = Path(kb)
 
     def read_kb(self) -> Iterable[Entity]:
