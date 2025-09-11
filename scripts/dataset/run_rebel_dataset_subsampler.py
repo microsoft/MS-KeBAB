@@ -28,11 +28,11 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
 
 
 @click.option(
-    "--base-dir",
+    "--input-dir",
     type=pathlib.Path,
     default=pathlib.Path.cwd() / "output",
     help=(
-        "Path to the base dataset directory produced by RebelDatasetBuilder. "
+        "Path to the dataset directory produced by RebelDatasetBuilder. "
         "This directory must contain the base linking/clustering/generation jsonl files."
     ),
 )
@@ -79,7 +79,7 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
 )
 @click.command()
 def main(
-    base_dir: pathlib.Path,
+    input_dir: pathlib.Path,
     output_dir: pathlib.Path,
     required_type_id: str,
     exclude_type_id: tuple[str, ...],
@@ -100,7 +100,7 @@ def main(
         )
 
     sampler = RebelDatasetSubsampler(
-        base_dir=base_dir,
+        base_dir=input_dir,
         output_dir=output_dir,
         splits=default_splits(),
         type_filter=type_filter,

@@ -400,8 +400,14 @@ class RebelDatasetSubsampler:
             included_fragment_ids.add(right.metadata["fragment_id"])
 
         self._logger.info(
-            f"Sampled {len(sampled_pairs)}/{cfg.pair_count_limit} pairs; positives: {sum(sampled_labels)} ({(100.0 * sum(sampled_labels) / len(sampled_labels)) if sampled_labels else 0.0:.2f}%); iterations: {iterations}; acceptance: {(100.0 * len(sampled_pairs) / iterations) if iterations else 0.0:.2f}%; entities: {len(linking_entity_counter)}"
+            f"Sampled {len(sampled_pairs)}/{cfg.pair_count_limit} pairs; positives: {sum(sampled_labels)}"
+            f" ({(100.0 * sum(sampled_labels) / len(sampled_labels)) if sampled_labels else 0.0:.2f}%);"
+            f" iterations: {iterations};"
+            f" acceptance: {(100.0 * len(sampled_pairs) / iterations) if iterations else 0.0:.2f}%; entities: {len(linking_entity_counter)}"
         )
+
+        self._logger.info("Top 10 types: " + ", ".join(f"{t}:{c}" for t, c in type_counter.most_common(10)))
+        self._logger.info("Top 10 properties: " + ", ".join(f"{p}:{c}" for p, c in property_counter.most_common(10)))
 
         return sampled_pairs, sampled_labels, linking_entity_counter, included_fragment_ids
 
