@@ -1,0 +1,599 @@
+"""
+Create Test/Validation/Train datasets from a base REBEL dataset, focusing on more diverse samples.
+
+Workflow:
+- Load the base linking dataset.
+- Optionally filter by entity types using the Wikidata type hierarchy.
+- Sample a more "interesting" Test split using heuristic limits (per-entity, property-pattern,
+  property-overlap distribution, and class balance), then a Validation split that excludes Test entities,
+  and finally a Train split that excludes entities from both Test and Validation.
+- Derive Clustering and Generation datasets for each split based on the entities used in the split by
+  subsetting the corresponding base datasets.
+
+Input layout (produced by RebelDatasetBuilder into base_dir):
+- base_dir/rebel_linking_dataset.jsonl
+- base_dir/rebel_linking_ground_truth.jsonl
+- base_dir/rebel_fragment_to_entity_map.jsonl
+- base_dir/clustering/rebel_clustering_dataset.jsonl
+- base_dir/clustering/rebel_clustering_ground_truth.jsonl
+- base_dir/entity_generation/rebel_entity_generation_dataset.jsonl
+- base_dir/fragment_generation/rebel_fragment_generation_dataset.jsonl
+
+Output layout (within output_dir):
+- output_dir/linking/<Split>/rebel_linking_dataset.jsonl
+- output_dir/linking/<Split>/rebel_linking_ground_truth.jsonl
+- output_dir/linking/<Split>/rebel_linking_used_entities.jsonl
+- output_dir/clustering/<Split>/rebel_clustering_dataset.jsonl
+- output_dir/clustering/<Split>/rebel_clustering_ground_truth.jsonl
+- output_dir/entity_generation/<Split>/rebel_entity_generation_dataset.jsonl
+- output_dir/fragment_generation/<Split>/rebel_fragment_generation_dataset.jsonl
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import pathlib
+import random
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
+
+from kebab.utils.dataset.rebel.rebel_dataset_builder import RebelDatasetBuilder
+from kebab.utils.dataset.wikidata import wikidata_utils
+from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
+from kebab.utils.io_helpers import resolve_path
+
+
+@dataclass
+class LinkingConfig:
+    """Sampling configuration for a split of the linking dataset."""
+
+    # size limits
+    pair_count_limit: int  # total pairs in the split
+    pairs_per_entity_limit: int  # max pairs per entity in the split
+
+    # distribution limits
+    property_pattern_count_limit: int  # max pairs per property key pattern in the split
+    property_overlap_limits: dict[int, float] = field(
+        default_factory=dict
+    )  # e.g. only one property in common => no more than 35% of pairs
+    single_class_ratio_limit: float | None = None
+
+    seed: int | None = None
+
+
+@dataclass
+class ClusteringConfig:
+    """Configuration for building a clustering split from selected entities."""
+
+    min_fragments_per_entity: int = 3
+    entity_count_limit: int = 0  # 0 means no limit
+    fragments_per_entity_limit: int = 50
+    include_all_linking_fragments_first: bool = True
+
+
+@dataclass
+class SplitBuildConfig:
+    """Full configuration for producing a single split."""
+
+    name: str
+    linking: LinkingConfig
+    clustering: ClusteringConfig = field(default_factory=ClusteringConfig)
+
+
+@dataclass
+class TypeFilter:
+    """Type filtering settings using the Wikidata type hierarchy graph.
+
+    If required_type_id is set, only entities whose types intersect the required set are kept.
+    If exclude_type_ids is set, any entity whose types intersect the excluded set is skipped.
+    """
+
+    type_hierarchy_path: pathlib.Path
+    required_type_id: str | None = None
+    exclude_type_ids: list[str] | None = None
+    include_descendants: bool = False
+
+
+class RebelDatasetSubsampler:
+    """Create Test/Validation/Train datasets from a base REBEL dataset in a single run."""
+
+    def __init__(
+        self,
+        *,
+        base_dir: pathlib.Path,
+        output_dir: pathlib.Path,
+        splits: list[SplitBuildConfig],
+        type_filter: TypeFilter | None = None,
+    ) -> None:
+        """Initialize the subsampler.
+
+        Args:
+            base_dir: Directory containing the base datasets produced by RebelDatasetBuilder.
+            output_dir: Directory where the split datasets will be written.
+            splits: The list of split configurations to produce (e.g., Test, Validation, Train) in order.
+            type_filter: Optional type filtering configuration based on Wikidata type hierarchy.
+        """
+        self._logger = logging.getLogger(__name__)
+
+        self.base_dir = resolve_path(base_dir)
+        self.output_dir = resolve_path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.splits = splits
+        self.type_filter = type_filter
+
+        # compute base paths using the same names as the builder
+        self.base_linking_dataset_path = self.base_dir / RebelDatasetBuilder.LINKING_DATASET_FILENAME
+        self.base_linking_ground_truth_path = self.base_dir / RebelDatasetBuilder.LINKING_GROUND_TRUTH_FILENAME
+        self.base_fragment_to_entity_map_path = self.base_dir / RebelDatasetBuilder.FRAGMENT_TO_ENTITY_MAP_FILENAME
+
+        self.base_clustering_dataset_path = (
+            self.base_dir / "clustering" / RebelDatasetBuilder.CLUSTERING_DATASET_FILENAME
+        )
+        self.base_clustering_ground_truth_path = (
+            self.base_dir / "clustering" / RebelDatasetBuilder.CLUSTERING_GROUND_TRUTH_FILENAME
+        )
+
+        self.base_entity_generation_dataset_path = (
+            self.base_dir / "entity_generation" / RebelDatasetBuilder.ENTITY_GENERATION_DATASET_FILENAME
+        )
+        self.base_fragment_generation_dataset_path = (
+            self.base_dir / "fragment_generation" / RebelDatasetBuilder.FRAGMENT_GENERATION_DATASET_FILENAME
+        )
+
+        # resolved filtering sets (based on labels i.e., human-readable names present in fragments)
+        self.required_entity_types: set[str] = set()
+        self.excluded_entity_types: set[str] = set()
+        if self.type_filter and (
+            self.type_filter.required_type_id
+            or (self.type_filter.exclude_type_ids and len(self.type_filter.exclude_type_ids) > 0)
+        ):
+            self._init_type_filters()
+
+    def _init_type_filters(self) -> None:
+        """Initialize type filtering by loading the hierarchy and collecting target/excluded sets."""
+        assert self.type_filter
+        graph, type_id_to_node = wikidata_utils.load_type_hierarchy(resolve_path(self.type_filter.type_hierarchy_path))
+
+        if self.type_filter.required_type_id:
+            required = (
+                wikidata_utils.collect_all_subtypes(graph, type_id_to_node, self.type_filter.required_type_id)
+                if self.type_filter.include_descendants
+                else {self.type_filter.required_type_id}
+            )
+            self.required_entity_types = {type_id_to_node[t]["name"] for t in required}
+
+        if self.type_filter.exclude_type_ids:
+            excluded: set[str] = set()
+            for t in self.type_filter.exclude_type_ids:
+                types = (
+                    wikidata_utils.collect_all_subtypes(graph, type_id_to_node, t)
+                    if self.type_filter.include_descendants
+                    else {t}
+                )
+                excluded.update(types)
+            self.excluded_entity_types = {type_id_to_node[t]["name"] for t in excluded}
+
+        self._logger.info(
+            f"Type filters initialized: required={len(self.required_entity_types)}, excluded={len(self.excluded_entity_types)}"
+        )
+
+    def run(self) -> None:
+        """Build all requested splits in the specified order (Test -> Validation -> Train)."""
+        # load mapping from fragment_id -> entity_id
+        fragment_to_entity = self._load_fragment_to_entity_map(self.base_fragment_to_entity_map_path)
+        self._logger.info(f"Loaded fragment->entity map: {len(fragment_to_entity)} entries")
+
+        # load and optionally type-filter base linking pairs
+        pairs, labels = self._load_and_filter_linking_pairs(
+            self.base_linking_dataset_path,
+            self.base_linking_ground_truth_path,
+            fragment_to_entity,
+        )
+        self._logger.info(f"Loaded base linking pairs: {len(pairs)}")
+
+        # Track entities used by prior splits to enforce disjointness
+        disallowed_entity_ids: set[str] = set()
+
+        for split in self.splits:
+            self._logger.info(f"Building split: {split.name}")
+            linking_dir = self.output_dir / "linking" / split.name
+            linking_dir.mkdir(parents=True, exist_ok=True)
+            clustering_dir = self.output_dir / "clustering" / split.name
+            clustering_dir.mkdir(parents=True, exist_ok=True)
+            entity_gen_dir = self.output_dir / "entity_generation" / split.name
+            entity_gen_dir.mkdir(parents=True, exist_ok=True)
+            fragment_gen_dir = self.output_dir / "fragment_generation" / split.name
+            fragment_gen_dir.mkdir(parents=True, exist_ok=True)
+
+            sampled_pairs, sampled_labels, linking_entity_counter, included_fragment_ids = self._sample_linking_pairs(
+                pairs, labels, disallowed_entity_ids, split.linking
+            )
+
+            # write linking outputs
+            self._write_linking_outputs(linking_dir, sampled_pairs, sampled_labels, linking_entity_counter)
+
+            # Entities used in this split
+            entities_to_include = set(linking_entity_counter.keys())
+
+            # derive clustering
+            self._derive_clustering(
+                clustering_dir,
+                entities_to_include,
+                included_fragment_ids,
+                split.clustering,
+            )
+
+            # derive entity generation (no config required)
+            self._derive_entity_generation(
+                entity_gen_dir,
+                entities_to_include,
+            )
+
+            # derive fragment generation (no config required)
+            self._derive_fragment_generation(
+                fragment_gen_dir,
+                entities_to_include,
+            )
+
+            # update disallowed entities for next splits
+            disallowed_entity_ids.update(entities_to_include)
+
+    @staticmethod
+    def _load_fragment_to_entity_map(path: pathlib.Path) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        with open(resolve_path(path), encoding="utf-8") as f:
+            for line in f:
+                frag_id, ent_id = json.loads(line)
+                mapping[frag_id] = ent_id
+        return mapping
+
+    def _load_and_filter_linking_pairs(
+        self,
+        ds_path: pathlib.Path,
+        gt_path: pathlib.Path,
+        fragment_to_entity: dict[str, str],
+    ) -> tuple[list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]], list[bool]]:
+        """Load all base linking pairs and ground-truth labels, apply optional type filtering."""
+        pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]] = []
+        labels: list[bool] = []
+
+        required_types = self.required_entity_types
+        excluded_types = self.excluded_entity_types
+
+        with (
+            open(resolve_path(ds_path), encoding="utf-8") as f_ds,
+            open(resolve_path(gt_path), encoding="utf-8") as f_gt,
+        ):
+            for i, (line_ds, line_gt) in enumerate(zip(f_ds, f_gt, strict=False)):
+                d = json.loads(line_ds)
+                left = ResolvedWikidataEntity.from_dict(d[0])
+                right = ResolvedWikidataEntity.from_dict(d[1])
+
+                # enrich with entity ids (these were removed in base linking dataset)
+                try:
+                    left.entity_id = fragment_to_entity[left.metadata["fragment_id"]]
+                    right.entity_id = fragment_to_entity[right.metadata["fragment_id"]]
+                except KeyError as ex:
+                    # skip if mapping missing (shouldn't happen for properly aligned datasets)
+                    self._logger.debug(f"Missing fragment->entity mapping at line {i}: {ex}")
+                    continue
+
+                if required_types and (
+                    not set(left.wikidata_type or []).intersection(required_types)
+                    or not set(right.wikidata_type or []).intersection(required_types)
+                ):
+                    continue
+
+                if excluded_types and (
+                    set(left.wikidata_type or []).intersection(excluded_types)
+                    or set(right.wikidata_type or []).intersection(excluded_types)
+                ):
+                    continue
+
+                pairs.append((left, right))
+                labels.append(bool(json.loads(line_gt)))
+
+        assert len(pairs) == len(labels)
+        self._logger.info(
+            f"After type filtering: {len(pairs)} pairs kept; positives = {sum(labels)} ({(100.0 * sum(labels) / len(labels)) if pairs else 0.0:.2f}%)"
+        )
+        return pairs, labels
+
+    @staticmethod
+    def _pair_property_overlap(left: ResolvedWikidataEntity, right: ResolvedWikidataEntity) -> int:
+        """Count of overlapping property keys between two entities."""
+        left_props = set((left.properties or {}).keys())
+        right_props = set((right.properties or {}).keys())
+        return len(left_props.intersection(right_props))
+
+    def _sample_linking_pairs(
+        self,
+        pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
+        labels: list[bool],
+        disallowed_entity_ids: set[str],
+        cfg: LinkingConfig,
+    ) -> tuple[
+        list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
+        list[bool],
+        Counter[str],
+        set[str],
+    ]:
+        """Heuristic sampling to produce a more interesting subset."""
+        rng = random.Random(cfg.seed)  # noqa: S311 - pseudo-random is fine for dataset sampling
+
+        indices = list(range(len(pairs)))
+        rng.shuffle(indices)
+
+        sampled_pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]] = []
+        sampled_labels: list[bool] = []
+
+        linking_entity_counter: Counter[str] = Counter()
+        property_pattern_counter: Counter[tuple[tuple[str, ...], tuple[str, ...]]] = Counter()
+        property_counter: Counter[str] = Counter()
+        type_counter: Counter[str] = Counter()
+        overlap_counter: Counter[int] = Counter()
+        class_counter: Counter[bool] = Counter()
+
+        included_fragment_ids: set[str] = set()
+
+        iterations = 0
+        for i in indices:
+            iterations += 1
+            if len(sampled_pairs) >= cfg.pair_count_limit:
+                break
+
+            left, right = pairs[i]
+            label = labels[i]
+
+            if left.entity_id in disallowed_entity_ids or right.entity_id in disallowed_entity_ids:
+                continue
+
+            if (
+                linking_entity_counter[left.entity_id] >= cfg.pairs_per_entity_limit
+                or linking_entity_counter[right.entity_id] >= cfg.pairs_per_entity_limit
+            ):
+                continue
+
+            left_keys = tuple(sorted((left.properties or {}).keys()))
+            right_keys = tuple(sorted((right.properties or {}).keys()))
+            prop_pattern: tuple[tuple[str, ...], tuple[str, ...]] = (
+                (left_keys, right_keys) if left_keys <= right_keys else (right_keys, left_keys)
+            )
+            if property_pattern_counter[prop_pattern] >= cfg.property_pattern_count_limit:
+                continue
+
+            # property overlap distribution shaping
+            overlap_num = self._pair_property_overlap(left, right)
+            if cfg.property_overlap_limits:
+                allowed_ratio = cfg.property_overlap_limits.get(overlap_num)
+                if allowed_ratio is not None and overlap_counter[overlap_num] >= allowed_ratio * cfg.pair_count_limit:
+                    continue
+
+            # class balance shaping (limit single class)
+            if (
+                cfg.single_class_ratio_limit is not None
+                and class_counter[label] > cfg.single_class_ratio_limit * cfg.pair_count_limit
+            ):
+                continue
+
+            # accept the pair
+            sampled_pairs.append((left, right))
+            sampled_labels.append(label)
+
+            class_counter[label] += 1
+            overlap_counter[overlap_num] += 1
+
+            linking_entity_counter[left.entity_id] += 1
+            if left.entity_id != right.entity_id:
+                linking_entity_counter[right.entity_id] += 1
+
+            property_pattern_counter[prop_pattern] += 1
+
+            for t in set(left.wikidata_type or []).union(right.wikidata_type or []):
+                type_counter[t] += 1
+
+            for prop_name in set((left.properties or {}).keys()).union((right.properties or {}).keys()):
+                property_counter[prop_name] += 1
+
+            included_fragment_ids.add(left.metadata["fragment_id"])
+            included_fragment_ids.add(right.metadata["fragment_id"])
+
+        self._logger.info(
+            f"Sampled {len(sampled_pairs)}/{cfg.pair_count_limit} pairs; positives: {sum(sampled_labels)}"
+            f" ({(100.0 * sum(sampled_labels) / len(sampled_labels)) if sampled_labels else 0.0:.2f}%);"
+            f" iterations: {iterations};"
+            f" acceptance: {(100.0 * len(sampled_pairs) / iterations) if iterations else 0.0:.2f}%; entities: {len(linking_entity_counter)}"
+        )
+
+        self._logger.info("Top 10 types: " + ", ".join(f"{t}:{c}" for t, c in type_counter.most_common(10)))
+        self._logger.info("Top 10 properties: " + ", ".join(f"{p}:{c}" for p, c in property_counter.most_common(10)))
+
+        return sampled_pairs, sampled_labels, linking_entity_counter, included_fragment_ids
+
+    def _write_linking_outputs(
+        self,
+        split_dir: pathlib.Path,
+        sampled_pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
+        sampled_labels: list[bool],
+        linking_entity_counter: Counter[str],
+    ) -> None:
+        """Write the linking dataset, ground truth, and used entities for a split."""
+        split_dir.mkdir(parents=True, exist_ok=True)
+        ds_out = split_dir / RebelDatasetBuilder.LINKING_DATASET_FILENAME
+        gt_out = split_dir / RebelDatasetBuilder.LINKING_GROUND_TRUTH_FILENAME
+        used_ents_out = split_dir / "rebel_linking_used_entities.jsonl"
+        with open(ds_out, "w", encoding="utf-8") as f_ds:
+            for left, right in sampled_pairs:
+                d = [left.to_dict(minimal_repr=True), right.to_dict(minimal_repr=True)]
+                f_ds.write(json.dumps(d) + "\n")
+
+        with open(gt_out, "w", encoding="utf-8") as f_gt:
+            for label in sampled_labels:
+                f_gt.write(json.dumps(bool(label)) + "\n")
+
+        with open(used_ents_out, "w", encoding="utf-8") as f_ents:
+            for ent_id in linking_entity_counter:
+                f_ents.write(json.dumps(ent_id) + "\n")
+
+        self._logger.info(f"Wrote linking outputs: {ds_out}, {gt_out}, entities={len(linking_entity_counter)}")
+
+    def _derive_clustering(
+        self,
+        out_dir: pathlib.Path,
+        entities_to_include: set[str],
+        included_fragment_ids: set[str],
+        cfg: ClusteringConfig,
+    ) -> None:
+        """Derive clustering dataset for the split by subsetting the base clustering dataset."""
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ds_out = out_dir / RebelDatasetBuilder.CLUSTERING_DATASET_FILENAME
+        gt_out = out_dir / RebelDatasetBuilder.CLUSTERING_GROUND_TRUTH_FILENAME
+
+        clustering_entities: dict[str, list[ResolvedWikidataEntity]] = defaultdict(list)
+        with (
+            open(self.base_clustering_dataset_path, encoding="utf-8") as f_ds,
+            open(self.base_clustering_ground_truth_path, encoding="utf-8") as f_gt,
+        ):
+            for line_ds, line_gt in zip(f_ds, f_gt, strict=False):
+                fragment = ResolvedWikidataEntity.from_dict(json.loads(line_ds))
+                entity_id = json.loads(line_gt)
+                if entity_id in entities_to_include:
+                    clustering_entities[entity_id].append(fragment)
+
+        ent_with_frags = list(clustering_entities.items())
+        random.shuffle(ent_with_frags)
+
+        entity_counter: Counter[str] = Counter()
+        with open(ds_out, "w", encoding="utf-8") as f_ds_out, open(gt_out, "w", encoding="utf-8") as f_gt_out:
+            for entity_id, frags in ent_with_frags:
+                if len(frags) < cfg.min_fragments_per_entity:
+                    continue
+
+                if 0 < cfg.entity_count_limit <= len(entity_counter) and entity_id not in entity_counter:
+                    continue
+
+                # include linking fragments first (if requested)
+                if cfg.include_all_linking_fragments_first:
+                    sorted_frags = sorted(
+                        frags,
+                        key=lambda f: f.metadata.get("fragment_id") not in included_fragment_ids,
+                    )
+                else:
+                    sorted_frags = frags
+
+                for fragment in sorted_frags[: cfg.fragments_per_entity_limit]:
+                    f_ds_out.write(json.dumps(fragment.without_entity_id().to_dict(minimal_repr=True)) + "\n")
+                    f_gt_out.write(json.dumps(entity_id) + "\n")
+                    entity_counter[entity_id] += 1
+
+        self._logger.info(
+            f"Clustering: wrote {sum(entity_counter.values())} fragments for {len(entity_counter)} entities to {ds_out}"
+        )
+
+    def _derive_entity_generation(
+        self,
+        out_dir: pathlib.Path,
+        entities_to_include: set[str],
+    ) -> None:
+        """Derive entity generation dataset for the split by subsetting the base entity generation dataset."""
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ds_out = out_dir / RebelDatasetBuilder.ENTITY_GENERATION_DATASET_FILENAME
+        count = 0
+
+        with (
+            open(self.base_entity_generation_dataset_path, encoding="utf-8") as f_ds,
+            open(ds_out, "w", encoding="utf-8") as f_out,
+        ):
+            for line in f_ds:
+                fragment = ResolvedWikidataEntity.from_dict(json.loads(line))
+                entity_id = fragment.entity_id
+                if entity_id not in entities_to_include:
+                    continue
+                f_out.write(json.dumps(fragment.without_entity_id().to_dict(minimal_repr=True)) + "\n")
+                count += 1
+
+        self._logger.info(f"Entity generation: wrote {count} records to {ds_out}")
+
+    def _derive_fragment_generation(
+        self,
+        out_dir: pathlib.Path,
+        entities_to_include: set[str],
+    ) -> None:
+        """Derive fragment generation dataset for the split by subsetting the base fragment generation dataset."""
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ds_out = out_dir / RebelDatasetBuilder.FRAGMENT_GENERATION_DATASET_FILENAME
+        count = 0
+
+        with (
+            open(self.base_fragment_generation_dataset_path, encoding="utf-8") as f_ds,
+            open(ds_out, "w", encoding="utf-8") as f_out,
+        ):
+            for line in f_ds:
+                fragment = ResolvedWikidataEntity.from_dict(json.loads(line))
+                entity_id = fragment.entity_id
+                if entity_id not in entities_to_include:
+                    continue
+                f_out.write(json.dumps(fragment.without_entity_id().to_dict(minimal_repr=True)) + "\n")
+                count += 1
+
+        self._logger.info(f"Fragment generation: wrote {count} records to {ds_out}")
+
+
+def default_splits() -> list[SplitBuildConfig]:
+    """Provide default configs for Test, Validation, Train splits."""
+    test = SplitBuildConfig(
+        name="Test",
+        linking=LinkingConfig(
+            pair_count_limit=2_000,
+            pairs_per_entity_limit=10,
+            property_pattern_count_limit=20,
+            property_overlap_limits={1: 0.35},
+            single_class_ratio_limit=0.76,
+            seed=23,
+        ),
+        clustering=ClusteringConfig(
+            min_fragments_per_entity=3,
+            entity_count_limit=0,
+            fragments_per_entity_limit=50,
+            include_all_linking_fragments_first=True,
+        ),
+    )
+
+    validation = SplitBuildConfig(
+        name="Validation",
+        linking=LinkingConfig(
+            pair_count_limit=20_000,
+            pairs_per_entity_limit=100,
+            property_pattern_count_limit=1_000,
+            property_overlap_limits={1: 0.40},
+            single_class_ratio_limit=0.76,
+            seed=24,
+        ),
+        clustering=ClusteringConfig(
+            min_fragments_per_entity=3,
+            entity_count_limit=0,
+            fragments_per_entity_limit=50,
+            include_all_linking_fragments_first=True,
+        ),
+    )
+
+    train = SplitBuildConfig(
+        name="Train",
+        linking=LinkingConfig(
+            pair_count_limit=500_000,
+            pairs_per_entity_limit=500,
+            property_pattern_count_limit=10_000,
+            property_overlap_limits={1: 0.45},
+            single_class_ratio_limit=0.76,
+            seed=25,
+        ),
+        clustering=ClusteringConfig(
+            min_fragments_per_entity=3,
+            entity_count_limit=0,
+            fragments_per_entity_limit=1_000,
+            include_all_linking_fragments_first=True,
+        ),
+    )
+
+    return [test, validation, train]
