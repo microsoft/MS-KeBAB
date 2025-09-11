@@ -85,14 +85,14 @@ class Task(ABC):
 
     @abstractmethod
     def evaluate(
-        self, output_to_evaluate: Path, eval_result_path: Path | None = None, logger: Logger | None = None
+        self, predictions: Path, result_output_path: Path | None = None, logger: Logger | None = None
     ) -> dict[str, float]:
         """
         Evaluate an output for the task.
 
         Args:
-            output_to_evaluate: The output that needs to be evaluated.
-            eval_result_path: Optional path to save the evaluation result.
+            predictions: The path to the predictions file that needs to be evaluated.
+            result_output_path: Optional path to save the evaluation results to.
             logger: Optional logger to log the evaluation process.
 
         Returns:

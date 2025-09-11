@@ -33,10 +33,10 @@ from __future__ import annotations
 
 import json
 import logging
-import pathlib
 import random
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from kebab.utils.dataset.rebel.rebel_dataset_builder import RebelDatasetBuilder
 from kebab.utils.dataset.wikidata import wikidata_utils
@@ -89,7 +89,7 @@ class TypeFilter:
     If exclude_type_ids is set, any entity whose types intersect the excluded set is skipped.
     """
 
-    type_hierarchy_path: pathlib.Path
+    type_hierarchy_path: Path
     required_type_id: str | None = None
     exclude_type_ids: list[str] | None = None
     include_descendants: bool = False
@@ -98,11 +98,26 @@ class TypeFilter:
 class RebelDatasetSubsampler:
     """Create Test/Validation/Train datasets from a base REBEL dataset in a single run."""
 
+    _logger: logging.Logger
+    base_dir: Path
+    output_dir: Path
+    splits: list[SplitBuildConfig]
+    type_filter: TypeFilter | None
+    base_linking_dataset_path: Path
+    base_linking_ground_truth_path: Path
+    base_fragment_to_entity_map_path: Path
+    base_clustering_dataset_path: Path
+    base_clustering_ground_truth_path: Path
+    base_entity_generation_dataset_path: Path
+    base_fragment_generation_dataset_path: Path
+    required_entity_types: set[str]
+    excluded_entity_types: set[str]
+
     def __init__(
         self,
         *,
-        base_dir: pathlib.Path,
-        output_dir: pathlib.Path,
+        base_dir: Path,
+        output_dir: Path,
         splits: list[SplitBuildConfig],
         type_filter: TypeFilter | None = None,
     ) -> None:
@@ -115,35 +130,28 @@ class RebelDatasetSubsampler:
             type_filter: Optional type filtering configuration based on Wikidata type hierarchy.
         """
         self._logger = logging.getLogger(__name__)
-
         self.base_dir = resolve_path(base_dir)
         self.output_dir = resolve_path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.splits = splits
         self.type_filter = type_filter
-
-        # compute base paths using the same names as the builder
         self.base_linking_dataset_path = self.base_dir / RebelDatasetBuilder.LINKING_DATASET_FILENAME
         self.base_linking_ground_truth_path = self.base_dir / RebelDatasetBuilder.LINKING_GROUND_TRUTH_FILENAME
         self.base_fragment_to_entity_map_path = self.base_dir / RebelDatasetBuilder.FRAGMENT_TO_ENTITY_MAP_FILENAME
-
         self.base_clustering_dataset_path = (
             self.base_dir / "clustering" / RebelDatasetBuilder.CLUSTERING_DATASET_FILENAME
         )
         self.base_clustering_ground_truth_path = (
             self.base_dir / "clustering" / RebelDatasetBuilder.CLUSTERING_GROUND_TRUTH_FILENAME
         )
-
         self.base_entity_generation_dataset_path = (
             self.base_dir / "entity_generation" / RebelDatasetBuilder.ENTITY_GENERATION_DATASET_FILENAME
         )
         self.base_fragment_generation_dataset_path = (
             self.base_dir / "fragment_generation" / RebelDatasetBuilder.FRAGMENT_GENERATION_DATASET_FILENAME
         )
-
-        # resolved filtering sets (based on labels i.e., human-readable names present in fragments)
-        self.required_entity_types: set[str] = set()
-        self.excluded_entity_types: set[str] = set()
+        self.required_entity_types = set()
+        self.excluded_entity_types = set()
         if self.type_filter and (
             self.type_filter.required_type_id
             or (self.type_filter.exclude_type_ids and len(self.type_filter.exclude_type_ids) > 0)
@@ -240,7 +248,7 @@ class RebelDatasetSubsampler:
             disallowed_entity_ids.update(entities_to_include)
 
     @staticmethod
-    def _load_fragment_to_entity_map(path: pathlib.Path) -> dict[str, str]:
+    def _load_fragment_to_entity_map(path: Path) -> dict[str, str]:
         mapping: dict[str, str] = {}
         with open(resolve_path(path), encoding="utf-8") as f:
             for line in f:
@@ -250,8 +258,8 @@ class RebelDatasetSubsampler:
 
     def _load_and_filter_linking_pairs(
         self,
-        ds_path: pathlib.Path,
-        gt_path: pathlib.Path,
+        ds_path: Path,
+        gt_path: Path,
         fragment_to_entity: dict[str, str],
     ) -> tuple[list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]], list[bool]]:
         """Load all base linking pairs and ground-truth labels, apply optional type filtering."""
@@ -413,7 +421,7 @@ class RebelDatasetSubsampler:
 
     def _write_linking_outputs(
         self,
-        split_dir: pathlib.Path,
+        split_dir: Path,
         sampled_pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
         sampled_labels: list[bool],
         linking_entity_counter: Counter[str],
@@ -440,7 +448,7 @@ class RebelDatasetSubsampler:
 
     def _derive_clustering(
         self,
-        out_dir: pathlib.Path,
+        out_dir: Path,
         entities_to_include: set[str],
         included_fragment_ids: set[str],
         cfg: ClusteringConfig,
@@ -493,7 +501,7 @@ class RebelDatasetSubsampler:
 
     def _derive_entity_generation(
         self,
-        out_dir: pathlib.Path,
+        out_dir: Path,
         entities_to_include: set[str],
     ) -> None:
         """Derive entity generation dataset for the split by subsetting the base entity generation dataset."""
@@ -517,7 +525,7 @@ class RebelDatasetSubsampler:
 
     def _derive_fragment_generation(
         self,
-        out_dir: pathlib.Path,
+        out_dir: Path,
         entities_to_include: set[str],
     ) -> None:
         """Derive fragment generation dataset for the split by subsetting the base fragment generation dataset."""

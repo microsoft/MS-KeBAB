@@ -111,11 +111,11 @@ def test_resolve_shortcuts(input_path: str, expected: Path) -> None:
         raise FileNotFoundError(f"cannot resolve {name!r}")
 
     def _is_file_stub(self: Path) -> bool:
-        """Stub for pathlib.Path.is_file to avoid real file system checks."""
+        """Stub for Path.is_file to avoid real file system checks."""
         return self.suffix.lower() == ".lnk"
 
     def _exists_stub(self: Path) -> bool:
-        """Stub for pathlib.Path.exists to avoid real file system checks."""
+        """Stub for Path.exists to avoid real file system checks."""
         return self.name != "datasets_shortcut"
 
     with (

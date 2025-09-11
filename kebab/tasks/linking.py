@@ -27,9 +27,6 @@ from kebab.utils.io_helpers import (
 )
 
 
-# TODO: add seed
-
-
 class LinkingTask(Task):
     """Represents a linking benchmark task with its data files."""
 
@@ -95,8 +92,8 @@ class LinkingTask(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: Logger | None = None,
         output_dir: Path | None = None,
         adjust_to_test_prior: bool = True,
@@ -106,8 +103,8 @@ class LinkingTask(Task):
         Evaluate an output for the linking task.
 
         Args:
-            output_to_evaluate: Path to model output predictions (log-odds or 0/1 predictions).
-            eval_result_path: Optional path to save evaluation metrics as JSON.
+            predictions: Path to model output predictions (log-odds or 0/1 predictions).
+            result_output_path: Optional path to save evaluation metrics as JSON.
             logger: Optional logger for logging evaluation summaries.
             output_dir: Optional directory for saving metrics and evaluation outputs.
             adjust_to_test_prior: If True, adjust the log-odds to match the prior on the test set.
@@ -121,7 +118,7 @@ class LinkingTask(Task):
         if self.ground_truth is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        log_odds = np.asarray(list(ItemJsonlReader[float](output_to_evaluate, converter=float).read_items()))
+        log_odds = np.asarray(list(ItemJsonlReader[float](predictions, converter=float).read_items()))
         pairs, gt_labels = zip(*self.read_items(), strict=False)
         gt_labels = np.asarray(gt_labels, dtype=bool)
         if log_odds.shape != gt_labels.shape:
@@ -146,7 +143,7 @@ class LinkingTask(Task):
 
         # build detailed records
         detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predictions, debugging_info_path)
-        self._write_side_outputs(metrics, detail_records, output_dir, eval_result_path)
+        self._write_side_outputs(metrics, detail_records, output_dir, result_output_path)
 
         # report metrics in console or logger
         self._report_metrics(logger, metrics)

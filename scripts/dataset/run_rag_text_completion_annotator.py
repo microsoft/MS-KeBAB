@@ -66,8 +66,8 @@ if __name__ == "__main__":
 
     # Evluate the results.
     task_instance.evaluate(
-        output_to_evaluate=output_to_evaulate_path,
-        eval_result_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics.json"),
+        predictions=output_to_evaulate_path,
+        result_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics.json"),
     )
 
     # Write the full output for debugging.

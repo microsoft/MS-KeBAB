@@ -69,15 +69,15 @@ class QuestionAnsweringTaskBase(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the question-answering task."""
         if logger:
             logger.info("Starting evaluation for the question-answering task.")
 
-        predictions = StringLineReader(output_to_evaluate).read_items()
+        predictions = StringLineReader(predictions).read_items()
         targets = StringLineReader(self.__ground_truth).read_items()
         predictions_and_targets = zip(predictions, targets, strict=True)
         accuracy = [1 if item[0] == item[1] else 0 for item in predictions_and_targets]
@@ -102,8 +102,8 @@ class QuestionAnsweringTaskBase(Task):
         if logger:
             logger.info("Evaluation metrics calculated successfully.")
             logger.info(f"Metrics: {metrics}")
-        if eval_result_path:
-            save_dict_to_json(metrics, eval_result_path)
+        if result_output_path:
+            save_dict_to_json(metrics, result_output_path)
 
         return metrics
 

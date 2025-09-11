@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import json
 import logging
-import pathlib
 from collections import defaultdict
 from collections.abc import Iterable
+from pathlib import Path
 
 from kebab.utils.dataset.wikidata import wikidata_utils
 
@@ -30,31 +30,37 @@ class WikidataDatasetBuilder:
 
     WIKIDATA_DATASET_OUTPUT_FILENAME: str = "wikidata_dataset.jsonl"
 
+    _logger: logging.Logger
+    wikidata_dump_path: Path | None
+    wikidata_type_hierarchy_path: Path | None
+    wikidata_properties_path: Path | None
+    wikidata_simple_entities_path: Path
+    output_dir: Path
+    type_ids: list[str]
+    property_ids: list[str]
+
     def __init__(
         self,
         *,
-        wikidata_json_dump_path: pathlib.Path | None = None,
-        wikidata_type_hierarchy_path: pathlib.Path | None = None,
-        wikidata_properties_path: pathlib.Path | None = None,
-        wikidata_simple_entities_path: pathlib.Path,
-        output_dir: pathlib.Path | None = None,
+        wikidata_json_dump_path: Path | None = None,
+        wikidata_type_hierarchy_path: Path | None = None,
+        wikidata_properties_path: Path | None = None,
+        wikidata_simple_entities_path: Path,
+        output_dir: Path | None = None,
         type_ids: list[str] | None = None,
         property_ids: list[str] | None = None,
     ):
         """Initialize the WikidataDatasetBuilder."""
-        self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
-
-        self.wikidata_dump_path: pathlib.Path | None = wikidata_json_dump_path
-        self.wikidata_type_hierarchy_path: pathlib.Path | None = wikidata_type_hierarchy_path
-        self.wikidata_properties_path: pathlib.Path | None = wikidata_properties_path
-        self.wikidata_simple_entities_path: pathlib.Path = wikidata_simple_entities_path
-        self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
-
+        self._logger = logging.getLogger(self.__class__.__name__)
+        self.wikidata_dump_path = wikidata_json_dump_path
+        self.wikidata_type_hierarchy_path = wikidata_type_hierarchy_path
+        self.wikidata_properties_path = wikidata_properties_path
+        self.wikidata_simple_entities_path = wikidata_simple_entities_path
+        self.output_dir = output_dir or Path.cwd()
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
-
-        self.type_ids: list[str] = type_ids or []
-        self.property_ids: list[str] = property_ids or []
+        self.type_ids = type_ids or []
+        self.property_ids = property_ids or []
 
     def run(self) -> None:
         """Run the extraction process."""
@@ -102,9 +108,7 @@ class WikidataDatasetBuilder:
             for entity in entities:
                 f.write(json.dumps(entity, ensure_ascii=False) + "\n")
 
-    def load_type_hierarchy(
-        self, type_hierarchy_path: pathlib.Path | None = None
-    ) -> tuple[dict[str, dict], dict[str, dict]]:
+    def load_type_hierarchy(self, type_hierarchy_path: Path | None = None) -> tuple[dict[str, dict], dict[str, dict]]:
         """Load the hierarchy of Wikidata types."""
         self._logger.info("Loading the hierarchy of Wikidata types")
         input_path = type_hierarchy_path or self.wikidata_type_hierarchy_path
@@ -129,7 +133,7 @@ class WikidataDatasetBuilder:
 
         return graph, type_id_to_node
 
-    def load_properties(self, properties_path: pathlib.Path | None) -> dict[str, dict]:
+    def load_properties(self, properties_path: Path | None) -> dict[str, dict]:
         """Load the properties of Wikidata."""
         self._logger.info("Loading the properties of Wikidata.")
         input_path = properties_path or self.wikidata_properties_path
@@ -170,7 +174,7 @@ class WikidataDatasetBuilder:
         self,
         type_ids: Iterable[str],
         property_ids: Iterable[str],
-        wikidata_dump_path: pathlib.Path | None = None,
+        wikidata_dump_path: Path | None = None,
     ) -> Iterable[wikidata_utils.WikidataEntity]:
         """Extract entities of the given types from Wikidata."""
         input_path = wikidata_dump_path or self.wikidata_dump_path

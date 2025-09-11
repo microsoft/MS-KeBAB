@@ -24,8 +24,8 @@ from __future__ import annotations
 
 import json
 import logging
-import pathlib
 from collections.abc import Iterable
+from pathlib import Path
 
 from kebab.utils.dataset.wikidata import wikidata_utils
 
@@ -35,27 +35,31 @@ class WikidataNamesDatasetBuilder:
 
     WIKIDATA_NAMES_OUTPUT_FILENAME: str = "wikidata_names.jsonl"
 
+    _logger: logging.Logger
+    wikidata_entities_path: Path
+    wikidata_type_hierarchy_path: Path
+    output_dir: Path
+    type_ids: list[str]
+    min_aliases: int
+
     def __init__(
         self,
         *,
-        wikidata_entities_path: pathlib.Path,
-        wikidata_type_hierarchy_path: pathlib.Path,
-        output_dir: pathlib.Path | None = None,
+        wikidata_entities_path: Path,
+        wikidata_type_hierarchy_path: Path,
+        output_dir: Path | None = None,
         type_ids: list[str] | None = None,
         min_aliases: int = 2,
     ):
         """Initialize the WikidataNamesDatasetBuilder."""
-        self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
-
-        self.wikidata_entities_path: pathlib.Path = wikidata_entities_path
-        self.wikidata_type_hierarchy_path: pathlib.Path = wikidata_type_hierarchy_path
-        self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
-
+        self._logger = logging.getLogger(self.__class__.__name__)
+        self.wikidata_entities_path = wikidata_entities_path
+        self.wikidata_type_hierarchy_path = wikidata_type_hierarchy_path
+        self.output_dir = output_dir or Path.cwd()
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
-
-        self.type_ids: list[str] = type_ids or []
-        self.min_aliases: int = min_aliases
+        self.type_ids = type_ids or []
+        self.min_aliases = min_aliases
 
     def run(self) -> None:
         """Run the extraction process."""
@@ -74,7 +78,7 @@ class WikidataNamesDatasetBuilder:
             ):
                 f.write(entity.to_json() + "\n")
 
-    def load_hierarchy(self, type_hierarchy_path: pathlib.Path | None) -> dict[str, dict]:
+    def load_hierarchy(self, type_hierarchy_path: Path | None) -> dict[str, dict]:
         """Load the hierarchy of Wikidata types."""
         self._logger.info("Loading the hierarchy of Wikidata types")
         input_path = type_hierarchy_path or self.wikidata_type_hierarchy_path

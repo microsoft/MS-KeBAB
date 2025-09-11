@@ -25,6 +25,7 @@ class Benchmark:
 
     __tasks_by_type: dict[TaskType, list[Task]]
     __tasks_by_name: dict[str, Task]
+    data: Path | None
 
     @property
     def tasks_by_type(self) -> dict[TaskType, list[Task]]:
@@ -44,7 +45,6 @@ class Benchmark:
     def __init__(self, config_path: Path, data: Path | None = None):
         """Initialize entry point."""
         self.data = data or Path.cwd()
-
         self.__tasks_by_type = {}
         self.__tasks_by_name = {}
 

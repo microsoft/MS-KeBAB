@@ -97,8 +97,8 @@ class ExtractionTask(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: logging.Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the extraction task."""
@@ -109,7 +109,7 @@ class ExtractionTask(Task):
             ExtractionOutput(document=document, entities=entity_list)
             for document, entity_list in zip(
                 (item.document for item in self.read_items()),
-                EntityListJsonlReader(output_to_evaluate).read_items(),
+                EntityListJsonlReader(predictions).read_items(),
                 strict=True,
             )
         )
@@ -135,7 +135,7 @@ class ExtractionTask(Task):
             )
             metric_results = metric_calculator_cls(metric_config, logger).run(pred_extractions, self.read_items())  # type: ignore
             metrics[metric_name] = metric_results
-        if eval_result_path:
-            save_dict_to_json(metrics, eval_result_path)
+        if result_output_path:
+            save_dict_to_json(metrics, result_output_path)
 
         return metrics

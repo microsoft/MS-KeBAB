@@ -24,6 +24,20 @@ from kebab.utils.io_helpers import resolve_path
 class WikidataResolver:
     """A class for resolving Wikidata entities and properties."""
 
+    _logger: logging.Logger
+    entities_path: Path
+    wikidata_simple_entities_path: Path
+    wikidata_properties_path: Path
+    wikidata_type_hierarchy_path: Path
+    resolve_property_names: bool
+    resolve_property_values: bool
+    attach_types: bool
+    resolve_attached_types: bool
+    query_api: bool
+    save_with_minimal_repr: bool
+    output_dir: Path
+    entities_output_path: Path
+
     def __init__(
         self,
         *,
@@ -40,23 +54,19 @@ class WikidataResolver:
         output_dir: Path,
     ):
         """Initialize the Wikidata resolver."""
-        self._logger: logging.Logger = logging.getLogger(__name__)
-
+        self._logger = logging.getLogger(__name__)
         self.entities_path = resolve_path(entities_path)
         self.wikidata_simple_entities_path = resolve_path(wikidata_simple_entities_path)
         self.wikidata_properties_path = resolve_path(wikidata_properties_path)
         self.wikidata_type_hierarchy_path = resolve_path(wikidata_type_hierarchy_path)
-
         self.resolve_property_names = resolve_property_names
         self.resolve_property_values = resolve_property_values
         self.attach_types = attach_types
         self.resolve_attached_types = resolve_attached_types
         self.query_api = query_api
         self.save_with_minimal_repr = save_with_minimal_repr
-
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-
         self.entities_output_path = self.output_dir / self.entities_path.name
 
         if not self.entities_path.exists():

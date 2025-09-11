@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import json
 import logging
-import pathlib
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any, Self
 
 import requests
@@ -350,7 +350,7 @@ def get_entity_aliases(entity: dict) -> set[str]:
 def fetch_properties_via_api(
     start: int = 1,
     end: int = 15_000,
-    output_path: pathlib.Path | None = None,
+    output_path: Path | None = None,
 ) -> None:
     """
     Query the IDs and English labels for a range of properties via the Wikidata API.
@@ -363,7 +363,7 @@ def fetch_properties_via_api(
     """
     logging.info(f"Querying {end - start + 1} properties from Wikidata...")
 
-    output_path = output_path or pathlib.Path.cwd() / f"wikidata_properties_{start}_{end}.json"
+    output_path = output_path or Path.cwd() / f"wikidata_properties_{start}_{end}.json"
 
     properties = {}
     error_count = 0
@@ -433,7 +433,7 @@ def fetch_properties_via_api(
 
 
 def extract_wikidata_entities_from_dump(
-    wikidata_json_dump_path: pathlib.Path = pathlib.Path.cwd() / "latest-all.json",
+    wikidata_json_dump_path: Path = Path.cwd() / "latest-all.json",
     properties: Iterable[str] | None = None,
     input_entity_predicate: Callable[[dict], bool] | None = None,
     output_entity_predicate: Callable[[WikidataEntity], bool] | None = None,
@@ -503,13 +503,13 @@ def extract_wikidata_entities_from_dump(
         logging.warning(f"Skipped {skipped_count} entities without labels or type")
 
 
-def load_properties(path: pathlib.Path) -> dict[str, dict]:
+def load_properties(path: Path) -> dict[str, dict]:
     """Load (previously extracted) Wikidata properties from a JSON file."""
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
-def load_type_hierarchy(type_hierarchy_path: pathlib.Path) -> tuple[dict[str, dict], dict[str, dict]]:
+def load_type_hierarchy(type_hierarchy_path: Path) -> tuple[dict[str, dict], dict[str, dict]]:
     """Load the hierarchy of Wikidata types.
 
     Returns:
@@ -534,7 +534,7 @@ def load_type_hierarchy(type_hierarchy_path: pathlib.Path) -> tuple[dict[str, di
     return graph, type_id_to_node_map
 
 
-def load_wikidata_entities(wikidata_entities_path: pathlib.Path) -> Iterable[WikidataEntity]:
+def load_wikidata_entities(wikidata_entities_path: Path) -> Iterable[WikidataEntity]:
     """Load the list of wikidata entities extracted from Wikidata."""
     count = 0
     with open(wikidata_entities_path, encoding="utf-8") as f:
@@ -574,7 +574,7 @@ def collect_all_subtypes(graph: dict[str, dict], type_id_to_node: dict[str, dict
 
 def collect_wikidata_entities(
     ids_to_include: set[str],
-    wikidata_entities_path: pathlib.Path,
+    wikidata_entities_path: Path,
     query_api: bool = False,
     append_to_file: bool = False,
     include_properties: bool = False,

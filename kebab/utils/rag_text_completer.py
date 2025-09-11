@@ -184,6 +184,11 @@ class BasePhiRAGTextCompleter(BaseRAGTextCompleter):
     TOKENS_TO_EXCLUDE: ClassVar[list[str]] = ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
     """Tokens that are excluded from the model's predictions."""
 
+    model_id: str
+    tokenizer: Any
+    token_ids_to_exclude: list
+    device: Any
+
     def __init__(self, model_id: str = "microsoft/phi-4") -> None:
         """
         Initializes the text completer.

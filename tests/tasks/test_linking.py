@@ -31,9 +31,9 @@ def test_linking_read_write_items_roundtrip() -> None:
     schema_path = Path(__file__).parents[1] / "data" / "linking" / "property_schema.json"
     task_instance = LinkingTask(
         "Linking-Alexandria-Train",
-        str(entity_pairs_path),
-        str(schema_path),
-        str(boolean_labels_path),
+        entity_pairs_path,
+        schema_path,
+        boolean_labels_path,
     )
 
     # Prepare data

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import pathlib
+from pathlib import Path
 
 import click
 from kebab.utils import logging_helpers
@@ -24,22 +24,22 @@ from kebab.utils.dataset.wikidata.wikidata_simple_extractor import WikidataSimpl
 )
 @click.option(
     "--wikidata-json-dump-path",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "data" / "latest-all.json",
+    type=Path,
+    default=Path.cwd() / "data" / "latest-all.json",
     help="The path to the standard Wikidata JSON dump file.",
 )
 @click.option(
     "--output-dir",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "output" / "wikidata",
+    type=Path,
+    default=Path.cwd() / "output" / "wikidata",
     help="The directory to save the extracted data.",
 )
 @click.command()
 def main(
     run_entity_extraction: bool,
     run_property_fetch: bool,
-    wikidata_json_dump_path: pathlib.Path,
-    output_dir: pathlib.Path,
+    wikidata_json_dump_path: Path,
+    output_dir: Path,
 ):
     """Run Wikidata hierarchy extraction steps."""
     logging_helpers.configure_logging()

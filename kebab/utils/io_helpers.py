@@ -75,6 +75,8 @@ class StringLineReader(ItemReader[str]):
     This class reads a text file, and outputs a line at a time.
     """
 
+    path: Path
+
     def __init__(self, path: Path):
         """
         Initializes the line by line reader for text files.
@@ -102,6 +104,9 @@ class ItemJsonlReader[DataItemType](ItemReader[DataItemType]):
 
     This class reads a JSONL file, where each line contains a serialized object.
     """
+
+    path: Path
+    converter: Callable[[Any], DataItemType] | None
 
     def __init__(
         self,
@@ -143,6 +148,9 @@ class DocumentJsonlReader(ItemReader[Document]):
     It uses schemas to parse and validate the fields of the documents.
     """
 
+    schemas: dict
+    path: Path
+
     def __init__(self, path: Path):
         """
         Initializes the JSONL reader for documents.
@@ -169,6 +177,8 @@ class EntityJsonlReader(ItemReader[Entity]):
 
     This class reads a JSONL file, where each line contains a serialized `Entity` object.
     """
+
+    path: Path
 
     def __init__(self, path: Path):
         """
@@ -198,6 +208,8 @@ class EntityListJsonlReader(ItemReader[list[Entity]]):
     This class reads a JSONL file, where each line contains a serialized list of `Entity` objects.
     """
 
+    path: Path
+
     def __init__(self, path: Path):
         """
         Initializes the JSONL reader for entity lists.
@@ -225,6 +237,8 @@ class EntityPairJsonlReader(ItemReader[tuple[Entity, Entity]]):
 
     This class reads a JSONL file, where each line contains exactly two serialized `Entity` objects.
     """
+
+    path: Path
 
     def __init__(self, path: Path):
         """
@@ -273,6 +287,8 @@ class StringLineWriter(ItemWriter[str]):
     This class writes a text file line by line.
     """
 
+    path: Path
+
     def __init__(self, path: Path):
         """
         Initializes the writer.
@@ -302,6 +318,8 @@ class ItemJsonlWriter[DataItemType](ItemWriter[DataItemType]):
     This class writes a JSONL file, where each line contains a serialized object.
     """
 
+    path: Path
+
     def __init__(self, path: Path):
         """
         Initializes the JSONL writer for objects.
@@ -330,6 +348,8 @@ class EntityJsonlWriter(ItemWriter[Entity]):
 
     This class writes a JSONL file, where each line contains a serialized `Entity` object.
     """
+
+    path: Path
 
     def __init__(self, path: Path):
         """
@@ -364,6 +384,8 @@ class EntityListJsonlWriter(ItemWriter[list[Entity]]):
 
     This class writes a JSONL file, where each line contains a serialized list of `Entity` objects.
     """
+
+    path: Path
 
     def __init__(self, path: Path):
         """

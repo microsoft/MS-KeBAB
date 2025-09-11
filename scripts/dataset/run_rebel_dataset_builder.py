@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import pathlib
+from pathlib import Path
 
 import click
 from kebab.utils import logging_helpers
@@ -14,8 +14,8 @@ from kebab.utils.dataset.rebel.rebel_dataset_builder import MergeDistributionMod
 
 @click.option(
     "--rebel-fragments-path",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd()
+    type=Path,
+    default=Path.cwd()
     / "data"
     / "REBEL"
     / "Fragments"
@@ -27,8 +27,8 @@ from kebab.utils.dataset.rebel.rebel_dataset_builder import MergeDistributionMod
 )
 @click.option(
     "--output-dir",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "output",
+    type=Path,
+    default=Path.cwd() / "output",
     help="Path to the output directory (dataset *.jsonl files will be created there).",
 )
 @click.option(
@@ -57,8 +57,8 @@ from kebab.utils.dataset.rebel.rebel_dataset_builder import MergeDistributionMod
 )
 @click.command()
 def main(
-    rebel_fragments_path: pathlib.Path,
-    output_dir: pathlib.Path,
+    rebel_fragments_path: Path,
+    output_dir: Path,
     max_count: int,
     max_merge_fragments: int,
     merge_distribution: str,

@@ -41,10 +41,10 @@ from __future__ import annotations
 
 import json
 import logging
-import pathlib
 import typing
 from collections import defaultdict
 from collections.abc import Callable, Iterable
+from pathlib import Path
 from typing import Any
 
 from kebab.utils.dataset.wikidata import wikidata_utils
@@ -76,18 +76,20 @@ class WikidataTypeHierarchyExtractor:
     WIKIDATA_REMOVED_GRANDPARENT_LINKS_FILENAME = "wikidata_removed_grandparent_links.txt"
     WIKIDATA_HIERARCHY_FILENAME = "wikidata_type_hierarchy.jsonl"
 
+    _logger: logging.Logger
+    wikidata_dump_path: Path | None
+    output_dir: Path
+
     def __init__(
         self,
         *,
-        wikidata_json_dump_path: pathlib.Path | None = None,
-        output_dir: pathlib.Path | None = None,
+        wikidata_json_dump_path: Path | None = None,
+        output_dir: Path | None = None,
     ):
         """Initialize the Wikidata hierarchy extractor."""
-        self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
-
-        self.wikidata_dump_path: pathlib.Path | None = wikidata_json_dump_path
-        self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
-
+        self._logger = logging.getLogger(self.__class__.__name__)
+        self.wikidata_dump_path = wikidata_json_dump_path
+        self.output_dir = output_dir or Path.cwd()
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -115,7 +117,7 @@ class WikidataTypeHierarchyExtractor:
         # construct the type entities by querying the Wikidata API, include parent type entities
         self.construct_wikidata_type_entities()
 
-    def run_build_wikidata_hierarchy(self, type_entity_ids_whitelist_path: pathlib.Path | None = None):
+    def run_build_wikidata_hierarchy(self, type_entity_ids_whitelist_path: Path | None = None):
         """Build the hierarchy of Wikidata type entities."""
         # load the Wikidata type entities
         type_entities = self.load_type_entities()
@@ -151,10 +153,10 @@ class WikidataTypeHierarchyExtractor:
 
     def extract_concrete_entities_from_wikidata_dump(
         self,
-        wikidata_dump_path: pathlib.Path | None = None,
-        working_dir: pathlib.Path | None = None,
+        wikidata_dump_path: Path | None = None,
+        working_dir: Path | None = None,
         skip_when_output_exists: bool = True,
-    ) -> pathlib.Path:
+    ) -> Path:
         """
         Extract all entities from the Wikidata dump that have an "instance of" property ("concrete" entities).
         Keep only simplified objects - entity ID and the values of the "instance of" property.
@@ -190,10 +192,10 @@ class WikidataTypeHierarchyExtractor:
 
     def extract_type_entities_from_concrete_entities(
         self,
-        concrete_entities_path: pathlib.Path | None = None,
-        working_dir: pathlib.Path | None = None,
+        concrete_entities_path: Path | None = None,
+        working_dir: Path | None = None,
         skip_when_output_exists: bool = True,
-    ) -> pathlib.Path:
+    ) -> Path:
         """
         Extract all type entities from the concrete entities in Wikidata dump,
         i.e. collect all the values of the "instance of" property of all entities in the dump.
@@ -306,10 +308,10 @@ class WikidataTypeHierarchyExtractor:
 
     def construct_wikidata_type_entities(
         self,
-        entity_ids_with_ref_counts_path: pathlib.Path | None = None,
-        working_dir: pathlib.Path | None = None,
+        entity_ids_with_ref_counts_path: Path | None = None,
+        working_dir: Path | None = None,
         skip_when_output_exists: bool = True,
-    ) -> pathlib.Path:
+    ) -> Path:
         """
         Construct all the type entities from Wikidata.
 
@@ -344,7 +346,7 @@ class WikidataTypeHierarchyExtractor:
 
         return output_path
 
-    def load_type_entities(self, type_entities_path: pathlib.Path | None = None) -> dict[str, WikidataEntity]:
+    def load_type_entities(self, type_entities_path: Path | None = None) -> dict[str, WikidataEntity]:
         """Load the type entities from the file."""
         type_entities_path = type_entities_path or (self.output_dir / self.WIKIDATA_TYPE_ENTITIES_FILENAME)
 
@@ -466,7 +468,7 @@ class WikidataTypeHierarchyExtractor:
         self,
         graph: dict[str, dict],
         type_entities: dict[str, WikidataEntity],
-        output_path: pathlib.Path | None = None,
+        output_path: Path | None = None,
     ) -> None:
         """Write the Wikidata hierarchy to a file."""
         output_path = output_path or (self.output_dir / self.WIKIDATA_HIERARCHY_FILENAME)
@@ -783,7 +785,7 @@ class WikidataTypeHierarchyExtractor:
         cls,
         sequences: Iterable[Iterable[str]],
         entities: dict[str, WikidataEntity],
-        path: pathlib.Path,
+        path: Path,
         sort_by_len: bool = False,
     ) -> None:
         """Write the node sequences to a file."""

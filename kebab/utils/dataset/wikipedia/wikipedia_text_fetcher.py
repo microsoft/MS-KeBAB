@@ -18,8 +18,8 @@ from __future__ import annotations
 
 import json
 import logging
-import pathlib
 import random
+from pathlib import Path
 
 from tqdm import tqdm
 
@@ -31,28 +31,31 @@ class WikipediaTextFetcher:
 
     WIKIPEDIA_PAGES_FILENAME = "wikipedia_pages.jsonl"
 
+    _logger: logging.Logger
+    entities_path: Path | None
+    fetch_full_intros: bool
+    output_dir: Path
+
     def __init__(
         self,
         *,
-        entities_path: pathlib.Path | None = None,
+        entities_path: Path | None = None,
         fetch_full_intros: bool = False,
-        output_dir: pathlib.Path | None = None,
+        output_dir: Path | None = None,
     ):
         """Initialize the extractor."""
-        self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
-
-        self.entities_path: pathlib.Path | None = entities_path
-        self.fetch_full_intros: bool = fetch_full_intros
-        self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
-
+        self._logger = logging.getLogger(self.__class__.__name__)
+        self.entities_path = entities_path
+        self.fetch_full_intros = fetch_full_intros
+        self.output_dir = output_dir or Path.cwd()
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def fetch_wikipedia_texts(
         self,
-        entities_path: pathlib.Path | None = None,
+        entities_path: Path | None = None,
         fetch_full_intros: bool = False,
-    ) -> pathlib.Path:
+    ) -> Path:
         """Fetch Wikipedia texts for the given Wikidata entities."""
         entities_path = entities_path or self.entities_path
         if entities_path is None:

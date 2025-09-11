@@ -3,7 +3,6 @@
 
 import datetime
 import logging
-import pathlib
 
 
 def configure_logging(
@@ -23,7 +22,7 @@ def configure_logging(
         handlers.append(handler)
 
     if log_to_file:
-        path = pathlib.Path.cwd() / log_dir / f"{datetime.datetime.now():log_%Y-%m-%d-%H-%M-%S}.log"
+        path = Path.cwd() / log_dir / f"{datetime.datetime.now():log_%Y-%m-%d-%H-%M-%S}.log"
         path.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(path, encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)

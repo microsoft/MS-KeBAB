@@ -61,8 +61,8 @@ class EntityGenerationTask(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the entity generation task."""

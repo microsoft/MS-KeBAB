@@ -81,15 +81,15 @@ class ClusteringTask(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: Logger | None = None,  # noqa: ARG002
     ) -> dict[str, float]:
         """Evaluate an output for the clustering task."""
         if self.ground_truth is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        predictions = list(ItemJsonlReader[str](output_to_evaluate, converter=str).read_items())
+        predictions = list(ItemJsonlReader[str](predictions, converter=str).read_items())
         ground_truth = list(ItemJsonlReader[str](self.ground_truth).read_items())
 
         fragment_count = len(predictions)
@@ -139,7 +139,7 @@ class ClusteringTask(Task):
 
         metrics = dict(metrics)
 
-        if eval_result_path:
-            save_dict_to_json(metrics, eval_result_path)
+        if result_output_path:
+            save_dict_to_json(metrics, result_output_path)
 
         return metrics

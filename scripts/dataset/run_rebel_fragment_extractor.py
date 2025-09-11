@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import pathlib
+from pathlib import Path
 
 import click
 from kebab.utils import logging_helpers
@@ -14,14 +14,14 @@ from kebab.utils.dataset.rebel.rebel_fragment_extractor import RebelFragmentExtr
 
 @click.option(
     "--rebel-dir",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "data" / "REBEL" / "Original Dataset" / "full",
+    type=Path,
+    default=Path.cwd() / "data" / "REBEL" / "Original Dataset" / "full",
     help="Path to the REBEL data directory (will be *json/*.jsonl-globbed against).",
 )
 @click.option(
     "--output-dir",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "output",
+    type=Path,
+    default=Path.cwd() / "output",
     help="Path to the output directory ('rebel_entity_fragments.jsonl' will be created there).",
 )
 @click.option(
@@ -32,8 +32,8 @@ from kebab.utils.dataset.rebel.rebel_fragment_extractor import RebelFragmentExtr
 )
 @click.command()
 def main(
-    rebel_dir: pathlib.Path,
-    output_dir: pathlib.Path,
+    rebel_dir: Path,
+    output_dir: Path,
     extract_surface_forms: bool,
 ) -> None:
     """Run REBEL fragment extraction steps."""

@@ -14,8 +14,8 @@ Example output:
 from __future__ import annotations
 
 import logging
-import pathlib
 from collections import Counter
+from pathlib import Path
 
 from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
 from kebab.utils.io_helpers import resolve_path
@@ -26,11 +26,15 @@ class RebelFragmentFilter:
 
     ENTITY_FRAGMENTS_FILENAME: str = "rebel_entity_fragments.jsonl"
 
+    _logger: logging.Logger
+    fragments_path: Path
+    output_dir: Path
+
     def __init__(
         self,
         *,
-        fragments_path: pathlib.Path,
-        output_dir: pathlib.Path,
+        fragments_path: Path,
+        output_dir: Path,
     ):
         """
         Initialize the fragment filter.
@@ -39,11 +43,9 @@ class RebelFragmentFilter:
             fragments_path: Path to the input REBEL fragments file.
             output_dir: Directory where output datasets will be written.
         """
-        self._logger: logging.Logger = logging.getLogger(__name__)
-
-        self.fragments_path: pathlib.Path = resolve_path(fragments_path)
-
-        self.output_dir: pathlib.Path = output_dir
+        self._logger = logging.getLogger(__name__)
+        self.fragments_path = resolve_path(fragments_path)
+        self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def run(self) -> None:

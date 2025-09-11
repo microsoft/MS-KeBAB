@@ -127,15 +127,15 @@ class TextCompletionTaskBase(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the text completion task."""
         if logger:
             logger.info("Starting evaluation for the text completion task.")
 
-        predictions = ItemJsonlReader[dict[str, str | float]](output_to_evaluate).read_items()
+        predictions = ItemJsonlReader[dict[str, str | float]](predictions).read_items()
         queries = self.generate_partial_queries()
         predictions_and_queries = zip(predictions, queries, strict=True)
 
@@ -169,8 +169,8 @@ class TextCompletionTaskBase(Task):
         if logger:
             logger.info("Evaluation metrics calculated successfully.")
             logger.info(f"Metrics: {metrics}")
-        if eval_result_path:
-            save_dict_to_json(metrics, eval_result_path)
+        if result_output_path:
+            save_dict_to_json(metrics, result_output_path)
 
         return metrics
 
