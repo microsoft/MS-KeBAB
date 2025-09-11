@@ -28,7 +28,8 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
 
 
 @click.option(
-    "--input-dir",
+    "--input",
+    "input_dir",
     type=pathlib.Path,
     default=pathlib.Path.cwd() / "output",
     help=(
