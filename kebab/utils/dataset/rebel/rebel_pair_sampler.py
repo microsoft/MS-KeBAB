@@ -156,7 +156,7 @@ class RebelPairSampler:
 
     def run(self) -> None:
         """Run the pair sampling pipeline."""
-        self._logger.info("Sampling REBEL fragment pairs from...")
+        self._logger.info("Sampling REBEL fragment pairs based on confusable entities")
 
         # load the input fragments
         fragments: list[ResolvedWikidataEntity] = self.load_fragments()
