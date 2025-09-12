@@ -19,7 +19,7 @@ def configure_logging(
     if log_to_console:
         handler = logging.StreamHandler()
         handler.setLevel(level)
-        formatter = logging.Formatter("%(message)s")
+        formatter = logging.Formatter("%(asctime)s\t%(levelname)s\t%(name)s\t%(message)s", datefmt="%Y-%m-%dT%H:%M:%S")
         handler.setFormatter(formatter)
         handlers.append(handler)
 

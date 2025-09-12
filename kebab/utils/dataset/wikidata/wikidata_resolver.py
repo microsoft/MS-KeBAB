@@ -62,7 +62,7 @@ class WikidataResolver:
         output_dir: Path,
     ):
         """Initialize the Wikidata resolver."""
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger(self.__class__.__name__)
         self.entities_path = resolve_path(entities_path)
         self.wikidata_simple_entities_path = (
             resolve_path(wikidata_simple_entities_path) if wikidata_simple_entities_path is not None else None

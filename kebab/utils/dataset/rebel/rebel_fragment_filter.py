@@ -46,7 +46,7 @@ class RebelFragmentFilter:
             output_dir: Directory where output datasets will be written.
             drop_fragments_without_type: If True, drop fragments that have no WikiData type in metadata.
         """
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger(self.__class__.__name__)
         self.fragments_path = resolve_path(fragments_path)
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)

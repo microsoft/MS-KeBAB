@@ -1,5 +1,5 @@
 """
-Samples pre-merged fragment pairs from REBEL dataset and outputs:
+Samples pre-merged fragment pairs from REBEL dataset and produces:
 - Pairwise linking dataset that contains pairs of entity fragments (ZipF-sampled and merged) from REBEL.
 - Clustering dataset that contains all fragments of all entities included in the pairwise linking dataset.
 - Entity generation dataset that contains merged fragments of all entities included in the clustering dataset.
@@ -121,7 +121,7 @@ class RebelPairSampler:
             deduplicate_values: Whether to deduplicate property values in the merged fragments.
             seed: Optional seed to make sampling deterministic across Python's `random` and NumPy.
         """
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger(self.__class__.__name__)
         self.fragments_path = resolve_path(fragments_path)
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)

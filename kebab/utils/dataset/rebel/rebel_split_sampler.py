@@ -149,7 +149,7 @@ class RebelSplitSampler:
             splits: The list of split configurations to produce (e.g., Test, Validation, Train) in order.
             type_filter: Optional type filtering configuration based on Wikidata type hierarchy.
         """
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger(self.__class__.__name__)
         self.input_dir = resolve_path(input_dir)
         self.output_dir = resolve_path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -719,23 +719,17 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     test = SplitBuildConfig(
         name="test",
         linking=LinkingConfig(
-            pair_count_limit=2_000,
-            pairs_per_entity_limit=10,
-            property_pattern_count_limit=20,
+            pair_count_limit=5_000,
+            pairs_per_entity_limit=50,
+            property_pattern_count_limit=100,
             property_overlap_limits={1: 0.35},
             single_class_ratio_limit=0.76,
             seed=seed if seed is not None else 23,
         ),
         clustering=ClusteringConfig(
-            min_fragments_per_entity=3,
-            entity_count_limit=0,
-            fragments_per_entity_limit=50,
-            include_all_linking_fragments_first=True,
             seed=seed if seed is not None else 23,
         ),
         incremental_linking=IncrementalLinkingConfig(
-            max_chain_len=25,
-            negatives_per_positive=1,
             seed=seed if seed is not None else 23,
         ),
     )
@@ -743,23 +737,17 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     dev = SplitBuildConfig(
         name="dev",
         linking=LinkingConfig(
-            pair_count_limit=20_000,
-            pairs_per_entity_limit=100,
-            property_pattern_count_limit=1_000,
-            property_overlap_limits={1: 0.40},
+            pair_count_limit=5_000,
+            pairs_per_entity_limit=50,
+            property_pattern_count_limit=100,
+            property_overlap_limits={1: 0.35},
             single_class_ratio_limit=0.76,
             seed=seed + 1 if seed is not None else 24,
         ),
         clustering=ClusteringConfig(
-            min_fragments_per_entity=3,
-            entity_count_limit=0,
-            fragments_per_entity_limit=50,
-            include_all_linking_fragments_first=True,
             seed=seed + 1 if seed is not None else 24,
         ),
         incremental_linking=IncrementalLinkingConfig(
-            max_chain_len=25,
-            negatives_per_positive=1,
             seed=seed + 1 if seed is not None else 24,
         ),
     )
@@ -768,22 +756,17 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
         name="train",
         linking=LinkingConfig(
             pair_count_limit=500_000,
-            pairs_per_entity_limit=500,
-            property_pattern_count_limit=10_000,
-            property_overlap_limits={1: 0.45},
+            pairs_per_entity_limit=5_000,
+            property_pattern_count_limit=20_000,
+            property_overlap_limits={1: 0.55},
             single_class_ratio_limit=0.76,
             seed=seed + 2 if seed is not None else 25,
         ),
         clustering=ClusteringConfig(
-            min_fragments_per_entity=3,
-            entity_count_limit=0,
             fragments_per_entity_limit=1_000,
-            include_all_linking_fragments_first=True,
             seed=seed + 2 if seed is not None else 25,
         ),
         incremental_linking=IncrementalLinkingConfig(
-            max_chain_len=25,
-            negatives_per_positive=1,
             seed=seed + 2 if seed is not None else 25,
         ),
     )
