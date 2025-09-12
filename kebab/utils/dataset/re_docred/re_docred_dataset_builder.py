@@ -13,7 +13,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import pathlib
 import typing
 from collections.abc import Iterable
 from pathlib import Path
@@ -62,8 +61,15 @@ class ReDocRedDatasetBuilder:
     MIN_PROPERTY_COUNT: typing.ClassVar[int] = 2
 
     SCHEMAS: typing.ClassVar[dict[str, DocumentSchema]] = DocumentUtilities.load_schemas(
-        pathlib.Path(__file__).parents[3] / "configs" / "doc_schemas"
+        Path(__file__).parents[3] / "configs" / "doc_schemas"
     )
+
+    _logger: logging.Logger
+    re_docred_dir: Path
+    wikidata_properties_path: Path
+    output_dir: Path
+    extracts_output_path: Path
+    entities_output_path: Path
 
     def __init__(
         self,
@@ -80,14 +86,11 @@ class ReDocRedDatasetBuilder:
             wikidata_properties_path: Path to the Wikidata properties file.
             output_dir: Path to the output directory.
         """
-        self._logger: logging.Logger = logging.getLogger(__name__)
-
-        self.re_docred_dir: Path = re_docred_dir
-        self.wikidata_properties_path: Path = wikidata_properties_path
-        self.output_dir: Path = output_dir
-
+        self._logger = logging.getLogger(__name__)
+        self.re_docred_dir = re_docred_dir
+        self.wikidata_properties_path = wikidata_properties_path
+        self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-
         self.extracts_output_path = self.output_dir / self.EXTRACTS_FILENAME
         self.entities_output_path = self.output_dir / self.ENTITIES_FILENAME
         assert not self.extracts_output_path.exists(), "Extracts output file already exists."

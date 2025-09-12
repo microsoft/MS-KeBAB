@@ -26,8 +26,8 @@ def test_entity_generation_read_write_items_roundtrip() -> None:
     schema_file_path = Path(__file__).parents[1] / "data" / "entity_generation" / "propert_schema.json"
     task_instance = EntityGenerationTask(
         "EntityGeneration-Alexandria-Train",
-        str(entities_file_path),
-        str(schema_file_path),
+        entities_file_path,
+        schema_file_path,
     )
 
     # Act

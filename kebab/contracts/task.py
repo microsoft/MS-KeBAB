@@ -34,13 +34,13 @@ class Task(ABC):
 
     __name: str
     __schema: Path | None
-    __data_path: Path | None
+    __root_for_relative_paths: Path | None
 
-    def __init__(self, name: str, schema: str | None = None, data_path: Path | None = None):
+    def __init__(self, name: str, schema: Path | None = None, root_for_relative_paths: Path | None = None):
         """Initialize a task."""
         self.__name = name
-        self.__data_path = data_path
-        self.__schema = resolve_path(schema, data_path) if schema else None
+        self.__root_for_relative_paths = resolve_path(root_for_relative_paths) if root_for_relative_paths else None
+        self.__schema = resolve_path(schema, root_for_relative_paths) if schema is not None else None
 
     @property
     def name(self) -> str:
@@ -53,9 +53,9 @@ class Task(ABC):
         return self.name.translate(str.maketrans("", "", r'<>:"/\\|?*'))
 
     @property
-    def data_path(self) -> Path | None:
+    def root_for_relative_paths(self) -> Path | None:
         """Return the path to the data root."""
-        return self.__data_path
+        return self.__root_for_relative_paths
 
     @property
     @abstractmethod
@@ -85,14 +85,14 @@ class Task(ABC):
 
     @abstractmethod
     def evaluate(
-        self, output_to_evaluate: Path, eval_result_path: Path | None = None, logger: Logger | None = None
+        self, predictions: Path, result_output_path: Path | None = None, logger: Logger | None = None
     ) -> dict[str, float]:
         """
         Evaluate an output for the task.
 
         Args:
-            output_to_evaluate: The output that needs to be evaluated.
-            eval_result_path: Optional path to save the evaluation result.
+            predictions: The path to the predictions file that needs to be evaluated.
+            result_output_path: Optional path to save the evaluation results to.
             logger: Optional logger to log the evaluation process.
 
         Returns:

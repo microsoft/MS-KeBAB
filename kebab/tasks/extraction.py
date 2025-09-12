@@ -25,9 +25,9 @@ from kebab.utils.io_helpers import (
 class ExtractionTask(Task):
     """Represents an extraction benchmark task with its data files."""
 
-    __data_extracts: Path
-    __data_ground_truth_extracted_entities: Path | None = None
-    __default_metrics_config_path: Path = (
+    __extracts: Path
+    __ground_truth: Path | None = None
+    __default_metrics_config: Path = (
         Path(__file__).parents[1] / "configs" / "extraction" / "default_metrics_config.json"
     )
     __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {}
@@ -39,31 +39,31 @@ class ExtractionTask(Task):
         return TaskType.Extraction
 
     @property
-    def data_extracts(self) -> Path:
+    def extracts(self) -> Path:
         """Return path to extracts."""
-        return self.__data_extracts
+        return self.__extracts
 
     @property
-    def data_ground_truth_extracted_entities(self) -> Path | None:
+    def ground_truth(self) -> Path | None:
         """Return path to ground truth extracted entities."""
-        return self.__data_ground_truth_extracted_entities
+        return self.__ground_truth
 
     def __init__(
         self,
         name: str,
-        extracts: str,
-        schema: str,
-        ground_truth_extracted_entities: str | None = None,
-        metrics_config: str | None = None,
-        data_path: Path | None = None,
+        extracts: Path,
+        schema: Path,
+        ground_truth: Path | None = None,
+        metrics_config: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize an extraction task."""
-        super().__init__(name, schema, data_path=data_path)
-        self.__data_extracts = resolve_path(extracts, data_path)
-        if ground_truth_extracted_entities is not None:
-            self.__data_ground_truth_extracted_entities = resolve_path(ground_truth_extracted_entities, data_path)
+        super().__init__(name, schema, root_for_relative_paths=root_for_relative_paths)
+        self.__extracts = resolve_path(extracts)
+        if ground_truth is not None:
+            self.__ground_truth = resolve_path(ground_truth, root_for_relative_paths)
         self.metrics_config = load_dict_from_json(
-            resolve_path(metrics_config or self.__default_metrics_config_path, data_path)
+            resolve_path(metrics_config or self.__default_metrics_config, root_for_relative_paths)
         )
 
     def read_items(self) -> Iterable[ExtractionOutput]:
@@ -76,11 +76,9 @@ class ExtractionTask(Task):
         """
         # TODO (allenwang): Pass `Cache` into this instance to resolve dataset links to local paths
         # after instances.json is updated with valid links.
-        extracts = DocumentJsonlReader(self.data_extracts).read_items()
+        extracts = DocumentJsonlReader(self.extracts).read_items()
         entity_lists = (
-            EntityListJsonlReader(self.data_ground_truth_extracted_entities).read_items()
-            if self.data_ground_truth_extracted_entities is not None
-            else iter([])
+            EntityListJsonlReader(self.ground_truth).read_items() if self.ground_truth is not None else iter([])
         )
         return (
             ExtractionOutput(document=extract, entities=entity_list)
@@ -99,19 +97,19 @@ class ExtractionTask(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: logging.Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the extraction task."""
-        if hasattr(self, "__data_ground_truth_extracted_entities"):
+        if hasattr(self, "__ground_truth"):
             raise ValueError("Can not evaluate on heldout Extraction task")
 
         pred_extractions = (
             ExtractionOutput(document=document, entities=entity_list)
             for document, entity_list in zip(
                 (item.document for item in self.read_items()),
-                EntityListJsonlReader(output_to_evaluate).read_items(),
+                EntityListJsonlReader(predictions).read_items(),
                 strict=True,
             )
         )
@@ -137,7 +135,7 @@ class ExtractionTask(Task):
             )
             metric_results = metric_calculator_cls(metric_config, logger).run(pred_extractions, self.read_items())  # type: ignore
             metrics[metric_name] = metric_results
-        if eval_result_path:
-            save_dict_to_json(metrics, eval_result_path)
+        if result_output_path:
+            save_dict_to_json(metrics, result_output_path)
 
         return metrics

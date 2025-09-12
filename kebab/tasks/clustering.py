@@ -19,8 +19,8 @@ from kebab.utils.io_helpers import EntityJsonlReader, ItemJsonlReader, ItemJsonl
 class ClusteringTask(Task):
     """Represents a clustering benchmark task with its data files."""
 
-    __data_entity_fragments: Path
-    __data_ground_truth_labels: Path | None
+    __entity_fragments: Path
+    __ground_truth: Path | None
 
     @property
     def task_type(self) -> TaskType:
@@ -28,28 +28,28 @@ class ClusteringTask(Task):
         return TaskType.Clustering
 
     @property
-    def data_entity_fragments(self) -> Path:
+    def entity_fragments(self) -> Path:
         """Return the path to the file containing entity fragments."""
-        return self.__data_entity_fragments
+        return self.__entity_fragments
 
     @property
-    def data_ground_truth_labels(self) -> Path | None:
+    def ground_truth(self) -> Path | None:
         """Return the path to the ground truth labels representing cluster IDs."""
-        return self.__data_ground_truth_labels
+        return self.__ground_truth
 
     def __init__(
         self,
         name: str,
-        entity_fragments: str | Path,
-        schema: str | None = None,
-        ground_truth_labels: str | Path | None = None,
-        data_path: Path | None = None,
+        entity_fragments: Path,
+        schema: Path | None = None,
+        ground_truth: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a new clustering task."""
-        super().__init__(name, schema, data_path=data_path)
-        self.__data_entity_fragments = resolve_path(entity_fragments, data_path)
-        if ground_truth_labels is not None:
-            self.__data_ground_truth_labels = resolve_path(ground_truth_labels, data_path)
+        super().__init__(name, schema, root_for_relative_paths=root_for_relative_paths)
+        self.__entity_fragments = resolve_path(entity_fragments, root_for_relative_paths)
+        if ground_truth is not None:
+            self.__ground_truth = resolve_path(ground_truth, root_for_relative_paths)
 
     def read_items(self) -> Iterable[tuple[Entity, str | None]]:
         """
@@ -61,10 +61,10 @@ class ClusteringTask(Task):
                 - An `Entity` object describing an entity fragment.
                 - A string value providing the ground-truth label (cluster ID).
         """
-        entities = EntityJsonlReader(self.data_entity_fragments).read_items()
+        entities = EntityJsonlReader(self.entity_fragments).read_items()
         labels = (
-            ItemJsonlReader[str](self.data_ground_truth_labels, converter=str).read_items()
-            if self.data_ground_truth_labels is not None
+            ItemJsonlReader[str](self.ground_truth, converter=str).read_items()
+            if self.ground_truth is not None
             else iter([])
         )
         return zip_longest(entities, labels)
@@ -81,25 +81,25 @@ class ClusteringTask(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: Logger | None = None,  # noqa: ARG002
     ) -> dict[str, float]:
         """Evaluate an output for the clustering task."""
-        if self.data_ground_truth_labels is None:
+        if self.ground_truth is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        predictions = list(ItemJsonlReader[str](output_to_evaluate, converter=str).read_items())
-        ground_truth = list(ItemJsonlReader[str](self.data_ground_truth_labels).read_items())
+        predicted_vals = list(ItemJsonlReader[str](predictions, converter=str).read_items())
+        ground_truth = list(ItemJsonlReader[str](self.ground_truth).read_items())
 
-        fragment_count = len(predictions)
+        fragment_count = len(predicted_vals)
         metrics = defaultdict(float)
         metrics["fragments"] = fragment_count
 
         # construct the predicted {element_idx -> set of element_idx} map
         pred_clusters = defaultdict(set)
         pred_cluster_map = {}
-        for i, cluster_id in enumerate(predictions):
+        for i, cluster_id in enumerate(predicted_vals):
             cluster = pred_clusters[cluster_id]
             cluster.add(i)
             pred_cluster_map[i] = cluster
@@ -139,7 +139,7 @@ class ClusteringTask(Task):
 
         metrics = dict(metrics)
 
-        if eval_result_path:
-            save_dict_to_json(metrics, eval_result_path)
+        if result_output_path:
+            save_dict_to_json(metrics, result_output_path)
 
         return metrics

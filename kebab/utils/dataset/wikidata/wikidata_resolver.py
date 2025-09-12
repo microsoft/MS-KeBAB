@@ -13,8 +13,8 @@ Required inputs:
 from __future__ import annotations
 
 import logging
-import pathlib
 from collections import defaultdict
+from pathlib import Path
 
 from kebab.contracts.entity import Entity
 from kebab.utils.dataset.wikidata import wikidata_utils
@@ -24,39 +24,49 @@ from kebab.utils.io_helpers import resolve_path
 class WikidataResolver:
     """A class for resolving Wikidata entities and properties."""
 
+    _logger: logging.Logger
+    entities_path: Path
+    wikidata_simple_entities_path: Path
+    wikidata_properties_path: Path
+    wikidata_type_hierarchy_path: Path
+    resolve_property_names: bool
+    resolve_property_values: bool
+    attach_types: bool
+    resolve_attached_types: bool
+    query_api: bool
+    save_with_minimal_repr: bool
+    output_dir: Path
+    entities_output_path: Path
+
     def __init__(
         self,
         *,
-        entities_path: pathlib.Path,
-        wikidata_simple_entities_path: pathlib.Path,
-        wikidata_properties_path: pathlib.Path,
-        wikidata_type_hierarchy_path: pathlib.Path,
+        entities_path: Path,
+        wikidata_simple_entities_path: Path,
+        wikidata_properties_path: Path,
+        wikidata_type_hierarchy_path: Path,
         attach_types: bool = True,
         resolve_attached_types: bool = False,
         resolve_property_names: bool = True,
         resolve_property_values: bool = True,
         query_api: bool = True,
         save_with_minimal_repr: bool = True,
-        output_dir: pathlib.Path,
+        output_dir: Path,
     ):
         """Initialize the Wikidata resolver."""
-        self._logger: logging.Logger = logging.getLogger(__name__)
-
-        self.entities_path: pathlib.Path = resolve_path(entities_path)
-        self.wikidata_simple_entities_path: pathlib.Path = resolve_path(wikidata_simple_entities_path)
-        self.wikidata_properties_path: pathlib.Path = resolve_path(wikidata_properties_path)
-        self.wikidata_type_hierarchy_path: pathlib.Path = resolve_path(wikidata_type_hierarchy_path)
-
-        self.resolve_property_names: bool = resolve_property_names
-        self.resolve_property_values: bool = resolve_property_values
-        self.attach_types: bool = attach_types
-        self.resolve_attached_types: bool = resolve_attached_types
-        self.query_api: bool = query_api
-        self.save_with_minimal_repr: bool = save_with_minimal_repr
-
-        self.output_dir: pathlib.Path = output_dir
+        self._logger = logging.getLogger(__name__)
+        self.entities_path = resolve_path(entities_path)
+        self.wikidata_simple_entities_path = resolve_path(wikidata_simple_entities_path)
+        self.wikidata_properties_path = resolve_path(wikidata_properties_path)
+        self.wikidata_type_hierarchy_path = resolve_path(wikidata_type_hierarchy_path)
+        self.resolve_property_names = resolve_property_names
+        self.resolve_property_values = resolve_property_values
+        self.attach_types = attach_types
+        self.resolve_attached_types = resolve_attached_types
+        self.query_api = query_api
+        self.save_with_minimal_repr = save_with_minimal_repr
+        self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-
         self.entities_output_path = self.output_dir / self.entities_path.name
 
         if not self.entities_path.exists():
@@ -107,9 +117,9 @@ class WikidataResolver:
 
         self._logger.info(f"Resolved entities saved to: {self.entities_output_path}")
 
-    def collect_referenced_ids(self, entities_path: pathlib.Path | None = None) -> set[str]:
+    def collect_referenced_ids(self, entities_path: Path | None = None) -> set[str]:
         """Collect all distinct entity ids and reference property values."""
-        entities_path = entities_path or self.entities_path
+        entities_path = resolve_path(entities_path or self.entities_path)
         referenced_ids = set()
 
         with open(entities_path, encoding="utf-8") as f:
@@ -130,13 +140,13 @@ class WikidataResolver:
         wikidata_entities: dict[str, wikidata_utils.WikidataEntity],
         wikidata_properties: dict[str, dict],
         type_id_to_node: dict[str, dict],
-        entities_path: pathlib.Path | None = None,
-        output_path: pathlib.Path | None = None,
+        entities_path: Path | None = None,
+        output_path: Path | None = None,
         save_with_minimal_repr: bool | None = None,
     ) -> None:
         """Substitute the actual values into the entities."""
-        entities_path = entities_path or self.entities_path
-        output_path = output_path or self.entities_output_path
+        entities_path = resolve_path(entities_path or self.entities_path)
+        output_path = resolve_path(output_path or self.entities_output_path)
         save_with_minimal_repr = save_with_minimal_repr or self.save_with_minimal_repr
 
         with open(output_path, mode="w", encoding="utf-8") as f_out, open(entities_path, encoding="utf-8") as f_in:

@@ -16,7 +16,7 @@ Output layout (within output_dir):
 
 from __future__ import annotations
 
-import pathlib
+from pathlib import Path
 
 import click
 from kebab.utils import logging_helpers
@@ -30,8 +30,8 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
 @click.option(
     "--input",
     "input_dir",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "output",
+    type=Path,
+    default=Path.cwd() / "output",
     help=(
         "Path to the dataset directory produced by RebelDatasetBuilder. "
         "This directory must contain the base linking/clustering/generation jsonl files."
@@ -39,8 +39,8 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
 )
 @click.option(
     "--output-dir",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd() / "output",
+    type=Path,
+    default=Path.cwd() / "output",
     help="Path to the target output directory",
 )
 @click.option(
@@ -63,13 +63,8 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
 )
 @click.option(
     "--type-hierarchy-path",
-    type=pathlib.Path,
-    default=pathlib.Path.cwd()
-    / "Datasets"
-    / "Wikidata"
-    / "Type Hierarchy"
-    / "2025-01-30"
-    / "wikidata_type_hierarchy.jsonl",
+    type=Path,
+    default=Path.cwd() / "Datasets" / "Wikidata" / "Type Hierarchy" / "2025-01-30" / "wikidata_type_hierarchy.jsonl",
     help="Path to the Wikidata type hierarchy jsonl file (required when using type filters).",
 )
 @click.option(
@@ -80,11 +75,11 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
 )
 @click.command()
 def main(
-    input_dir: pathlib.Path,
-    output_dir: pathlib.Path,
+    input_dir: Path,
+    output_dir: Path,
     required_type_id: str,
     exclude_type_id: tuple[str, ...],
-    type_hierarchy_path: pathlib.Path,
+    type_hierarchy_path: Path,
     include_descendants: bool,
 ) -> None:
     """Run REBEL subsampler to produce Test/Validation/Train splits in one go."""

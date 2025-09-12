@@ -6,9 +6,9 @@
 from __future__ import annotations
 
 import json
-import pathlib
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Self
 
 
@@ -115,8 +115,8 @@ class DocumentUtilities:
     @classmethod
     def load_collection(
         cls,
-        path_to_schema_dir: pathlib.Path,
-        path_to_documents_dir: pathlib.Path,
+        path_to_schema_dir: Path,
+        path_to_documents_dir: Path,
     ) -> Iterable[Document]:
         """Load schemas and a collection of documents from a directory."""
         assert path_to_documents_dir.exists(), f"Directory not found: {path_to_documents_dir}"
@@ -127,7 +127,7 @@ class DocumentUtilities:
             yield from cls.load_documents(documents_path, schemas)
 
     @classmethod
-    def load_schemas(cls, path: pathlib.Path) -> dict[str, DocumentSchema]:
+    def load_schemas(cls, path: Path) -> dict[str, DocumentSchema]:
         """Load a collection of schemas from a directory."""
         assert path.exists(), f"Directory not found: {path}"
 
@@ -140,7 +140,7 @@ class DocumentUtilities:
         return schemas
 
     @classmethod
-    def load_documents(cls, path: pathlib.Path, schemas: dict[str, DocumentSchema]) -> Iterable[Document]:
+    def load_documents(cls, path: Path, schemas: dict[str, DocumentSchema]) -> Iterable[Document]:
         """Load a list of documents from a JSON-lines file."""
         assert path.exists(), f"File not found: {path}"
 
@@ -149,7 +149,7 @@ class DocumentUtilities:
                 yield Document.from_json(line, schemas=schemas)
 
     @classmethod
-    def save_documents(cls, documents: Iterable[Document], path: pathlib.Path) -> None:
+    def save_documents(cls, documents: Iterable[Document], path: Path) -> None:
         """Save a list of documents as a JSON-lines file."""
         path.parent.mkdir(parents=True, exist_ok=True)
 

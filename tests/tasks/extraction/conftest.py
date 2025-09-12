@@ -3,7 +3,9 @@
 
 """Fixtures for extraction tests."""
 
-import pathlib
+from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 from kebab.contracts.entity import PropertySchema
@@ -12,6 +14,4 @@ from kebab.contracts.entity import PropertySchema
 @pytest.fixture
 def property_schema() -> PropertySchema:
     """Load extraction PropertySchema for testing."""
-    return PropertySchema.from_file(
-        pathlib.Path(__file__).parents[2] / "data" / "extraction" / "property_schema_metrics.json"
-    )
+    return PropertySchema.from_file(Path(__file__).parents[2] / "data" / "extraction" / "property_schema_metrics.json")

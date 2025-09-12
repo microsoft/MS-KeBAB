@@ -30,8 +30,8 @@ from kebab.utils.io_helpers import (
 class LinkingTask(Task):
     """Represents a linking benchmark task with its data files."""
 
-    __data_entity_fragment_pairs: Path
-    __data_ground_truth_boolean: Path | None
+    __entity_fragment: Path
+    __ground_truth: Path | None
 
     @property
     def task_type(self) -> TaskType:
@@ -41,26 +41,26 @@ class LinkingTask(Task):
     @property
     def data_entity_fragment_pairs(self) -> Path:
         """Return path to entity fragment pairs."""
-        return self.__data_entity_fragment_pairs
+        return self.__entity_fragment
 
     @property
-    def data_ground_truth_boolean(self) -> Path | None:
+    def ground_truth(self) -> Path | None:
         """Return path to ground truth boolean."""
-        return self.__data_ground_truth_boolean
+        return self.__ground_truth
 
     def __init__(
         self,
         name: str,
-        entity_fragment_pairs: str,
-        schema: str | None = None,
-        ground_truth_boolean: str | None = None,
-        data_path: Path | None = None,
+        entity_fragment_pairs: Path,
+        schema: Path | None = None,
+        ground_truth: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a linking task."""
-        super().__init__(name, schema, data_path=data_path)
-        self.__data_entity_fragment_pairs = resolve_path(entity_fragment_pairs, data_path)
-        if ground_truth_boolean is not None:
-            self.__data_ground_truth_boolean = resolve_path(ground_truth_boolean, data_path)
+        super().__init__(name, schema, root_for_relative_paths=root_for_relative_paths)
+        self.__entity_fragment = resolve_path(entity_fragment_pairs, root_for_relative_paths)
+        if ground_truth is not None:
+            self.__ground_truth = resolve_path(ground_truth, root_for_relative_paths)
 
     def read_items(self) -> Iterable[tuple[tuple[Entity, Entity], bool | None]]:
         """
@@ -74,8 +74,8 @@ class LinkingTask(Task):
         """
         entity_pairs = EntityPairJsonlReader(self.data_entity_fragment_pairs).read_items()
         labels = (
-            ItemJsonlReader[bool](self.data_ground_truth_boolean, converter=bool).read_items()
-            if self.data_ground_truth_boolean is not None
+            ItemJsonlReader[bool](self.ground_truth, converter=bool).read_items()
+            if self.ground_truth is not None
             else iter([])
         )
         return zip_longest(entity_pairs, labels)
@@ -92,8 +92,8 @@ class LinkingTask(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: Logger | None = None,
         output_dir: Path | None = None,
         adjust_to_test_prior: bool = True,
@@ -103,8 +103,8 @@ class LinkingTask(Task):
         Evaluate an output for the linking task.
 
         Args:
-            output_to_evaluate: Path to model output predictions (log-odds or 0/1 predictions).
-            eval_result_path: Optional path to save evaluation metrics as JSON.
+            predictions: Path to model output predictions (log-odds or 0/1 predictions).
+            result_output_path: Optional path to save evaluation metrics as JSON.
             logger: Optional logger for logging evaluation summaries.
             output_dir: Optional directory for saving metrics and evaluation outputs.
             adjust_to_test_prior: If True, adjust the log-odds to match the prior on the test set.
@@ -115,10 +115,10 @@ class LinkingTask(Task):
         Returns:
             dict[str, float]: Evaluation metrics dictionary.
         """
-        if self.data_ground_truth_boolean is None:
+        if self.ground_truth is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        log_odds = np.asarray(list(ItemJsonlReader[float](output_to_evaluate, converter=float).read_items()))
+        log_odds = np.asarray(list(ItemJsonlReader[float](predictions, converter=float).read_items()))
         pairs, gt_labels = zip(*self.read_items(), strict=False)
         gt_labels = np.asarray(gt_labels, dtype=bool)
         if log_odds.shape != gt_labels.shape:
@@ -133,8 +133,8 @@ class LinkingTask(Task):
         metrics = self._compute_probabilistic_metrics(log_odds, gt_labels, adjust_to_test_prior)
 
         # compute binary metrics
-        predictions = log_odds > 0
-        conf_matrix = _ConfMatrix.from_arrays(gt_labels, predictions)
+        predicted_vals = log_odds > 0
+        conf_matrix = _ConfMatrix.from_arrays(gt_labels, predicted_vals)
         metrics = {**metrics, **conf_matrix.get_metrics()}
 
         # no need for optimistic log-prob if log_prob is available
@@ -142,8 +142,8 @@ class LinkingTask(Task):
             metrics["optimistic_log_prob"] = float("nan")
 
         # build detailed records
-        detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predictions, debugging_info_path)
-        self._write_side_outputs(metrics, detail_records, output_dir, eval_result_path)
+        detail_records = self._build_detail_records(pairs, gt_labels, log_odds, predicted_vals, debugging_info_path)
+        self._write_side_outputs(metrics, detail_records, output_dir, result_output_path)
 
         # report metrics in console or logger
         self._report_metrics(logger, metrics)
@@ -174,7 +174,7 @@ class LinkingTask(Task):
 
     def _compute_probabilistic_metrics(
         self, log_odds: np.ndarray, gt_labels: np.ndarray, adjust_to_test_prior: bool
-    ) -> dict[str, float]:
+    ) -> dict[str, float | int]:
         """Compute the probabilistic metrics based on log-odds and ground truth labels."""
         metrics = {"log_prob": float("nan"), "log_odds_adjustment": float("nan")}
 
@@ -217,11 +217,9 @@ class LinkingTask(Task):
         reported_metrics = {key: metrics[key] for key in order if key in metrics}
 
         if logger:
-            logger.info(
-                "\t".join(reported_metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in reported_metrics.values())
-            )
-        else:
-            print("\t".join(reported_metrics.keys()) + "\n" + "\t".join(f"{v:.4f}" for v in reported_metrics.values()))
+            logger.info("Metrics:")
+            for k, v in reported_metrics.items():
+                logger.info(f"{k}: {v}")
 
     def _build_detail_records(
         self,
@@ -406,4 +404,4 @@ class _ConfMatrix:
         cm = confusion_matrix(gt_labels, predictions)
         tn, fp, fn, tp = cm.ravel()
 
-        return _ConfMatrix(tp=tp, tn=tn, fp=fp, fn=fn)
+        return _ConfMatrix(tp=int(tp), tn=int(tn), fp=int(fp), fn=int(fn))

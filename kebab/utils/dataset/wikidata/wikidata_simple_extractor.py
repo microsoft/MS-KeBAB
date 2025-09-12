@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
-import pathlib
+from pathlib import Path
 
 from kebab.utils.dataset.wikidata import wikidata_utils
 
@@ -29,23 +29,26 @@ class WikidataSimpleExtractor:
     WIKIDATA_SIMPLE_ENTITIES_FILENAME = "wikidata_simple_entities.jsonl"
     WIKIDATA_PROPERTIES_FILENAME = "wikidata_properties.json"
 
+    _logger: logging.Logger
+    wikidata_dump_path: Path | None
+    run_entity_extraction: bool
+    run_property_fetch: bool
+    output_dir: Path
+
     def __init__(
         self,
         *,
-        wikidata_json_dump_path: pathlib.Path | None = None,
+        wikidata_json_dump_path: Path | None = None,
         run_entity_extraction: bool,
         run_property_fetch: bool,
-        output_dir: pathlib.Path | None = None,
+        output_dir: Path | None = None,
     ):
         """Initialize the extractor."""
-        self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
-
-        self.wikidata_dump_path: pathlib.Path | None = wikidata_json_dump_path
-        self.run_entity_extraction: bool = run_entity_extraction
-        self.run_property_fetch: bool = run_property_fetch
-
-        self.output_dir: pathlib.Path = output_dir or pathlib.Path.cwd()
-
+        self._logger = logging.getLogger(self.__class__.__name__)
+        self.wikidata_dump_path = wikidata_json_dump_path
+        self.run_entity_extraction = run_entity_extraction
+        self.run_property_fetch = run_property_fetch
+        self.output_dir = output_dir or Path.cwd()
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -57,7 +60,7 @@ class WikidataSimpleExtractor:
         if self.run_property_fetch:
             self.fetch_properties()
 
-    def extract_simple_entities(self, wikidata_dump_path: pathlib.Path | None = None) -> pathlib.Path:
+    def extract_simple_entities(self, wikidata_dump_path: Path | None = None) -> Path:
         """Extract simple entities (ID + names + types) from Wikidata."""
         input_path = wikidata_dump_path or self.wikidata_dump_path
         if input_path is None:
@@ -84,7 +87,7 @@ class WikidataSimpleExtractor:
 
         return output_path
 
-    def fetch_properties(self) -> pathlib.Path:
+    def fetch_properties(self) -> Path:
         """Fetch all properties from Wikidata."""
         output_path = self.output_dir / self.WIKIDATA_PROPERTIES_FILENAME
 

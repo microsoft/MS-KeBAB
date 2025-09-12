@@ -19,6 +19,7 @@ from kebab.utils.io_helpers import (
     EntityJsonlReader,
     StringLineReader,
     StringLineWriter,
+    resolve_path,
     save_dict_to_json,
 )
 
@@ -26,8 +27,8 @@ from kebab.utils.io_helpers import (
 class QuestionAnsweringTaskBase(Task):
     """Base class for question-answering benchmark task."""
 
-    __data_questions: Path
-    __data_ground_truth_answers: Path
+    __questions: Path
+    __ground_truth: Path
 
     @property
     @abstractmethod
@@ -37,15 +38,15 @@ class QuestionAnsweringTaskBase(Task):
     def __init__(
         self,
         name: str,
-        questions: str,
-        ground_truth_answers: str,
-        schema: str,
-        data_path: Path | None = None,
+        questions: Path,
+        ground_truth: Path,
+        schema: Path | None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a question-answering task."""
-        super().__init__(name, schema=schema, data_path=data_path)
-        self.__data_questions = Path(questions)
-        self.__data_ground_truth_answers = Path(ground_truth_answers)
+        super().__init__(name, schema=schema, root_for_relative_paths=root_for_relative_paths)
+        self.__questions = resolve_path(questions)
+        self.__ground_truth = resolve_path(ground_truth)
 
     def read_items(self) -> Iterable[str]:
         """
@@ -54,7 +55,7 @@ class QuestionAnsweringTaskBase(Task):
         Returns:
             Iterable[str]: An iterable of string objects.
         """
-        return StringLineReader(self.__data_questions).read_items()
+        return StringLineReader(self.__questions).read_items()
 
     def write_items(self, path: Path, items: Iterable[str]) -> None:
         """
@@ -68,31 +69,31 @@ class QuestionAnsweringTaskBase(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the question-answering task."""
         if logger:
             logger.info("Starting evaluation for the question-answering task.")
 
-        predictions = StringLineReader(output_to_evaluate).read_items()
-        targets = StringLineReader(self.__data_ground_truth_answers).read_items()
-        predictions_and_targets = zip(predictions, targets, strict=True)
+        predicted_vals = StringLineReader(predictions).read_items()
+        targets = StringLineReader(self.__ground_truth).read_items()
+        predictions_and_targets = zip(predicted_vals, targets, strict=True)
         accuracy = [1 if item[0] == item[1] else 0 for item in predictions_and_targets]
 
         metrics = {}
         metrics["exact_match_accuracy"] = statistics.mean(accuracy)
 
         rouge = evaluate.load("rouge")
-        rouge_metrics = rouge.compute(predictions=predictions, references=targets)
+        rouge_metrics = rouge.compute(predictions=predicted_vals, references=targets)
         if rouge_metrics is not None:
             metrics |= rouge_metrics
 
         bertscore = evaluate.load("bertscore")
         model_type = "microsoft/deberta-xlarge-mnli"
         bertscore_metrics = bertscore.compute(
-            predictions=predictions, references=targets, lang="en", model_type=model_type
+            predictions=predicted_vals, references=targets, lang="en", model_type=model_type
         )
         if bertscore_metrics is not None:
             metrics["bertscore_model"] = model_type
@@ -101,8 +102,8 @@ class QuestionAnsweringTaskBase(Task):
         if logger:
             logger.info("Evaluation metrics calculated successfully.")
             logger.info(f"Metrics: {metrics}")
-        if eval_result_path:
-            save_dict_to_json(metrics, eval_result_path)
+        if result_output_path:
+            save_dict_to_json(metrics, result_output_path)
 
         return metrics
 
@@ -110,7 +111,7 @@ class QuestionAnsweringTaskBase(Task):
 class QuestionAnsweringUsingDocumentsTask(QuestionAnsweringTaskBase):
     """Represents an end-to-end question-answering benchmark task with its data files."""
 
-    __data_documents: Path
+    __documents: Path
 
     @property
     def task_type(self) -> TaskType:
@@ -120,25 +121,25 @@ class QuestionAnsweringUsingDocumentsTask(QuestionAnsweringTaskBase):
     def __init__(
         self,
         name: str,
-        documents: str,
-        questions: str,
-        ground_truth_answers: str,
-        data_path: Path | None = None,
+        documents: Path,
+        questions: Path,
+        ground_truth: Path,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize an end-to-end question-answering completion task."""
         super().__init__(
             name,
             questions=questions,
-            ground_truth_answers=ground_truth_answers,
-            schema="",
-            data_path=data_path,
+            ground_truth=ground_truth,
+            schema=None,
+            root_for_relative_paths=root_for_relative_paths,
         )  # kb schema is not used in this task
-        self.__data_documents = Path(documents)
+        self.__documents = Path(documents)
 
     @property
-    def data_documents(self) -> Path:
+    def documents(self) -> Path:
         """Return path to documents."""
-        return self.__data_documents
+        return self.__documents
 
     def read_documents(self) -> Iterable[Document]:
         """
@@ -147,13 +148,13 @@ class QuestionAnsweringUsingDocumentsTask(QuestionAnsweringTaskBase):
         Returns:
             Iterable[Document]: An iterable of `Document` objects.
         """
-        return DocumentJsonlReader(self.__data_documents).read_items()
+        return DocumentJsonlReader(self.__documents).read_items()
 
 
 class QuestionAnsweringUsingKBTask(QuestionAnsweringTaskBase):
     """Represents a kb-augmented question-answering benchmark task with its data files."""
 
-    __data_kb: Path
+    __kb: Path
 
     @property
     def task_type(self) -> TaskType:
@@ -161,24 +162,28 @@ class QuestionAnsweringUsingKBTask(QuestionAnsweringTaskBase):
         return TaskType.QuestionAnsweringUsingKB
 
     @property
-    def data_kb(self) -> Path:
+    def kb(self) -> Path:
         """Return path to knowledge base."""
-        return self.__data_kb
+        return self.__kb
 
     def __init__(
         self,
         name: str,
-        kb: str,
-        questions: str,
-        ground_truth_answers: str,
-        schema: str,
-        data_path: Path | None = None,
+        kb: Path,
+        questions: Path,
+        ground_truth: Path,
+        schema: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a kb-augmented question-answering task."""
         super().__init__(
-            name, questions=questions, ground_truth_answers=ground_truth_answers, schema=schema, data_path=data_path
+            name,
+            questions=questions,
+            ground_truth=ground_truth,
+            schema=schema,
+            root_for_relative_paths=root_for_relative_paths,
         )
-        self.__data_kb = Path(kb)
+        self.__kb = Path(kb)
 
     def read_kb(self) -> Iterable[Entity]:
         """
@@ -187,7 +192,7 @@ class QuestionAnsweringUsingKBTask(QuestionAnsweringTaskBase):
         Returns:
             Iterable[Entity]: An iterable of `Entity` objects.
         """
-        return EntityJsonlReader(self.__data_kb).read_items()
+        return EntityJsonlReader(self.__kb).read_items()
 
     def remove_sources_from_kb(self, kb: list[Entity], remove_sources_list: list[str]) -> list[Entity]:
         """Return a new KB after removing property values corresponding to specified sources from all entities.

@@ -47,11 +47,11 @@ from __future__ import annotations
 
 import json
 import logging
-import pathlib
 import random
 from collections import defaultdict
 from collections.abc import Iterable
 from enum import Enum
+from pathlib import Path
 from time import perf_counter as pc
 
 import numpy as np
@@ -77,11 +77,29 @@ class RebelDatasetBuilder:
     FRAGMENT_GENERATION_DATASET_FILENAME: str = "rebel_fragment_generation_dataset.jsonl"
     FRAGMENT_TO_ENTITY_MAP_FILENAME: str = "rebel_fragment_to_entity_map.jsonl"
 
+    _logger: logging.Logger
+    fragments_path: Path
+    output_dir: Path
+    max_count: int | None
+    max_merge_fragments: int
+    merge_distribution: MergeDistributionMode
+    deduplicate_values: bool
+    linking_dataset_output_path: Path
+    linking_ground_truth_output_path: Path
+    fragment_to_entity_map_output_path: Path
+    clustering_output_dir: Path
+    clustering_dataset_output_path: Path
+    clustering_ground_truth_output_path: Path
+    entity_generation_output_dir: Path
+    entity_generation_dataset_output_path: Path
+    fragment_generation_output_dir: Path
+    fragment_generation_dataset_output_path: Path
+
     def __init__(
         self,
         *,
-        fragments_path: pathlib.Path,
-        output_dir: pathlib.Path,
+        fragments_path: Path,
+        output_dir: Path,
         max_count: int | None = None,
         max_merge_fragments: int = 10,
         merge_distribution: MergeDistributionMode | None = None,
@@ -98,34 +116,27 @@ class RebelDatasetBuilder:
             merge_distribution: Distribution mode for sampling the number of fragments to merge (ZIPF or TRIANGULAR).
             deduplicate_values: Whether to deduplicate property values in the merged fragments.
         """
-        self._logger: logging.Logger = logging.getLogger(__name__)
-
-        self.fragments_path: pathlib.Path = resolve_path(fragments_path)
-
-        self.output_dir: pathlib.Path = output_dir
+        self._logger = logging.getLogger(__name__)
+        self.fragments_path = resolve_path(fragments_path)
+        self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-
-        self.max_count: int | None = max_count
-        self.max_merge_fragments: int = max_merge_fragments
-        self.merge_distribution: MergeDistributionMode = merge_distribution or MergeDistributionMode.ZIPF
-        self.deduplicate_values: bool = deduplicate_values
-
+        self.max_count = max_count
+        self.max_merge_fragments = max_merge_fragments
+        self.merge_distribution = merge_distribution or MergeDistributionMode.ZIPF
+        self.deduplicate_values = deduplicate_values
         self.linking_dataset_output_path = self.output_dir / self.LINKING_DATASET_FILENAME
         self.linking_ground_truth_output_path = self.output_dir / self.LINKING_GROUND_TRUTH_FILENAME
         self.fragment_to_entity_map_output_path = self.output_dir / self.FRAGMENT_TO_ENTITY_MAP_FILENAME
-
-        self.clustering_output_dir: pathlib.Path = self.output_dir / "clustering"
+        self.clustering_output_dir = self.output_dir / "clustering"
         self.clustering_output_dir.mkdir(parents=True, exist_ok=True)
         self.clustering_dataset_output_path = self.clustering_output_dir / self.CLUSTERING_DATASET_FILENAME
         self.clustering_ground_truth_output_path = self.clustering_output_dir / self.CLUSTERING_GROUND_TRUTH_FILENAME
-
-        self.entity_generation_output_dir: pathlib.Path = self.output_dir / "entity_generation"
+        self.entity_generation_output_dir = self.output_dir / "entity_generation"
         self.entity_generation_output_dir.mkdir(parents=True, exist_ok=True)
         self.entity_generation_dataset_output_path = (
             self.entity_generation_output_dir / self.ENTITY_GENERATION_DATASET_FILENAME
         )
-
-        self.fragment_generation_output_dir: pathlib.Path = self.output_dir / "fragment_generation"
+        self.fragment_generation_output_dir = self.output_dir / "fragment_generation"
         self.fragment_generation_output_dir.mkdir(parents=True, exist_ok=True)
         self.fragment_generation_dataset_output_path = (
             self.fragment_generation_output_dir / self.FRAGMENT_GENERATION_DATASET_FILENAME
@@ -151,7 +162,7 @@ class RebelDatasetBuilder:
         # execute and write the dataset
         self.write_datasets(fragments, pairs, entity_id_to_fragment_indices)
 
-    def load_fragments(self, fragments_path: pathlib.Path | None = None) -> list[ResolvedWikidataEntity]:
+    def load_fragments(self, fragments_path: Path | None = None) -> list[ResolvedWikidataEntity]:
         """Load REBEL entity fragments from the file."""
         fragments_path = fragments_path or self.fragments_path
         fragments = []

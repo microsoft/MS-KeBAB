@@ -7,12 +7,12 @@
 from __future__ import annotations
 
 import json
-import pathlib
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any, Self
 
 
@@ -190,7 +190,7 @@ class PropertySchema:
             "properties": [prop.to_dict() for prop in self.properties.values()],
         }
 
-    def to_file(self, path: pathlib.Path) -> None:
+    def to_file(self, path: Path) -> None:
         """Write the property schema to a JSON file."""
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(self.to_dict(), f, indent=2)
@@ -210,7 +210,7 @@ class PropertySchema:
         )
 
     @classmethod
-    def from_file(cls, path: pathlib.Path) -> Self:
+    def from_file(cls, path: Path) -> Self:
         """Load a property schema from a JSON file."""
         with open(path, encoding="utf-8") as f:
             return cls.from_dict(json.load(f))
@@ -471,7 +471,7 @@ class EntityUtilities:
     """Utilities for working with entities."""
 
     @staticmethod
-    def load_entities(path_to_entities_dir: pathlib.Path) -> Iterable[Entity]:
+    def load_entities(path_to_entities_dir: Path) -> Iterable[Entity]:
         """Load a collection of entities from a directory."""
         assert path_to_entities_dir.exists(), f"Directory not found: {path_to_entities_dir}"
 
@@ -487,19 +487,19 @@ class EntityUtilities:
                     yield Entity.from_json(line)
 
     @staticmethod
-    def save_collection(entities: list[Entity], path: pathlib.Path) -> None:
+    def save_collection(entities: list[Entity], path: Path) -> None:
         """Save a collection of entities as a JSON-lines file."""
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             for entity in entities:
                 f.write(entity.to_json() + "\n")
 
     @staticmethod
-    def load_schema(path: pathlib.Path) -> PropertySchema:
+    def load_schema(path: Path) -> PropertySchema:
         """Load a property schema from a file."""
         return PropertySchema.from_file(path)
 
     @staticmethod
-    def save_schema(schema: PropertySchema, path: pathlib.Path) -> None:
+    def save_schema(schema: PropertySchema, path: Path) -> None:
         """Save a property schema to a directory."""
         path.parent.mkdir(parents=True, exist_ok=True)
         schema.to_file(path)

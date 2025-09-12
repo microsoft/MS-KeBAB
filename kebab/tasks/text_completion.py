@@ -32,7 +32,7 @@ class TextCompletionTaskBase(Task):
     MASK: str = "<mask>"
     """The token used to mask the text in text completion tasks."""
 
-    __data_documents: Path
+    __documents: Path
 
     @property
     @abstractmethod
@@ -40,20 +40,20 @@ class TextCompletionTaskBase(Task):
         """Return task type."""
 
     @property
-    def data_documents(self) -> Path:
+    def documents(self) -> Path:
         """Return path to documents."""
-        return self.__data_documents
+        return self.__documents
 
     def __init__(
         self,
         name: str,
-        documents: str,
-        schema: str,
-        data_path: Path | None = None,
+        documents: Path,
+        schema: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a text completion task."""
-        super().__init__(name, schema=schema, data_path=data_path)
-        self.__data_documents = resolve_path(documents, data_path)
+        super().__init__(name, schema=schema, root_for_relative_paths=root_for_relative_paths)
+        self.__documents = resolve_path(documents, root_for_relative_paths)
 
     def read_items(self) -> Iterable[Document]:
         """
@@ -62,7 +62,7 @@ class TextCompletionTaskBase(Task):
         Returns:
             Iterable[Document]: An iterable of `Document` objects.
         """
-        return DocumentJsonlReader(self.__data_documents).read_items()
+        return DocumentJsonlReader(self.__documents).read_items()
 
     def generate_partial_queries(self, verbose: bool = False) -> Iterable[dict[str, str]]:
         """
@@ -127,17 +127,17 @@ class TextCompletionTaskBase(Task):
 
     def evaluate(
         self,
-        output_to_evaluate: Path,
-        eval_result_path: Path | None = None,
+        predictions: Path,
+        result_output_path: Path | None = None,
         logger: Logger | None = None,
     ) -> dict[str, float]:
         """Evaluate an output for the text completion task."""
         if logger:
             logger.info("Starting evaluation for the text completion task.")
 
-        predictions = ItemJsonlReader[dict[str, str | float]](output_to_evaluate).read_items()
+        predicted_vals = ItemJsonlReader[dict[str, str | float]](predictions).read_items()
         queries = self.generate_partial_queries()
-        predictions_and_queries = zip(predictions, queries, strict=True)
+        predictions_and_queries = zip(predicted_vals, queries, strict=True)
 
         log_probs = []
         log_probs_by_doc = defaultdict(list)
@@ -169,8 +169,8 @@ class TextCompletionTaskBase(Task):
         if logger:
             logger.info("Evaluation metrics calculated successfully.")
             logger.info(f"Metrics: {metrics}")
-        if eval_result_path:
-            save_dict_to_json(metrics, eval_result_path)
+        if result_output_path:
+            save_dict_to_json(metrics, result_output_path)
 
         return metrics
 
@@ -200,19 +200,19 @@ class TextCompletionUsingDocumentsTask(TextCompletionTaskBase):
     def __init__(
         self,
         name: str,
-        documents: str,
-        data_path: Path | None = None,
+        documents: Path,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize an end-to-end text completion task."""
         super().__init__(
-            name, documents=documents, schema="", data_path=data_path
+            name, documents=documents, schema=None, root_for_relative_paths=root_for_relative_paths
         )  # kb schema is not used in this task
 
 
 class TextCompletionUsingKBTask(TextCompletionTaskBase):
     """Represents a kb-augmented text completion benchmark task with its data files."""
 
-    __data_kb: Path
+    __kb: Path
 
     @property
     def task_type(self) -> TaskType:
@@ -220,21 +220,21 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
         return TaskType.TextCompletionUsingKB
 
     @property
-    def data_kb(self) -> Path:
+    def kb(self) -> Path:
         """Return path to knowledge base."""
-        return self.__data_kb
+        return self.__kb
 
     def __init__(
         self,
         name: str,
-        documents: str,
-        kb: str,
-        schema: str,
-        data_path: Path | None = None,
+        documents: Path,
+        kb: Path,
+        schema: Path | None = None,
+        root_for_relative_paths: Path | None = None,
     ):
         """Initialize a kb-augmented text completion task."""
-        super().__init__(name, documents=documents, schema=schema, data_path=data_path)
-        self.__data_kb = resolve_path(kb, data_path)
+        super().__init__(name, documents=documents, schema=schema, root_for_relative_paths=root_for_relative_paths)
+        self.__kb = resolve_path(kb, root_for_relative_paths)
 
     def read_kb(self) -> Iterable[Entity]:
         """
@@ -243,7 +243,7 @@ class TextCompletionUsingKBTask(TextCompletionTaskBase):
         Returns:
             Iterable[Entity]: An iterable of `Entity` objects.
         """
-        return EntityJsonlReader(self.__data_kb).read_items()
+        return EntityJsonlReader(self.__kb).read_items()
 
     def remove_sources_from_kb(self, kb: list[Entity], remove_sources_list: list[str]) -> list[Entity]:
         """Return a new KB after removing property values corresponding to specified sources from all entities.
