@@ -1,8 +1,10 @@
 """
-Build datasets based on REBEL and Wikidata:
+Samples pre-merged fragment pairs from REBEL dataset and outputs:
 - Pairwise linking dataset that contains pairs of entity fragments (ZipF-sampled and merged) from REBEL.
 - Clustering dataset that contains all fragments of all entities included in the pairwise linking dataset.
 - Entity generation dataset that contains merged fragments of all entities included in the clustering dataset.
+- Fragment generation dataset that contains merged ZipF-distributed clusters of fragments included
+  in the clustering dataset.
 
 
 The linking dataset contains pairs of fragments that either belong to the same entity or not.
@@ -66,8 +68,8 @@ class MergeDistributionMode(Enum):
     TRIANGULAR = "triangular"
 
 
-class RebelDatasetBuilder:
-    """Build linking and clustering fragment datasets based on REBEL and Wikidata."""
+class RebelPairSampler:
+    """Sample fragment pairs for linking and clustering datasets based on REBEL and Wikidata."""
 
     LINKING_DATASET_FILENAME: str = "rebel_linking_dataset.jsonl"
     LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_ground_truth.jsonl"
@@ -84,6 +86,7 @@ class RebelDatasetBuilder:
     max_merge_fragments: int
     merge_distribution: MergeDistributionMode
     deduplicate_values: bool
+    linking_output_dir: Path
     linking_dataset_output_path: Path
     linking_ground_truth_output_path: Path
     fragment_to_entity_map_output_path: Path
@@ -104,6 +107,7 @@ class RebelDatasetBuilder:
         max_merge_fragments: int = 10,
         merge_distribution: MergeDistributionMode | None = None,
         deduplicate_values: bool = True,
+        seed: int | None = None,
     ):
         """
         Initialize the dataset creator.
@@ -115,6 +119,7 @@ class RebelDatasetBuilder:
             max_merge_fragments: Maximum number of fragments to merge when generating merged fragments for the datasets.
             merge_distribution: Distribution mode for sampling the number of fragments to merge (ZIPF or TRIANGULAR).
             deduplicate_values: Whether to deduplicate property values in the merged fragments.
+            seed: Optional seed to make sampling deterministic across Python's `random` and NumPy.
         """
         self._logger = logging.getLogger(__name__)
         self.fragments_path = resolve_path(fragments_path)
@@ -124,26 +129,35 @@ class RebelDatasetBuilder:
         self.max_merge_fragments = max_merge_fragments
         self.merge_distribution = merge_distribution or MergeDistributionMode.ZIPF
         self.deduplicate_values = deduplicate_values
-        self.linking_dataset_output_path = self.output_dir / self.LINKING_DATASET_FILENAME
-        self.linking_ground_truth_output_path = self.output_dir / self.LINKING_GROUND_TRUTH_FILENAME
-        self.fragment_to_entity_map_output_path = self.output_dir / self.FRAGMENT_TO_ENTITY_MAP_FILENAME
-        self.clustering_output_dir = self.output_dir / "clustering"
+        self.linking_output_dir = self.output_dir / "linking" / "base"
+        self.linking_output_dir.mkdir(parents=True, exist_ok=True)
+        self.linking_dataset_output_path = self.linking_output_dir / self.LINKING_DATASET_FILENAME
+        self.linking_ground_truth_output_path = self.linking_output_dir / self.LINKING_GROUND_TRUTH_FILENAME
+        self.fragment_to_entity_map_output_path = self.linking_output_dir / self.FRAGMENT_TO_ENTITY_MAP_FILENAME
+        self.clustering_output_dir = self.output_dir / "clustering" / "base"
         self.clustering_output_dir.mkdir(parents=True, exist_ok=True)
         self.clustering_dataset_output_path = self.clustering_output_dir / self.CLUSTERING_DATASET_FILENAME
         self.clustering_ground_truth_output_path = self.clustering_output_dir / self.CLUSTERING_GROUND_TRUTH_FILENAME
-        self.entity_generation_output_dir = self.output_dir / "entity_generation"
+        self.entity_generation_output_dir = self.output_dir / "entity_generation" / "base"
         self.entity_generation_output_dir.mkdir(parents=True, exist_ok=True)
         self.entity_generation_dataset_output_path = (
             self.entity_generation_output_dir / self.ENTITY_GENERATION_DATASET_FILENAME
         )
-        self.fragment_generation_output_dir = self.output_dir / "fragment_generation"
+        self.fragment_generation_output_dir = self.output_dir / "fragment_generation" / "base"
         self.fragment_generation_output_dir.mkdir(parents=True, exist_ok=True)
         self.fragment_generation_dataset_output_path = (
             self.fragment_generation_output_dir / self.FRAGMENT_GENERATION_DATASET_FILENAME
         )
 
+        self.seed = seed
+        if self.seed is not None:
+            random.seed(self.seed)
+        self.rng = np.random.default_rng(self.seed)
+
     def run(self) -> None:
-        """Run the dataset building pipeline."""
+        """Run the pair sampling pipeline."""
+        self._logger.info("Sampling REBEL fragment pairs from...")
+
         # load the input fragments
         fragments: list[ResolvedWikidataEntity] = self.load_fragments()
         fragments = sorted(fragments, key=lambda f: f.entity_id)
@@ -157,7 +171,7 @@ class RebelDatasetBuilder:
         conf_entities_map = self.get_confusing_entities_map(fragments)
 
         # sample pairs
-        pairs = self.sample_pairs(fragments, conf_entities_map, max_count=self.max_count)
+        pairs = self.sample_pairs(fragments, conf_entities_map, max_count=self.max_count, rng=self.rng)
 
         # execute and write the dataset
         self.write_datasets(fragments, pairs, entity_id_to_fragment_indices)
@@ -394,6 +408,7 @@ class RebelDatasetBuilder:
                     max_fragments=self.max_merge_fragments,
                     distribution=self.merge_distribution,
                     deduplicate_values=self.deduplicate_values,
+                    rng=self.rng,
                 )
                 right_fragment = self.generate_merged_fragment(
                     pair[1],
@@ -402,6 +417,7 @@ class RebelDatasetBuilder:
                     max_fragments=self.max_merge_fragments,
                     distribution=self.merge_distribution,
                     deduplicate_values=self.deduplicate_values,
+                    rng=self.rng,
                 )
 
                 # avoid writing duplicates
@@ -458,6 +474,7 @@ class RebelDatasetBuilder:
                     max_fragments=None,
                     distribution=None,  # take all fragments for entity generation
                     deduplicate_values=self.deduplicate_values,
+                    rng=self.rng,
                 )
 
                 f_out.write(merged.to_json(minimal_repr=True) + "\n")
@@ -476,10 +493,13 @@ class RebelDatasetBuilder:
                     max_fragments=None,
                     include_base_fragment=False,
                     deduplicate_values=self.deduplicate_values,
+                    rng=self.rng,
                 )
 
                 f_out.write(merged.to_json(minimal_repr=True) + "\n")
                 count += 1
+
+        logging.info(f"Wrote {count:,} merged fragments to {self.fragment_generation_dataset_output_path}")
 
     @classmethod
     def generate_merged_fragment(
@@ -491,6 +511,7 @@ class RebelDatasetBuilder:
         distribution: MergeDistributionMode | None = MergeDistributionMode.ZIPF,
         include_base_fragment: bool = True,
         deduplicate_values: bool = True,
+        rng: np.random.Generator | None = None,
     ) -> ResolvedWikidataEntity:
         """
         Generate a merged fragment by merging up to `max_fragments` from the list of fragments.
@@ -503,6 +524,7 @@ class RebelDatasetBuilder:
             distribution: Probability distribution to sample merge count (`zipf` or `triangular`).
             include_base_fragment: Whether to always include the base fragment in the merge.
             deduplicate_values: Whether to deduplicate property values in the merged fragment.
+            rng: Optional NumPy random Generator to use for deterministic sampling.
 
         Returns:
             A merged ResolvedWikidataEntity preserving original metadata.
@@ -529,8 +551,9 @@ class RebelDatasetBuilder:
 
         if p is not None:
             p /= p.sum()
-            r = np.random.choice(n, p=p) + 1  # noqa: NPY002
-            indices = random.sample(range(n), r)
+            rng = rng or np.random.default_rng()
+            r = rng.choice(n, p=p) + 1
+            indices = rng.choice(n, size=int(r), replace=False).tolist()
 
             if include_base_fragment and 0 not in indices:
                 indices[0] = 0  # ensure the base fragment is always included

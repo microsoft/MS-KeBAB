@@ -15,25 +15,25 @@ from kebab.utils.dataset.wikidata.wikidata_resolver import WikidataResolver
 @click.option(
     "--entities-path",
     type=Path,
-    default=Path.cwd() / "data" / "REBEL" / "Fragments" / "Surface Forms" / "rebel_entity_fragments.jsonl",
+    required=True,
     help="Path to the input entities file.",
 )
 @click.option(
     "--wikidata-simple-entities-path",
     type=Path,
-    default=Path.cwd() / "data" / "Wikidata" / "Simple Entities" / "2025-01-30" / "wikidata_simple_entities.jsonl",
+    default=Path.cwd() / "data" / "Wikidata" / "simple_entities" / "wikidata_simple_entities.jsonl",
     help="The path to the extracted Wikidata simple entities.",
 )
 @click.option(
     "--wikidata-properties-path",
     type=Path,
-    default=Path.cwd() / "data" / "Wikidata" / "Properties" / "2025-01-30" / "wikidata_properties.json",
+    default=Path.cwd() / "data" / "Wikidata" / "properties" / "wikidata_properties.json",
     help="Path to the Wikidata properties file.",
 )
 @click.option(
     "--wikidata-type-hierarchy-path",
     type=Path,
-    default=Path.cwd() / "data" / "Wikidata" / "Type Hierarchy" / "2025-01-30" / "wikidata_type_hierarchy.jsonl",
+    default=Path.cwd() / "data" / "Wikidata" / "type_hierarchy" / "wikidata_type_hierarchy.jsonl",
     help="The path to the Wikidata type hierarchy.",
 )
 @click.option(
@@ -64,7 +64,7 @@ from kebab.utils.dataset.wikidata.wikidata_resolver import WikidataResolver
 @click.option(
     "--output-dir",
     type=Path,
-    default=Path.cwd() / "output" / "resolved_entities",
+    default=Path.cwd() / "output",
     help="Path to the output directory (the output jsonl file will be created there).",
 )
 @click.command()

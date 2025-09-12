@@ -1,16 +1,17 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Tests for the REBEL dataset subsampler."""
+"""Tests for the REBEL split sampler."""
 
 from pathlib import Path
 
 import pytest
-from kebab.utils.dataset.rebel.rebel_dataset_builder import RebelDatasetBuilder
-from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
+from kebab.utils.dataset.rebel.rebel_pair_sampler import RebelPairSampler
+from kebab.utils.dataset.rebel.rebel_split_sampler import (
     ClusteringConfig,
+    IncrementalLinkingConfig,
     LinkingConfig,
-    RebelDatasetSubsampler,
+    RebelSplitSampler,
     SplitBuildConfig,
 )
 
@@ -42,15 +43,15 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     # 1) Build base datasets with the builder
     base_dir = tmp_path / "base"
     base_dir.mkdir(parents=True, exist_ok=True)
-    builder = RebelDatasetBuilder(
+    pair_sampler = RebelPairSampler(
         fragments_path=rebel_sample_resolved_fragments_file_path,
         output_dir=base_dir,
     )
-    builder.run()
+    pair_sampler.run()
 
     # 2) Configure two tiny splits to keep the test fast
     test_split = SplitBuildConfig(
-        name="Test",
+        name="test",
         linking=LinkingConfig(
             pair_count_limit=50,
             pairs_per_entity_limit=5,
@@ -65,10 +66,11 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
             fragments_per_entity_limit=10,
             include_all_linking_fragments_first=True,
         ),
+        incremental_linking=IncrementalLinkingConfig(),
     )
 
     val_split = SplitBuildConfig(
-        name="Validation",
+        name="dev",
         linking=LinkingConfig(
             pair_count_limit=50,
             pairs_per_entity_limit=5,
@@ -83,51 +85,52 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
             fragments_per_entity_limit=10,
             include_all_linking_fragments_first=True,
         ),
+        incremental_linking=IncrementalLinkingConfig(),
     )
 
     out_dir = tmp_path / "subsampled"
-    subsampler = RebelDatasetSubsampler(
-        base_dir=base_dir,
+    split_sampler = RebelSplitSampler(
+        input_dir=base_dir,
         output_dir=out_dir,
         splits=[test_split, val_split],
     )
-    subsampler.run()
+    split_sampler.run()
 
-    # 3) Verify outputs: Test must be non-empty; Validation may be empty depending on tiny sample size
-    test_linking_dir = out_dir / "linking" / "Test"
-    test_clustering_dir = out_dir / "clustering" / "Test"
-    test_entity_gen_dir = out_dir / "entity_generation" / "Test"
-    test_fragment_gen_dir = out_dir / "fragment_generation" / "Test"
-    _assert_non_empty(test_linking_dir / RebelDatasetBuilder.LINKING_DATASET_FILENAME)
-    _assert_non_empty(test_linking_dir / RebelDatasetBuilder.LINKING_GROUND_TRUTH_FILENAME)
+    # 3) Verify outputs: test must be non-empty; dev may be empty depending on tiny sample size
+    test_linking_dir = out_dir / "linking" / test_split.name
+    test_clustering_dir = out_dir / "clustering" / test_split.name
+    test_entity_gen_dir = out_dir / "entity_generation" / test_split.name
+    test_fragment_gen_dir = out_dir / "fragment_generation" / test_split.name
+    _assert_non_empty(test_linking_dir / RebelPairSampler.LINKING_DATASET_FILENAME)
+    _assert_non_empty(test_linking_dir / RebelPairSampler.LINKING_GROUND_TRUTH_FILENAME)
     _assert_non_empty(test_linking_dir / "rebel_linking_used_entities.jsonl")
-    _assert_non_empty(test_clustering_dir / RebelDatasetBuilder.CLUSTERING_DATASET_FILENAME)
-    _assert_non_empty(test_clustering_dir / RebelDatasetBuilder.CLUSTERING_GROUND_TRUTH_FILENAME)
-    _assert_non_empty(test_entity_gen_dir / RebelDatasetBuilder.ENTITY_GENERATION_DATASET_FILENAME)
-    _assert_non_empty(test_fragment_gen_dir / RebelDatasetBuilder.FRAGMENT_GENERATION_DATASET_FILENAME)
+    _assert_non_empty(test_clustering_dir / RebelPairSampler.CLUSTERING_DATASET_FILENAME)
+    _assert_non_empty(test_clustering_dir / RebelPairSampler.CLUSTERING_GROUND_TRUTH_FILENAME)
+    _assert_non_empty(test_entity_gen_dir / RebelPairSampler.ENTITY_GENERATION_DATASET_FILENAME)
+    _assert_non_empty(test_fragment_gen_dir / RebelPairSampler.FRAGMENT_GENERATION_DATASET_FILENAME)
 
-    # Validation files should exist; they may be empty if entities are exhausted
-    val_linking_dir = out_dir / "linking" / "Validation"
-    val_clustering_dir = out_dir / "clustering" / "Validation"
-    val_entity_gen_dir = out_dir / "entity_generation" / "Validation"
-    val_fragment_gen_dir = out_dir / "fragment_generation" / "Validation"
-    assert (val_linking_dir / RebelDatasetBuilder.LINKING_DATASET_FILENAME).exists()
-    assert (val_linking_dir / RebelDatasetBuilder.LINKING_GROUND_TRUTH_FILENAME).exists()
+    # dev files should exist; they may be empty if entities are exhausted
+    val_linking_dir = out_dir / "linking" / val_split.name
+    val_clustering_dir = out_dir / "clustering" / val_split.name
+    val_entity_gen_dir = out_dir / "entity_generation" / val_split.name
+    val_fragment_gen_dir = out_dir / "fragment_generation" / val_split.name
+    assert (val_linking_dir / RebelPairSampler.LINKING_DATASET_FILENAME).exists()
+    assert (val_linking_dir / RebelPairSampler.LINKING_GROUND_TRUTH_FILENAME).exists()
     assert (val_linking_dir / "rebel_linking_used_entities.jsonl").exists()
-    assert (val_clustering_dir / RebelDatasetBuilder.CLUSTERING_DATASET_FILENAME).exists()
-    assert (val_clustering_dir / RebelDatasetBuilder.CLUSTERING_GROUND_TRUTH_FILENAME).exists()
-    assert (val_entity_gen_dir / RebelDatasetBuilder.ENTITY_GENERATION_DATASET_FILENAME).exists()
-    assert (val_fragment_gen_dir / RebelDatasetBuilder.FRAGMENT_GENERATION_DATASET_FILENAME).exists()
+    assert (val_clustering_dir / RebelPairSampler.CLUSTERING_DATASET_FILENAME).exists()
+    assert (val_clustering_dir / RebelPairSampler.CLUSTERING_GROUND_TRUTH_FILENAME).exists()
+    assert (val_entity_gen_dir / RebelPairSampler.ENTITY_GENERATION_DATASET_FILENAME).exists()
+    assert (val_fragment_gen_dir / RebelPairSampler.FRAGMENT_GENERATION_DATASET_FILENAME).exists()
 
 
-def test_subsampler_disjoint_entities_between_splits(
+def test_split_sampler_disjoint_entities_between_splits(
     rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path
 ) -> None:
     """Ensure entity sets used by different splits are disjoint as intended."""
     # Build base
     base_dir = tmp_path / "base"
-    builder = RebelDatasetBuilder(fragments_path=rebel_sample_resolved_fragments_file_path, output_dir=base_dir)
-    builder.run()
+    pair_sampler = RebelPairSampler(fragments_path=rebel_sample_resolved_fragments_file_path, output_dir=base_dir)
+    pair_sampler.run()
 
     # Two small splits
     splits = [
@@ -141,6 +144,13 @@ def test_subsampler_disjoint_entities_between_splits(
                 single_class_ratio_limit=None,
                 seed=1,
             ),
+            clustering=ClusteringConfig(
+                min_fragments_per_entity=1,
+                entity_count_limit=0,
+                fragments_per_entity_limit=10,
+                include_all_linking_fragments_first=True,
+            ),
+            incremental_linking=IncrementalLinkingConfig(),
         ),
         SplitBuildConfig(
             name="B",
@@ -152,11 +162,18 @@ def test_subsampler_disjoint_entities_between_splits(
                 single_class_ratio_limit=None,
                 seed=2,
             ),
+            clustering=ClusteringConfig(
+                min_fragments_per_entity=1,
+                entity_count_limit=0,
+                fragments_per_entity_limit=10,
+                include_all_linking_fragments_first=True,
+            ),
+            incremental_linking=IncrementalLinkingConfig(),
         ),
     ]
 
     out_dir = tmp_path / "out"
-    RebelDatasetSubsampler(base_dir=base_dir, output_dir=out_dir, splits=splits).run()
+    RebelSplitSampler(input_dir=base_dir, output_dir=out_dir, splits=splits).run()
 
     # Read used entity sets
     def read_entities(p: Path) -> set[str]:

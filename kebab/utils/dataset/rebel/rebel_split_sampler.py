@@ -10,23 +10,25 @@ Workflow:
 - Derive Clustering and Generation datasets for each split based on the entities used in the split by
   subsetting the corresponding base datasets.
 
-Input layout (produced by RebelDatasetBuilder into base_dir):
-- base_dir/rebel_linking_dataset.jsonl
-- base_dir/rebel_linking_ground_truth.jsonl
-- base_dir/rebel_fragment_to_entity_map.jsonl
-- base_dir/clustering/rebel_clustering_dataset.jsonl
-- base_dir/clustering/rebel_clustering_ground_truth.jsonl
-- base_dir/entity_generation/rebel_entity_generation_dataset.jsonl
-- base_dir/fragment_generation/rebel_fragment_generation_dataset.jsonl
+Input layout (produced by RebelPairSampler into input_dir):
+- input_dir/linking/base/rebel_linking_dataset.jsonl
+- input_dir/linking/base/rebel_linking_ground_truth.jsonl
+- input_dir/rebel_fragment_to_entity_map.jsonl
+- input_dir/clustering/base/rebel_clustering_dataset.jsonl
+- input_dir/clustering/base/rebel_clustering_ground_truth.jsonl
+- input_dir/entity_generation/base/rebel_entity_generation_dataset.jsonl
+- input_dir/fragment_generation/base/rebel_fragment_generation_dataset.jsonl
 
 Output layout (within output_dir):
-- output_dir/linking/<Split>/rebel_linking_dataset.jsonl
-- output_dir/linking/<Split>/rebel_linking_ground_truth.jsonl
-- output_dir/linking/<Split>/rebel_linking_used_entities.jsonl
-- output_dir/clustering/<Split>/rebel_clustering_dataset.jsonl
-- output_dir/clustering/<Split>/rebel_clustering_ground_truth.jsonl
-- output_dir/entity_generation/<Split>/rebel_entity_generation_dataset.jsonl
-- output_dir/fragment_generation/<Split>/rebel_fragment_generation_dataset.jsonl
+- output_dir/linking/<split>/rebel_linking_dataset.jsonl
+- output_dir/linking/<split>/rebel_linking_ground_truth.jsonl
+- output_dir/linking/<split>/rebel_linking_used_entities.jsonl
+- output_dir/clustering/<split>/rebel_clustering_dataset.jsonl
+- output_dir/clustering/<split>/rebel_clustering_ground_truth.jsonl
+- output_dir/entity_generation/<split>/rebel_entity_generation_dataset.jsonl
+- output_dir/fragment_generation/<split>/rebel_fragment_generation_dataset.jsonl
+- output_dir/incremental_linking/<split>/rebel_incremental_linking_dataset.jsonl
+- output_dir/incremental_linking/<split>/rebel_incremental_linking_ground_truth.jsonl
 """
 
 from __future__ import annotations
@@ -38,7 +40,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from kebab.utils.dataset.rebel.rebel_dataset_builder import RebelDatasetBuilder
+from kebab.utils.dataset.rebel.rebel_pair_sampler import RebelPairSampler
 from kebab.utils.dataset.wikidata import wikidata_utils
 from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
 from kebab.utils.io_helpers import resolve_path
@@ -70,6 +72,20 @@ class ClusteringConfig:
     entity_count_limit: int = 0  # 0 means no limit
     fragments_per_entity_limit: int = 50
     include_all_linking_fragments_first: bool = True
+    seed: int | None = None
+
+
+@dataclass
+class IncrementalLinkingConfig:
+    """Configuration for building incremental linking pairs per entity.
+
+    Pairs are built from sorted fragments f0, f1, f2, ... of the same entity:
+    (f0, f1), (merge(f0,f1), f2), (merge(f0,f1,f2), f3), ... up to `max_chain_len`.
+    """
+
+    max_chain_len: int = 25
+    negatives_per_positive: int = 1
+    seed: int | None = None
 
 
 @dataclass
@@ -78,28 +94,32 @@ class SplitBuildConfig:
 
     name: str
     linking: LinkingConfig
-    clustering: ClusteringConfig = field(default_factory=ClusteringConfig)
+    clustering: ClusteringConfig
+    incremental_linking: IncrementalLinkingConfig
 
 
 @dataclass
 class TypeFilter:
     """Type filtering settings using the Wikidata type hierarchy graph.
 
-    If required_type_id is set, only entities whose types intersect the required set are kept.
+    If required_type_ids is set, only entities whose types intersect the required set are kept.
     If exclude_type_ids is set, any entity whose types intersect the excluded set is skipped.
     """
 
     type_hierarchy_path: Path
-    required_type_id: str | None = None
+    required_type_ids: list[str] | None = None
     exclude_type_ids: list[str] | None = None
     include_descendants: bool = False
 
 
-class RebelDatasetSubsampler:
+class RebelSplitSampler:
     """Create Test/Validation/Train datasets from a base REBEL dataset in a single run."""
 
+    INCREMENTAL_LINKING_DATASET_FILENAME: str = "rebel_incremental_linking_dataset.jsonl"
+    INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME: str = "rebel_incremental_linking_ground_truth.jsonl"
+
     _logger: logging.Logger
-    base_dir: Path
+    input_dir: Path
     output_dir: Path
     splits: list[SplitBuildConfig]
     type_filter: TypeFilter | None
@@ -116,44 +136,51 @@ class RebelDatasetSubsampler:
     def __init__(
         self,
         *,
-        base_dir: Path,
+        input_dir: Path,
         output_dir: Path,
         splits: list[SplitBuildConfig],
         type_filter: TypeFilter | None = None,
     ) -> None:
-        """Initialize the subsampler.
+        """Initialize the dataset split sampler.
 
         Args:
-            base_dir: Directory containing the base datasets produced by RebelDatasetBuilder.
+            input_dir: Directory containing the base datasets produced by RebelDatasetBuilder.
             output_dir: Directory where the split datasets will be written.
             splits: The list of split configurations to produce (e.g., Test, Validation, Train) in order.
             type_filter: Optional type filtering configuration based on Wikidata type hierarchy.
         """
         self._logger = logging.getLogger(__name__)
-        self.base_dir = resolve_path(base_dir)
+        self.input_dir = resolve_path(input_dir)
         self.output_dir = resolve_path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.splits = splits
         self.type_filter = type_filter
-        self.base_linking_dataset_path = self.base_dir / RebelDatasetBuilder.LINKING_DATASET_FILENAME
-        self.base_linking_ground_truth_path = self.base_dir / RebelDatasetBuilder.LINKING_GROUND_TRUTH_FILENAME
-        self.base_fragment_to_entity_map_path = self.base_dir / RebelDatasetBuilder.FRAGMENT_TO_ENTITY_MAP_FILENAME
+        self.base_linking_dataset_path = self.input_dir / "linking" / "base" / RebelPairSampler.LINKING_DATASET_FILENAME
+        self.base_linking_ground_truth_path = (
+            self.input_dir / "linking" / "base" / RebelPairSampler.LINKING_GROUND_TRUTH_FILENAME
+        )
+        # fragment->entity map is written at the base_dir root by RebelPairSampler
+        self.base_fragment_to_entity_map_path = (
+            self.input_dir / "linking" / "base" / RebelPairSampler.FRAGMENT_TO_ENTITY_MAP_FILENAME
+        )
         self.base_clustering_dataset_path = (
-            self.base_dir / "clustering" / RebelDatasetBuilder.CLUSTERING_DATASET_FILENAME
+            self.input_dir / "clustering" / "base" / RebelPairSampler.CLUSTERING_DATASET_FILENAME
         )
         self.base_clustering_ground_truth_path = (
-            self.base_dir / "clustering" / RebelDatasetBuilder.CLUSTERING_GROUND_TRUTH_FILENAME
+            self.input_dir / "clustering" / "base" / RebelPairSampler.CLUSTERING_GROUND_TRUTH_FILENAME
         )
         self.base_entity_generation_dataset_path = (
-            self.base_dir / "entity_generation" / RebelDatasetBuilder.ENTITY_GENERATION_DATASET_FILENAME
+            self.input_dir / "entity_generation" / "base" / RebelPairSampler.ENTITY_GENERATION_DATASET_FILENAME
         )
         self.base_fragment_generation_dataset_path = (
-            self.base_dir / "fragment_generation" / RebelDatasetBuilder.FRAGMENT_GENERATION_DATASET_FILENAME
+            self.input_dir / "fragment_generation" / "base" / RebelPairSampler.FRAGMENT_GENERATION_DATASET_FILENAME
         )
+
+        # Type filtering setup
         self.required_entity_types = set()
         self.excluded_entity_types = set()
         if self.type_filter and (
-            self.type_filter.required_type_id
+            (self.type_filter.required_type_ids and len(self.type_filter.required_type_ids) > 0)
             or (self.type_filter.exclude_type_ids and len(self.type_filter.exclude_type_ids) > 0)
         ):
             self._init_type_filters()
@@ -161,14 +188,22 @@ class RebelDatasetSubsampler:
     def _init_type_filters(self) -> None:
         """Initialize type filtering by loading the hierarchy and collecting target/excluded sets."""
         assert self.type_filter
+        assert self.type_filter.type_hierarchy_path.exists(), (
+            f"Wikidata type hierarchy file not found: {self.type_filter.type_hierarchy_path}"
+        )
+
         graph, type_id_to_node = wikidata_utils.load_type_hierarchy(resolve_path(self.type_filter.type_hierarchy_path))
 
-        if self.type_filter.required_type_id:
-            required = (
-                wikidata_utils.collect_all_subtypes(graph, type_id_to_node, self.type_filter.required_type_id)
-                if self.type_filter.include_descendants
-                else {self.type_filter.required_type_id}
-            )
+        # Collect required set from provided required_type_ids
+        if self.type_filter.required_type_ids:
+            required: set[str] = set()
+            for req_id in self.type_filter.required_type_ids:
+                types = (
+                    wikidata_utils.collect_all_subtypes(graph, type_id_to_node, req_id)
+                    if self.type_filter.include_descendants
+                    else {req_id}
+                )
+                required.update(types)
             self.required_entity_types = {type_id_to_node[t]["name"] for t in required}
 
         if self.type_filter.exclude_type_ids:
@@ -188,6 +223,8 @@ class RebelDatasetSubsampler:
 
     def run(self) -> None:
         """Build all requested splits in the specified order (Test -> Validation -> Train)."""
+        self._logger.info(f"Sampling REBEL split with {len(self.splits)} splits; output_dir={self.output_dir}")
+
         # load mapping from fragment_id -> entity_id
         fragment_to_entity = self._load_fragment_to_entity_map(self.base_fragment_to_entity_map_path)
         self._logger.info(f"Loaded fragment->entity map: {len(fragment_to_entity)} entries")
@@ -213,6 +250,8 @@ class RebelDatasetSubsampler:
             entity_gen_dir.mkdir(parents=True, exist_ok=True)
             fragment_gen_dir = self.output_dir / "fragment_generation" / split.name
             fragment_gen_dir.mkdir(parents=True, exist_ok=True)
+            incr_linking_dir = self.output_dir / "incremental_linking" / split.name
+            incr_linking_dir.mkdir(parents=True, exist_ok=True)
 
             sampled_pairs, sampled_labels, linking_entity_counter, included_fragment_ids = self._sample_linking_pairs(
                 pairs, labels, disallowed_entity_ids, split.linking
@@ -232,16 +271,23 @@ class RebelDatasetSubsampler:
                 split.clustering,
             )
 
-            # derive entity generation (no config required)
+            # derive entity generation
             self._derive_entity_generation(
                 entity_gen_dir,
                 entities_to_include,
             )
 
-            # derive fragment generation (no config required)
+            # derive fragment generation
             self._derive_fragment_generation(
                 fragment_gen_dir,
                 entities_to_include,
+            )
+
+            # derive incremental linking
+            self._derive_incremental_linking(
+                incr_linking_dir,
+                entities_to_include,
+                split.incremental_linking,
             )
 
             # update disallowed entities for next splits
@@ -278,12 +324,11 @@ class RebelDatasetSubsampler:
                 left = ResolvedWikidataEntity.from_dict(d[0])
                 right = ResolvedWikidataEntity.from_dict(d[1])
 
-                # enrich with entity ids (these were removed in base linking dataset)
+                # attach entity ids (these were removed in base linking dataset)
                 try:
                     left.entity_id = fragment_to_entity[left.metadata["fragment_id"]]
                     right.entity_id = fragment_to_entity[right.metadata["fragment_id"]]
                 except KeyError as ex:
-                    # skip if mapping missing (shouldn't happen for properly aligned datasets)
                     self._logger.debug(f"Missing fragment->entity mapping at line {i}: {ex}")
                     continue
 
@@ -428,12 +473,15 @@ class RebelDatasetSubsampler:
     ) -> None:
         """Write the linking dataset, ground truth, and used entities for a split."""
         split_dir.mkdir(parents=True, exist_ok=True)
-        ds_out = split_dir / RebelDatasetBuilder.LINKING_DATASET_FILENAME
-        gt_out = split_dir / RebelDatasetBuilder.LINKING_GROUND_TRUTH_FILENAME
+        ds_out = split_dir / RebelPairSampler.LINKING_DATASET_FILENAME
+        gt_out = split_dir / RebelPairSampler.LINKING_GROUND_TRUTH_FILENAME
         used_ents_out = split_dir / "rebel_linking_used_entities.jsonl"
         with open(ds_out, "w", encoding="utf-8") as f_ds:
             for left, right in sampled_pairs:
-                d = [left.to_dict(minimal_repr=True), right.to_dict(minimal_repr=True)]
+                d = [
+                    left.without_entity_id().to_dict(minimal_repr=True),
+                    right.without_entity_id().to_dict(minimal_repr=True),
+                ]
                 f_ds.write(json.dumps(d) + "\n")
 
         with open(gt_out, "w", encoding="utf-8") as f_gt:
@@ -455,8 +503,8 @@ class RebelDatasetSubsampler:
     ) -> None:
         """Derive clustering dataset for the split by subsetting the base clustering dataset."""
         out_dir.mkdir(parents=True, exist_ok=True)
-        ds_out = out_dir / RebelDatasetBuilder.CLUSTERING_DATASET_FILENAME
-        gt_out = out_dir / RebelDatasetBuilder.CLUSTERING_GROUND_TRUTH_FILENAME
+        ds_out = out_dir / RebelPairSampler.CLUSTERING_DATASET_FILENAME
+        gt_out = out_dir / RebelPairSampler.CLUSTERING_GROUND_TRUTH_FILENAME
 
         clustering_entities: dict[str, list[ResolvedWikidataEntity]] = defaultdict(list)
         with (
@@ -469,34 +517,50 @@ class RebelDatasetSubsampler:
                 if entity_id in entities_to_include:
                     clustering_entities[entity_id].append(fragment)
 
-        ent_with_frags = list(clustering_entities.items())
-        random.shuffle(ent_with_frags)
+        records: list[tuple[dict, str]] = []
+        entities_included = 0
+        for entity_id, fragments in clustering_entities.items():
+            if len(fragments) < cfg.min_fragments_per_entity:
+                continue
 
-        entity_counter: Counter[str] = Counter()
+            if 0 < cfg.entity_count_limit <= entities_included:
+                break
+
+            # include linking fragments first (if requested)
+            if cfg.include_all_linking_fragments_first:
+                sorted_fragments = sorted(
+                    fragments,
+                    key=lambda f: f.metadata.get("fragment_id") not in included_fragment_ids,
+                )
+            else:
+                sorted_fragments = fragments
+
+            selected = sorted_fragments[: cfg.fragments_per_entity_limit]
+            records.extend(
+                (
+                    fragment.without_entity_id().to_dict(minimal_repr=True),
+                    entity_id,
+                )
+                for fragment in selected
+            )
+
+            entities_included += 1
+
+        # Shuffle the combined list
+        rng = random.Random(cfg.seed)  # noqa: S311 - pseudo-random is fine for dataset sampling
+        rng.shuffle(records)
+
         with open(ds_out, "w", encoding="utf-8") as f_ds_out, open(gt_out, "w", encoding="utf-8") as f_gt_out:
-            for entity_id, frags in ent_with_frags:
-                if len(frags) < cfg.min_fragments_per_entity:
-                    continue
+            for frag_obj, entity_id in records:
+                f_ds_out.write(json.dumps(frag_obj) + "\n")
+                f_gt_out.write(json.dumps(entity_id) + "\n")
 
-                if 0 < cfg.entity_count_limit <= len(entity_counter) and entity_id not in entity_counter:
-                    continue
-
-                # include linking fragments first (if requested)
-                if cfg.include_all_linking_fragments_first:
-                    sorted_frags = sorted(
-                        frags,
-                        key=lambda f: f.metadata.get("fragment_id") not in included_fragment_ids,
-                    )
-                else:
-                    sorted_frags = frags
-
-                for fragment in sorted_frags[: cfg.fragments_per_entity_limit]:
-                    f_ds_out.write(json.dumps(fragment.without_entity_id().to_dict(minimal_repr=True)) + "\n")
-                    f_gt_out.write(json.dumps(entity_id) + "\n")
-                    entity_counter[entity_id] += 1
+        written_entity_counter: Counter[str] = Counter()
+        for _, entity_id in records:
+            written_entity_counter[entity_id] += 1
 
         self._logger.info(
-            f"Clustering: wrote {sum(entity_counter.values())} fragments for {len(entity_counter)} entities to {ds_out}"
+            f"Clustering: wrote {len(records)} fragments for {len(written_entity_counter)} entities to {ds_out}"
         )
 
     def _derive_entity_generation(
@@ -506,7 +570,7 @@ class RebelDatasetSubsampler:
     ) -> None:
         """Derive entity generation dataset for the split by subsetting the base entity generation dataset."""
         out_dir.mkdir(parents=True, exist_ok=True)
-        ds_out = out_dir / RebelDatasetBuilder.ENTITY_GENERATION_DATASET_FILENAME
+        ds_out = out_dir / RebelPairSampler.ENTITY_GENERATION_DATASET_FILENAME
         count = 0
 
         with (
@@ -530,7 +594,7 @@ class RebelDatasetSubsampler:
     ) -> None:
         """Derive fragment generation dataset for the split by subsetting the base fragment generation dataset."""
         out_dir.mkdir(parents=True, exist_ok=True)
-        ds_out = out_dir / RebelDatasetBuilder.FRAGMENT_GENERATION_DATASET_FILENAME
+        ds_out = out_dir / RebelPairSampler.FRAGMENT_GENERATION_DATASET_FILENAME
         count = 0
 
         with (
@@ -547,61 +611,181 @@ class RebelDatasetSubsampler:
 
         self._logger.info(f"Fragment generation: wrote {count} records to {ds_out}")
 
+    def _derive_incremental_linking(
+        self,
+        out_dir: Path,
+        entities_to_include: set[str],
+        cfg: IncrementalLinkingConfig,
+    ) -> None:
+        """Derive incremental linking dataset for the split from the base clustering dataset.
 
-def default_splits() -> list[SplitBuildConfig]:
+        For each entity, pairs are emitted as:
+        (f0, f1), (merge(f0,f1), f2), (merge(f0,f1,f2), f3), ... up to `cfg.max_chain_len`.
+        """
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ds_out = out_dir / self.INCREMENTAL_LINKING_DATASET_FILENAME
+        gt_out = out_dir / self.INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME
+
+        ent_to_fragments: dict[str, list[ResolvedWikidataEntity]] = defaultdict(list)
+        with (
+            open(self.base_clustering_dataset_path, encoding="utf-8") as f_ds,
+            open(self.base_clustering_ground_truth_path, encoding="utf-8") as f_gt,
+        ):
+            for line_ds, line_gt in zip(f_ds, f_gt, strict=False):
+                fragment = ResolvedWikidataEntity.from_dict(json.loads(line_ds))
+                entity_id = json.loads(line_gt)
+                if entity_id in entities_to_include:
+                    ent_to_fragments[entity_id].append(fragment)
+
+        total_pairs = 0
+        min_fragments_for_pair = 2
+        rng = random.Random(cfg.seed)  # noqa: S311 - pseudo-random is fine for dataset sampling
+
+        with open(ds_out, "w", encoding="utf-8") as f_ds_out, open(gt_out, "w", encoding="utf-8") as f_gt_out:
+            entity_ids = list(ent_to_fragments.keys())
+            for entity_id, fragments in ent_to_fragments.items():
+                if len(fragments) < min_fragments_for_pair:
+                    continue
+
+                # Shuffle fragments of the entity
+                shuffled_fragments = list(fragments)
+                rng.shuffle(shuffled_fragments)
+
+                # Build incremental merges from the first fragment
+                max_right_idx = min(len(shuffled_fragments) - 1, cfg.max_chain_len - 1)
+                for idx in range(1, max_right_idx + 1):
+                    fragment = shuffled_fragments[idx]
+                    selected = shuffled_fragments[0:idx]
+                    merged_fragment = ResolvedWikidataEntity.merge(selected, deduplicate_values=True)
+
+                    merged_fragment.metadata["fragment_id"] = (
+                        selected[0].metadata.get("fragment_id") if selected else fragment.metadata.get("fragment_id")
+                    )
+                    merged_fragment.metadata["fragment_ids"] = (
+                        [f.metadata.get("fragment_id") for f in selected]
+                        if selected
+                        else [fragment.metadata.get("fragment_id")]
+                    )
+                    merged_fragment.metadata["type"] = fragment.wikidata_type
+                    merged_fragment.metadata["merge_count"] = len(selected)
+
+                    # Write positive pair
+                    left = merged_fragment.without_entity_id()
+                    right = fragment.without_entity_id()
+                    f_ds_out.write(
+                        json.dumps([left.to_dict(minimal_repr=True), right.to_dict(minimal_repr=True)]) + "\n"
+                    )
+                    f_gt_out.write(json.dumps(True) + "\n")
+                    total_pairs += 1
+
+                    # Write negative pairs
+                    if cfg.negatives_per_positive > 0 and len(entity_ids) > 1:
+                        for _ in range(cfg.negatives_per_positive):
+                            # pick a different entity id
+                            neg_entity_id = entity_id
+                            for _ in range(5):
+                                candidate_eid = rng.choice(entity_ids)
+                                if candidate_eid != entity_id and ent_to_fragments[candidate_eid]:
+                                    neg_entity_id = candidate_eid
+                                    break
+                            if neg_entity_id == entity_id:
+                                # fallback
+                                idx_cur = entity_ids.index(entity_id)
+                                neg_entity_id = entity_ids[(idx_cur + 1) % len(entity_ids)]
+
+                            neg_fragment = rng.choice(ent_to_fragments[neg_entity_id])
+
+                            left_neg = merged_fragment.without_entity_id()
+                            right_neg = neg_fragment.without_entity_id()
+                            f_ds_out.write(
+                                json.dumps(
+                                    [
+                                        left_neg.to_dict(minimal_repr=True),
+                                        right_neg.to_dict(minimal_repr=True),
+                                    ]
+                                )
+                                + "\n"
+                            )
+                            f_gt_out.write(json.dumps(False) + "\n")
+                            total_pairs += 1
+
+        self._logger.info(
+            f"Incremental linking: wrote {total_pairs} pairs to {ds_out} for {len(ent_to_fragments)} entities"
+        )
+
+
+def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     """Provide default configs for Test, Validation, Train splits."""
     test = SplitBuildConfig(
-        name="Test",
+        name="test",
         linking=LinkingConfig(
             pair_count_limit=2_000,
             pairs_per_entity_limit=10,
             property_pattern_count_limit=20,
             property_overlap_limits={1: 0.35},
             single_class_ratio_limit=0.76,
-            seed=23,
+            seed=seed if seed is not None else 23,
         ),
         clustering=ClusteringConfig(
             min_fragments_per_entity=3,
             entity_count_limit=0,
             fragments_per_entity_limit=50,
             include_all_linking_fragments_first=True,
+            seed=seed if seed is not None else 23,
+        ),
+        incremental_linking=IncrementalLinkingConfig(
+            max_chain_len=25,
+            negatives_per_positive=1,
+            seed=seed if seed is not None else 23,
         ),
     )
 
-    validation = SplitBuildConfig(
-        name="Validation",
+    dev = SplitBuildConfig(
+        name="dev",
         linking=LinkingConfig(
             pair_count_limit=20_000,
             pairs_per_entity_limit=100,
             property_pattern_count_limit=1_000,
             property_overlap_limits={1: 0.40},
             single_class_ratio_limit=0.76,
-            seed=24,
+            seed=seed + 1 if seed is not None else 24,
         ),
         clustering=ClusteringConfig(
             min_fragments_per_entity=3,
             entity_count_limit=0,
             fragments_per_entity_limit=50,
             include_all_linking_fragments_first=True,
+            seed=seed + 1 if seed is not None else 24,
+        ),
+        incremental_linking=IncrementalLinkingConfig(
+            max_chain_len=25,
+            negatives_per_positive=1,
+            seed=seed + 1 if seed is not None else 24,
         ),
     )
 
     train = SplitBuildConfig(
-        name="Train",
+        name="train",
         linking=LinkingConfig(
             pair_count_limit=500_000,
             pairs_per_entity_limit=500,
             property_pattern_count_limit=10_000,
             property_overlap_limits={1: 0.45},
             single_class_ratio_limit=0.76,
-            seed=25,
+            seed=seed + 2 if seed is not None else 25,
         ),
         clustering=ClusteringConfig(
             min_fragments_per_entity=3,
             entity_count_limit=0,
             fragments_per_entity_limit=1_000,
             include_all_linking_fragments_first=True,
+            seed=seed + 2 if seed is not None else 25,
+        ),
+        incremental_linking=IncrementalLinkingConfig(
+            max_chain_len=25,
+            negatives_per_positive=1,
+            seed=seed + 2 if seed is not None else 25,
         ),
     )
 
-    return [test, validation, train]
+    return [test, dev, train]

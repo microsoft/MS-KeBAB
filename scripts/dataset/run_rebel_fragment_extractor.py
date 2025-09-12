@@ -15,13 +15,13 @@ from kebab.utils.dataset.rebel.rebel_fragment_extractor import RebelFragmentExtr
 @click.option(
     "--rebel-dir",
     type=Path,
-    default=Path.cwd() / "data" / "REBEL" / "Original Dataset" / "full",
+    default=Path.cwd() / "data" / "REBEL" / "rebel_original_dataset" / "full",
     help="Path to the REBEL data directory (will be *json/*.jsonl-globbed against).",
 )
 @click.option(
     "--output-dir",
     type=Path,
-    default=Path.cwd() / "output",
+    default=Path.cwd() / "data" / "REBEL" / "rebel_fragments" / "extracted",
     help="Path to the output directory ('rebel_entity_fragments.jsonl' will be created there).",
 )
 @click.option(

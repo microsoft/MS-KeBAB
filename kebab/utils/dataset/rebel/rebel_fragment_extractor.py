@@ -83,6 +83,8 @@ class RebelFragmentExtractor:
         seen = set()
         self._UNSAFE_FRAGMENT_COUNTER = 0
 
+        self._logger.info(f"Extracting entity fragments to {self.entity_fragments_output_path}")
+
         stats = Counter()
         frag_count = 0
 

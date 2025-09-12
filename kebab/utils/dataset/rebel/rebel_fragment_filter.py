@@ -29,12 +29,14 @@ class RebelFragmentFilter:
     _logger: logging.Logger
     fragments_path: Path
     output_dir: Path
+    drop_fragments_without_type: bool
 
     def __init__(
         self,
         *,
         fragments_path: Path,
         output_dir: Path,
+        drop_fragments_without_type: bool = True,
     ):
         """
         Initialize the fragment filter.
@@ -42,16 +44,20 @@ class RebelFragmentFilter:
         Args:
             fragments_path: Path to the input REBEL fragments file.
             output_dir: Directory where output datasets will be written.
+            drop_fragments_without_type: If True, drop fragments that have no WikiData type in metadata.
         """
         self._logger = logging.getLogger(__name__)
         self.fragments_path = resolve_path(fragments_path)
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.drop_fragments_without_type = drop_fragments_without_type
 
     def run(self) -> None:
         """Run the dataset filter pipeline."""
         fragments_output_path = self.output_dir / self.fragments_path.name
         counter = Counter()
+
+        self._logger.info(f"Filtering fragments from {self.fragments_path}")
 
         with (
             open(fragments_output_path, mode="w", encoding="utf-8") as f_out,
@@ -62,7 +68,7 @@ class RebelFragmentFilter:
                 counter["total"] += 1
 
                 if counter["total"] % 100_000 == 0:
-                    self._logger.info(f"Processed {counter['total']:,} fragments...")
+                    self._logger.info(f"Processed {counter['total']:,} fragments")
 
                 for values in fragment.properties.values():
                     for value in values:
@@ -80,8 +86,8 @@ class RebelFragmentFilter:
                     counter["empty_properties"] += 1
                     continue
 
-                # Remove fragments that have no WikiData type in the metadata
-                if not fragment.wikidata_type:
+                # Optionally remove fragments that have no WikiData type in the metadata
+                if self.drop_fragments_without_type and not fragment.wikidata_type:
                     counter["no_wikidata_types"] += 1
                     continue
 

@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Tests for the REBEL linking and clustering dataset builder."""
+"""Tests for the REBEL linking pair sampler."""
 
 import random
 from collections import defaultdict
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from kebab.utils.dataset.rebel.rebel_dataset_builder import MergeDistributionMode, RebelDatasetBuilder
+from kebab.utils.dataset.rebel.rebel_pair_sampler import MergeDistributionMode, RebelPairSampler
 from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
 
 
@@ -78,7 +78,7 @@ def test_get_confusing_entities_map_and_sample() -> None:
     ]
 
     fragments = [ResolvedWikidataEntity.from_dict(d) for d in fragment_dicts]
-    conf_entities = RebelDatasetBuilder.get_confusing_entities_map(fragments)
+    conf_entities = RebelPairSampler.get_confusing_entities_map(fragments)
 
     assert sorted(conf_entities["Entity_1"]) == ["Entity_1", "Entity_2", "Entity_3"]
     assert sorted(conf_entities["Entity_2"]) == ["Entity_1", "Entity_2"]
@@ -89,7 +89,7 @@ def test_get_confusing_entities_map_and_sample() -> None:
     rng = np.random.default_rng(0)
 
     pairs = list(
-        RebelDatasetBuilder.sample_pairs(
+        RebelPairSampler.sample_pairs(
             fragments,
             conf_entities,
             min_acc_rate=1e-6,
@@ -116,7 +116,7 @@ def test_get_confusing_entities_map_and_sample() -> None:
 
 def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) -> None:
     """Test building linking and clustering datasets from the resolved REBEL fragments."""
-    builder = RebelDatasetBuilder(fragments_path=rebel_sample_resolved_fragments_file_path, output_dir=tmp_path)
+    builder = RebelPairSampler(fragments_path=rebel_sample_resolved_fragments_file_path, output_dir=tmp_path)
     builder.run()
 
     output_file = builder.linking_dataset_output_path
@@ -205,10 +205,8 @@ def sample_fragments_for_merge() -> tuple[list[ResolvedWikidataEntity], dict[str
 def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     """Test generate_merged_fragment method (sanity check)."""
     fragments, entity_idx = sample_fragments_for_merge
-
-    np.random.seed(0)  # noqa: NPY002
-    random.seed(0)
-    merged = RebelDatasetBuilder.generate_merged_fragment(0, fragments, entity_idx, max_fragments=3)
+    rng = np.random.default_rng(0)
+    merged = RebelPairSampler.generate_merged_fragment(0, fragments, entity_idx, max_fragments=3, rng=rng)
 
     # base fragment included
     assert fragments[0].metadata["fragment_id"] in merged.metadata["fragment_id"]
@@ -224,7 +222,7 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     assert set(merged.names).issubset({"A", "B", "C"})
 
     # when only one fragment exists for the entity, no merge occurs
-    single = RebelDatasetBuilder.generate_merged_fragment(3, fragments, entity_idx, max_fragments=3)
+    single = RebelPairSampler.generate_merged_fragment(3, fragments, entity_idx, max_fragments=3, rng=rng)
     assert single is fragments[3]
     assert "merge_count" not in single.metadata
 
@@ -233,12 +231,13 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     fragments_with_duplicates = [fragments[2], fragments[2], fragments[2]]
     entity_idx_with_duplicates = {"E1": [0, 1, 2]}
     for _ in range(10):
-        merged = RebelDatasetBuilder.generate_merged_fragment(
+        merged = RebelPairSampler.generate_merged_fragment(
             0,
             fragments_with_duplicates,
             entity_idx_with_duplicates,
             max_fragments=3,
             deduplicate_values=False,
+            rng=rng,
         )
 
         if merged.metadata["merge_count"] == 1:
@@ -286,7 +285,7 @@ def test_generate_merged_fragment_stats(dist: MergeDistributionMode) -> None:
     counts = np.zeros(n_frags, dtype=np.int32)
 
     for _ in range(n_samples):
-        merged = RebelDatasetBuilder.generate_merged_fragment(
+        merged = RebelPairSampler.generate_merged_fragment(
             0, fragments, mapping, max_fragments=n_frags, distribution=dist
         )
 

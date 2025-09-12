@@ -1,7 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Script to run the Wikidata type hierarchy extraction steps."""
+"""
+Script to run the Wikidata type hierarchy extraction steps.
+
+Requires a standard Wikidata JSON dump file, which can be downloaded from
+https://dumps.wikimedia.org/wikidatawiki/entities/
+"""
 
 from __future__ import annotations
 

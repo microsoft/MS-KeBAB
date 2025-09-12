@@ -16,13 +16,13 @@ from kebab.utils.dataset.wikidata.wikidata_names_dataset_builder import Wikidata
 @click.option(
     "--wikidata-simple-entities-path",
     type=Path,
-    default=Path.cwd() / "data" / "Wikidata" / "Simple Entities" / "2024-06-27" / "wikidata_simple_entities.jsonl",
+    default=Path.cwd() / "data" / "Wikidata" / "Simple Entities" / "wikidata_simple_entities.jsonl",
     help="The path to the extracted Wikidata simple entities.",
 )
 @click.option(
     "--wikidata-type-hierarchy-path",
     type=Path,
-    default=Path.cwd() / "data" / "Wikidata" / "Type Hierarchy" / "2024-06-27" / "wikidata_type_hierarchy.jsonl",
+    default=Path.cwd() / "data" / "Wikidata" / "Type Hierarchy" / "wikidata_type_hierarchy.jsonl",
     help="The path to the Wikidata type hierarchy.",
 )
 @click.option(
