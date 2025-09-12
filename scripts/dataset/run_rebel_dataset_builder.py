@@ -29,6 +29,7 @@ Notes:
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import click
@@ -117,6 +118,16 @@ def main(
 ) -> None:
     """Run the full REBEL dataset builder pipeline with sensible defaults."""
     logging_helpers.configure_logging()
+    logger = logging.getLogger(Path(__file__).stem)
+
+    logger.info(
+        "Starting REBEL dataset build: working_dir=%s, extract_properties=%s, extract_simple_entities=%s, extract_type_hierarchy=%s, seed=%d",
+        working_dir,
+        extract_properties,
+        extract_simple_entities,
+        extract_type_hierarchy,
+        seed,
+    )
 
     # Layout roots
     rebel_root = working_dir / "REBEL"
@@ -137,6 +148,13 @@ def main(
 
     # 1) Optional Wikidata extractions
     if extract_properties or extract_simple_entities:
+        logger.info(
+            "Running Wikidata simple/property extraction (entities=%s, properties=%s) from dump=%s -> out=%s",
+            extract_simple_entities,
+            extract_properties,
+            dump_path,
+            wikidata_root,
+        )
         extractor = WikidataSimpleExtractor(
             wikidata_json_dump_path=dump_path,
             run_entity_extraction=extract_simple_entities,
@@ -144,13 +162,22 @@ def main(
             output_dir=wikidata_root,
         )
         extractor.run()
+    else:
+        logger.info("Skipping Wikidata simple/property extraction (flags disabled)")
 
     if extract_type_hierarchy:
+        logger.info(
+            "Running Wikidata type hierarchy extraction from dump=%s -> out=%s",
+            dump_path,
+            wd_type_hierarchy_out,
+        )
         hierarchy_extractor = WikidataTypeHierarchyExtractor(
             wikidata_json_dump_path=dump_path,
             output_dir=wd_type_hierarchy_out,
         )
         hierarchy_extractor.run()
+    else:
+        logger.info("Skipping Wikidata type hierarchy extraction (flag disabled)")
 
     # Check availability of optional Wikidata artifacts (used for resolver),
     # regardless of whether we produced them in this run.
@@ -162,7 +189,23 @@ def main(
     simple_entities_available = _exists(simple_entities_path)
     type_hierarchy_available = _exists(type_hierarchy_path)
 
+    logger.info(
+        "Optional inputs availability: properties=%s (%s), simple_entities=%s (%s), type_hierarchy=%s (%s)",
+        properties_available,
+        properties_path,
+        simple_entities_available,
+        simple_entities_path,
+        type_hierarchy_available,
+        type_hierarchy_path,
+    )
+
     # 2) Extract fragments from REBEL dataset
+    logger.info(
+        "Extracting REBEL fragments from %s -> %s (surface_forms=%s)",
+        rebel_original_dir,
+        rebel_fragments_extracted,
+        True,
+    )
     fragment_extractor = RebelFragmentExtractor(
         rebel_dir=rebel_original_dir,
         output_dir=rebel_fragments_extracted,
@@ -171,6 +214,15 @@ def main(
     fragment_extractor.run()
 
     # 3) Resolve Wikidata names/types/values where possible given available inputs
+    logger.info(
+        "Resolving Wikidata fields (types attach=%s resolve=%s, prop_names=%s, prop_values=%s, query_api=%s) -> %s",
+        type_hierarchy_available,
+        type_hierarchy_available,
+        properties_available,
+        simple_entities_available,
+        True,
+        rebel_fragments_resolved,
+    )
     resolver = WikidataResolver(
         entities_path=rebel_fragments_extracted / "rebel_entity_fragments.jsonl",
         wikidata_simple_entities_path=simple_entities_path,
@@ -186,6 +238,11 @@ def main(
     resolver.run()
 
     # 4) Filter out degenerate fragments
+    logger.info(
+        "Filtering degenerate fragments (drop_without_type=%s) -> %s",
+        bool(type_hierarchy_available),
+        rebel_fragments_filtered,
+    )
     fragment_filter = RebelFragmentFilter(
         fragments_path=rebel_fragments_resolved / "rebel_entity_fragments.jsonl",
         output_dir=rebel_fragments_filtered,
@@ -194,10 +251,20 @@ def main(
     fragment_filter.run()
 
     # 5) Build base datasets (linking/clustering)
+    max_pair_count = 100_000
+    logger.info(
+        "Sampling base pairs (max_count=%d, max_merge_fragments=%d, merge_distribution=%s, dedup_values=%s, seed=%d) -> %s",
+        max_pair_count,
+        10,
+        MergeDistributionMode.ZIPF,
+        True,
+        seed,
+        rebel_root,
+    )
     pair_sampler = RebelPairSampler(
         fragments_path=rebel_fragments_filtered / "rebel_entity_fragments.jsonl",
         output_dir=rebel_root,
-        max_count=100_000,
+        max_count=max_pair_count,
         max_merge_fragments=10,
         merge_distribution=MergeDistributionMode.ZIPF,
         deduplicate_values=True,
@@ -206,6 +273,7 @@ def main(
     pair_sampler.run()
 
     # 6) Produce splits for all tasks
+    logger.info("Producing dataset splits -> %s", rebel_root)
     split_sampler = RebelSplitSampler(
         input_dir=rebel_root,
         output_dir=rebel_root,
@@ -213,6 +281,8 @@ def main(
         type_filter=None,
     )
     split_sampler.run()
+
+    logger.info("REBEL dataset build completed successfully: out=%s", rebel_root)
 
 
 if __name__ == "__main__":

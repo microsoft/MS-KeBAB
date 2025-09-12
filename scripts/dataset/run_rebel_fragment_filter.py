@@ -27,7 +27,10 @@ from kebab.utils.dataset.rebel.rebel_fragment_filter import RebelFragmentFilter
 @click.option(
     "--drop-fragments-without-type/--keep-fragments-without-type",
     default=True,
-    help=("If enabled, drop fragments that have no WikiData type in the metadata. Disable to keep such fragments."),
+    help=(
+        "If enabled, drop fragments that have no WikiData type in the metadata."
+        " These tend to be incomplete or poorly defined entities."
+    ),
 )
 @click.command()
 def main(
