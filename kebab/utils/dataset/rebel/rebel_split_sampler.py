@@ -115,8 +115,8 @@ class TypeFilter:
 class RebelSplitSampler:
     """Create Test/Validation/Train datasets from a base REBEL dataset in a single run."""
 
-    INCREMENTAL_LINKING_DATASET_FILENAME: str = "rebel_incremental_linking_dataset.jsonl"
-    INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME: str = "rebel_incremental_linking_ground_truth.jsonl"
+    INCREMENTAL_LINKING_DATASET_FILENAME: str = "rebel_linking_dataset.jsonl"
+    INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_ground_truth.jsonl"
 
     _logger: logging.Logger
     input_dir: Path

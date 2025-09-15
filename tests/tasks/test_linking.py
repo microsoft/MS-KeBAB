@@ -16,15 +16,15 @@ from kebab.utils.io_helpers import compare_files_ignore_linebreaks
 
 
 @pytest.fixture
-def _setup_and_teardown() -> Generator[None, Any, None]:
-    output_dir = Path(__file__).parents[1] / "output" / "linking"
+def _setup_and_teardown(tmp_path: Path) -> Generator[None, Any, None]:
+    output_dir = tmp_path / "linking"
     output_dir.mkdir(parents=True, exist_ok=True)
     yield
     shutil.rmtree(output_dir)
 
 
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
-def test_linking_read_write_items_roundtrip() -> None:
+def test_linking_read_write_items_roundtrip(tmp_path: Path) -> None:
     """Test reading and writing items in the LinkingTask."""
     entity_pairs_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
     boolean_labels_path = Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
@@ -39,7 +39,7 @@ def test_linking_read_write_items_roundtrip() -> None:
     # Prepare data
     items = list(task_instance.read_items())
     boolean_labels = [predicted_boolean for _, predicted_boolean in items if predicted_boolean is not None]
-    boolean_labels_output_path = Path(__file__).parents[1] / "output" / "linking" / "boolean_labels.jsonl"
+    boolean_labels_output_path = tmp_path / "boolean_labels.jsonl"
     task_instance.write_items(
         boolean_labels_output_path,
         boolean_labels,

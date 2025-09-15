@@ -230,8 +230,7 @@ class RebelPairSampler:
             for entity_id in entity_ids:
                 ent_id_to_conf_ent_ids[entity_id].update(entity_ids)
 
-        ent_id_to_conf_ent_ids = {entity_id: list(values) for entity_id, values in ent_id_to_conf_ent_ids.items()}
-
+        ent_id_to_conf_ent_ids = {entity_id: sorted(values) for entity_id, values in ent_id_to_conf_ent_ids.items()}
         logging.info(f"Built the confusing entities map, keys = {len(ent_id_to_conf_ent_ids):,}")
 
         return ent_id_to_conf_ent_ids
@@ -263,7 +262,7 @@ class RebelPairSampler:
         rng = rng or np.random.default_rng()
 
         # we'll keep base collections (fragments, entity_ids) as lists, and maintain index->array(indices) dictionaries
-        entity_ids = list(confusing_entities_map.keys())
+        entity_ids = sorted(confusing_entities_map.keys())
 
         # maps entity id (string) to entity index in the flat list
         entity_id_to_ent_index = {entity_id: i for i, entity_id in enumerate(entity_ids)}
@@ -464,6 +463,8 @@ class RebelPairSampler:
         )
 
         # write the entity generation dataset
+        entity_ids = sorted(entity_ids)
+
         count = 0
         with open(self.entity_generation_dataset_output_path, mode="w", encoding="utf-8") as f_out:
             for entity_id in entity_ids:

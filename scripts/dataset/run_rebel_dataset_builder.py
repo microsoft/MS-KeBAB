@@ -103,7 +103,7 @@ def _exists(p: Path) -> bool:
 )
 @click.option(
     "--run-extract-fragments/--no-run-extract-fragments",
-    default=False,
+    default=True,
     help=(
         "Whether to run step 2: extract REBEL fragments. If disabled, expects "
         "existing outputs under <working_dir>/REBEL/rebel_fragments/extracted."
@@ -111,7 +111,7 @@ def _exists(p: Path) -> bool:
 )
 @click.option(
     "--run-resolve/--no-run-resolve",
-    default=False,
+    default=True,
     help=(
         "Whether to run step 3: resolve Wikidata names/types/values. If disabled, expects "
         "existing outputs under <working_dir>/REBEL/rebel_fragments/resolved or will use extracted."
@@ -119,7 +119,7 @@ def _exists(p: Path) -> bool:
 )
 @click.option(
     "--run-filter/--no-run-filter",
-    default=False,
+    default=True,
     help=(
         "Whether to run step 4: filter degenerate fragments. If disabled, expects "
         "existing outputs under <working_dir>/REBEL/rebel_fragments/filtered or will use prior step."
@@ -316,7 +316,7 @@ def main(
         logger.info("Skipping fragment filtering (flag disabled)")
 
     # 5) Build base datasets (linking/clustering) (optional)
-    max_pair_count = 100_000
+    max_pair_count = 10_000_000
     if run_sample_pairs:
         logger.info(
             "Sampling base pairs (max_count=%d, max_merge_fragments=%d, merge_distribution=%s, dedup_values=%s, seed=%d) -> %s",

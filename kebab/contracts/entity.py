@@ -282,7 +282,7 @@ class Entity:
     def deduplicate_property_values(self) -> None:
         """Deduplicate values of each property."""
         for prop_id, values in self.properties.items():
-            self.properties[prop_id] = list(set(values))
+            self.properties[prop_id] = list(dict.fromkeys(values))
 
     def deduplicate_source_ids(self) -> None:
         """Deduplicate source IDs."""
