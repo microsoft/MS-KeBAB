@@ -35,7 +35,7 @@ def load_json(file_path: str) -> dict:
         return json.load(file)
 
 
-def test_task_interface():
+def test_task_interface(tmp_path: Path):
     """Test task interface."""
     benchmark = mskebab.Benchmark(Path(__file__).parent / "data" / "test_task_instances.json")
 
@@ -126,7 +126,11 @@ def test_task_interface():
                 task_instance_data[task_name]["metrics"],
                 strict=False,
             ):
-                metrics = task_instance.evaluate(Path(predictions_file))
+                # Ensure tasks that write outputs use a temporary directory (Linking)
+                if task_instance.task_type == TaskType.Linking:
+                    metrics = task_instance.evaluate(Path(predictions_file), output_dir=tmp_path)
+                else:
+                    metrics = task_instance.evaluate(Path(predictions_file))
                 assert_dicts_equal(gt_metrics, metrics, epsilon=1e-3)
 
 
