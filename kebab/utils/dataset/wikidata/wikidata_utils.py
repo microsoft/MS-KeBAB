@@ -361,7 +361,7 @@ def fetch_properties_via_api(
     errors in a row.
     (We could batch requests to speed up the process, but not doing so since this method is rarely used.)
     """
-    logging.info(f"Querying {end - start + 1} properties from Wikidata...")
+    logging.info(f"Querying {end - start + 1:,} properties from Wikidata...")
 
     output_path = output_path or Path.cwd() / f"wikidata_properties_{start}_{end}.json"
 
