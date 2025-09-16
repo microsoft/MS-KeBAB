@@ -716,6 +716,13 @@ class RebelSplitSampler:
 
 def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     """Provide default configs for Test, Validation, Train splits."""
+    seed_increment = 0
+
+    def get_next_seed() -> int:
+        nonlocal seed_increment
+        seed_increment += 1
+        return (seed if seed is not None else 0) + seed_increment
+
     test = SplitBuildConfig(
         name="test",
         linking=LinkingConfig(
@@ -724,13 +731,13 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
             property_pattern_count_limit=100,
             property_overlap_limits={1: 0.35},
             single_class_ratio_limit=0.76,
-            seed=seed if seed is not None else 23,
+            seed=get_next_seed(),
         ),
         clustering=ClusteringConfig(
-            seed=seed if seed is not None else 23,
+            seed=get_next_seed(),
         ),
         incremental_linking=IncrementalLinkingConfig(
-            seed=seed if seed is not None else 23,
+            seed=get_next_seed(),
         ),
     )
 
@@ -742,13 +749,13 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
             property_pattern_count_limit=100,
             property_overlap_limits={1: 0.35},
             single_class_ratio_limit=0.76,
-            seed=seed + 1 if seed is not None else 24,
+            seed=get_next_seed(),
         ),
         clustering=ClusteringConfig(
-            seed=seed + 1 if seed is not None else 24,
+            seed=get_next_seed(),
         ),
         incremental_linking=IncrementalLinkingConfig(
-            seed=seed + 1 if seed is not None else 24,
+            seed=get_next_seed(),
         ),
     )
 
@@ -760,14 +767,14 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
             property_pattern_count_limit=20_000,
             property_overlap_limits={1: 0.55},
             single_class_ratio_limit=0.76,
-            seed=seed + 2 if seed is not None else 25,
+            seed=get_next_seed(),
         ),
         clustering=ClusteringConfig(
             fragments_per_entity_limit=1_000,
-            seed=seed + 2 if seed is not None else 25,
+            seed=get_next_seed(),
         ),
         incremental_linking=IncrementalLinkingConfig(
-            seed=seed + 2 if seed is not None else 25,
+            seed=get_next_seed(),
         ),
     )
 
