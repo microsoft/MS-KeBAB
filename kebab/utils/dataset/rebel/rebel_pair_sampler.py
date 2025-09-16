@@ -57,6 +57,7 @@ from pathlib import Path
 from time import perf_counter as pc
 
 import numpy as np
+
 from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
 from kebab.utils.io_helpers import resolve_path
 
