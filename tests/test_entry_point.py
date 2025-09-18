@@ -126,7 +126,7 @@ def test_task_interface(tmp_path: Path):
                 task_instance_data[task_name]["metrics"],
                 strict=False,
             ):
-                metrics = task_instance.evaluate(Path(predictions_file), result_output_path=tmp_path)
+                metrics = task_instance.evaluate(Path(predictions_file), result_output_path=tmp_path / "results.txt")
                 assert_dicts_equal(gt_metrics, metrics, epsilon=1e-3)
 
 

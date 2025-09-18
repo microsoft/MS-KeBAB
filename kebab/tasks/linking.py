@@ -284,11 +284,11 @@ class LinkingTask(Task):
         metrics: dict[str, float],
         detail_records: list[dict],
         output_dir: Path,
-        eval_result_path: Path | None,
+        result_output_path: Path | None,
     ) -> None:
         """Save evaluation metrics and detailed prediction records."""
-        if eval_result_path:
-            save_dict_to_json(metrics, eval_result_path)
+        if result_output_path:
+            save_dict_to_json(metrics, result_output_path)
 
         tsv_path = output_dir / "linking_predictions.tsv"
         with tsv_path.open("w", encoding="utf-8") as f:
