@@ -4,7 +4,8 @@
 """Build the linking, clustering and generation datasets based on REBEL and Wikidata.
 
 Steps:
-1) Optionally extract Wikidata properties, simple entities, and type hierarchy.
+0) (Optional) Download and unpack the public REBEL dataset archive.
+1) (Optional) Extract Wikidata properties, simple entities, and type hierarchy.
 2) Extract REBEL fragments.
 3) Resolve Wikidata types/props/values where possible.
 4) Filter degenerate fragments.
@@ -14,7 +15,7 @@ Steps:
 Inputs are discovered under a single working directory (default: ./data).
 
 Expected input locations under ``<working_dir>``:
-- REBEL original dataset: ``REBEL/rebel_original_dataset/full``
+- REBEL original dataset: ``REBEL/rebel_original_dataset``
 - Wikidata properties (optional): ``Wikidata/properties/wikidata_properties.json``
 - Wikidata simple entities (optional): ``Wikidata/simple_entities/wikidata_simple_entities.jsonl``
 - Wikidata type hierarchy (optional): ``Wikidata/type_hierarchy/wikidata_type_hierarchy.jsonl``
@@ -30,6 +31,9 @@ Notes:
 from __future__ import annotations
 
 import logging
+import tempfile
+import urllib.request
+import zipfile
 from pathlib import Path
 
 import click
@@ -48,6 +52,9 @@ from kebab.utils.dataset.wikidata.wikidata_type_hierarchy_extractor import (
 )
 
 
+REBEL_ZIP_URL = "https://huggingface.co/datasets/Babelscape/rebel-dataset/resolve/main/rebel_dataset.zip"
+
+
 def _exists(p: Path) -> bool:
     """Check if a path exists."""
     try:
@@ -56,12 +63,57 @@ def _exists(p: Path) -> bool:
         return False
 
 
+def _dir_has_files(dir_path: Path) -> bool:
+    """Return True if directory exists and contains at least one file (non-recursive)."""
+    if not dir_path.is_dir():
+        return False
+    return any(dir_path.iterdir())
+
+
+def _download_and_unpack_rebel(logger: logging.Logger, dest_dir: Path, force: bool) -> None:
+    """Download and unzip the REBEL dataset archive into the destination directory."""
+    if _dir_has_files(dest_dir) and not force:
+        logger.info(
+            "REBEL original dataset already present at %s (skip download; use --force-download-rebel to re-download)",
+            dest_dir,
+        )
+        return
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Downloading REBEL dataset archive from %s", REBEL_ZIP_URL)
+    try:
+        with tempfile.TemporaryDirectory() as tmpd:
+            tmp_zip = Path(tmpd) / "rebel_dataset.zip"
+            urllib.request.urlretrieve(REBEL_ZIP_URL, tmp_zip)  # noqa: S310 (trusted constant URL)
+            logger.info("Download complete (%s bytes); extracting -> %s", tmp_zip.stat().st_size, dest_dir)
+            with zipfile.ZipFile(tmp_zip, "r") as zf:
+                zf.extractall(dest_dir)
+    except Exception:
+        logger.exception("Failed to download or extract REBEL dataset")
+        raise
+    else:
+        logger.info("REBEL dataset extracted successfully -> %s", dest_dir)
+
+
 @click.command()
 @click.option(
     "--working-dir",
     type=Path,
     default=Path.cwd() / "data",
     help="Root data directory to read inputs and write outputs.",
+)
+@click.option(
+    "--download-rebel/--no-download-rebel",
+    default=True,
+    help=(
+        "Download and unpack the public REBEL dataset archive if not already present under "
+        "<working_dir>/REBEL/rebel_original_dataset."
+    ),
+)
+@click.option(
+    "--force-download-rebel/--no-force-download-rebel",
+    default=False,
+    help="Force re-download of REBEL dataset even if target directory is non-empty.",
 )
 @click.option(
     "--extract-properties/--no-extract-properties",
@@ -147,6 +199,8 @@ def _exists(p: Path) -> bool:
 )
 def main(
     working_dir: Path,
+    download_rebel: bool,
+    force_download_rebel: bool,
     extract_properties: bool,
     extract_simple_entities: bool,
     extract_type_hierarchy: bool,
@@ -164,11 +218,13 @@ def main(
 
     logger.info(
         (
-            "Starting REBEL dataset build: working_dir=%s, "
+            "Starting REBEL dataset build: working_dir=%s, download_rebel=%s, force_download_rebel=%s, "
             "extract_properties=%s, extract_simple_entities=%s, extract_type_hierarchy=%s, "
             "run_extract_fragments=%s, run_resolve=%s, run_filter=%s, run_sample_pairs=%s, run_split=%s, seed=%d"
         ),
         working_dir,
+        download_rebel,
+        force_download_rebel,
         extract_properties,
         extract_simple_entities,
         extract_type_hierarchy,
@@ -192,12 +248,18 @@ def main(
 
     # REBEL I/O paths
     rebel_original_dir = rebel_root / "rebel_original_dataset" / "full"
+
+    # 0) Download REBEL dataset
+    if download_rebel:
+        _download_and_unpack_rebel(logger, rebel_original_dir, force_download_rebel)
+    else:
+        logger.info("Skipping REBEL dataset download (flag disabled)")
     rebel_fragments_root = rebel_root / "rebel_fragments"
     rebel_fragments_extracted = rebel_fragments_root / "extracted"
     rebel_fragments_resolved = rebel_fragments_root / "resolved"
     rebel_fragments_filtered = rebel_fragments_root / "filtered"
 
-    # 1) Optional Wikidata extractions
+    # 1) Wikidata extractions (optional)
     if extract_properties or extract_simple_entities:
         logger.info(
             "Running Wikidata simple/property extraction (entities=%s, properties=%s) from dump=%s -> out=%s",
