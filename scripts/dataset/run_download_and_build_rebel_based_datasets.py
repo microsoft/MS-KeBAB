@@ -74,25 +74,24 @@ def _download_and_unpack_rebel(logger: logging.Logger, dest_dir: Path, force: bo
     """Download and unzip the REBEL dataset archive into the destination directory."""
     if _dir_has_files(dest_dir) and not force:
         logger.info(
-            "REBEL original dataset already present at %s (skip download; use --force-download-rebel to re-download)",
-            dest_dir,
+            f"REBEL original dataset already present at {dest_dir} (skip download; use --force-download-rebel to re-download)"
         )
         return
 
     dest_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("Downloading REBEL dataset archive from %s", REBEL_ZIP_URL)
+    logger.info(f"Downloading REBEL dataset archive from {REBEL_ZIP_URL}")
     try:
         with tempfile.TemporaryDirectory() as tmpd:
             tmp_zip = Path(tmpd) / "rebel_dataset.zip"
             urllib.request.urlretrieve(REBEL_ZIP_URL, tmp_zip)  # noqa: S310 (trusted constant URL)
-            logger.info("Download complete (%s bytes); extracting -> %s", tmp_zip.stat().st_size, dest_dir)
+            logger.info(f"Download complete ({tmp_zip.stat().st_size} bytes); extracting -> {dest_dir}")
             with zipfile.ZipFile(tmp_zip, "r") as zf:
                 zf.extractall(dest_dir)
     except Exception:
         logger.exception("Failed to download or extract REBEL dataset")
         raise
     else:
-        logger.info("REBEL dataset extracted successfully -> %s", dest_dir)
+        logger.info(f"REBEL dataset extracted successfully -> {dest_dir}")
 
 
 @click.command()
@@ -217,23 +216,11 @@ def main(
     logger = logging.getLogger(Path(__file__).stem)
 
     logger.info(
-        (
-            "Starting REBEL dataset build: working_dir=%s, download_rebel=%s, force_download_rebel=%s, "
-            "extract_properties=%s, extract_simple_entities=%s, extract_type_hierarchy=%s, "
-            "run_extract_fragments=%s, run_resolve=%s, run_filter=%s, run_sample_pairs=%s, run_split=%s, seed=%d"
-        ),
-        working_dir,
-        download_rebel,
-        force_download_rebel,
-        extract_properties,
-        extract_simple_entities,
-        extract_type_hierarchy,
-        run_extract_fragments,
-        run_resolve,
-        run_filter,
-        run_sample_pairs,
-        run_split,
-        seed,
+        f"Starting REBEL dataset build: "
+        f"working_dir={working_dir}, download_rebel={download_rebel}, force_download_rebel={force_download_rebel}, "
+        f"extract_properties={extract_properties}, extract_simple_entities={extract_simple_entities}, extract_type_hierarchy={extract_type_hierarchy}, "
+        f"run_extract_fragments={run_extract_fragments}, run_resolve={run_resolve}, run_filter={run_filter}, "
+        f"run_sample_pairs={run_sample_pairs}, run_split={run_split}, seed={seed}"
     )
 
     # Layout roots
@@ -247,7 +234,7 @@ def main(
     wd_type_hierarchy_out = wikidata_root / "type_hierarchy"
 
     # REBEL I/O paths
-    rebel_original_dir = rebel_root / "rebel_original_dataset" / "full"
+    rebel_original_dir = rebel_root / "rebel_original_dataset"
 
     # 0) Download REBEL dataset
     if download_rebel:
@@ -262,11 +249,8 @@ def main(
     # 1) Wikidata extractions (optional)
     if extract_properties or extract_simple_entities:
         logger.info(
-            "Running Wikidata simple/property extraction (entities=%s, properties=%s) from dump=%s -> out=%s",
-            extract_simple_entities,
-            extract_properties,
-            dump_path,
-            wikidata_root,
+            f"Running Wikidata simple/property extraction (entities={extract_simple_entities}, properties={extract_properties}) "
+            f"from dump={dump_path} -> out={wikidata_root}"
         )
         extractor = WikidataSimpleExtractor(
             wikidata_json_dump_path=dump_path,
@@ -279,11 +263,7 @@ def main(
         logger.info("Skipping Wikidata simple/property extraction (flags disabled)")
 
     if extract_type_hierarchy:
-        logger.info(
-            "Running Wikidata type hierarchy extraction from dump=%s -> out=%s",
-            dump_path,
-            wd_type_hierarchy_out,
-        )
+        logger.info(f"Running Wikidata type hierarchy extraction from dump={dump_path} -> out={wd_type_hierarchy_out}")
         hierarchy_extractor = WikidataTypeHierarchyExtractor(
             wikidata_json_dump_path=dump_path,
             output_dir=wd_type_hierarchy_out,
@@ -303,22 +283,15 @@ def main(
     type_hierarchy_available = _exists(type_hierarchy_path)
 
     logger.info(
-        "Optional inputs availability: properties=%s (%s), simple_entities=%s (%s), type_hierarchy=%s (%s)",
-        properties_available,
-        properties_path,
-        simple_entities_available,
-        simple_entities_path,
-        type_hierarchy_available,
-        type_hierarchy_path,
+        f"Optional inputs availability: properties={properties_available} ({properties_path}), "
+        f"simple_entities={simple_entities_available} ({simple_entities_path}), "
+        f"type_hierarchy={type_hierarchy_available} ({type_hierarchy_path})"
     )
 
     # 2) Extract fragments from REBEL dataset (optional)
     if run_extract_fragments:
         logger.info(
-            "Extracting REBEL fragments from %s -> %s (surface_forms=%s)",
-            rebel_original_dir,
-            rebel_fragments_extracted,
-            True,
+            f"Extracting REBEL fragments from {rebel_original_dir} -> {rebel_fragments_extracted} (surface_forms={True})"
         )
         fragment_extractor = RebelFragmentExtractor(
             rebel_dir=rebel_original_dir,
@@ -335,13 +308,8 @@ def main(
     # 3) Resolve Wikidata names/types/values where possible given available inputs (optional)
     if run_resolve:
         logger.info(
-            "Resolving Wikidata fields (types attach=%s resolve=%s, prop_names=%s, prop_values=%s, query_api=%s) -> %s",
-            type_hierarchy_available,
-            type_hierarchy_available,
-            properties_available,
-            simple_entities_available,
-            True,
-            rebel_fragments_resolved,
+            f"Resolving Wikidata fields (types attach={type_hierarchy_available} resolve={type_hierarchy_available}, "
+            f"prop_names={properties_available}, prop_values={simple_entities_available}, query_api={True}) -> {rebel_fragments_resolved}"
         )
         resolver = WikidataResolver(
             entities_path=current_fragments_path,
@@ -363,9 +331,7 @@ def main(
     # 4) Filter out degenerate fragments (optional)
     if run_filter:
         logger.info(
-            "Filtering degenerate fragments (drop_without_type=%s) -> %s",
-            bool(type_hierarchy_available),
-            rebel_fragments_filtered,
+            f"Filtering degenerate fragments (drop_without_type={bool(type_hierarchy_available)}) -> {rebel_fragments_filtered}"
         )
         fragment_filter = RebelFragmentFilter(
             fragments_path=current_fragments_path,
@@ -381,13 +347,8 @@ def main(
     max_pair_count = 10_000_000
     if run_sample_pairs:
         logger.info(
-            "Sampling base pairs (max_count=%d, max_merge_fragments=%d, merge_distribution=%s, dedup_values=%s, seed=%d) -> %s",
-            max_pair_count,
-            10,
-            MergeDistributionMode.ZIPF,
-            True,
-            seed,
-            rebel_root,
+            f"Sampling base pairs (max_count={max_pair_count}, max_merge_fragments={10}, merge_distribution={MergeDistributionMode.ZIPF}, "
+            f"dedup_values={True}, seed={seed}) -> {rebel_root}"
         )
         pair_sampler = RebelPairSampler(
             fragments_path=current_fragments_path,
@@ -404,7 +365,7 @@ def main(
 
     # 6) Produce splits for all tasks (optional)
     if run_split:
-        logger.info("Producing dataset splits -> %s", rebel_root)
+        logger.info(f"Producing dataset splits -> {rebel_root}")
         split_sampler = RebelSplitSampler(
             input_dir=rebel_root,
             output_dir=rebel_root,
@@ -415,7 +376,7 @@ def main(
     else:
         logger.info("Skipping dataset split generation (flag disabled)")
 
-    logger.info("REBEL dataset build completed successfully: out=%s", rebel_root)
+    logger.info(f"REBEL dataset build completed successfully: out={rebel_root}")
 
 
 if __name__ == "__main__":

@@ -126,11 +126,7 @@ def test_task_interface(tmp_path: Path):
                 task_instance_data[task_name]["metrics"],
                 strict=False,
             ):
-                # Ensure tasks that write outputs use a temporary directory (Linking)
-                if task_instance.task_type == TaskType.Linking:
-                    metrics = task_instance.evaluate(Path(predictions_file), output_dir=tmp_path)
-                else:
-                    metrics = task_instance.evaluate(Path(predictions_file))
+                metrics = task_instance.evaluate(Path(predictions_file), result_output_path=tmp_path)
                 assert_dicts_equal(gt_metrics, metrics, epsilon=1e-3)
 
 

@@ -182,7 +182,7 @@ class RebelPairSampler:
         fragments_path = fragments_path or self.fragments_path
         fragments = []
 
-        self._logger.info("Loading REBEL entity fragments from %s", fragments_path)
+        self._logger.info(f"Loading REBEL entity fragments from {fragments_path}")
 
         with open(fragments_path, encoding="utf-8") as f:
             for line in f:
