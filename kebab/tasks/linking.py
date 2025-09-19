@@ -19,7 +19,7 @@ from sklearn.metrics import confusion_matrix
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
 from kebab.utils.io_helpers import (
-    EntityPairJsonlReader,
+    ClusterPairJsonlReader,
     ItemJsonlReader,
     ItemJsonlWriter,
     resolve_path,
@@ -30,7 +30,7 @@ from kebab.utils.io_helpers import (
 class LinkingTask(Task):
     """Represents a linking benchmark task with its data files."""
 
-    __entity_fragment: Path
+    __entity_fragments: Path
     __ground_truth: Path | None
 
     @property
@@ -41,7 +41,7 @@ class LinkingTask(Task):
     @property
     def data_entity_fragment_pairs(self) -> Path:
         """Return path to entity fragment pairs."""
-        return self.__entity_fragment
+        return self.__entity_fragments
 
     @property
     def ground_truth(self) -> Path | None:
@@ -58,21 +58,20 @@ class LinkingTask(Task):
     ):
         """Initialize a linking task."""
         super().__init__(name, schema, root_for_relative_paths=root_for_relative_paths)
-        self.__entity_fragment = resolve_path(entity_fragment_pairs, root_for_relative_paths)
+        self.__entity_fragments = resolve_path(entity_fragment_pairs, root_for_relative_paths)
         if ground_truth is not None:
             self.__ground_truth = resolve_path(ground_truth, root_for_relative_paths)
 
-    def read_items(self) -> Iterable[tuple[tuple[Entity, Entity], bool | None]]:
-        """
-        Read data items with optional ground-truth entity fragment pairs.
+    def read_items(
+        self,
+    ) -> Iterable[tuple[tuple[Entity | list[Entity], Entity | list[Entity]], bool | None]]:
+        """Read data items with optional ground-truth labels.
 
-        Returns:
-            Iterable[tuple[tuple[Entity, Entity], bool | None]]: An iterable of tuples, where each
-            tuple contains:
-                - A pair of `Entity` objects.
-                - An optional boolean value providing the ground-truth labels.
+        Each data item is a pair ``(lhs, rhs)`` where both sides can now be either a single ``Entity`` or a list of
+        ``Entity`` objects. The optional second element of the outer tuple is the ground-truth boolean
+        label if available.
         """
-        entity_pairs = EntityPairJsonlReader(self.data_entity_fragment_pairs).read_items()
+        entity_pairs = ClusterPairJsonlReader(self.data_entity_fragment_pairs).read_items()
         labels = (
             ItemJsonlReader[bool](self.ground_truth, converter=bool).read_items()
             if self.ground_truth is not None
@@ -95,7 +94,6 @@ class LinkingTask(Task):
         predictions: Path,
         result_output_path: Path | None = None,
         logger: Logger | None = None,
-        output_dir: Path | None = None,
         adjust_to_test_prior: bool = True,
         debugging_info_path: Path | None = None,
     ) -> dict[str, float]:
@@ -126,7 +124,8 @@ class LinkingTask(Task):
                 f"Log-odds shape {log_odds.shape} does not match ground truth labels shape {gt_labels.shape}."
             )
 
-        output_dir = output_dir or Path.cwd() / "output" / self.path_safe_name
+        output_dir = result_output_path.parent if result_output_path else Path.cwd()
+        output_dir = output_dir / self.path_safe_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # compute probabilistic metrics (and update the log-odds in-place if needed)
@@ -223,7 +222,7 @@ class LinkingTask(Task):
 
     def _build_detail_records(
         self,
-        pairs: Iterable[tuple[Entity, Entity]],
+        pairs: Iterable[tuple[Entity | list[Entity], Entity | list[Entity]]],
         gt_labels: np.ndarray,
         log_odds: np.ndarray,
         predictions: np.ndarray,
@@ -243,26 +242,31 @@ class LinkingTask(Task):
             predictions,
             debugging_infos,
         ):
-            ent_type: set[str] = set(left.metadata.get("type", [])) | set(right.metadata.get("type", []))
+            # If a side is a list of fragments, merge into one entity for reporting.
+            left_entity = Entity.merge(left) if isinstance(left, list) else left
+            right_entity = Entity.merge(right) if isinstance(right, list) else right
 
-            left_props = set(left.properties.keys())
-            right_props = set(right.properties.keys())
+            ent_type: set[str] = set(left_entity.metadata.get("type", [])) | set(right_entity.metadata.get("type", []))
+
+            left_props = set(left_entity.properties.keys())
+            right_props = set(right_entity.properties.keys())
             overlap_props = sorted(left_props & right_props)
-
-            prop_pattern = tuple(sorted([tuple(sorted(left.properties)), tuple(sorted(right.properties))]))
+            prop_pattern = tuple(
+                sorted([tuple(sorted(left_entity.properties)), tuple(sorted(right_entity.properties))])
+            )
 
             name_overlap = (
                 len(
-                    {name.lower() for name in left.properties.get("name", [])}
-                    & {name.lower() for name in right.properties.get("name", [])}
+                    {name.lower() for name in left_entity.properties.get("name", [])}
+                    & {name.lower() for name in right_entity.properties.get("name", [])}
                 )
                 >= 1
             )
 
             records.append(
                 {
-                    "left": dict(left.properties),
-                    "right": dict(right.properties),
+                    "left": dict(left_entity.properties),
+                    "right": dict(right_entity.properties),
                     "entity_type": sorted(ent_type),
                     "overlap_props": overlap_props,
                     "prop_overlap_num": len(overlap_props),
@@ -271,8 +275,8 @@ class LinkingTask(Task):
                     "label": gt_label,
                     "log_odds": score,
                     "predicted_label": prediction,
-                    "left_entity_id": left.entity_id,
-                    "right_entity_id": right.entity_id,
+                    "left_entity_id": left_entity.entity_id,
+                    "right_entity_id": right_entity.entity_id,
                     "debugging_info": debugging_info if debugging_info else "",
                 }
             )

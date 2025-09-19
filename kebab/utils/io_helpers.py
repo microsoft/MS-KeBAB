@@ -264,6 +264,63 @@ class EntityPairJsonlReader(ItemReader[tuple[Entity, Entity]]):
             yield entities[0], entities[1]
 
 
+class ClusterPairJsonlReader(ItemReader[tuple[Entity | list[Entity], Entity | list[Entity]]]):
+    """
+    Reader for JSONL files containing linking pairs.
+
+    Each JSONL line must be a JSON array of length 2:
+    - Either [Entity, Entity]
+    - Or [[Entity, Entity, ...], Entity]
+    - Or [Entity, [Entity, Entity, ...]]
+    - Or [[Entity, Entity, ...], [Entity, Entity, ...]]
+    """
+
+    path: Path
+
+    def __init__(self, path: Path):
+        """Initialize the reader with a path to a JSONL file."""
+        self.path = path
+
+    def read_items(self) -> Iterable[tuple[Entity | list[Entity], Entity | list[Entity]]]:
+        """Yield pairs where the left side is an Entity or a list of Entities, and right is an Entity."""
+        line_pair_len = 2  # expected array length per JSONL line
+        with open(self.path, encoding="utf-8") as file:
+            for line in file:
+                obj = json.loads(line)
+                if not isinstance(obj, list) or len(obj) != line_pair_len:
+                    raise ValueError(f"Expected a JSON array of length 2 per line, got: {obj!r}")
+
+                left_raw, right_raw = obj[0], obj[1]
+
+                # Case 1: [Entity, Entity]
+                if isinstance(left_raw, dict) and isinstance(right_raw, dict):
+                    yield (Entity.from_dict(left_raw), Entity.from_dict(right_raw))
+                    continue
+
+                # Case 2: [[Entity, ...], Entity]
+                if isinstance(left_raw, list) and isinstance(right_raw, dict):
+                    left_list = [Entity.from_dict(e) for e in left_raw]
+                    yield (left_list, Entity.from_dict(right_raw))
+                    continue
+
+                # Case 3: [Entity, [Entity, ...]]
+                if isinstance(left_raw, dict) and isinstance(right_raw, list):
+                    right_list = [Entity.from_dict(e) for e in right_raw]
+                    yield (Entity.from_dict(left_raw), right_list)
+                    continue
+
+                # Case 4: [[Entity, ...], [Entity, ...]]
+                if isinstance(left_raw, list) and isinstance(right_raw, list):
+                    left_list = [Entity.from_dict(e) for e in left_raw]
+                    right_list = [Entity.from_dict(e) for e in right_raw]
+                    yield (left_list, right_list)
+                    continue
+
+                raise ValueError(
+                    f"Unsupported JSONL line format. Expected [entity, entity] or [[entities...], entity], got: {obj!r}"
+                )
+
+
 class ItemWriter[DataItemType](ABC):
     """
     Abstract base class for output item writers.

@@ -9,6 +9,7 @@ import pytest
 from kebab.utils.dataset.rebel.rebel_pair_sampler import RebelPairSampler
 from kebab.utils.dataset.rebel.rebel_split_sampler import (
     ClusteringConfig,
+    FragmentSetGenerationConfig,
     IncrementalLinkingConfig,
     LinkingConfig,
     RebelSplitSampler,
@@ -67,6 +68,8 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
             include_all_linking_fragments_first=True,
         ),
         incremental_linking=IncrementalLinkingConfig(),
+        incremental_set_linking=IncrementalLinkingConfig(left_as_set=True),
+        fragment_set_generation=FragmentSetGenerationConfig(),
     )
 
     val_split = SplitBuildConfig(
@@ -86,6 +89,8 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
             include_all_linking_fragments_first=True,
         ),
         incremental_linking=IncrementalLinkingConfig(),
+        incremental_set_linking=IncrementalLinkingConfig(left_as_set=True),
+        fragment_set_generation=FragmentSetGenerationConfig(),
     )
 
     out_dir = tmp_path / "subsampled"
@@ -101,6 +106,8 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     test_clustering_dir = out_dir / "clustering" / test_split.name
     test_entity_gen_dir = out_dir / "entity_generation" / test_split.name
     test_fragment_gen_dir = out_dir / "fragment_generation" / test_split.name
+    test_incr_linking_dir = out_dir / "incremental_linking" / test_split.name
+    test_incr_set_linking_dir = out_dir / "incremental_set_linking" / test_split.name
     _assert_non_empty(test_linking_dir / RebelPairSampler.LINKING_DATASET_FILENAME)
     _assert_non_empty(test_linking_dir / RebelPairSampler.LINKING_GROUND_TRUTH_FILENAME)
     _assert_non_empty(test_linking_dir / "rebel_linking_used_entities.jsonl")
@@ -108,12 +115,24 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     _assert_non_empty(test_clustering_dir / RebelPairSampler.CLUSTERING_GROUND_TRUTH_FILENAME)
     _assert_non_empty(test_entity_gen_dir / RebelPairSampler.ENTITY_GENERATION_DATASET_FILENAME)
     _assert_non_empty(test_fragment_gen_dir / RebelPairSampler.FRAGMENT_GENERATION_DATASET_FILENAME)
+    # incremental linking variants
+    from kebab.utils.dataset.rebel.rebel_split_sampler import RebelSplitSampler as _Sampler
+
+    _assert_non_empty(test_incr_linking_dir / _Sampler.INCREMENTAL_LINKING_DATASET_FILENAME)
+    _assert_non_empty(test_incr_linking_dir / _Sampler.INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME)
+    _assert_non_empty(test_incr_set_linking_dir / _Sampler.INCREMENTAL_SET_LINKING_DATASET_FILENAME)
+    _assert_non_empty(test_incr_set_linking_dir / _Sampler.INCREMENTAL_SET_LINKING_GROUND_TRUTH_FILENAME)
+    # fragment set generation dataset
+    fragset_dir = out_dir / "fragment_set_generation" / test_split.name
+    _assert_non_empty(fragset_dir / _Sampler.FRAGMENT_SET_GENERATION_DATASET_FILENAME)
 
     # dev files should exist; they may be empty if entities are exhausted
     val_linking_dir = out_dir / "linking" / val_split.name
     val_clustering_dir = out_dir / "clustering" / val_split.name
     val_entity_gen_dir = out_dir / "entity_generation" / val_split.name
     val_fragment_gen_dir = out_dir / "fragment_generation" / val_split.name
+    val_incr_linking_dir = out_dir / "incremental_linking" / val_split.name
+    val_incr_set_linking_dir = out_dir / "incremental_set_linking" / val_split.name
     assert (val_linking_dir / RebelPairSampler.LINKING_DATASET_FILENAME).exists()
     assert (val_linking_dir / RebelPairSampler.LINKING_GROUND_TRUTH_FILENAME).exists()
     assert (val_linking_dir / "rebel_linking_used_entities.jsonl").exists()
@@ -121,6 +140,15 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     assert (val_clustering_dir / RebelPairSampler.CLUSTERING_GROUND_TRUTH_FILENAME).exists()
     assert (val_entity_gen_dir / RebelPairSampler.ENTITY_GENERATION_DATASET_FILENAME).exists()
     assert (val_fragment_gen_dir / RebelPairSampler.FRAGMENT_GENERATION_DATASET_FILENAME).exists()
+    # incremental linking variants
+    assert (val_incr_linking_dir / _Sampler.INCREMENTAL_LINKING_DATASET_FILENAME).exists()
+    assert (val_incr_linking_dir / _Sampler.INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME).exists()
+    assert (val_incr_set_linking_dir / _Sampler.INCREMENTAL_SET_LINKING_DATASET_FILENAME).exists()
+    assert (val_incr_set_linking_dir / _Sampler.INCREMENTAL_SET_LINKING_GROUND_TRUTH_FILENAME).exists()
+    # fragment set generation dataset
+    assert (
+        out_dir / "fragment_set_generation" / val_split.name / _Sampler.FRAGMENT_SET_GENERATION_DATASET_FILENAME
+    ).exists()
 
 
 def test_split_sampler_disjoint_entities_between_splits(
@@ -151,6 +179,8 @@ def test_split_sampler_disjoint_entities_between_splits(
                 include_all_linking_fragments_first=True,
             ),
             incremental_linking=IncrementalLinkingConfig(),
+            incremental_set_linking=IncrementalLinkingConfig(left_as_set=True),
+            fragment_set_generation=FragmentSetGenerationConfig(),
         ),
         SplitBuildConfig(
             name="B",
@@ -169,6 +199,8 @@ def test_split_sampler_disjoint_entities_between_splits(
                 include_all_linking_fragments_first=True,
             ),
             incremental_linking=IncrementalLinkingConfig(),
+            incremental_set_linking=IncrementalLinkingConfig(left_as_set=True),
+            fragment_set_generation=FragmentSetGenerationConfig(),
         ),
     ]
 
