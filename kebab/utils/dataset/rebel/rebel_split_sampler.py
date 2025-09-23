@@ -96,6 +96,7 @@ class FragmentSetGenerationConfig:
     max_fragments_per_entity: int = 100
     sequences_per_entity: int | None = 5  # if None use fragment_count cap
     seed: int | None = None
+    seed: int | None = None
 
 
 @dataclass
@@ -849,9 +850,9 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     test = SplitBuildConfig(
         name="test",
         linking=LinkingConfig(
-            pair_count_limit=100,
-            pairs_per_entity_limit=10,
-            property_pattern_count_limit=10,
+            pair_count_limit=5000,
+            pairs_per_entity_limit=50,
+            property_pattern_count_limit=100,
             property_overlap_limits={1: 0.35},
             single_class_ratio_limit=0.76,
             seed=get_next_seed(),
@@ -876,9 +877,9 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     dev = SplitBuildConfig(
         name="dev",
         linking=LinkingConfig(
-            pair_count_limit=200,
-            pairs_per_entity_limit=10,
-            property_pattern_count_limit=10,
+            pair_count_limit=5000,
+            pairs_per_entity_limit=50,
+            property_pattern_count_limit=100,
             property_overlap_limits={1: 0.35},
             single_class_ratio_limit=0.76,
             seed=get_next_seed(),
@@ -901,9 +902,9 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     train = SplitBuildConfig(
         name="train",
         linking=LinkingConfig(
-            pair_count_limit=1_000_000,
+            pair_count_limit=100_000,
             pairs_per_entity_limit=100,
-            property_pattern_count_limit=50_000,
+            property_pattern_count_limit=2_000,
             property_overlap_limits={1: 0.55},
             single_class_ratio_limit=0.76,
             seed=get_next_seed(),
