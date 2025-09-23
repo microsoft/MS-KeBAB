@@ -21,7 +21,6 @@ Expected input locations under ``<working_dir>``:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import shutil
 from pathlib import Path
@@ -29,12 +28,11 @@ from pathlib import Path
 import click
 import requests
 from kebab.utils import logging_helpers
-from kebab.utils.dataset.re_docred.re_docred_dataset_builder import (
-    ReDocRedDatasetBuilder,
-)
+from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedDatasetBuilder
 from kebab.utils.dataset.wikidata.wikidata_simple_extractor import (
     WikidataSimpleExtractor,
 )
+from kebab.utils.io_helpers import md5sum, verify_md5_file
 
 
 RE_DOCRED_SPLITS = ["train", "dev", "test"]
@@ -61,16 +59,27 @@ def _download_file(url: str, dest: Path) -> None:
         f.write(resp.text)
 
 
-def _md5sum(path: Path) -> str:
-    """Compute the MD5 hash of a file, ignoring CR characters.
+def _create_md5_file(md5_file: Path, base_dir: Path) -> None:
+    """Create an MD5 file from current extraction outputs."""
+    extractions_dir = base_dir / "Extractions"
+    md5_entries = []
 
-    Note: MD5 is kept to match reference hashes in extraction.md5.
-    """
-    hash_md5 = hashlib.md5(usedforsecurity=False)
-    with open(path, "rb") as f:
-        for buf in iter(lambda: f.read(4096), b""):
-            hash_md5.update(buf.replace(b"\r", b""))
-    return hash_md5.hexdigest()
+    for split in RE_DOCRED_SPLITS:
+        split_dir = extractions_dir / split
+        if split_dir.exists():
+            for file_path in split_dir.glob("*.jsonl"):
+                relative_path = file_path.relative_to(extractions_dir)
+                md5_hash = md5sum(file_path)
+                md5_entries.append(f"{md5_hash}  {relative_path}")
+
+    md5_entries.sort()  # Sort for consistent output
+    with open(md5_file, "w", encoding="utf-8") as f:
+        for entry in md5_entries:
+            f.write(entry + "\n")
+
+
+def _verify_md5_file(md5_file: Path, base_dir: Path, logger: logging.Logger) -> None:  # legacy wrapper for consistency
+    verify_md5_file(md5_file, base_dir / "Extractions", logger)
 
 
 @click.command()
@@ -144,29 +153,12 @@ def main(
         else:
             logger.info(f"Extraction directory for {split} already exists. Skipping preprocessing.")
 
-    # 4) Check MD5 hashes
+    # 4) Check/create MD5 hashes
     if not _exists(md5_file):
-        logger.warning(f"MD5 file {md5_file} not found. Skipping MD5 check.")
-        return
-    with open(md5_file, encoding="utf-8") as f:
-        for raw_line in f:
-            line = raw_line.strip()
-            if not line:
-                continue
-            parts = line.split()
-            if len(parts) != MD5_LINE_PARTS:
-                logger.warning(f"Malformed MD5 line: {line}")
-                continue
-            expected_md5, file_rel = parts
-            file_path = redocred_output_dir / "Extractions" / file_rel
-            if not _exists(file_path):
-                logger.error(f"File {file_path} not found for MD5 check.")
-                raise FileNotFoundError(file_path)
-            actual_md5 = _md5sum(file_path)
-            if actual_md5 != expected_md5:
-                logger.error(f"MD5 mismatch for {file_path}: expected {expected_md5}, got {actual_md5}")
-                raise ValueError(f"MD5 mismatch for {file_path}")
-    logger.info("MD5 check passed. All files are correctly generated.")
+        logger.warning(f"MD5 file {md5_file} not found. Creating it from current outputs.")
+        _create_md5_file(md5_file, redocred_output_dir)
+    else:
+        _verify_md5_file(md5_file, redocred_output_dir, logger)
 
 
 if __name__ == "__main__":

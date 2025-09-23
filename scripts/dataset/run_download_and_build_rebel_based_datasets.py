@@ -50,9 +50,11 @@ from kebab.utils.dataset.wikidata.wikidata_simple_extractor import WikidataSimpl
 from kebab.utils.dataset.wikidata.wikidata_type_hierarchy_extractor import (
     WikidataTypeHierarchyExtractor,
 )
+from kebab.utils.io_helpers import create_md5_file, verify_md5_file
 
 
 REBEL_ZIP_URL = "https://huggingface.co/datasets/Babelscape/rebel-dataset/resolve/main/rebel_dataset.zip"
+MD5_LINE_PARTS = 2  # kept for backward compatibility of existing md5 files
 
 
 def _exists(p: Path) -> bool:
@@ -94,6 +96,46 @@ def _download_and_unpack_rebel(logger: logging.Logger, dest_dir: Path, force: bo
         logger.info(f"REBEL dataset extracted successfully -> {dest_dir}")
 
 
+def _collect_rebel_output_files(rebel_root: Path) -> list[Path]:
+    """Collect all output files that should be included in MD5 verification."""
+    output_files = []
+    fragments_root = rebel_root / "rebel_fragments"
+    for stage in ["extracted", "resolved", "filtered"]:
+        stage_dir = fragments_root / stage
+        if stage_dir.exists():
+            output_files.extend(list(stage_dir.glob("*.jsonl")))
+    for task in ["linking", "clustering", "entity_generation", "fragment_generation"]:
+        task_dir = rebel_root / task / "base"
+        if task_dir.exists():
+            output_files.extend(list(task_dir.glob("*.jsonl")))
+    map_file = rebel_root / "rebel_fragment_to_entity_map.jsonl"
+    if map_file.exists():
+        output_files.append(map_file)
+    for task in [
+        "linking",
+        "clustering",
+        "entity_generation",
+        "fragment_generation",
+        "incremental_linking",
+        "incremental_set_linking",
+    ]:
+        task_dir = rebel_root / task
+        if task_dir.exists():
+            for split_dir in task_dir.iterdir():
+                if split_dir.is_dir() and split_dir.name != "base":
+                    output_files.extend(list(split_dir.glob("*.jsonl")))
+    return output_files
+
+
+def _create_md5_file(md5_file: Path, rebel_root: Path) -> None:  # wrapper to maintain script interface
+    files = _collect_rebel_output_files(rebel_root)
+    create_md5_file(md5_file, files, rebel_root)
+
+
+def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -> None:  # wrapper
+    verify_md5_file(md5_file, rebel_root, logger)
+
+
 @click.command()
 @click.option(
     "--working-dir",
@@ -116,7 +158,7 @@ def _download_and_unpack_rebel(logger: logging.Logger, dest_dir: Path, force: bo
 )
 @click.option(
     "--extract-properties/--no-extract-properties",
-    default=False,
+    default=True,
     help=(
         "Extract Wikidata properties into <working_dir>/Wikidata/properties. "
         "If not extracting, we'll look for 'wikidata_properties.json' there; "
@@ -196,6 +238,11 @@ def _download_and_unpack_rebel(logger: logging.Logger, dest_dir: Path, force: bo
     show_default=True,
     help=("Random seed to make sampling deterministic across runs."),
 )
+@click.option(
+    "--verify-md5/--no-verify-md5",
+    default=True,
+    help=("Whether to verify/create MD5 checksums for all output files."),
+)
 def main(
     working_dir: Path,
     download_rebel: bool,
@@ -210,6 +257,7 @@ def main(
     run_filter: bool,
     run_sample_pairs: bool,
     run_split: bool,
+    verify_md5: bool,
 ) -> None:
     """Run the full REBEL dataset builder pipeline with sensible defaults."""
     logging_helpers.configure_logging()
@@ -220,7 +268,7 @@ def main(
         f"working_dir={working_dir}, download_rebel={download_rebel}, force_download_rebel={force_download_rebel}, "
         f"extract_properties={extract_properties}, extract_simple_entities={extract_simple_entities}, extract_type_hierarchy={extract_type_hierarchy}, "
         f"run_extract_fragments={run_extract_fragments}, run_resolve={run_resolve}, run_filter={run_filter}, "
-        f"run_sample_pairs={run_sample_pairs}, run_split={run_split}, seed={seed}"
+        f"run_sample_pairs={run_sample_pairs}, run_split={run_split}, verify_md5={verify_md5}, seed={seed}"
     )
 
     # Layout roots
@@ -377,6 +425,15 @@ def main(
         logger.info("Skipping dataset split generation (flag disabled)")
 
     logger.info(f"REBEL dataset build completed successfully: out={rebel_root}")
+
+    # MD5 verification/creation
+    if verify_md5:
+        md5_file = rebel_root / "rebel_outputs.md5"
+        if not _exists(md5_file):
+            logger.warning(f"MD5 file {md5_file} not found. Creating it from current outputs.")
+            _create_md5_file(md5_file, rebel_root)
+        else:
+            _verify_md5_file(md5_file, rebel_root, logger)
 
 
 if __name__ == "__main__":
