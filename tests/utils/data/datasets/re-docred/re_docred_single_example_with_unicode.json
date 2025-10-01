@@ -1,0 +1,1083 @@
+[
+    {
+        "title": "Jir\u014d Shiizaki",
+        "vertexSet": [
+            [
+                {
+                    "name": "Jir\u014d Shiizaki",
+                    "pos": [
+                        0,
+                        2
+                    ],
+                    "sent_id": 0,
+                    "type": "PER",
+                    "global_pos": [
+                        0,
+                        0
+                    ],
+                    "index": "0_0"
+                },
+                {
+                    "name": "\u690e\u5d0e\u4e8c\u90ce,Shiizaki Jir\u014d",
+                    "pos": [
+                        3,
+                        5
+                    ],
+                    "sent_id": 0,
+                    "type": "PER",
+                    "global_pos": [
+                        3,
+                        3
+                    ],
+                    "index": "0_1"
+                },
+                {
+                    "name": "Shiizaki",
+                    "pos": [
+                        0,
+                        1
+                    ],
+                    "sent_id": 6,
+                    "type": "PER",
+                    "global_pos": [
+                        239,
+                        239
+                    ],
+                    "index": "0_2"
+                },
+                {
+                    "name": "Shiizaki",
+                    "pos": [
+                        0,
+                        1
+                    ],
+                    "sent_id": 2,
+                    "type": "PER",
+                    "global_pos": [
+                        52,
+                        52
+                    ],
+                    "index": "0_3"
+                },
+                {
+                    "name": "Shiizaki",
+                    "pos": [
+                        28,
+                        29
+                    ],
+                    "sent_id": 3,
+                    "type": "PER",
+                    "global_pos": [
+                        119,
+                        119
+                    ],
+                    "index": "0_4"
+                }
+            ],
+            [
+                {
+                    "type": "TIME",
+                    "pos": [
+                        7,
+                        10
+                    ],
+                    "name": "30 September 1911",
+                    "sent_id": 0,
+                    "global_pos": [
+                        7,
+                        7
+                    ],
+                    "index": "1_0"
+                }
+            ],
+            [
+                {
+                    "type": "TIME",
+                    "pos": [
+                        11,
+                        14
+                    ],
+                    "name": "15 August 1945",
+                    "sent_id": 0,
+                    "global_pos": [
+                        11,
+                        11
+                    ],
+                    "index": "2_0"
+                }
+            ],
+            [
+                {
+                    "name": "Imperial Japanese Army",
+                    "pos": [
+                        21,
+                        24
+                    ],
+                    "sent_id": 0,
+                    "type": "ORG",
+                    "global_pos": [
+                        21,
+                        21
+                    ],
+                    "index": "3_0"
+                }
+            ],
+            [
+                {
+                    "name": "World War II",
+                    "pos": [
+                        25,
+                        28
+                    ],
+                    "sent_id": 0,
+                    "type": "MISC",
+                    "global_pos": [
+                        25,
+                        25
+                    ],
+                    "index": "4_0"
+                }
+            ],
+            [
+                {
+                    "type": "ORG",
+                    "pos": [
+                        15,
+                        18
+                    ],
+                    "name": "Military Affairs Bureau",
+                    "sent_id": 1,
+                    "global_pos": [
+                        44,
+                        44
+                    ],
+                    "index": "5_0"
+                }
+            ],
+            [
+                {
+                    "type": "ORG",
+                    "pos": [
+                        19,
+                        22
+                    ],
+                    "name": "War Affairs Section",
+                    "sent_id": 1,
+                    "global_pos": [
+                        48,
+                        48
+                    ],
+                    "index": "6_0"
+                }
+            ],
+            [
+                {
+                    "type": "MISC",
+                    "pos": [
+                        16,
+                        18
+                    ],
+                    "name": "Ky\u016bj\u014d incident",
+                    "sent_id": 2,
+                    "global_pos": [
+                        68,
+                        68
+                    ],
+                    "index": "7_0"
+                }
+            ],
+            [
+                {
+                    "type": "TIME",
+                    "pos": [
+                        24,
+                        28
+                    ],
+                    "name": "August 15 , 1945",
+                    "sent_id": 2,
+                    "global_pos": [
+                        76,
+                        76
+                    ],
+                    "index": "8_0"
+                }
+            ],
+            [
+                {
+                    "name": "Japan",
+                    "pos": [
+                        35,
+                        36
+                    ],
+                    "sent_id": 2,
+                    "type": "LOC",
+                    "global_pos": [
+                        87,
+                        87
+                    ],
+                    "index": "9_0"
+                }
+            ],
+            [
+                {
+                    "name": "Kenji Hatanaka",
+                    "pos": [
+                        7,
+                        9
+                    ],
+                    "sent_id": 3,
+                    "type": "PER",
+                    "global_pos": [
+                        98,
+                        98
+                    ],
+                    "index": "10_0"
+                }
+            ],
+            [
+                {
+                    "type": "ORG",
+                    "pos": [
+                        50,
+                        54
+                    ],
+                    "name": "First Imperial Guard Division",
+                    "sent_id": 3,
+                    "global_pos": [
+                        141,
+                        141
+                    ],
+                    "index": "11_0"
+                }
+            ],
+            [
+                {
+                    "name": "Imperial Palace",
+                    "pos": [
+                        57,
+                        59
+                    ],
+                    "sent_id": 3,
+                    "type": "LOC",
+                    "global_pos": [
+                        148,
+                        148
+                    ],
+                    "index": "12_0"
+                },
+                {
+                    "name": "Imperial Palace",
+                    "pos": [
+                        20,
+                        22
+                    ],
+                    "sent_id": 6,
+                    "type": "LOC",
+                    "global_pos": [
+                        259,
+                        259
+                    ],
+                    "index": "12_1"
+                },
+                {
+                    "name": "Palace",
+                    "pos": [
+                        14,
+                        15
+                    ],
+                    "sent_id": 5,
+                    "type": "LOC",
+                    "global_pos": [
+                        211,
+                        211
+                    ],
+                    "index": "12_2"
+                }
+            ],
+            [
+                {
+                    "type": "PER",
+                    "pos": [
+                        62,
+                        63
+                    ],
+                    "name": "Hirohito",
+                    "sent_id": 3,
+                    "global_pos": [
+                        153,
+                        153
+                    ],
+                    "index": "13_0"
+                }
+            ],
+            [
+                {
+                    "type": "TIME",
+                    "pos": [
+                        2,
+                        4
+                    ],
+                    "name": "seven o'clock",
+                    "sent_id": 4,
+                    "global_pos": [
+                        181,
+                        181
+                    ],
+                    "index": "14_0"
+                }
+            ],
+            [
+                {
+                    "type": "TIME",
+                    "pos": [
+                        8,
+                        10
+                    ],
+                    "name": "August 15",
+                    "sent_id": 4,
+                    "global_pos": [
+                        187,
+                        187
+                    ],
+                    "index": "15_0"
+                }
+            ],
+            [
+                {
+                    "name": "Shizuichi Tanaka",
+                    "pos": [
+                        1,
+                        3
+                    ],
+                    "sent_id": 5,
+                    "type": "PER",
+                    "global_pos": [
+                        198,
+                        198
+                    ],
+                    "index": "16_0"
+                }
+            ],
+            [
+                {
+                    "name": "Eastern District Army",
+                    "pos": [
+                        7,
+                        10
+                    ],
+                    "sent_id": 5,
+                    "type": "ORG",
+                    "global_pos": [
+                        204,
+                        204
+                    ],
+                    "index": "17_0"
+                }
+            ]
+        ],
+        "labels": [
+            {
+                "r": "P607",
+                "h": 0,
+                "t": 4,
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "r": "P27",
+                "h": 0,
+                "t": 9,
+                "evidence": [
+                    0,
+                    2
+                ]
+            },
+            {
+                "r": "P569",
+                "h": 0,
+                "t": 1,
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "r": "P570",
+                "h": 0,
+                "t": 2,
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "r": "P607",
+                "h": 3,
+                "t": 4,
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "r": "P17",
+                "h": 3,
+                "t": 9,
+                "evidence": [
+                    0,
+                    2
+                ]
+            },
+            {
+                "r": "P361",
+                "h": 6,
+                "t": 4,
+                "evidence": [
+                    0,
+                    1
+                ]
+            },
+            {
+                "r": "P35",
+                "h": 9,
+                "t": 13,
+                "evidence": [
+                    2,
+                    3
+                ]
+            },
+            {
+                "r": "P607",
+                "h": 10,
+                "t": 4,
+                "evidence": [
+                    0,
+                    3
+                ]
+            },
+            {
+                "r": "P27",
+                "h": 10,
+                "t": 9,
+                "evidence": [
+                    2,
+                    3
+                ]
+            },
+            {
+                "r": "P17",
+                "h": 12,
+                "t": 9,
+                "evidence": [
+                    2,
+                    3
+                ]
+            },
+            {
+                "r": "P607",
+                "h": 13,
+                "t": 4,
+                "evidence": [
+                    0,
+                    2,
+                    3
+                ]
+            },
+            {
+                "r": "P27",
+                "h": 13,
+                "t": 9,
+                "evidence": [
+                    2,
+                    3
+                ]
+            },
+            {
+                "r": "P607",
+                "h": 16,
+                "t": 4,
+                "evidence": [
+                    0,
+                    5
+                ]
+            },
+            {
+                "r": "P27",
+                "h": 16,
+                "t": 9,
+                "evidence": [
+                    2,
+                    5
+                ]
+            },
+            {
+                "r": "P17",
+                "h": 17,
+                "t": 9,
+                "evidence": [
+                    2,
+                    5
+                ]
+            },
+            {
+                "h": 11,
+                "t": 9,
+                "r": "P17",
+                "evidence": []
+            },
+            {
+                "h": 7,
+                "t": 2,
+                "r": "P585",
+                "evidence": []
+            },
+            {
+                "h": 7,
+                "t": 8,
+                "r": "P585",
+                "evidence": []
+            },
+            {
+                "h": 0,
+                "t": 3,
+                "r": "P241",
+                "evidence": []
+            },
+            {
+                "h": 17,
+                "t": 4,
+                "r": "P607",
+                "evidence": []
+            },
+            {
+                "h": 7,
+                "t": 4,
+                "r": "P361",
+                "evidence": []
+            },
+            {
+                "h": 0,
+                "t": 8,
+                "r": "P570",
+                "evidence": []
+            },
+            {
+                "h": 9,
+                "t": 4,
+                "r": "P1344",
+                "evidence": []
+            },
+            {
+                "h": 16,
+                "t": 3,
+                "r": "P241",
+                "evidence": []
+            },
+            {
+                "h": 10,
+                "t": 3,
+                "r": "P241",
+                "evidence": []
+            },
+            {
+                "h": 6,
+                "t": 9,
+                "r": "P17",
+                "evidence": []
+            },
+            {
+                "h": 11,
+                "t": 4,
+                "r": "P607",
+                "evidence": []
+            },
+            {
+                "h": 16,
+                "t": 17,
+                "r": "P241",
+                "evidence": []
+            },
+            {
+                "h": 7,
+                "t": 12,
+                "r": "P276",
+                "evidence": []
+            },
+            {
+                "h": 5,
+                "t": 9,
+                "r": "P17",
+                "evidence": []
+            },
+            {
+                "h": 7,
+                "t": 15,
+                "r": "P585",
+                "evidence": []
+            },
+            {
+                "h": 4,
+                "t": 0,
+                "r": "P710",
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "h": 4,
+                "t": 3,
+                "r": "P710",
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "h": 4,
+                "t": 6,
+                "r": "P527",
+                "evidence": [
+                    0,
+                    1
+                ]
+            },
+            {
+                "h": 13,
+                "t": 9,
+                "r": "P1001",
+                "evidence": [
+                    2,
+                    3
+                ]
+            },
+            {
+                "h": 4,
+                "t": 10,
+                "r": "P710",
+                "evidence": [
+                    0,
+                    3
+                ]
+            },
+            {
+                "h": 4,
+                "t": 13,
+                "r": "P710",
+                "evidence": [
+                    0,
+                    2,
+                    3
+                ]
+            },
+            {
+                "h": 4,
+                "t": 16,
+                "r": "P710",
+                "evidence": [
+                    0,
+                    5
+                ]
+            },
+            {
+                "h": 4,
+                "t": 17,
+                "r": "P710",
+                "evidence": []
+            },
+            {
+                "h": 4,
+                "t": 7,
+                "r": "P527",
+                "evidence": []
+            },
+            {
+                "h": 4,
+                "t": 9,
+                "r": "P710",
+                "evidence": []
+            },
+            {
+                "h": 4,
+                "t": 11,
+                "r": "P710",
+                "evidence": []
+            },
+            {
+                "h": 0,
+                "t": 4,
+                "r": "P1344",
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "h": 3,
+                "t": 4,
+                "r": "P1344",
+                "evidence": [
+                    0
+                ]
+            },
+            {
+                "h": 3,
+                "t": 9,
+                "r": "P131",
+                "evidence": [
+                    0,
+                    2
+                ]
+            },
+            {
+                "h": 10,
+                "t": 4,
+                "r": "P1344",
+                "evidence": [
+                    0,
+                    3
+                ]
+            },
+            {
+                "h": 12,
+                "t": 9,
+                "r": "P131",
+                "evidence": [
+                    2,
+                    3
+                ]
+            },
+            {
+                "h": 13,
+                "t": 4,
+                "r": "P1344",
+                "evidence": [
+                    0,
+                    2,
+                    3
+                ]
+            },
+            {
+                "h": 16,
+                "t": 4,
+                "r": "P1344",
+                "evidence": [
+                    0,
+                    5
+                ]
+            },
+            {
+                "h": 17,
+                "t": 9,
+                "r": "P131",
+                "evidence": [
+                    2,
+                    5
+                ]
+            },
+            {
+                "h": 11,
+                "t": 9,
+                "r": "P131",
+                "evidence": []
+            },
+            {
+                "h": 17,
+                "t": 4,
+                "r": "P1344",
+                "evidence": []
+            },
+            {
+                "h": 6,
+                "t": 9,
+                "r": "P131",
+                "evidence": []
+            },
+            {
+                "h": 11,
+                "t": 4,
+                "r": "P1344",
+                "evidence": []
+            },
+            {
+                "h": 5,
+                "t": 9,
+                "r": "P131",
+                "evidence": []
+            }
+        ],
+        "sents": [
+            [
+                "Jir\u014d",
+                "Shiizaki",
+                "(",
+                "\u690e\u5d0e\u4e8c\u90ce,Shiizaki",
+                "Jir\u014d",
+                ")",
+                "(",
+                "30",
+                "September",
+                "1911",
+                "\u2013",
+                "15",
+                "August",
+                "1945",
+                ")",
+                "was",
+                "a",
+                "lieutenant",
+                "colonel",
+                "in",
+                "the",
+                "Imperial",
+                "Japanese",
+                "Army",
+                "in",
+                "World",
+                "War",
+                "II",
+                "."
+            ],
+            [
+                "He",
+                "served",
+                "as",
+                "a",
+                "member",
+                "of",
+                "the",
+                "staff",
+                "of",
+                "the",
+                "domestic",
+                "affairs",
+                "section",
+                "of",
+                "the",
+                "Military",
+                "Affairs",
+                "Bureau",
+                "'s",
+                "War",
+                "Affairs",
+                "Section",
+                "."
+            ],
+            [
+                "Shiizaki",
+                "was",
+                "one",
+                "of",
+                "several",
+                "members",
+                "of",
+                "that",
+                "staff",
+                "to",
+                "participate",
+                "in",
+                "a",
+                "coup",
+                "(",
+                "the",
+                "Ky\u016bj\u014d",
+                "incident",
+                ")",
+                "in",
+                "the",
+                "early",
+                "morning",
+                "of",
+                "August",
+                "15",
+                ",",
+                "1945",
+                ",",
+                "the",
+                "day",
+                "the",
+                "Emperor",
+                "would",
+                "declare",
+                "Japan",
+                "'s",
+                "surrender",
+                "."
+            ],
+            [
+                "The",
+                "coup",
+                "was",
+                "organized",
+                "primarily",
+                "by",
+                "Major",
+                "Kenji",
+                "Hatanaka",
+                ",",
+                "and",
+                "though",
+                "quite",
+                "a",
+                "number",
+                "of",
+                "men",
+                "were",
+                "involved",
+                "in",
+                "the",
+                "plot",
+                "at",
+                "one",
+                "point",
+                "or",
+                "another",
+                ",",
+                "Shiizaki",
+                "was",
+                "one",
+                "of",
+                "the",
+                "few",
+                "to",
+                "be",
+                "involved",
+                "in",
+                "the",
+                "climactic",
+                "action",
+                ";",
+                "the",
+                "rebels",
+                ",",
+                "with",
+                "the",
+                "help",
+                "of",
+                "the",
+                "First",
+                "Imperial",
+                "Guard",
+                "Division",
+                ",",
+                "seized",
+                "the",
+                "Imperial",
+                "Palace",
+                ",",
+                "held",
+                "Emperor",
+                "Hirohito",
+                "under",
+                ",",
+                "essentially",
+                ",",
+                "house",
+                "arrest",
+                ",",
+                "and",
+                "sought",
+                "to",
+                "destroy",
+                "the",
+                "phonographic",
+                "recordings",
+                "which",
+                "had",
+                "been",
+                "made",
+                "of",
+                "the",
+                "Emperor",
+                "'s",
+                "surrender",
+                "speech",
+                "."
+            ],
+            [
+                "Sometime",
+                "around",
+                "seven",
+                "o'clock",
+                "on",
+                "the",
+                "morning",
+                "of",
+                "August",
+                "15",
+                ",",
+                "the",
+                "plot",
+                "began",
+                "to",
+                "fall",
+                "apart",
+                "."
+            ],
+            [
+                "General",
+                "Shizuichi",
+                "Tanaka",
+                ",",
+                "commander",
+                "of",
+                "the",
+                "Eastern",
+                "District",
+                "Army",
+                ",",
+                "arrived",
+                "at",
+                "the",
+                "Palace",
+                "and",
+                "harangued",
+                "the",
+                "conspirators",
+                "on",
+                "their",
+                "duty",
+                "to",
+                "their",
+                "country",
+                ",",
+                "and",
+                "demanding",
+                "that",
+                "the",
+                "dishonor",
+                "brought",
+                "by",
+                "their",
+                "treason",
+                "could",
+                "only",
+                "be",
+                "absolved",
+                "through",
+                "seppuku",
+                "."
+            ],
+            [
+                "Shiizaki",
+                ",",
+                "along",
+                "with",
+                "a",
+                "number",
+                "of",
+                "others",
+                ",",
+                "committed",
+                "ritual",
+                "suicide",
+                "that",
+                "morning",
+                ",",
+                "on",
+                "the",
+                "grounds",
+                "of",
+                "the",
+                "Imperial",
+                "Palace",
+                "."
+            ]
+        ]
+    }
+]
