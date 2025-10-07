@@ -1,13 +1,13 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Build the linking, clustering and generation datasets based on REBEL and Wikidata.
+"""Build the linking, clustering and generation datasets based on REBEL and (optionally) Wikidata.
 
 Steps:
 0) (Optional) Download and unpack the public REBEL dataset archive.
-1) (Optional) Extract Wikidata properties, simple entities, and type hierarchy.
+1) (On demand) Ensure Wikidata artifacts required for requested resolution are present; extract if missing.
 2) Extract REBEL fragments.
-3) Resolve Wikidata types/props/values where possible.
+3) Resolve Wikidata types / property names / property values as requested.
 4) Filter degenerate fragments.
 5) Sample pairs to build base linking/clustering datasets.
 6) Split into train/dev/test datasets for all tasks.
@@ -16,16 +16,21 @@ Inputs are discovered under a single working directory (default: ./data).
 
 Expected input locations under ``<working_dir>``:
 - REBEL original dataset: ``REBEL/rebel_original_dataset``
-- Wikidata properties (optional): ``Wikidata/properties/wikidata_properties.json``
-- Wikidata simple entities (optional): ``Wikidata/simple_entities/wikidata_simple_entities.jsonl``
-- Wikidata type hierarchy (optional): ``Wikidata/type_hierarchy/wikidata_type_hierarchy.jsonl``
+- Wikidata properties: ``Wikidata/properties/wikidata_properties.json``
+- Wikidata simple entities: ``Wikidata/simple_entities/wikidata_simple_entities.jsonl``
+- Wikidata type hierarchy: ``Wikidata/type_hierarchy/wikidata_type_hierarchy.jsonl``
+
+Resolution behaviour:
+- "Resolve property names" (default: enabled) will use the properties file if present; otherwise it is extracted.
+- "Resolve property values" (default: disabled) will use / extract simple entities as needed.
+- "Resolve / attach types" (default: disabled) will use / extract a type hierarchy as needed.
 
 Notes:
-- By default, Wikidata artifacts are not extracted. Enabling extraction requires a standard Wikidata JSON dump
-  (``latest-all.json``). You can download it from  https://dumps.wikimedia.org/wikidatawiki/entities/
-  (unpacked size is > 1 TB).
-- If Wikidata inputs are not available (and not extracted), some functionality is skipped: certain degenerate-fragment
-  filtering will not be applied, and IDs (property IDs, entity IDs, type IDs) will not be resolved to human-readable values.
+- Extraction of missing Wikidata artifacts requires a standard Wikidata JSON dump (``latest-all.json``) which can be
+    downloaded from https://dumps.wikimedia.org/wikidatawiki/entities/ (unpacked size > 1 TB). Only artifacts required
+    by the chosen resolution flags are extracted.
+- If resolution flags are disabled (or artifacts unavailable and not requested), corresponding enrichment is skipped;
+    degenerate-fragment filtering that depends on types will also be skipped if types aren't resolved.
 """
 
 from __future__ import annotations
@@ -157,31 +162,27 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
     help="Force re-download of REBEL dataset even if target directory is non-empty.",
 )
 @click.option(
-    "--extract-properties/--no-extract-properties",
+    "--resolve-property-names/--no-resolve-property-names",
     default=True,
     help=(
-        "Extract Wikidata properties into <working_dir>/Wikidata/properties. "
-        "If not extracting, we'll look for 'wikidata_properties.json' there; "
-        "if missing, property names will not be resolved from IDs."
+        "Resolve Wikidata property names. Uses <working_dir>/Wikidata/properties/wikidata_properties.json if it exists; "
+        "otherwise fetches it from Wikidata."
     ),
 )
 @click.option(
-    "--extract-simple-entities/--no-extract-simple-entities",
+    "--resolve-property-values/--no-resolve-property-values",
     default=False,
     help=(
-        "Extract Wikidata simple entities into <working_dir>/Wikidata/simple_entities. "
-        "If not extracting, we'll look for 'wikidata_simple_entities.jsonl' there; "
-        "if missing, property values will not be resolved from IDs."
+        "Resolve Wikidata property values. Uses <working_dir>/Wikidata/simple_entities/"
+        "wikidata_simple_entities.jsonl if present; otherwise extracts it (requires latest-all.json)."
     ),
 )
 @click.option(
-    "--extract-type-hierarchy/--no-extract-type-hierarchy",
+    "--resolve-types/--no-resolve-types",
     default=False,
     help=(
-        "Extract Wikidata type hierarchy into <working_dir>/Wikidata/type_hierarchy. "
-        "If not extracting, we'll look for 'wikidata_type_hierarchy.jsonl' there; "
-        "if missing, types will not be attached/resolved and type-based filtering "
-        "of degenerate fragments will not be applied."
+        "Attach and resolve Wikidata types. Uses <working_dir>/Wikidata/type_hierarchy/wikidata_type_hierarchy.jsonl "
+        "if present; otherwise extracts it (requires latest-all.json). Enables type-based filtering."
     ),
 )
 @click.option(
@@ -247,9 +248,9 @@ def main(
     working_dir: Path,
     download_rebel: bool,
     force_download_rebel: bool,
-    extract_properties: bool,
-    extract_simple_entities: bool,
-    extract_type_hierarchy: bool,
+    resolve_property_names: bool,
+    resolve_property_values: bool,
+    resolve_types: bool,
     wikidata_json_dump_path: Path | None,
     seed: int,
     run_extract_fragments: bool,
@@ -264,9 +265,9 @@ def main(
     logger = logging.getLogger(Path(__file__).stem)
 
     logger.info(
-        f"Starting REBEL dataset build: "
+        "Starting REBEL dataset build: "
         f"working_dir={working_dir}, download_rebel={download_rebel}, force_download_rebel={force_download_rebel}, "
-        f"extract_properties={extract_properties}, extract_simple_entities={extract_simple_entities}, extract_type_hierarchy={extract_type_hierarchy}, "
+        f"resolve_property_names={resolve_property_names}, resolve_property_values={resolve_property_values}, resolve_types={resolve_types}, "
         f"run_extract_fragments={run_extract_fragments}, run_resolve={run_resolve}, run_filter={run_filter}, "
         f"run_sample_pairs={run_sample_pairs}, run_split={run_split}, verify_md5={verify_md5}, seed={seed}"
     )
@@ -298,55 +299,83 @@ def main(
     rebel_fragments_resolved = rebel_fragments_root / "resolved"
     rebel_fragments_filtered = rebel_fragments_root / "filtered"
 
-    # 1) Wikidata extractions (optional)
-    if extract_simple_entities:
-        logger.info(f"Running Wikidata simple entity extraction from dump={dump_path} -> out={wd_simple_entities_out}")
-        entity_extractor = WikidataSimpleExtractor(
-            wikidata_json_dump_path=dump_path,
-            run_entity_extraction=True,
-            run_property_fetch=False,
-            output_dir=wd_simple_entities_out,
-        )
-        entity_extractor.run()
-    else:
-        logger.info("Skipping Wikidata simple entity extraction (flag disabled)")
-
-    if extract_properties:
-        logger.info(f"Running Wikidata property fetch from dump={dump_path} -> out={wd_properties_out}")
-        property_extractor = WikidataSimpleExtractor(
-            wikidata_json_dump_path=dump_path,
-            run_entity_extraction=False,
-            run_property_fetch=True,
-            output_dir=wd_properties_out,
-        )
-        property_extractor.run()
-    else:
-        logger.info("Skipping Wikidata property fetch (flag disabled)")
-
-    if extract_type_hierarchy:
-        logger.info(f"Running Wikidata type hierarchy extraction from dump={dump_path} -> out={wd_type_hierarchy_out}")
-        hierarchy_extractor = WikidataTypeHierarchyExtractor(
-            wikidata_json_dump_path=dump_path,
-            output_dir=wd_type_hierarchy_out,
-        )
-        hierarchy_extractor.run()
-    else:
-        logger.info("Skipping Wikidata type hierarchy extraction (flag disabled)")
-
-    # Check availability of optional Wikidata artifacts (used for resolver),
-    # regardless of whether we produced them in this run.
+    # 1) Ensure Wikidata artifacts needed for requested resolution are present (extract on demand)
     properties_path = wd_properties_out / WikidataSimpleExtractor.WIKIDATA_PROPERTIES_FILENAME
     simple_entities_path = wd_simple_entities_out / WikidataSimpleExtractor.WIKIDATA_SIMPLE_ENTITIES_FILENAME
     type_hierarchy_path = wd_type_hierarchy_out / WikidataTypeHierarchyExtractor.WIKIDATA_HIERARCHY_FILENAME
 
-    properties_available = _exists(properties_path)
-    simple_entities_available = _exists(simple_entities_path)
-    type_hierarchy_available = _exists(type_hierarchy_path)
+    if resolve_property_names:
+        if _exists(properties_path):
+            logger.info(f"Using existing Wikidata properties file: {properties_path}")
+        else:
+            logger.info(
+                f"Property name resolution requested; properties file missing -> fetching from Wikidata -> out={wd_properties_out}"
+            )
+            property_extractor = WikidataSimpleExtractor(
+                run_entity_extraction=False,
+                run_property_fetch=True,
+                output_dir=wd_properties_out,
+            )
+            property_extractor.run()
+    else:
+        logger.info("Property name resolution disabled (will not extract or use properties file)")
+
+    if resolve_property_values:
+        if _exists(simple_entities_path):
+            logger.info(f"Using existing Wikidata simple entities file: {simple_entities_path}")
+        else:
+            logger.info(
+                f"Property value resolution requested; simple entities file missing -> extracting from dump={dump_path} -> out={wd_simple_entities_out}"
+            )
+            entity_extractor = WikidataSimpleExtractor(
+                wikidata_json_dump_path=dump_path,
+                run_entity_extraction=True,
+                run_property_fetch=False,
+                output_dir=wd_simple_entities_out,
+            )
+            entity_extractor.run()
+    else:
+        logger.info("Property value resolution disabled (will not extract or use simple entities file)")
+
+    if resolve_types:
+        if _exists(type_hierarchy_path):
+            logger.info(f"Using existing Wikidata type hierarchy file: {type_hierarchy_path}")
+        else:
+            logger.info(
+                f"Type resolution requested; hierarchy file missing -> extracting from dump={dump_path} -> out={wd_type_hierarchy_out}"
+            )
+            hierarchy_extractor = WikidataTypeHierarchyExtractor(
+                wikidata_json_dump_path=dump_path,
+                output_dir=wd_type_hierarchy_out,
+            )
+            hierarchy_extractor.run()
+    else:
+        logger.info("Type resolution disabled (will not extract or use type hierarchy file)")
+
+    # Validate that all requested resolution artifacts actually exist.
+    if resolve_property_names and not _exists(properties_path):
+        raise RuntimeError(
+            "Requested property name resolution but properties file not found: "
+            f"{properties_path}. Provide a Wikidata dump or disable --no-resolve-property-names."
+        )
+
+    if resolve_property_values and not _exists(simple_entities_path):
+        raise RuntimeError(
+            "Requested property value resolution but simple entities file not found: "
+            f"{simple_entities_path}. Provide a Wikidata dump or disable --no-resolve-property-values."
+        )
+
+    if resolve_types and not _exists(type_hierarchy_path):
+        raise RuntimeError(
+            "Requested type resolution but type hierarchy file not found: "
+            f"{type_hierarchy_path}. Provide a Wikidata dump or disable --no-resolve-types."
+        )
 
     logger.info(
-        f"Optional inputs availability: properties={properties_available} ({properties_path}), "
-        f"simple_entities={simple_entities_available} ({simple_entities_path}), "
-        f"type_hierarchy={type_hierarchy_available} ({type_hierarchy_path})"
+        "Resolution inputs: "
+        f"property_names={resolve_property_names} (path={properties_path}), "
+        f"property_values={resolve_property_values} (path={simple_entities_path}), "
+        f"types={resolve_types} (path={type_hierarchy_path})"
     )
 
     # 2) Extract fragments from REBEL dataset (optional)
@@ -369,18 +398,19 @@ def main(
     # 3) Resolve Wikidata names/types/values where possible given available inputs (optional)
     if run_resolve:
         logger.info(
-            f"Resolving Wikidata fields (types attach={type_hierarchy_available} resolve={type_hierarchy_available}, "
-            f"prop_names={properties_available}, prop_values={simple_entities_available}, query_api={True}) -> {rebel_fragments_resolved}"
+            "Resolving Wikidata fields ("
+            f"attach_types={resolve_types}, resolve_types={resolve_types}, "
+            f"property_names={resolve_property_names}, property_values={resolve_property_values}, query_api={True}) -> {rebel_fragments_resolved}"
         )
         resolver = WikidataResolver(
             entities_path=current_fragments_path,
             wikidata_simple_entities_path=simple_entities_path,
             wikidata_properties_path=properties_path,
             wikidata_type_hierarchy_path=type_hierarchy_path,
-            attach_types=type_hierarchy_available,
-            resolve_attached_types=type_hierarchy_available,
-            resolve_property_names=properties_available,
-            resolve_property_values=simple_entities_available,
+            attach_types=resolve_types,
+            resolve_attached_types=resolve_types,
+            resolve_property_names=resolve_property_names,
+            resolve_property_values=resolve_property_values,
             query_api=True,
             output_dir=rebel_fragments_resolved,
         )
@@ -392,12 +422,12 @@ def main(
     # 4) Filter out degenerate fragments (optional)
     if run_filter:
         logger.info(
-            f"Filtering degenerate fragments (drop_without_type={bool(type_hierarchy_available)}) -> {rebel_fragments_filtered}"
+            f"Filtering degenerate fragments (drop_without_type={bool(resolve_types)}) -> {rebel_fragments_filtered}"
         )
         fragment_filter = RebelFragmentFilter(
             fragments_path=current_fragments_path,
             output_dir=rebel_fragments_filtered,
-            drop_fragments_without_type=bool(type_hierarchy_available),
+            drop_fragments_without_type=bool(resolve_types),
         )
         fragment_filter.run()
         current_fragments_path = rebel_fragments_filtered / "rebel_entity_fragments.jsonl"
