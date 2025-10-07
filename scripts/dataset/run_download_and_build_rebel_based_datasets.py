@@ -275,6 +275,10 @@ def main(
     rebel_root = working_dir / "REBEL"
     wikidata_root = working_dir / "Wikidata"
 
+    # The truth MD5 file is located under the repository root: <repo_root>/data/REBEL/rebel_outputs.md5.
+    repo_root = Path(__file__).resolve().parents[2]
+    canonical_md5_file = repo_root / "data" / "REBEL" / "rebel_outputs.md5"
+
     # Wikidata I/O paths
     dump_path = wikidata_json_dump_path or (working_dir / "latest-all.json")
     wd_properties_out = wikidata_root / "properties"
@@ -295,20 +299,29 @@ def main(
     rebel_fragments_filtered = rebel_fragments_root / "filtered"
 
     # 1) Wikidata extractions (optional)
-    if extract_properties or extract_simple_entities:
-        logger.info(
-            f"Running Wikidata simple/property extraction (entities={extract_simple_entities}, properties={extract_properties}) "
-            f"from dump={dump_path} -> out={wikidata_root}"
-        )
-        extractor = WikidataSimpleExtractor(
+    if extract_simple_entities:
+        logger.info(f"Running Wikidata simple entity extraction from dump={dump_path} -> out={wd_simple_entities_out}")
+        entity_extractor = WikidataSimpleExtractor(
             wikidata_json_dump_path=dump_path,
-            run_entity_extraction=extract_simple_entities,
-            run_property_fetch=extract_properties,
-            output_dir=wikidata_root,
+            run_entity_extraction=True,
+            run_property_fetch=False,
+            output_dir=wd_simple_entities_out,
         )
-        extractor.run()
+        entity_extractor.run()
     else:
-        logger.info("Skipping Wikidata simple/property extraction (flags disabled)")
+        logger.info("Skipping Wikidata simple entity extraction (flag disabled)")
+
+    if extract_properties:
+        logger.info(f"Running Wikidata property fetch from dump={dump_path} -> out={wd_properties_out}")
+        property_extractor = WikidataSimpleExtractor(
+            wikidata_json_dump_path=dump_path,
+            run_entity_extraction=False,
+            run_property_fetch=True,
+            output_dir=wd_properties_out,
+        )
+        property_extractor.run()
+    else:
+        logger.info("Skipping Wikidata property fetch (flag disabled)")
 
     if extract_type_hierarchy:
         logger.info(f"Running Wikidata type hierarchy extraction from dump={dump_path} -> out={wd_type_hierarchy_out}")
@@ -322,9 +335,9 @@ def main(
 
     # Check availability of optional Wikidata artifacts (used for resolver),
     # regardless of whether we produced them in this run.
-    properties_path = wd_properties_out / "wikidata_properties.json"
-    simple_entities_path = wd_simple_entities_out / "wikidata_simple_entities.jsonl"
-    type_hierarchy_path = wd_type_hierarchy_out / "wikidata_type_hierarchy.jsonl"
+    properties_path = wd_properties_out / WikidataSimpleExtractor.WIKIDATA_PROPERTIES_FILENAME
+    simple_entities_path = wd_simple_entities_out / WikidataSimpleExtractor.WIKIDATA_SIMPLE_ENTITIES_FILENAME
+    type_hierarchy_path = wd_type_hierarchy_out / WikidataTypeHierarchyExtractor.WIKIDATA_HIERARCHY_FILENAME
 
     properties_available = _exists(properties_path)
     simple_entities_available = _exists(simple_entities_path)
@@ -428,12 +441,13 @@ def main(
 
     # MD5 verification/creation
     if verify_md5:
-        md5_file = rebel_root / "rebel_outputs.md5"
-        if not _exists(md5_file):
-            logger.warning(f"MD5 file {md5_file} not found. Creating it from current outputs.")
-            _create_md5_file(md5_file, rebel_root)
+        if not _exists(canonical_md5_file):
+            logger.warning(f"Canonical MD5 file not found at {canonical_md5_file}. Creating it from current outputs.")
+            canonical_md5_file.parent.mkdir(parents=True, exist_ok=True)
+            _create_md5_file(canonical_md5_file, rebel_root)
         else:
-            _verify_md5_file(md5_file, rebel_root, logger)
+            logger.info(f"Verifying outputs in {rebel_root} against canonical MD5 file {canonical_md5_file}")
+            _verify_md5_file(canonical_md5_file, rebel_root, logger)
 
 
 if __name__ == "__main__":

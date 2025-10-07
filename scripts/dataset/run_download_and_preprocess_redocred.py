@@ -107,7 +107,10 @@ def main(
     redocred_output_dir = working_dir / "Re-DocRED"
     wikidata_properties_file = "wikidata_properties.json"
     wikidata_properties_path = wikidata_output_dir / wikidata_properties_file
-    md5_file = redocred_output_dir / "extraction.md5"
+
+    # The truth MD5 file is under the repository root: <repo_root>/data/Re-DocRED/extraction.md5.
+    repo_root = Path(__file__).resolve().parents[2]
+    canonical_md5_file = repo_root / "data" / "Re-DocRED" / "extraction.md5"
 
     # 1) Fetch Wikidata properties
     if force or not _exists(wikidata_properties_path):
@@ -153,12 +156,16 @@ def main(
         else:
             logger.info(f"Extraction directory for {split} already exists. Skipping preprocessing.")
 
-    # 4) Check/create MD5 hashes
-    if not _exists(md5_file):
-        logger.warning(f"MD5 file {md5_file} not found. Creating it from current outputs.")
-        _create_md5_file(md5_file, redocred_output_dir)
+    # 4) Check/create canonical MD5 hashes (independent of chosen working directory)
+    if not _exists(canonical_md5_file):
+        logger.warning(
+            f"Canonical MD5 file {canonical_md5_file} not found. Creating it from current outputs (this will reflect this run's artifacts)."
+        )
+        canonical_md5_file.parent.mkdir(parents=True, exist_ok=True)
+        _create_md5_file(canonical_md5_file, redocred_output_dir)
     else:
-        _verify_md5_file(md5_file, redocred_output_dir, logger)
+        logger.info(f"Verifying outputs in {redocred_output_dir} against canonical MD5 file {canonical_md5_file}")
+        _verify_md5_file(canonical_md5_file, redocred_output_dir, logger)
 
 
 if __name__ == "__main__":
