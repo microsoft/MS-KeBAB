@@ -29,8 +29,6 @@ Notes:
 - Extraction of missing Wikidata artifacts requires a standard Wikidata JSON dump (``latest-all.json``) which can be
     downloaded from https://dumps.wikimedia.org/wikidatawiki/entities/ (unpacked size > 1 TB). Only artifacts required
     by the chosen resolution flags are extracted.
-- If resolution flags are disabled (or artifacts unavailable and not requested), corresponding enrichment is skipped;
-    degenerate-fragment filtering that depends on types will also be skipped if types aren't resolved.
 """
 
 from __future__ import annotations
