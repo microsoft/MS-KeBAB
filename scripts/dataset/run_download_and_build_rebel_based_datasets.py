@@ -204,14 +204,6 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
     ),
 )
 @click.option(
-    "--run-resolve/--no-run-resolve",
-    default=True,
-    help=(
-        "Whether to run step 3: resolve Wikidata names/types/values. If disabled, expects "
-        "existing outputs under <working_dir>/REBEL/rebel_fragments/resolved or will use extracted."
-    ),
-)
-@click.option(
     "--run-filter/--no-run-filter",
     default=True,
     help=(
@@ -254,7 +246,6 @@ def main(
     wikidata_json_dump_path: Path | None,
     seed: int,
     run_extract_fragments: bool,
-    run_resolve: bool,
     run_filter: bool,
     run_sample_pairs: bool,
     run_split: bool,
@@ -268,7 +259,7 @@ def main(
         "Starting REBEL dataset build: "
         f"working_dir={working_dir}, download_rebel={download_rebel}, force_download_rebel={force_download_rebel}, "
         f"resolve_property_names={resolve_property_names}, resolve_property_values={resolve_property_values}, resolve_types={resolve_types}, "
-        f"run_extract_fragments={run_extract_fragments}, run_resolve={run_resolve}, run_filter={run_filter}, "
+        f"run_extract_fragments={run_extract_fragments}, run_filter={run_filter}, "
         f"run_sample_pairs={run_sample_pairs}, run_split={run_split}, verify_md5={verify_md5}, seed={seed}"
     )
 
@@ -396,7 +387,7 @@ def main(
     current_fragments_path = rebel_fragments_extracted / "rebel_entity_fragments.jsonl"
 
     # 3) Resolve Wikidata names/types/values where possible given available inputs (optional)
-    if run_resolve:
+    if resolve_property_names or resolve_property_values or resolve_types:
         logger.info(
             "Resolving Wikidata fields ("
             f"attach_types={resolve_types}, resolve_types={resolve_types}, "
