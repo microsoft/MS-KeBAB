@@ -70,7 +70,7 @@ def document_debug_output_to_excel(
         return f"${letter}${start}:${letter}${end}"
 
     def conditions(property_id: str) -> str:
-        return f"""{col("gt_entity_id")}, "?*", {col("pred_entity_id")}, "?*", {col("property_id")}, "{property_id}" """
+        return f"""{col("gt_entity_id")}, {{"<>{UNDEFINED_ID}", "?*"}}, {col("pred_entity_id")}, {{"<>{UNDEFINED_ID}", "?*"}}, {col("property_id")}, "{property_id}" """
 
     def property_precision_formula(property_id: str) -> str:
         """Return excel formula for property precision."""
