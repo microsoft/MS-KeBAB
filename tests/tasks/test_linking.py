@@ -52,6 +52,7 @@ def test_linking_read_write_items_roundtrip(tmp_path: Path) -> None:
     assert len(first_entity_pair) == 2
     assert all(isinstance(entity, Entity) for entity in first_entity_pair)
     first_entity = first_entity_pair[0]
+    assert isinstance(first_entity, Entity)
     assert first_entity.entity_id == "doc_0_entity_0"
     first_boolean_label = items[0][1]
     assert isinstance(first_boolean_label, bool)
@@ -126,16 +127,16 @@ def test_linking_metrics(tmp_path: Path) -> None:
     task_instance = LinkingTask("Linking-Metrics-Train", entity_pairs_path, schema_path, labels_path)
 
     # binary predictions
-    binary_metrics_path = tmp_path / "binary_metrics.json"
+    metrics_path = tmp_path / "binary_metrics.json"
     metrics = task_instance.evaluate(
-        binary_predictions_path, result_output_path=binary_metrics_path, adjust_to_test_prior=False, output_dir=tmp_path
+        binary_predictions_path, result_output_path=metrics_path, adjust_to_test_prior=False
     )
 
     for value in metrics.values():
         assert isinstance(value, (int | float)) or value is None
 
     # validate metrics were written correctly
-    with open(binary_metrics_path, encoding="utf-8") as f:
+    with open(metrics_path, encoding="utf-8") as f:
         loaded_metrics = json.load(f)
 
     def _equal(a: Any, b: Any) -> bool:
@@ -167,7 +168,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert np.isclose(metrics["optimistic_log_prob"], -3.2958 / total, atol=1e-4, rtol=1e-4)
 
     # probabilistic predictions
-    metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=False, output_dir=tmp_path)
+    metrics = task_instance.evaluate(prob_predictions_path, result_output_path=metrics_path, adjust_to_test_prior=False)
     for value in metrics.values():
         assert isinstance(value, (int | float)) or value is None
 
@@ -185,7 +186,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert math.isnan(metrics["optimistic_log_prob"])
 
     # log odds adjustment
-    metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=True, output_dir=tmp_path)
+    metrics = task_instance.evaluate(prob_predictions_path, result_output_path=metrics_path, adjust_to_test_prior=True)
 
     def adj_log_prob(adj: float) -> float:
         adj_log_odds = log_odds + adj
@@ -240,7 +241,9 @@ def test_linking_metrics(tmp_path: Path) -> None:
         """Helper function to test case 1 with zero FN."""
         write_jsonl(binary_predictions_path, (float(pred) for pred in predictions))
         task_instance = LinkingTask("Linking-Metrics-Train", entity_pairs_path, schema_path, labels_path)
-        metrics = task_instance.evaluate(binary_predictions_path, adjust_to_test_prior=False, output_dir=tmp_path)
+        metrics = task_instance.evaluate(
+            binary_predictions_path, result_output_path=metrics_path, adjust_to_test_prior=False
+        )
         assert metrics["total"] == 4
         assert metrics["true_positive"] == tp
         assert metrics["false_positive"] == fp

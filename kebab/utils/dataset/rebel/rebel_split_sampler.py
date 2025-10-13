@@ -27,8 +27,11 @@ Output layout (within output_dir):
 - output_dir/clustering/<split>/rebel_clustering_ground_truth.jsonl
 - output_dir/entity_generation/<split>/rebel_entity_generation_dataset.jsonl
 - output_dir/fragment_generation/<split>/rebel_fragment_generation_dataset.jsonl
-- output_dir/incremental_linking/<split>/rebel_incremental_linking_dataset.jsonl
-- output_dir/incremental_linking/<split>/rebel_incremental_linking_ground_truth.jsonl
+- output_dir/incremental_linking/<split>/rebel_linking_dataset.jsonl
+- output_dir/incremental_linking/<split>/rebel_linking_ground_truth.jsonl
+- output_dir/fragment_set_generation/<split>/rebel_fragment_set_generation_dataset.jsonl
+- output_dir/incremental_set_linking/<split>/rebel_set_linking_dataset.jsonl
+- output_dir/incremental_set_linking/<split>/rebel_set_linking_ground_truth.jsonl
 """
 
 from __future__ import annotations
@@ -39,6 +42,7 @@ import random
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 from kebab.utils.dataset.rebel.rebel_pair_sampler import RebelPairSampler
 from kebab.utils.dataset.wikidata import wikidata_utils
@@ -70,21 +74,28 @@ class ClusteringConfig:
 
     min_fragments_per_entity: int = 3
     entity_count_limit: int = 0  # 0 means no limit
-    fragments_per_entity_limit: int = 50
+    fragments_per_entity_limit: int = 25
     include_all_linking_fragments_first: bool = True
     seed: int | None = None
 
 
 @dataclass
 class IncrementalLinkingConfig:
-    """Configuration for building incremental linking pairs per entity.
+    """Configuration for building incremental linking pairs per entity."""
 
-    Pairs are built from sorted fragments f0, f1, f2, ... of the same entity:
-    (f0, f1), (merge(f0,f1), f2), (merge(f0,f1,f2), f3), ... up to `max_chain_len`.
-    """
-
-    max_chain_len: int = 25
+    max_chain_len: int = 100  # upper bound on sampled subset length
     negatives_per_positive: int = 1
+    left_as_set: bool = False
+    sequences_per_entity: int | None = 5  # if None use fragment_count cap
+    seed: int | None = None
+
+
+@dataclass
+class FragmentSetGenerationConfig:
+    """Configuration for building fragment set generation dataset per entity."""
+
+    max_fragments_per_entity: int = 100
+    sequences_per_entity: int | None = 5  # if None use fragment_count cap
     seed: int | None = None
 
 
@@ -96,6 +107,8 @@ class SplitBuildConfig:
     linking: LinkingConfig
     clustering: ClusteringConfig
     incremental_linking: IncrementalLinkingConfig
+    incremental_set_linking: IncrementalLinkingConfig
+    fragment_set_generation: FragmentSetGenerationConfig
 
 
 @dataclass
@@ -117,6 +130,11 @@ class RebelSplitSampler:
 
     INCREMENTAL_LINKING_DATASET_FILENAME: str = "rebel_linking_dataset.jsonl"
     INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_ground_truth.jsonl"
+    INCREMENTAL_LINKING_SET_DATASET_FILENAME: str = "rebel_linking_set_dataset.jsonl"
+    INCREMENTAL_LINKING_SET_GROUND_TRUTH_FILENAME: str = "rebel_linking_set_ground_truth.jsonl"
+    INCREMENTAL_SET_LINKING_DATASET_FILENAME: str = "rebel_set_linking_dataset.jsonl"
+    INCREMENTAL_SET_LINKING_GROUND_TRUTH_FILENAME: str = "rebel_set_linking_ground_truth.jsonl"
+    FRAGMENT_SET_GENERATION_DATASET_FILENAME: str = "rebel_fragment_set_generation_dataset.jsonl"
 
     _logger: logging.Logger
     input_dir: Path
@@ -229,6 +247,9 @@ class RebelSplitSampler:
         fragment_to_entity = self._load_fragment_to_entity_map(self.base_fragment_to_entity_map_path)
         self._logger.info(f"Loaded fragment->entity map: {len(fragment_to_entity)} entries")
 
+        # Build fragment lookup (used for linking-set expansion)
+        fragment_lookup = self._build_fragment_lookup()
+
         # load and optionally type-filter base linking pairs
         pairs, labels = self._load_and_filter_linking_pairs(
             self.base_linking_dataset_path,
@@ -252,13 +273,23 @@ class RebelSplitSampler:
             fragment_gen_dir.mkdir(parents=True, exist_ok=True)
             incr_linking_dir = self.output_dir / "incremental_linking" / split.name
             incr_linking_dir.mkdir(parents=True, exist_ok=True)
+            incr_set_linking_dir = self.output_dir / "incremental_set_linking" / split.name
+            incr_set_linking_dir.mkdir(parents=True, exist_ok=True)
+            fragset_gen_dir = self.output_dir / "fragment_set_generation" / split.name
+            fragset_gen_dir.mkdir(parents=True, exist_ok=True)
 
             sampled_pairs, sampled_labels, linking_entity_counter, included_fragment_ids = self._sample_linking_pairs(
                 pairs, labels, disallowed_entity_ids, split.linking
             )
 
             # write linking outputs
-            self._write_linking_outputs(linking_dir, sampled_pairs, sampled_labels, linking_entity_counter)
+            self._write_linking_outputs(
+                linking_dir,
+                sampled_pairs,
+                sampled_labels,
+                linking_entity_counter,
+                fragment_lookup,
+            )
 
             # Entities used in this split
             entities_to_include = set(linking_entity_counter.keys())
@@ -284,11 +315,18 @@ class RebelSplitSampler:
             )
 
             # derive incremental linking
-            self._derive_incremental_linking(
-                incr_linking_dir,
-                entities_to_include,
-                split.incremental_linking,
-            )
+            self._derive_incremental_linking(incr_linking_dir, entities_to_include, split.incremental_linking)
+
+            # derive incremental set linking
+            self._derive_incremental_linking(incr_set_linking_dir, entities_to_include, split.incremental_set_linking)
+
+            # derive fragment set generation
+            if split.fragment_set_generation is not None:
+                self._derive_fragment_set_generation(
+                    fragset_gen_dir,
+                    entities_to_include,
+                    split.fragment_set_generation,
+                )
 
             # update disallowed entities for next splits
             disallowed_entity_ids.update(entities_to_include)
@@ -341,6 +379,12 @@ class RebelSplitSampler:
                 if excluded_types and (
                     set(left.wikidata_type or []).intersection(excluded_types)
                     or set(right.wikidata_type or []).intersection(excluded_types)
+                ):
+                    continue
+
+                # if any type contains word wikimedia - exclude it
+                if (left.wikidata_type and any("wikimedia" in t.lower() for t in left.wikidata_type)) or (
+                    right.wikidata_type and any("wikimedia" in t.lower() for t in right.wikidata_type)
                 ):
                     continue
 
@@ -470,29 +514,73 @@ class RebelSplitSampler:
         sampled_pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
         sampled_labels: list[bool],
         linking_entity_counter: Counter[str],
+        fragment_lookup: dict[str, ResolvedWikidataEntity],
     ) -> None:
-        """Write the linking dataset, ground truth, and used entities for a split."""
+        """Write merged linking dataset plus a set (unmerged) variant."""
         split_dir.mkdir(parents=True, exist_ok=True)
         ds_out = split_dir / RebelPairSampler.LINKING_DATASET_FILENAME
         gt_out = split_dir / RebelPairSampler.LINKING_GROUND_TRUTH_FILENAME
+        set_ds_out = split_dir / self.INCREMENTAL_LINKING_SET_DATASET_FILENAME
+        set_gt_out = split_dir / self.INCREMENTAL_LINKING_SET_GROUND_TRUTH_FILENAME
         used_ents_out = split_dir / "rebel_linking_used_entities.jsonl"
-        with open(ds_out, "w", encoding="utf-8") as f_ds:
+
+        def expand(entity: ResolvedWikidataEntity) -> list[dict]:
+            raw_ids = entity.metadata.get("fragment_ids") or [entity.metadata.get("fragment_id")]
+            frag_ids = cast(list[str], list(raw_ids))
+            expanded: list[dict] = []
+            for fid in frag_ids:
+                fragment = fragment_lookup[fid]
+                expanded.append(fragment.without_entity_id().to_dict(minimal_repr=True))
+            return expanded
+
+        with (
+            open(ds_out, "w", encoding="utf-8") as f_ds,
+            open(set_ds_out, "w", encoding="utf-8") as f_set_ds,
+        ):
             for left, right in sampled_pairs:
-                d = [
+                merged_pair = [
                     left.without_entity_id().to_dict(minimal_repr=True),
                     right.without_entity_id().to_dict(minimal_repr=True),
                 ]
-                f_ds.write(json.dumps(d) + "\n")
+                f_ds.write(json.dumps(merged_pair) + "\n")
+                f_set_ds.write(json.dumps([expand(left), expand(right)]) + "\n")
 
-        with open(gt_out, "w", encoding="utf-8") as f_gt:
+        with (
+            open(gt_out, "w", encoding="utf-8") as f_gt,
+            open(set_gt_out, "w", encoding="utf-8") as f_set_gt,
+        ):
             for label in sampled_labels:
-                f_gt.write(json.dumps(bool(label)) + "\n")
+                line = json.dumps(bool(label)) + "\n"
+                f_gt.write(line)
+                f_set_gt.write(line)
 
         with open(used_ents_out, "w", encoding="utf-8") as f_ents:
             for ent_id in linking_entity_counter:
                 f_ents.write(json.dumps(ent_id) + "\n")
 
-        self._logger.info(f"Wrote linking outputs: {ds_out}, {gt_out}, entities={len(linking_entity_counter)}")
+        self._logger.info(
+            "Wrote linking outputs: %s, %s (set variant: %s, %s), entities=%d",
+            ds_out,
+            gt_out,
+            set_ds_out,
+            set_gt_out,
+            len(linking_entity_counter),
+        )
+
+    def _build_fragment_lookup(self) -> dict[str, ResolvedWikidataEntity]:
+        """Build lookup of fragment_id -> fragment entity from base clustering dataset (once per run)."""
+        lookup: dict[str, ResolvedWikidataEntity] = {}
+        try:
+            with open(self.base_clustering_dataset_path, encoding="utf-8") as f_ds:
+                for line in f_ds:
+                    frag = ResolvedWikidataEntity.from_dict(json.loads(line))
+                    fid = frag.metadata.get("fragment_id")
+                    if fid and fid not in lookup:
+                        lookup[fid] = frag
+            self._logger.info(f"Fragment lookup size: {len(lookup)}")
+        except FileNotFoundError:
+            self._logger.warning("Clustering dataset not found; linking-set dataset will use merged fragments only")
+        return lookup
 
     def _derive_clustering(
         self,
@@ -549,19 +637,10 @@ class RebelSplitSampler:
         # Shuffle the combined list
         rng = random.Random(cfg.seed)  # noqa: S311 - pseudo-random is fine for dataset sampling
         rng.shuffle(records)
-
         with open(ds_out, "w", encoding="utf-8") as f_ds_out, open(gt_out, "w", encoding="utf-8") as f_gt_out:
             for frag_obj, entity_id in records:
                 f_ds_out.write(json.dumps(frag_obj) + "\n")
                 f_gt_out.write(json.dumps(entity_id) + "\n")
-
-        written_entity_counter: Counter[str] = Counter()
-        for _, entity_id in records:
-            written_entity_counter[entity_id] += 1
-
-        self._logger.info(
-            f"Clustering: wrote {len(records)} fragments for {len(written_entity_counter)} entities to {ds_out}"
-        )
 
     def _derive_entity_generation(
         self,
@@ -620,11 +699,16 @@ class RebelSplitSampler:
         """Derive incremental linking dataset for the split from the base clustering dataset.
 
         For each entity, pairs are emitted as:
-        (f0, f1), (merge(f0,f1), f2), (merge(f0,f1,f2), f3), ... up to `cfg.max_chain_len`.
+        (merge(f_i0, ..., f_ik), f_j) ... up to `cfg.max_chain_len`, where contents are sampled uniformly.
+        `merge` will be either a merged fragment (left_as_set=False) or a set of fragments (left_as_set=True).
         """
         out_dir.mkdir(parents=True, exist_ok=True)
-        ds_out = out_dir / self.INCREMENTAL_LINKING_DATASET_FILENAME
-        gt_out = out_dir / self.INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME
+        if cfg.left_as_set:
+            ds_out = out_dir / self.INCREMENTAL_SET_LINKING_DATASET_FILENAME
+            gt_out = out_dir / self.INCREMENTAL_SET_LINKING_GROUND_TRUTH_FILENAME
+        else:
+            ds_out = out_dir / self.INCREMENTAL_LINKING_DATASET_FILENAME
+            gt_out = out_dir / self.INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME
 
         ent_to_fragments: dict[str, list[ResolvedWikidataEntity]] = defaultdict(list)
         with (
@@ -638,79 +722,119 @@ class RebelSplitSampler:
                     ent_to_fragments[entity_id].append(fragment)
 
         total_pairs = 0
+        rng = random.Random(cfg.seed)  # noqa: S311
         min_fragments_for_pair = 2
-        rng = random.Random(cfg.seed)  # noqa: S311 - pseudo-random is fine for dataset sampling
 
         with open(ds_out, "w", encoding="utf-8") as f_ds_out, open(gt_out, "w", encoding="utf-8") as f_gt_out:
             entity_ids = list(ent_to_fragments.keys())
             for entity_id, fragments in ent_to_fragments.items():
-                if len(fragments) < min_fragments_for_pair:
+                fragment_count = len(fragments)
+                max_len = min(cfg.max_chain_len, fragment_count)
+                if max_len < min_fragments_for_pair:
                     continue
 
-                # Shuffle fragments of the entity
-                shuffled_fragments = list(fragments)
-                rng.shuffle(shuffled_fragments)
+                seq_cap = cfg.sequences_per_entity or fragment_count
+                seq_target = min(seq_cap, fragment_count)
+                for _ in range(seq_target):
+                    seq_len = rng.randint(min_fragments_for_pair, max_len)
+                    sampled = rng.sample(fragments, seq_len)
+                    rng.shuffle(sampled)
+                    right_fragment = sampled[-1]
+                    prefix = sampled[:-1]
+                    if not prefix:
+                        continue
 
-                # Build incremental merges from the first fragment
-                max_right_idx = min(len(shuffled_fragments) - 1, cfg.max_chain_len - 1)
-                for idx in range(1, max_right_idx + 1):
-                    fragment = shuffled_fragments[idx]
-                    selected = shuffled_fragments[0:idx]
-                    merged_fragment = ResolvedWikidataEntity.merge(selected, deduplicate_values=True)
+                    if cfg.left_as_set:
+                        left_obj = [f.without_entity_id().to_dict(minimal_repr=True) for f in prefix]
+                        merged_fragment = None
+                    else:
+                        merged_fragment = ResolvedWikidataEntity.merge(prefix, deduplicate_values=True)
+                        merged_fragment.metadata["fragment_id"] = prefix[0].metadata.get("fragment_id")
+                        merged_fragment.metadata["fragment_ids"] = [f.metadata.get("fragment_id") for f in prefix]
+                        merged_fragment.metadata["type"] = right_fragment.wikidata_type
+                        merged_fragment.metadata["merge_count"] = len(prefix)
+                        left_obj = merged_fragment.without_entity_id().to_dict(minimal_repr=True)
 
-                    merged_fragment.metadata["fragment_id"] = (
-                        selected[0].metadata.get("fragment_id") if selected else fragment.metadata.get("fragment_id")
-                    )
-                    merged_fragment.metadata["fragment_ids"] = (
-                        [f.metadata.get("fragment_id") for f in selected]
-                        if selected
-                        else [fragment.metadata.get("fragment_id")]
-                    )
-                    merged_fragment.metadata["type"] = fragment.wikidata_type
-                    merged_fragment.metadata["merge_count"] = len(selected)
-
-                    # Write positive pair
-                    left = merged_fragment.without_entity_id()
-                    right = fragment.without_entity_id()
-                    f_ds_out.write(
-                        json.dumps([left.to_dict(minimal_repr=True), right.to_dict(minimal_repr=True)]) + "\n"
-                    )
+                    right_obj = right_fragment.without_entity_id().to_dict(minimal_repr=True)
+                    f_ds_out.write(json.dumps([left_obj, right_obj]) + "\n")
                     f_gt_out.write(json.dumps(True) + "\n")
                     total_pairs += 1
 
-                    # Write negative pairs
+                    # negatives
                     if cfg.negatives_per_positive > 0 and len(entity_ids) > 1:
                         for _ in range(cfg.negatives_per_positive):
-                            # pick a different entity id
                             neg_entity_id = entity_id
                             for _ in range(5):
                                 candidate_eid = rng.choice(entity_ids)
                                 if candidate_eid != entity_id and ent_to_fragments[candidate_eid]:
                                     neg_entity_id = candidate_eid
                                     break
+
                             if neg_entity_id == entity_id:
-                                # fallback
                                 idx_cur = entity_ids.index(entity_id)
                                 neg_entity_id = entity_ids[(idx_cur + 1) % len(entity_ids)]
 
                             neg_fragment = rng.choice(ent_to_fragments[neg_entity_id])
 
-                            left_neg = merged_fragment.without_entity_id()
-                            right_neg = neg_fragment.without_entity_id()
-                            f_ds_out.write(
-                                json.dumps(
-                                    [
-                                        left_neg.to_dict(minimal_repr=True),
-                                        right_neg.to_dict(minimal_repr=True),
-                                    ]
-                                )
-                                + "\n"
-                            )
+                            if cfg.left_as_set:
+                                left_neg_obj = [f.without_entity_id().to_dict(minimal_repr=True) for f in prefix]
+                            else:
+                                assert merged_fragment is not None
+                                left_neg_obj = merged_fragment.without_entity_id().to_dict(minimal_repr=True)
+
+                            right_neg_obj = neg_fragment.without_entity_id().to_dict(minimal_repr=True)
+                            f_ds_out.write(json.dumps([left_neg_obj, right_neg_obj]) + "\n")
                             f_gt_out.write(json.dumps(False) + "\n")
                             total_pairs += 1
 
         self._logger.info(
             f"Incremental linking: wrote {total_pairs} pairs to {ds_out} for {len(ent_to_fragments)} entities"
+        )
+
+    def _derive_fragment_set_generation(
+        self,
+        out_dir: Path,
+        entities_to_include: set[str],
+        cfg: FragmentSetGenerationConfig,
+    ) -> None:
+        """Derive fragment set generation dataset using random subset sampling (no cumulative prefixes)."""
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ds_out = out_dir / self.FRAGMENT_SET_GENERATION_DATASET_FILENAME
+
+        ent_to_fragments: dict[str, list[ResolvedWikidataEntity]] = defaultdict(list)
+        with (
+            open(self.base_clustering_dataset_path, encoding="utf-8") as f_ds,
+            open(self.base_clustering_ground_truth_path, encoding="utf-8") as f_gt,
+        ):
+            for line_ds, line_gt in zip(f_ds, f_gt, strict=False):
+                fragment = ResolvedWikidataEntity.from_dict(json.loads(line_ds))
+                entity_id = json.loads(line_gt)
+                if entity_id in entities_to_include:
+                    ent_to_fragments[entity_id].append(fragment)
+
+        rng = random.Random(cfg.seed)  # noqa: S311 - pseudo-random is fine for dataset sampling
+        total_records = 0
+
+        with open(ds_out, "w", encoding="utf-8") as f_out:
+            for fragments in ent_to_fragments.values():
+                fragment_count = len(fragments)
+                max_len = min(cfg.max_fragments_per_entity, fragment_count)
+                if max_len == 0:
+                    continue
+
+                seq_cap = cfg.sequences_per_entity or fragment_count
+                seq_target = min(seq_cap, fragment_count)
+
+                for _ in range(seq_target):
+                    seq_len = rng.randint(1, max_len)
+                    sampled = rng.sample(fragments, seq_len)
+                    rng.shuffle(sampled)
+                    frag_list = [f.without_entity_id().to_dict(minimal_repr=True) for f in sampled]
+                    f_out.write(json.dumps(frag_list) + "\n")
+                    total_records += 1
+
+        self._logger.info(
+            f"Fragment set generation: wrote {total_records} data points to {ds_out} for {len(ent_to_fragments)} entities"
         )
 
 
@@ -726,7 +850,7 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     test = SplitBuildConfig(
         name="test",
         linking=LinkingConfig(
-            pair_count_limit=5_000,
+            pair_count_limit=5000,
             pairs_per_entity_limit=50,
             property_pattern_count_limit=100,
             property_overlap_limits={1: 0.35},
@@ -734,9 +858,18 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
             seed=get_next_seed(),
         ),
         clustering=ClusteringConfig(
+            min_fragments_per_entity=2,
+            fragments_per_entity_limit=10,
             seed=get_next_seed(),
         ),
         incremental_linking=IncrementalLinkingConfig(
+            seed=get_next_seed(),
+        ),
+        incremental_set_linking=IncrementalLinkingConfig(
+            left_as_set=True,
+            seed=get_next_seed(),
+        ),
+        fragment_set_generation=FragmentSetGenerationConfig(
             seed=get_next_seed(),
         ),
     )
@@ -744,7 +877,7 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     dev = SplitBuildConfig(
         name="dev",
         linking=LinkingConfig(
-            pair_count_limit=5_000,
+            pair_count_limit=5000,
             pairs_per_entity_limit=50,
             property_pattern_count_limit=100,
             property_overlap_limits={1: 0.35},
@@ -757,23 +890,44 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
         incremental_linking=IncrementalLinkingConfig(
             seed=get_next_seed(),
         ),
+        incremental_set_linking=IncrementalLinkingConfig(
+            left_as_set=True,
+            seed=get_next_seed(),
+        ),
+        fragment_set_generation=FragmentSetGenerationConfig(
+            seed=get_next_seed(),
+        ),
     )
 
     train = SplitBuildConfig(
         name="train",
         linking=LinkingConfig(
-            pair_count_limit=500_000,
-            pairs_per_entity_limit=5_000,
-            property_pattern_count_limit=20_000,
+            pair_count_limit=100_000,
+            pairs_per_entity_limit=100,
+            property_pattern_count_limit=2_000,
             property_overlap_limits={1: 0.55},
             single_class_ratio_limit=0.76,
             seed=get_next_seed(),
         ),
         clustering=ClusteringConfig(
-            fragments_per_entity_limit=1_000,
+            fragments_per_entity_limit=1,
             seed=get_next_seed(),
         ),
         incremental_linking=IncrementalLinkingConfig(
+            max_chain_len=1,
+            negatives_per_positive=0,
+            sequences_per_entity=1,
+            seed=get_next_seed(),
+        ),
+        incremental_set_linking=IncrementalLinkingConfig(
+            max_chain_len=1,
+            negatives_per_positive=0,
+            sequences_per_entity=1,
+            left_as_set=True,
+            seed=get_next_seed(),
+        ),
+        fragment_set_generation=FragmentSetGenerationConfig(
+            max_fragments_per_entity=100,
             seed=get_next_seed(),
         ),
     )

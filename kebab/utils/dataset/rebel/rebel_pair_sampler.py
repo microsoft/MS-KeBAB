@@ -79,6 +79,7 @@ class RebelPairSampler:
     ENTITY_GENERATION_DATASET_FILENAME: str = "rebel_entity_generation_dataset.jsonl"
     FRAGMENT_GENERATION_DATASET_FILENAME: str = "rebel_fragment_generation_dataset.jsonl"
     FRAGMENT_TO_ENTITY_MAP_FILENAME: str = "rebel_fragment_to_entity_map.jsonl"
+    CONFUSING_ENTITIES_MAP_FILENAME: str = "rebel_confusing_entities_map.jsonl"
 
     _logger: logging.Logger
     fragments_path: Path
@@ -91,6 +92,7 @@ class RebelPairSampler:
     linking_dataset_output_path: Path
     linking_ground_truth_output_path: Path
     fragment_to_entity_map_output_path: Path
+    confusing_entities_map_output_path: Path
     clustering_output_dir: Path
     clustering_dataset_output_path: Path
     clustering_ground_truth_output_path: Path
@@ -98,6 +100,7 @@ class RebelPairSampler:
     entity_generation_dataset_output_path: Path
     fragment_generation_output_dir: Path
     fragment_generation_dataset_output_path: Path
+    uniform_sampling: bool
 
     def __init__(
         self,
@@ -108,6 +111,7 @@ class RebelPairSampler:
         max_merge_fragments: int = 10,
         merge_distribution: MergeDistributionMode | None = None,
         deduplicate_values: bool = True,
+        uniform_sampling: bool = False,
         seed: int | None = None,
     ):
         """
@@ -120,6 +124,7 @@ class RebelPairSampler:
             max_merge_fragments: Maximum number of fragments to merge when generating merged fragments for the datasets.
             merge_distribution: Distribution mode for sampling the number of fragments to merge (ZIPF or TRIANGULAR).
             deduplicate_values: Whether to deduplicate property values in the merged fragments.
+            uniform_sampling: If True, sample pairs uniformly across all entities (no confusable-entities logic).
             seed: Optional seed to make sampling deterministic across Python's `random` and NumPy.
         """
         self._logger = logging.getLogger(self.__class__.__name__)
@@ -130,11 +135,13 @@ class RebelPairSampler:
         self.max_merge_fragments = max_merge_fragments
         self.merge_distribution = merge_distribution or MergeDistributionMode.ZIPF
         self.deduplicate_values = deduplicate_values
+        self.uniform_sampling = uniform_sampling
         self.linking_output_dir = self.output_dir / "linking" / "base"
         self.linking_output_dir.mkdir(parents=True, exist_ok=True)
         self.linking_dataset_output_path = self.linking_output_dir / self.LINKING_DATASET_FILENAME
         self.linking_ground_truth_output_path = self.linking_output_dir / self.LINKING_GROUND_TRUTH_FILENAME
         self.fragment_to_entity_map_output_path = self.linking_output_dir / self.FRAGMENT_TO_ENTITY_MAP_FILENAME
+        self.confusing_entities_map_output_path = self.linking_output_dir / self.CONFUSING_ENTITIES_MAP_FILENAME
         self.clustering_output_dir = self.output_dir / "clustering" / "base"
         self.clustering_output_dir.mkdir(parents=True, exist_ok=True)
         self.clustering_dataset_output_path = self.clustering_output_dir / self.CLUSTERING_DATASET_FILENAME
@@ -157,7 +164,10 @@ class RebelPairSampler:
 
     def run(self) -> None:
         """Run the pair sampling pipeline."""
-        self._logger.info("Sampling REBEL fragment pairs based on confusable entities")
+        self._logger.info(
+            "Sampling REBEL fragment pairs (%s)",
+            "uniform" if self.uniform_sampling else "confusable-entities",
+        )
 
         # load the input fragments
         fragments: list[ResolvedWikidataEntity] = self.load_fragments()
@@ -168,11 +178,28 @@ class RebelPairSampler:
         for i, fragment in enumerate(fragments):
             entity_id_to_fragment_indices[fragment.entity_id].append(i)
 
-        # get the confusing entities map
-        conf_entities_map = self.get_confusing_entities_map(fragments)
+        # build confusing entities map only when needed
+        conf_entities_map = None
+        if not self.uniform_sampling:
+            conf_entities_map = self.get_confusing_entities_map(fragments)
+            # persist confusing entities map (entity_id -> list[entity_id])
+            with open(self.confusing_entities_map_output_path, mode="w", encoding="utf-8") as f:
+                for entity_id, conf_ids in conf_entities_map.items():
+                    f.write(json.dumps((entity_id, conf_ids)) + "\n")
+            self._logger.info(
+                "Wrote confusing entities map (%s entries) to %s",
+                f"{len(conf_entities_map):,}",
+                self.confusing_entities_map_output_path,
+            )
 
         # sample pairs
-        pairs = self.sample_pairs(fragments, conf_entities_map, max_count=self.max_count, rng=self.rng)
+        pairs = self.sample_pairs(
+            fragments=fragments,
+            confusing_entities_map=conf_entities_map,
+            max_count=self.max_count,
+            rng=self.rng,
+            uniform_entities=self.uniform_sampling,
+        )
 
         # execute and write the dataset
         self.write_datasets(fragments, pairs, entity_id_to_fragment_indices)
@@ -240,11 +267,12 @@ class RebelPairSampler:
     def sample_pairs(
         cls,
         fragments: list[ResolvedWikidataEntity],
-        confusing_entities_map: dict[str, list[str]],
+        confusing_entities_map: dict[str, list[str]] | None,
         max_count: int | None = None,
         min_acc_rate: float = 0.5,
         min_fragment_attempt_count: int = 3,
         rng: np.random.Generator | None = None,
+        uniform_entities: bool = False,
     ) -> Iterable[tuple[int, int]]:
         """
         Sample pairs of fragments such that each pair comes from entities that are confusing to each other.
@@ -256,14 +284,24 @@ class RebelPairSampler:
         """
         logging.info("Sampling pairs")
 
-        logging.info(
-            f"Received {len(fragments):,} fragments, confusing entities map contains {len(confusing_entities_map):,} keys"
-        )
+        if uniform_entities:
+            logging.info(f"Received {len(fragments):,} fragments, sampling uniformly across all entities")
+        else:
+            if confusing_entities_map is None:
+                raise ValueError("confusing_entities_map must be provided when uniform_entities is False")
+            logging.info(
+                f"Received {len(fragments):,} fragments, confusing entities map contains {len(confusing_entities_map):,} keys"
+            )
 
         rng = rng or np.random.default_rng()
 
         # we'll keep base collections (fragments, entity_ids) as lists, and maintain index->array(indices) dictionaries
-        entity_ids = sorted(confusing_entities_map.keys())
+        if uniform_entities:
+            entity_ids = sorted({f.entity_id for f in fragments})
+        else:
+            # already validated above; keep assert for type checkers
+            assert confusing_entities_map is not None
+            entity_ids = sorted(confusing_entities_map.keys())
 
         # maps entity id (string) to entity index in the flat list
         entity_id_to_ent_index = {entity_id: i for i, entity_id in enumerate(entity_ids)}
@@ -284,23 +322,34 @@ class RebelPairSampler:
 
         logging.info(f"Largest entity contains {entity_sizes.max():,.0f} fragments")
 
-        # maps entity index to indices of entities that are confusing with it
-        confusing_entity_indices = [
-            np.array([entity_id_to_ent_index[eid] for eid in confusing_entities_map[entity_id]])
-            for entity_id in entity_ids
-        ]
+        if uniform_entities:
+            # Every entity is considered confusable with every entity (including itself)
+            all_entity_indices = np.arange(len(entity_ids))
+            confusing_entity_indices = [all_entity_indices for _ in range(len(entity_ids))]
+            conf_entity_sizes = [entity_sizes for _ in range(len(entity_ids))]
+        else:
+            # maps entity index to indices of entities that are confusing with it
+            assert confusing_entities_map is not None
+            confusing_entity_indices = [
+                np.array([entity_id_to_ent_index[eid] for eid in confusing_entities_map[entity_id]])
+                for entity_id in entity_ids
+            ]
 
-        # maps entity index to a numpy array of sizes of its confusing entities
-        conf_entity_sizes = [
-            entity_sizes[confusing_entity_indices[entity_idx]] for entity_idx in range(len(entity_ids))
-        ]
+            # maps entity index to a numpy array of sizes of its confusing entities
+            conf_entity_sizes = [
+                entity_sizes[confusing_entity_indices[entity_idx]] for entity_idx in range(len(entity_ids))
+            ]
 
         # maintain a set of available fragment indices that are (still) likely to form an unseen pair
         available_fragment_indices = _RandomSet(rng)
-        for i in range(len(fragments)):
-            # a fragment from a single-entity that is confusing only with itself can not form a pair
-            if conf_entity_sizes[fragment_entities[i]].sum() > 1:
+        if uniform_entities:
+            for i in range(len(fragments)):
                 available_fragment_indices.add(i)
+        else:
+            for i in range(len(fragments)):
+                # a fragment from a single-entity that is confusing only with itself can not form a pair
+                if conf_entity_sizes[fragment_entities[i]].sum() > 1:
+                    available_fragment_indices.add(i)
 
         logging.info(f"Available fragment indices {len(available_fragment_indices.items):,}")
 
@@ -325,16 +374,16 @@ class RebelPairSampler:
             left_f_idx = available_fragment_indices.sample()
             entity_idx = fragment_entities[left_f_idx]
             ent_indices = confusing_entity_indices[entity_idx]
-
             probs = conf_entity_probs[entity_idx]
             fragment_ar = fragment_acc_rates[left_f_idx]
             accepted = False
+
             while not fragment_ar.below_threshold():
                 # sample the candidate right entity according to their sizes
                 ent_idx = rng.choice(ent_indices, p=probs)
 
                 # sample the candidate right fragment uniformly from the selected right entity
-                right_f_idx = rng.choice(entity_fragments[ent_idx])
+                right_f_idx = int(rng.choice(entity_fragments[ent_idx]))
 
                 # accept the pair if unseen
                 pair = (left_f_idx, right_f_idx) if left_f_idx < right_f_idx else (right_f_idx, left_f_idx)
