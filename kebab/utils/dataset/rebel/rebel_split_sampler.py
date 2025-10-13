@@ -96,7 +96,6 @@ class FragmentSetGenerationConfig:
     max_fragments_per_entity: int = 100
     sequences_per_entity: int | None = 5  # if None use fragment_count cap
     seed: int | None = None
-    seed: int | None = None
 
 
 @dataclass
