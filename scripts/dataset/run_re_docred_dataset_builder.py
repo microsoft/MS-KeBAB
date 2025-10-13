@@ -21,7 +21,7 @@ from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedData
 @click.option(
     "--wikidata-properties-path",
     type=Path,
-    default=Path.cwd() / "data" / "Wikidata" / "Properties" / "2024-06-27" / "wikidata_properties.json",
+    default=Path.cwd() / "data" / "Wikidata" / "Properties" / "wikidata_properties.json",
     help="Path to the Wikidata properties file.",
 )
 @click.option(

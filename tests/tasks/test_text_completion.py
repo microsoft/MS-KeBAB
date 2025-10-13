@@ -2,22 +2,11 @@
 # Licensed under the MIT license.
 
 import math
-import shutil
-from collections.abc import Generator
 from pathlib import Path
-from typing import Any
 
 import pytest
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
 from kebab.utils.io_helpers import compare_files_ignore_linebreaks
-
-
-@pytest.fixture
-def _setup_and_teardown() -> Generator[None, Any, None]:
-    output_dir = Path(__file__).parents[1] / "output" / "text_completion"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    yield
-    shutil.rmtree(output_dir)
 
 
 @pytest.fixture
@@ -29,11 +18,10 @@ def text_completion_task() -> TextCompletionUsingDocumentsTask:
     )
 
 
-@pytest.mark.usefixtures(_setup_and_teardown.__name__)
-def test_text_completion_read_items_and_generate_queries(text_completion_task) -> None:
+def test_text_completion_read_items_and_generate_queries(text_completion_task, tmp_path: Path) -> None:
     # Arrange
     predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "predicted_contents.jsonl"
-    predictions_output_file_path = Path(__file__).parents[1] / "output" / "text_completion" / "predicted_contents.jsonl"
+    predictions_output_file_path = tmp_path / "predicted_contents.jsonl"
 
     # Act
     items = list(text_completion_task.read_items())

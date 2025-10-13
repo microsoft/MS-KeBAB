@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -555,3 +557,70 @@ def resolve_path(path: str | Path, working_dir: Path | None = None) -> Path:
         cur = next_part
 
     return cur
+
+
+def md5sum(path: Path, ignore_cr: bool = True) -> str:
+    """Compute MD5 hash of a file.
+
+    Args:
+        path: File to hash.
+        ignore_cr: If True, carriage returns are stripped (for cross-platform stability).
+    """
+    h = hashlib.md5(usedforsecurity=False)
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            data = chunk.replace(b"\r", b"") if ignore_cr else chunk
+            h.update(data)
+    return h.hexdigest()
+
+
+def create_md5_file(md5_file: Path, files: list[Path], base_dir: Path) -> None:
+    """Create an MD5 index file for provided files relative to base_dir.
+
+    Lines are ``<hash><two spaces><relative_path>`` and sorted lexicographically.
+    Existing file is overwritten.
+    """
+    entries: list[str] = []
+    for p in files:
+        if p.is_file():
+            rel = p.relative_to(base_dir)
+            entries.append(f"{md5sum(p)}  {rel}")
+    entries.sort()
+    md5_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(md5_file, "w", encoding="utf-8") as f:
+        for line in entries:
+            f.write(line + "\n")
+
+
+def verify_md5_file(md5_file: Path, base_dir: Path, logger: logging.Logger | None = None) -> None:
+    """Verify files listed in an MD5 index relative to base_dir.
+
+    Raises FileNotFoundError or ValueError on problems. Ignores blank or malformed lines.
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    if not md5_file.exists():
+        raise FileNotFoundError(f"MD5 file not found: {md5_file}")
+
+    min_md5_parts = 2  # hash + relative path
+    with open(md5_file, encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line:
+                continue
+            parts = line.split()
+            if len(parts) < min_md5_parts:
+                logger.warning("Malformed MD5 line: %s", line)
+                continue
+            expected = parts[0]
+            rel_path = " ".join(parts[1:])  # allow spaces in paths (unlikely here)
+            target = base_dir / rel_path
+            if not target.exists():
+                logger.error("File %s missing for MD5 verification", target)
+                raise FileNotFoundError(target)
+            actual = md5sum(target)
+            if actual != expected:
+                logger.error("MD5 mismatch for %s: expected %s got %s", target, expected, actual)
+                raise ValueError(f"MD5 mismatch for {target}")
+    logger.info("MD5 check passed for %s", md5_file)

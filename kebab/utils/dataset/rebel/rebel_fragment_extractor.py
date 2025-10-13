@@ -65,13 +65,12 @@ class RebelFragmentExtractor:
             output_dir: Path to the output directory ("all_entities_fragments.jsonl" will be created there).
             extract_surface_forms: If True, extract surface forms instead of URIs for property values.
         """
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger(self.__class__.__name__)
         self.rebel_dir = resolve_path(rebel_dir)
         self.extract_surface_forms = extract_surface_forms
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.entity_fragments_output_path = self.output_dir / self.ENTITY_FRAGMENTS_FILENAME
-        assert not self.entity_fragments_output_path.exists(), "Output file already exists."
 
     def run(self) -> None:
         """Run the fragment extraction process."""
@@ -82,6 +81,8 @@ class RebelFragmentExtractor:
         err_count = 0
         seen = set()
         self._UNSAFE_FRAGMENT_COUNTER = 0
+
+        self._logger.info(f"Extracting entity fragments to {self.entity_fragments_output_path}")
 
         stats = Counter()
         frag_count = 0

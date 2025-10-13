@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Tests for the REBEL linking and clustering dataset builder."""
+"""Tests for the REBEL linking pair sampler."""
 
 import random
 from collections import defaultdict
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from kebab.utils.dataset.rebel.rebel_dataset_builder import MergeDistributionMode, RebelDatasetBuilder
+from kebab.utils.dataset.rebel.rebel_pair_sampler import MergeDistributionMode, RebelPairSampler
 from kebab.utils.dataset.wikidata.wikidata_utils import ResolvedWikidataEntity
 
 
@@ -78,7 +78,7 @@ def test_get_confusing_entities_map_and_sample() -> None:
     ]
 
     fragments = [ResolvedWikidataEntity.from_dict(d) for d in fragment_dicts]
-    conf_entities = RebelDatasetBuilder.get_confusing_entities_map(fragments)
+    conf_entities = RebelPairSampler.get_confusing_entities_map(fragments)
 
     assert sorted(conf_entities["Entity_1"]) == ["Entity_1", "Entity_2", "Entity_3"]
     assert sorted(conf_entities["Entity_2"]) == ["Entity_1", "Entity_2"]
@@ -89,7 +89,7 @@ def test_get_confusing_entities_map_and_sample() -> None:
     rng = np.random.default_rng(0)
 
     pairs = list(
-        RebelDatasetBuilder.sample_pairs(
+        RebelPairSampler.sample_pairs(
             fragments,
             conf_entities,
             min_acc_rate=1e-6,
@@ -116,7 +116,7 @@ def test_get_confusing_entities_map_and_sample() -> None:
 
 def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) -> None:
     """Test building linking and clustering datasets from the resolved REBEL fragments."""
-    builder = RebelDatasetBuilder(fragments_path=rebel_sample_resolved_fragments_file_path, output_dir=tmp_path)
+    builder = RebelPairSampler(fragments_path=rebel_sample_resolved_fragments_file_path, output_dir=tmp_path)
     builder.run()
 
     output_file = builder.linking_dataset_output_path
@@ -205,10 +205,8 @@ def sample_fragments_for_merge() -> tuple[list[ResolvedWikidataEntity], dict[str
 def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     """Test generate_merged_fragment method (sanity check)."""
     fragments, entity_idx = sample_fragments_for_merge
-
-    np.random.seed(0)  # noqa: NPY002
-    random.seed(0)
-    merged = RebelDatasetBuilder.generate_merged_fragment(0, fragments, entity_idx, max_fragments=3)
+    rng = np.random.default_rng(0)
+    merged = RebelPairSampler.generate_merged_fragment(0, fragments, entity_idx, max_fragments=3, rng=rng)
 
     # base fragment included
     assert fragments[0].metadata["fragment_id"] in merged.metadata["fragment_id"]
@@ -224,7 +222,7 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     assert set(merged.names).issubset({"A", "B", "C"})
 
     # when only one fragment exists for the entity, no merge occurs
-    single = RebelDatasetBuilder.generate_merged_fragment(3, fragments, entity_idx, max_fragments=3)
+    single = RebelPairSampler.generate_merged_fragment(3, fragments, entity_idx, max_fragments=3, rng=rng)
     assert single is fragments[3]
     assert "merge_count" not in single.metadata
 
@@ -233,12 +231,13 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     fragments_with_duplicates = [fragments[2], fragments[2], fragments[2]]
     entity_idx_with_duplicates = {"E1": [0, 1, 2]}
     for _ in range(10):
-        merged = RebelDatasetBuilder.generate_merged_fragment(
+        merged = RebelPairSampler.generate_merged_fragment(
             0,
             fragments_with_duplicates,
             entity_idx_with_duplicates,
             max_fragments=3,
             deduplicate_values=False,
+            rng=rng,
         )
 
         if merged.metadata["merge_count"] == 1:
@@ -286,7 +285,7 @@ def test_generate_merged_fragment_stats(dist: MergeDistributionMode) -> None:
     counts = np.zeros(n_frags, dtype=np.int32)
 
     for _ in range(n_samples):
-        merged = RebelDatasetBuilder.generate_merged_fragment(
+        merged = RebelPairSampler.generate_merged_fragment(
             0, fragments, mapping, max_fragments=n_frags, distribution=dist
         )
 
@@ -305,3 +304,153 @@ def test_generate_merged_fragment_stats(dist: MergeDistributionMode) -> None:
 
     max_abs_diff = np.abs(empirical - probs).max()
     assert max_abs_diff < tol, f"max deviation {max_abs_diff:.3f} exceeds tolerance {tol}"
+
+
+def _make_fragments_for_seed_tests() -> list[ResolvedWikidataEntity]:
+    """Create a small synthetic fragment set.
+    Entities E1, E2, E3 share overlapping names to yield multiple confusing pairs.
+    """
+    data = [
+        {"entity_id": "E1", "properties": {"name": ["Alice", "Al"]}, "metadata": {"fragment_id": "1"}},
+        {"entity_id": "E1", "properties": {"name": ["Alicia"]}, "metadata": {"fragment_id": "2"}},
+        {"entity_id": "E1", "properties": {"name": ["A"]}, "metadata": {"fragment_id": "3"}},
+        {"entity_id": "E2", "properties": {"name": ["Alice"]}, "metadata": {"fragment_id": "4"}},
+        {"entity_id": "E2", "properties": {"name": ["Bob"]}, "metadata": {"fragment_id": "5"}},
+        {"entity_id": "E3", "properties": {"name": ["Al", "Bobby"]}, "metadata": {"fragment_id": "6"}},
+        {"entity_id": "E3", "properties": {"name": ["Alicia"]}, "metadata": {"fragment_id": "7"}},
+        {"entity_id": "E4", "properties": {"name": ["Charlie"]}, "metadata": {"fragment_id": "8"}},
+    ]
+    return [ResolvedWikidataEntity.from_dict(d) for d in data]
+
+
+def test_sample_pairs_seed_determinism() -> None:
+    """sample_pairs returns the same sequence with the same seed, and differs with a different seed."""
+    fragments = _make_fragments_for_seed_tests()
+    conf = RebelPairSampler.get_confusing_entities_map(fragments)
+
+    # same seed -> identical results
+    rng1 = np.random.default_rng(123)
+    rng2 = np.random.default_rng(123)
+
+    pairs1 = list(
+        RebelPairSampler.sample_pairs(
+            fragments, conf, max_count=50, min_acc_rate=1e-6, min_fragment_attempt_count=2, rng=rng1
+        )
+    )
+    pairs2 = list(
+        RebelPairSampler.sample_pairs(
+            fragments, conf, max_count=50, min_acc_rate=1e-6, min_fragment_attempt_count=2, rng=rng2
+        )
+    )
+
+    assert pairs1 == pairs2
+    assert len(pairs1) > 0
+
+    # different seed -> likely different sequence
+    rng3 = np.random.default_rng(124)
+    pairs3 = list(
+        RebelPairSampler.sample_pairs(
+            fragments, conf, max_count=50, min_acc_rate=1e-6, min_fragment_attempt_count=2, rng=rng3
+        )
+    )
+
+    # Assert they differ in at least one position.
+    assert any(a != b for a, b in zip(pairs1, pairs3, strict=False)) or len(pairs1) != len(pairs3)
+
+
+def test_generate_merged_fragment_seed_determinism() -> None:
+    """generate_merged_fragment selection is deterministic given the same seed and varies with a different seed."""
+    fragments = _make_fragments_for_seed_tests()
+
+    mapping: dict[str, list[int]] = defaultdict(list)
+    for idx, f in enumerate(fragments):
+        mapping[f.entity_id].append(idx)
+
+    # pick a base fragment that has multiple siblings (E1 has 3)
+    base_idx = 0
+
+    rng_a = np.random.default_rng(2024)
+    rng_b = np.random.default_rng(2024)
+    merged_a = RebelPairSampler.generate_merged_fragment(
+        base_idx, fragments, mapping, max_fragments=3, distribution=MergeDistributionMode.ZIPF, rng=rng_a
+    )
+    merged_b = RebelPairSampler.generate_merged_fragment(
+        base_idx, fragments, mapping, max_fragments=3, distribution=MergeDistributionMode.ZIPF, rng=rng_b
+    )
+
+    assert merged_a.metadata["fragment_ids"] == merged_b.metadata["fragment_ids"]
+
+    rng_c = np.random.default_rng(2025)
+    merged_c = RebelPairSampler.generate_merged_fragment(
+        base_idx, fragments, mapping, max_fragments=3, distribution=MergeDistributionMode.ZIPF, rng=rng_c
+    )
+
+    # Assert they are different
+    assert merged_a.metadata["fragment_ids"] != merged_c.metadata["fragment_ids"] or (
+        merged_a.metadata["merge_count"] != merged_c.metadata["merge_count"]
+    )
+
+
+def test_end_to_end_seed_determinism(tmp_path: Path) -> None:
+    """RebelPairSampler.run produces identical files with the same seed, and different with a different seed."""
+    fragments = _make_fragments_for_seed_tests()
+
+    # write a temporary fragments jsonl file
+    frag_path = tmp_path / "fragments.jsonl"
+    with open(frag_path, "w", encoding="utf-8") as f:
+        for frag in fragments:
+            f.write(frag.to_json(minimal_repr=True) + "\n")
+
+    out1 = tmp_path / "out1"
+    out2 = tmp_path / "out2"
+    out3 = tmp_path / "out3"
+
+    # same seed runs
+    sampler1 = RebelPairSampler(
+        fragments_path=frag_path,
+        output_dir=out1,
+        max_count=100,
+        max_merge_fragments=3,
+        merge_distribution=MergeDistributionMode.ZIPF,
+        seed=777,
+    )
+    sampler2 = RebelPairSampler(
+        fragments_path=frag_path,
+        output_dir=out2,
+        max_count=100,
+        max_merge_fragments=3,
+        merge_distribution=MergeDistributionMode.ZIPF,
+        seed=777,
+    )
+
+    sampler1.run()
+    sampler2.run()
+
+    # different seed run
+    sampler3 = RebelPairSampler(
+        fragments_path=frag_path,
+        output_dir=out3,
+        max_count=100,
+        max_merge_fragments=3,
+        merge_distribution=MergeDistributionMode.ZIPF,
+        seed=778,
+    )
+    sampler3.run()
+
+    def _read(path: Path) -> list[str]:
+        with open(path, encoding="utf-8") as f:
+            return f.read().splitlines()
+
+    # Compare linking datasets and ground truth; they should be identical for the same seed
+    ld1 = _read(sampler1.linking_dataset_output_path)
+    ld2 = _read(sampler2.linking_dataset_output_path)
+    gt1 = _read(sampler1.linking_ground_truth_output_path)
+    gt2 = _read(sampler2.linking_ground_truth_output_path)
+    assert ld1 == ld2
+    assert gt1 == gt2
+    assert len(ld1) > 0
+
+    # With a different seed, at least one of dataset or GT should differ
+    ld3 = _read(sampler3.linking_dataset_output_path)
+    gt3 = _read(sampler3.linking_ground_truth_output_path)
+    assert ld1 != ld3 or gt1 != gt3

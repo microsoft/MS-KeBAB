@@ -1,21 +1,17 @@
 ## GitHub's Python gitignore file
 ## Get latest from https://github.com/github/gitignore/blob/main/Python.gitignore
 
-# Custom
+# Experiments
 output/
-**/*.lnk
-
-# logs
+.local_cache
 log/
 
-# data
-scripts/output
-.local_cache
-data/Re-DocRED/**/*.jsonl
-data/Re-DocRED/**/*.json
-data/Wikidata/Properties/wikidata_properties.json
+# Data
+**/*.lnk
+data/**/*.jsonl
+data/**/*.json
 
-# visual studio
+# VS Code
 .vs/*
 .vscode/*
 TestResults/*

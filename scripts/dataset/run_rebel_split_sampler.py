@@ -2,16 +2,16 @@
 # Licensed under the MIT license.
 
 """
-Script to run the REBEL dataset subsampler to pick challenging examples and produce Test/Validation/Train splits.
+Script to run the REBEL dataset split sampler to pick challenging examples and produce Test/Validation/Train splits.
 
 Output layout (within output_dir):
-    output_dir/linking/<Split>/rebel_linking_dataset.jsonl
-    output_dir/linking/<Split>/rebel_linking_ground_truth.jsonl
-    output_dir/linking/<Split>/rebel_linking_used_entities.jsonl
-    output_dir/clustering/<Split>/rebel_clustering_dataset.jsonl
-    output_dir/clustering/<Split>/rebel_clustering_ground_truth.jsonl
-    output_dir/entity_generation/<Split>/rebel_entity_generation_dataset.jsonl
-    output_dir/fragment_generation/<Split>/rebel_fragment_generation_dataset.jsonl
+    output_dir/linking/<split>/rebel_linking_dataset.jsonl
+    output_dir/linking/<split>/rebel_linking_ground_truth.jsonl
+    output_dir/linking/<split>/rebel_linking_used_entities.jsonl
+    output_dir/clustering/<split>/rebel_clustering_dataset.jsonl
+    output_dir/clustering/<split>/rebel_clustering_ground_truth.jsonl
+    output_dir/entity_generation/<split>/rebel_entity_generation_dataset.jsonl
+    output_dir/fragment_generation/<split>/rebel_fragment_generation_dataset.jsonl
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ from pathlib import Path
 
 import click
 from kebab.utils import logging_helpers
-from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
-    RebelDatasetSubsampler,
+from kebab.utils.dataset.rebel.rebel_split_sampler import (
+    RebelSplitSampler,
     TypeFilter,
     default_splits,
 )
@@ -31,7 +31,7 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
     "--input",
     "input_dir",
     type=Path,
-    default=Path.cwd() / "output",
+    default=Path.cwd() / "data" / "REBEL",
     help=(
         "Path to the dataset directory produced by RebelDatasetBuilder. "
         "This directory must contain the base linking/clustering/generation jsonl files."
@@ -40,16 +40,16 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
 @click.option(
     "--output-dir",
     type=Path,
-    default=Path.cwd() / "output",
+    default=Path.cwd() / "data" / "REBEL",
     help="Path to the target output directory",
 )
 @click.option(
     "--required-type-id",
     type=str,
-    default="",
+    multiple=True,
     help=(
-        "Optional Wikidata type ID to include. If provided, only entities whose types intersect this (or its descendants, "
-        "when --include-descendants is set) will be kept."
+        "Optional Wikidata type IDs to include. If provided, only entities whose types intersect these (or their descendants, "
+        "when --include-descendants is set) will be kept. Can be passed multiple times."
     ),
 )
 @click.option(
@@ -64,7 +64,7 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
 @click.option(
     "--type-hierarchy-path",
     type=Path,
-    default=Path.cwd() / "Datasets" / "Wikidata" / "Type Hierarchy" / "2025-01-30" / "wikidata_type_hierarchy.jsonl",
+    default=Path.cwd() / "Datasets" / "Wikidata" / "type_hierarchy" / "wikidata_type_hierarchy.jsonl",
     help="Path to the Wikidata type hierarchy jsonl file (required when using type filters).",
 )
 @click.option(
@@ -73,16 +73,24 @@ from kebab.utils.dataset.rebel.rebel_dataset_subsampler import (
     default=False,
     help="Whether to include descendants of required/excluded type IDs in type filtering.",
 )
+@click.option(
+    "--seed",
+    type=int,
+    default=None,
+    show_default=True,
+    help=("Random seed to make sampling deterministic across runs."),
+)
 @click.command()
 def main(
     input_dir: Path,
     output_dir: Path,
-    required_type_id: str,
+    required_type_id: tuple[str, ...],
     exclude_type_id: tuple[str, ...],
     type_hierarchy_path: Path,
     include_descendants: bool,
+    seed: int | None,
 ) -> None:
-    """Run REBEL subsampler to produce Test/Validation/Train splits in one go."""
+    """Run REBEL split sampler to produce Test/Validation/Train splits."""
     logging_helpers.configure_logging()
 
     # Build optional type filter only if any option was provided
@@ -90,15 +98,15 @@ def main(
     if required_type_id or exclude_type_id:
         type_filter = TypeFilter(
             type_hierarchy_path=type_hierarchy_path,
-            required_type_id=required_type_id or None,
+            required_type_ids=list(required_type_id) or None,
             exclude_type_ids=list(exclude_type_id) or None,
             include_descendants=include_descendants,
         )
 
-    sampler = RebelDatasetSubsampler(
-        base_dir=input_dir,
+    sampler = RebelSplitSampler(
+        input_dir=input_dir,
         output_dir=output_dir,
-        splits=default_splits(),
+        splits=default_splits(seed=seed),
         type_filter=type_filter,
     )
 

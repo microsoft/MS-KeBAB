@@ -16,15 +16,15 @@ from kebab.utils.io_helpers import compare_files_ignore_linebreaks
 
 
 @pytest.fixture
-def _setup_and_teardown() -> Generator[None, Any, None]:
-    output_dir = Path(__file__).parents[1] / "output" / "linking"
+def _setup_and_teardown(tmp_path: Path) -> Generator[None, Any, None]:
+    output_dir = tmp_path / "linking"
     output_dir.mkdir(parents=True, exist_ok=True)
     yield
     shutil.rmtree(output_dir)
 
 
 @pytest.mark.usefixtures(_setup_and_teardown.__name__)
-def test_linking_read_write_items_roundtrip() -> None:
+def test_linking_read_write_items_roundtrip(tmp_path: Path) -> None:
     """Test reading and writing items in the LinkingTask."""
     entity_pairs_path = Path(__file__).parents[1] / "data" / "linking" / "entity_pairs.jsonl"
     boolean_labels_path = Path(__file__).parents[1] / "data" / "linking" / "boolean_labels.jsonl"
@@ -39,7 +39,7 @@ def test_linking_read_write_items_roundtrip() -> None:
     # Prepare data
     items = list(task_instance.read_items())
     boolean_labels = [predicted_boolean for _, predicted_boolean in items if predicted_boolean is not None]
-    boolean_labels_output_path = Path(__file__).parents[1] / "output" / "linking" / "boolean_labels.jsonl"
+    boolean_labels_output_path = tmp_path / "boolean_labels.jsonl"
     task_instance.write_items(
         boolean_labels_output_path,
         boolean_labels,
@@ -128,7 +128,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     # binary predictions
     binary_metrics_path = tmp_path / "binary_metrics.json"
     metrics = task_instance.evaluate(
-        binary_predictions_path, result_output_path=binary_metrics_path, adjust_to_test_prior=False
+        binary_predictions_path, result_output_path=binary_metrics_path, adjust_to_test_prior=False, output_dir=tmp_path
     )
 
     for value in metrics.values():
@@ -167,7 +167,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert np.isclose(metrics["optimistic_log_prob"], -3.2958 / total, atol=1e-4, rtol=1e-4)
 
     # probabilistic predictions
-    metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=False)
+    metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=False, output_dir=tmp_path)
     for value in metrics.values():
         assert isinstance(value, (int | float)) or value is None
 
@@ -185,7 +185,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
     assert math.isnan(metrics["optimistic_log_prob"])
 
     # log odds adjustment
-    metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=True)
+    metrics = task_instance.evaluate(prob_predictions_path, adjust_to_test_prior=True, output_dir=tmp_path)
 
     def adj_log_prob(adj: float) -> float:
         adj_log_odds = log_odds + adj
@@ -240,8 +240,7 @@ def test_linking_metrics(tmp_path: Path) -> None:
         """Helper function to test case 1 with zero FN."""
         write_jsonl(binary_predictions_path, (float(pred) for pred in predictions))
         task_instance = LinkingTask("Linking-Metrics-Train", entity_pairs_path, schema_path, labels_path)
-
-        metrics = task_instance.evaluate(binary_predictions_path, adjust_to_test_prior=False)
+        metrics = task_instance.evaluate(binary_predictions_path, adjust_to_test_prior=False, output_dir=tmp_path)
         assert metrics["total"] == 4
         assert metrics["true_positive"] == tp
         assert metrics["false_positive"] == fp

@@ -1,13 +1,18 @@
 """
-Given a collection of entities, substitute the actual values for properties, replace property ids with property names,
-and attach types to the entities. The values are resolved from the Wikidata dump of simple entities, followed by
-queries to the Wikidata API for missing information.
+Given a collection of entities, substitute property values, optionally replace property IDs with names,
+and optionally attach types to the entities. The values are resolved from the Wikidata dump of simple entities,
+followed by queries to the Wikidata API for missing information.
 
-Required inputs:
-- Entities to resolve
-- Wikidata simple entities (filtered dump)
-- Wikidata properties map
-- Wikidata type hierarchy
+Inputs:
+- Entities to resolve (required)
+- Wikidata simple entities (optional): used to resolve referenced entity values and entity types
+- Wikidata properties map (optional): used to map property IDs to human-readable names
+- Wikidata type hierarchy (optional): used to resolve type names and to attach types to metadata
+
+Behavior when optional inputs are missing:
+- No simple entities: referenced values are not de-referenced; keep original IDs; types are not attached
+- No properties map: keep property IDs; do not resolve property names
+- No type hierarchy: do not resolve type names; do not attach types to metadata
 """
 
 from __future__ import annotations
@@ -26,9 +31,9 @@ class WikidataResolver:
 
     _logger: logging.Logger
     entities_path: Path
-    wikidata_simple_entities_path: Path
-    wikidata_properties_path: Path
-    wikidata_type_hierarchy_path: Path
+    wikidata_simple_entities_path: Path | None
+    wikidata_properties_path: Path | None
+    wikidata_type_hierarchy_path: Path | None
     resolve_property_names: bool
     resolve_property_values: bool
     attach_types: bool
@@ -37,14 +42,17 @@ class WikidataResolver:
     save_with_minimal_repr: bool
     output_dir: Path
     entities_output_path: Path
+    _has_simple_entities: bool
+    _has_properties: bool
+    _has_type_hierarchy: bool
 
     def __init__(
         self,
         *,
         entities_path: Path,
-        wikidata_simple_entities_path: Path,
-        wikidata_properties_path: Path,
-        wikidata_type_hierarchy_path: Path,
+        wikidata_simple_entities_path: Path | None = None,
+        wikidata_properties_path: Path | None = None,
+        wikidata_type_hierarchy_path: Path | None = None,
         attach_types: bool = True,
         resolve_attached_types: bool = False,
         resolve_property_names: bool = True,
@@ -54,11 +62,17 @@ class WikidataResolver:
         output_dir: Path,
     ):
         """Initialize the Wikidata resolver."""
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger(self.__class__.__name__)
         self.entities_path = resolve_path(entities_path)
-        self.wikidata_simple_entities_path = resolve_path(wikidata_simple_entities_path)
-        self.wikidata_properties_path = resolve_path(wikidata_properties_path)
-        self.wikidata_type_hierarchy_path = resolve_path(wikidata_type_hierarchy_path)
+        self.wikidata_simple_entities_path = (
+            resolve_path(wikidata_simple_entities_path) if wikidata_simple_entities_path is not None else None
+        )
+        self.wikidata_properties_path = (
+            resolve_path(wikidata_properties_path) if wikidata_properties_path is not None else None
+        )
+        self.wikidata_type_hierarchy_path = (
+            resolve_path(wikidata_type_hierarchy_path) if wikidata_type_hierarchy_path is not None else None
+        )
         self.resolve_property_names = resolve_property_names
         self.resolve_property_values = resolve_property_values
         self.attach_types = attach_types
@@ -68,18 +82,14 @@ class WikidataResolver:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.entities_output_path = self.output_dir / self.entities_path.name
+        self._has_simple_entities = False
+        self._has_properties = False
+        self._has_type_hierarchy = False
 
         if not self.entities_path.exists():
             raise FileNotFoundError(f"Entities file not found: {self.entities_path}")
 
-        if not self.wikidata_simple_entities_path.exists():
-            raise FileNotFoundError(f"Simple entities file not found: {self.wikidata_simple_entities_path}")
-
-        if not self.wikidata_properties_path.exists():
-            raise FileNotFoundError(f"Properties file not found: {self.wikidata_properties_path}")
-
-        if not self.wikidata_type_hierarchy_path.exists():
-            raise FileNotFoundError(f"Type hierarchy file not found: {self.wikidata_type_hierarchy_path}")
+        # Optional inputs may be omitted; related features will be disabled in run()
 
         if self.entities_path == self.entities_output_path:
             raise ValueError("Input and output entities paths are the same.")
@@ -90,22 +100,66 @@ class WikidataResolver:
 
     def run(self) -> None:
         """Run the dataset building pipeline."""
+        # Determine availability of optional inputs and adjust behavior with warnings
+        self._has_simple_entities = bool(
+            self.wikidata_simple_entities_path and self.wikidata_simple_entities_path.exists()
+        )
+        self._has_properties = bool(self.wikidata_properties_path and self.wikidata_properties_path.exists())
+        self._has_type_hierarchy = bool(
+            self.wikidata_type_hierarchy_path and self.wikidata_type_hierarchy_path.exists()
+        )
+
+        if not self._has_simple_entities:
+            if self.resolve_property_values:
+                self._logger.warning(
+                    "Simple entities not provided; referenced values will not be de-referenced (IDs kept)."
+                )
+                self._logger.warning("Disabling property value resolution.")
+                self.resolve_property_values = False
+            if self.attach_types or self.resolve_attached_types:
+                self._logger.warning(
+                    "Simple entities not provided; types cannot be determined. Disabling type attachment."
+                )
+                self.attach_types = False
+                self.resolve_attached_types = False
+
+        if not self._has_properties and self.resolve_property_names:
+            self._logger.warning("Properties map not provided; property IDs will be kept (no name mapping).")
+            self.resolve_property_names = False
+
+        if not self._has_type_hierarchy:
+            if self.resolve_attached_types:
+                self._logger.warning(
+                    "Type hierarchy not provided; cannot resolve type names for attached types. Disabling."
+                )
+                self.resolve_attached_types = False
+            if self.attach_types:
+                self._logger.warning("Type hierarchy not provided; not attaching types to entity metadata.")
+                self.attach_types = False
+
         # collect all referenced IDs (for which we'll need to get Wikidata entities)
         self._logger.info("Collecting all referenced IDs")
         referenced_ids = self.collect_referenced_ids()
 
-        # load wikidata properties and type hierarchy
-        self._logger.info("Loading Wikidata properties")
-        wikidata_properties = wikidata_utils.load_properties(self.wikidata_properties_path)
+        # load wikidata properties and type hierarchy (if available)
+        wikidata_properties: dict[str, dict] = {}
+        type_id_to_node: dict[str, dict] = {}
+        if self._has_properties:
+            self._logger.info("Loading Wikidata properties")
+            wikidata_properties = wikidata_utils.load_properties(self.wikidata_properties_path)  # type: ignore[arg-type]
+        if self._has_type_hierarchy:
+            self._logger.info("Loading Wikidata type hierarchy")
+            _, type_id_to_node = wikidata_utils.load_type_hierarchy(self.wikidata_type_hierarchy_path)  # type: ignore[arg-type]
 
-        self._logger.info("Loading Wikidata type hierarchy")
-        _, type_id_to_node = wikidata_utils.load_type_hierarchy(self.wikidata_type_hierarchy_path)
-
-        # load and query wikidata entities, properties, and type hierarchy
-        self._logger.info("Loading Wikidata simple entities")
-        wikidata_entities = wikidata_utils.collect_wikidata_entities(
-            referenced_ids, wikidata_entities_path=self.wikidata_simple_entities_path, query_api=self.query_api
-        )
+        # load and query wikidata entities (if available)
+        wikidata_entities: dict[str, wikidata_utils.WikidataEntity] = {}
+        if self._has_simple_entities:
+            self._logger.info("Loading Wikidata simple entities")
+            wikidata_entities = wikidata_utils.collect_wikidata_entities(
+                referenced_ids,
+                wikidata_entities_path=self.wikidata_simple_entities_path,  # type: ignore[arg-type]
+                query_api=self.query_api,
+            )
 
         # substitute all properties and values
         self._logger.info("Substituting values into entities")
@@ -181,25 +235,26 @@ class WikidataResolver:
                     continue
 
                 prop_name = wikidata_properties.get(prop, {}).get("label")
-
-                if prop_name is None:
+                if self.resolve_property_names and prop_name is None:
                     self._logger.warning(f"Property {prop} not found in the properties map")
-                    continue
 
                 values = []
                 for ref_value in prop_values:
                     value = None
 
-                    if prop != wikidata_utils.TypeProperties.INSTANCE_OF.value:
-                        ref_entity = wikidata_entities.get(ref_value)
-                        if ref_entity is not None:
-                            value = ref_entity.name
-                    else:
-                        entity_type = type_id_to_node.get(ref_value)
-                        if entity_type is not None:
-                            value = entity_type.get("name")
+                    if self.resolve_property_values:
+                        if prop != wikidata_utils.TypeProperties.INSTANCE_OF.value:
+                            ref_entity = wikidata_entities.get(ref_value)
+                            if ref_entity is not None:
+                                value = ref_entity.name
+                        else:
+                            entity_type = type_id_to_node.get(ref_value)
+                            if entity_type is not None:
+                                value = entity_type.get("name")
 
-                    if value is None and not wikidata_utils.ENTITY_REFERENCE_REGEX_PATTERN.match(ref_value):
+                    if (not self.resolve_property_values) or (
+                        value is None and not wikidata_utils.ENTITY_REFERENCE_REGEX_PATTERN.match(ref_value)
+                    ):
                         value = ref_value
 
                     if value is not None:
@@ -212,7 +267,7 @@ class WikidataResolver:
                     vals = prop_values
 
                     if self.resolve_property_names:
-                        key = prop_name
+                        key = prop_name or prop
 
                     if self.resolve_property_values:
                         vals = values
