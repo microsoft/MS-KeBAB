@@ -42,6 +42,7 @@ import random
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 from kebab.utils.dataset.rebel.rebel_pair_sampler import RebelPairSampler
 from kebab.utils.dataset.wikidata import wikidata_utils
@@ -525,7 +526,7 @@ class RebelSplitSampler:
 
         def expand(entity: ResolvedWikidataEntity) -> list[dict]:
             raw_ids = entity.metadata.get("fragment_ids") or [entity.metadata.get("fragment_id")]
-            frag_ids = list(raw_ids)
+            frag_ids = cast(list[str], list(raw_ids))
             expanded: list[dict] = []
             for fid in frag_ids:
                 fragment = fragment_lookup[fid]
