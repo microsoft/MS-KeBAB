@@ -179,7 +179,9 @@ class WikidataResolver:
         with open(entities_path, encoding="utf-8") as f:
             for line in f:
                 entity = Entity.from_json(line)
-                referenced_ids.add(entity.entity_id)
+
+                if wikidata_utils.ENTITY_REFERENCE_REGEX_PATTERN.match(entity.entity_id):
+                    referenced_ids.add(entity.entity_id)
 
                 for prop_values in entity.properties.values():
                     for value in prop_values:
