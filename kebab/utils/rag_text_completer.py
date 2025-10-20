@@ -4,13 +4,20 @@
 from __future__ import annotations
 
 import copy
+import json
+import math
 import os
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Any, ClassVar, override
+from enum import Enum
+from typing import Any, ClassVar, cast, override
 
+import numpy as np
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from scipy.special import logsumexp
+from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
+from transformers.generation.utils import GenerateOutput
 
 from kebab.tasks.text_completion import TextCompletionTaskBase
 
@@ -113,6 +120,113 @@ class BaseRAGTextCompleter(ABC):
 
             yield result
 
+    @staticmethod
+    def prepare_results_from_top_logprobs(
+        target_content: str,
+        top_logprobs: list[list[dict[str, Any]]] | None,
+        additional_info: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """TODO."""
+        if top_logprobs is None or len(top_logprobs) == 0 or len(top_logprobs[0]) == 0:
+            results = {
+                "predicted_content": "<Not Finished Correctly>",
+                "target_content_logprob": float("-inf"),
+                "predicted_content_top_logprobs": [[{"token": target_content, "logprob": float("-inf")}]],
+            }
+            if additional_info:
+                results |= additional_info
+            return results
+
+        target_content_logprob = float("-inf")
+        target_content_lower = target_content.strip().lower()
+        # When the target content contains multiple tokens, LLM can return the target content
+        # through multiple tokenization paths. For example, LLM can return "Beijing" as two tokens
+        # ["Be", "ijing"] or just a single token ["Beijing"]; `self.tokenizer.encode` only returns
+        # the former. We will approximately calculate the combined log prob by summing the
+        # probabilities of all prefixes of the target content in `top_tokens`.
+        # TODO (allenwang-ms): account for all possible tokenization paths; calculate the accurate
+        # log prob of a sequence of tokens by multiple forward passes.
+        prefix_logprobs = []
+        for logprob in top_logprobs[0]:
+            token = logprob["token"].strip().lower()
+            if (
+                target_content_lower.startswith(token) or token.startswith(target_content_lower)
+            ) and token:  # Ensure non-empty token.
+                prefix_logprobs.append(logprob["logprob"])
+        if prefix_logprobs:
+            # Convert to numpy array for logsumexp operations.
+            prefix_array = np.array(prefix_logprobs, dtype=float)
+            target_content_logprob = logsumexp(prefix_array)
+
+        results = {
+            "predicted_content": top_logprobs[0][0]["token"],
+            "target_content_logprob": target_content_logprob,
+            "predicted_content_top_logprobs": top_logprobs,
+        }
+        if additional_info:
+            results |= additional_info
+        return results
+
+    @staticmethod
+    def get_target_content_logprob_with_fallback(result: dict[str, Any], top_k: int = 20) -> float:
+        """TODO."""
+        if result["target_content_logprob"] != float("-inf"):
+            return result["target_content_logprob"]
+        # Fallback to the smallest log probability among the top k predicted tokens when the
+        # target content log probability is -inf.
+        target_content_logprob = result["predicted_content_top_logprobs"][0][-1]["logprob"]
+        # Fallback to a small value to avoid -inf log probability.
+        if target_content_logprob > math.log(1 / top_k) or target_content_logprob == float("-inf"):
+            target_content_logprob = math.log(1 / 100_000)
+        return target_content_logprob
+
+    @staticmethod
+    def prepare_top_logprobs_from_json_response(
+        json_response: str,
+    ) -> tuple[list[dict[str, Any]] | None, str | None]:
+        """TODO."""
+        match = re.search(r"(\[.*?\])", json_response, re.DOTALL)
+        error = None
+        if not match:
+            error = "Could not find JSON list in model response."
+            return None, error
+        json_str = match.group(1)
+        top_logprobs = None
+        try:
+            top_probs = json.loads(json_str)
+        except Exception as e:  # noqa: BLE001 - intentionally catching all exceptions to log JSON parsing failures
+            error = f"Error parsing JSON: {e}"
+            return None, error
+        try:
+            # Clean up top_probs: combine probabilities for duplicate tokens and normalize.
+            token_prob_map = {}
+            for item in top_probs:
+                token = item.get("token", "")
+                prob = item.get("prob", 0.0)
+                if token in token_prob_map:
+                    token_prob_map[token] += prob
+                else:
+                    token_prob_map[token] = prob
+            # Normalize probabilities so they sum to 1.
+            total_prob = sum(token_prob_map.values())
+            if total_prob > 0:
+                for token in token_prob_map:
+                    token_prob_map[token] /= total_prob
+            # Convert back to list format.
+            top_probs = [{"token": token, "prob": prob} for token, prob in token_prob_map.items() if prob > 0.0]
+
+            # Sort top_probs by "prob" descending.
+            top_probs_sorted = sorted(top_probs, key=lambda x: x.get("prob", 1 / 100_000), reverse=True)
+            # Convert to top_logprobs format (replace 'prob' with 'logprob').
+            top_logprobs = [{"token": item["token"], "logprob": math.log(item["prob"])} for item in top_probs_sorted]
+        except Exception as e:  # noqa: BLE001 - intentionally catching all exceptions to log JSON parsing failures
+            error = f"Error processing top_probs: {e}"
+            return None, error
+        if top_logprobs is None:
+            error = "Failed to extract top_logprobs"
+            return None, error
+        return top_logprobs, None
+
     # Thresholds for categorizing log probabilities, used for color-coding text in HTML visualization.
     LOGPROB_THRESHOLDS: ClassVar[list[float]] = [-4, -8, -12]
 
@@ -174,7 +288,138 @@ class BaseRAGTextCompleter(ABC):
         print(f"HTML file generated: {os.path.abspath(output_path)}")
 
 
-class BasePhiRAGTextCompleter(BaseRAGTextCompleter):
+class PredictionMethod(Enum):
+    """Enumeration of different prediction methods."""
+
+    LOGPROBS_FROM_LOGITS = "logprobs_from_logits"
+    LOGPROBS_FROM_TEXT_RESPONSE = "logprobs_from_text_response"
+
+    def build_text_completion_prompt(self, text_with_mask: str, augmented_context: str, top_k: int) -> str:
+        """Build text completion prompt based on the prediction method."""
+        if self == PredictionMethod.LOGPROBS_FROM_LOGITS:
+            return PredictionMethod.__build_logprobs_from_logits_prompt(
+                text_with_mask=text_with_mask, augmented_context=augmented_context
+            )
+        if self == PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE:
+            return self.__build_logprobs_from_text_response_prompt(
+                text_with_mask=text_with_mask,
+                augmented_context=augmented_context,
+                top_k=top_k,
+            )
+        raise ValueError(f"Unknown prediction method: {self}")
+
+    @staticmethod
+    def __build_base_text_completion_prompt(text_with_mask: str, augmented_context: str) -> str:
+        """TODO."""
+        base_text_completion_prompt = f"""
+You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context.
+
+Below is the context retrieved to help you make a better prediction. It is marked between <Begin Context> and <End Context>:
+<Begin Context>
+{augmented_context}
+<End Context>
+
+Now, complete the following text by predicting the missing word, represented by "{TextCompletionTaskBase.MASK}". The text is marked between <Begin Text> and <End Text>:
+<Begin Text>
+{text_with_mask} <the rest of the text is not visible to you>
+<End Text>
+"""
+        return base_text_completion_prompt
+
+    @staticmethod
+    def __build_logprobs_from_logits_prompt(text_with_mask: str, augmented_context: str) -> str:
+        """TODO."""
+        text_completion_prompt = f"""{
+            PredictionMethod.__build_base_text_completion_prompt(
+                text_with_mask=text_with_mask, augmented_context=augmented_context
+            )
+        }
+What is the **single alphanumeric word** that best completes the masked position "{
+            TextCompletionTaskBase.MASK
+        }"? Please respond strictly with **only** the word.
+
+Answer: """
+        return text_completion_prompt
+
+    @staticmethod
+    def __build_logprobs_from_text_response_prompt(
+        text_with_mask: str,
+        augmented_context: str,
+        top_k: int,
+    ) -> str:
+        # Compose a prompt that asks the model to output top token predictions and their probs in JSON format.
+        text_completion_prompt = f"""{
+            PredictionMethod.__build_base_text_completion_prompt(
+                text_with_mask=text_with_mask, augmented_context=augmented_context
+            )
+        }
+Return exactly the top {top_k} single alphanumeric word predictions for "{
+            TextCompletionTaskBase.MASK
+        }" in **valid JSON format**.
+Each element must be an object with:
+  - "token": a string representing the predicted word.
+  - "prob": a float representing its probability.
+Your response must be a JSON array, like this:
+[{{"token":"pred1","prob": 0.432}},{{"token":"pred2","prob": 0.312}},...]
+
+Answer: """
+        return text_completion_prompt
+
+
+class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
+    """TODO."""
+
+    model_id: str
+    tokenizer: Any
+    device: Any
+
+    def __init__(
+        self,
+        model_id: str,
+        gpu_id: int | None = None,
+        prediction_method: PredictionMethod = PredictionMethod.LOGPROBS_FROM_LOGITS,
+    ) -> None:
+        """
+        Initializes the text completer.
+
+        Args:
+            model_id: The model Id to use for text completion.
+            gpu_id: The GPU Id to use for the model, if any.
+            prediction_method: The method to use for predicting log probabilities.
+        """
+        super().__init__()
+        self.model_id = model_id
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        self.device = torch.device(
+            "cuda" + ("" if gpu_id is None else f":{gpu_id}") if torch.cuda.is_available() else "cpu"
+        )
+        self.prediction_method = prediction_method
+
+    def prepare_results_from_predicted_token_logits(
+        self, target_content: str, predicted_token_logits: torch.Tensor, top_k: int
+    ) -> dict[str, Any]:
+        """TODO."""
+        # Compute log probabilities over the vocabulary.
+        log_probs = torch.nn.functional.log_softmax(predicted_token_logits, dim=-1)
+
+        # Extract top k token indices and their log probabilities.
+        top_logprobs, top_indices = torch.topk(log_probs, top_k)
+        top_tokens = [self.tokenizer.decode([idx]) for idx in top_indices]
+
+        top_logprobs = [
+            [
+                {"token": word, "logprob": logprob}
+                for word, logprob in zip(top_tokens, top_logprobs.tolist(), strict=True)
+            ]
+        ]
+
+        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
+            target_content=target_content,
+            top_logprobs=top_logprobs,
+        )
+
+
+class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
     """
     A base implementation of a RAG text completer using the Phi model. This class does not implement
     the `get_augmented_context` method, which should be provided by concrete subclasses to define
@@ -184,30 +429,32 @@ class BasePhiRAGTextCompleter(BaseRAGTextCompleter):
     TOKENS_TO_EXCLUDE: ClassVar[list[str]] = ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
     """Tokens that are excluded from the model's predictions."""
 
-    model_id: str
-    tokenizer: Any
-    token_ids_to_exclude: list
-    device: Any
+    token_ids_to_exclude: list[Any]
+    model: Any
 
-    def __init__(self, model_id: str = "microsoft/phi-4") -> None:
+    def __init__(self, model_id: str = "microsoft/phi-4", gpu_id: int | None = None) -> None:
         """
         Initializes the text completer.
 
         Args:
             model_id: The Phi model Id to use for text completion.
+            gpu_id: The GPU Id to use for the model, if any.
         """
-        super().__init__()
-        self.model_id = model_id
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        super().__init__(model_id=model_id, gpu_id=gpu_id)
         self.token_ids_to_exclude = [
             self.tokenizer.convert_tokens_to_ids(token) for token in BasePhiRAGTextCompleter.TOKENS_TO_EXCLUDE
         ]
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        print(f"Loading {self.model_id} model on device: {self.device}.")
+
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
             torch_dtype=torch.bfloat16,
-            device_map="auto",
-        ).to(self.device)
+            device_map={"": self.device} if gpu_id is not None else "auto",
+        )
+
+        print(f"Loaded {self.model_id} model on device: {self.device}.")
+
         self.model.eval()
 
     @override
@@ -216,7 +463,7 @@ class BasePhiRAGTextCompleter(BaseRAGTextCompleter):
         text_with_mask: str,
         target_content: str,
         augmented_context: str = "",
-        top_k: int = 100,
+        top_k: int = 20,
     ) -> dict[str, Any]:
         """
         Processes a single partial query and returns the predicted content and log probabilities.
@@ -236,21 +483,11 @@ class BasePhiRAGTextCompleter(BaseRAGTextCompleter):
                 top k predictions for that token position, including the token and its log
                 probability.
         """
-        text_completion_prompt = f"""
-You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context.
-
-Below is the context retrieved to help you make a better prediction. It is marked between <Begin Context> and <End Context>:
-<Begin Context>
-{augmented_context}
-<End Context>
-
-Now, complete the following text by predicting the missing word, represented by "{TextCompletionTaskBase.MASK}". The text is marked between <Begin Text> and <End Text>:
-<Begin Text>
-{text_with_mask} <the rest of the text is not visible to you>
-<End Text>
-What is the **single alphanumeric word** that best completes the masked position "{TextCompletionTaskBase.MASK}"? Please respond strictly with **only** the word after "Answer: ".
-
-Answer: """
+        text_completion_prompt = self.prediction_method.build_text_completion_prompt(
+            text_with_mask=text_with_mask,
+            augmented_context=augmented_context,
+            top_k=top_k,
+        )
 
         # Encode the prompt.
         input_ids = self.tokenizer.encode(text_completion_prompt, return_tensors="pt").to(self.device)
@@ -266,40 +503,449 @@ Answer: """
         for token_id in self.token_ids_to_exclude:
             next_token_logits[token_id] = float("-inf")
 
-        # Compute log probabilities over the vocabulary.
-        log_probs = torch.nn.functional.log_softmax(next_token_logits, dim=-1)
+        return self.prepare_results_from_predicted_token_logits(
+            target_content=target_content,
+            predicted_token_logits=next_token_logits,
+            top_k=top_k,
+        )
 
-        # Extract top k token indices and their log probabilities.
-        top_logprobs, top_indices = torch.topk(log_probs, top_k)
-        top_tokens = [self.tokenizer.decode([idx]).strip() for idx in top_indices]
 
-        target_content_logprob = float("-inf")
-        # When the target content contains multiple tokens, LLM can return the target content
-        # through multiple tokenization paths. For example, LLM can return "Beijing" as two tokens
-        # ["Be", "ijing"] or just a single token ["Beijing"]; `self.tokenizer.encode` only returns
-        # the former. We will approximately calculate the combined log prob by summing the
-        # probabilities of all prefixes of the target content in `top_tokens`.
-        # TODO (allenwang-ms): account for all possible tokenization paths; calculate the accurate
-        # log prob of a sequence of tokens by multiple forward passes.
-        prefix_logprobs = []
-        for i, token in enumerate(top_tokens):
-            if target_content.startswith(token) and token.strip():  # Ensure non-empty token.
-                prefix_logprobs.append(top_logprobs[i])
-        if prefix_logprobs:
-            # Convert to tensors for logaddexp operations.
-            prefix_tensor = torch.stack(prefix_logprobs)
-            target_content_logprob = torch.logsumexp(prefix_tensor, dim=0).item()
+class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
+    """
+    A base implementation of a RAG text completer using the Qwen model. This class does not implement
+    the `get_augmented_context` method, which should be provided by concrete subclasses to define
+    how augmented context is retrieved.
+    """
 
-        # Output results.
-        top_logprobs = [
-            [
-                {"token": word, "logprob": logprob}
-                for word, logprob in zip(top_tokens, top_logprobs.tolist(), strict=True)
-            ]
+    def __init__(
+        self,
+        model_id: str = "Qwen/Qwen3-14B",
+        gpu_id: int | None = None,
+        prediction_method: PredictionMethod = PredictionMethod.LOGPROBS_FROM_LOGITS,
+    ) -> None:
+        """
+        Initializes the text completer.
+
+        Args:
+            model_id: The Qwen model Id to use for text completion.
+            gpu_id: The GPU Id to use for the model, if any.
+            prediction_method: The method to use for predicting log probabilities.
+        """
+        super().__init__(model_id=model_id, gpu_id=gpu_id, prediction_method=prediction_method)
+
+        print(f"Loading {self.model_id} model on device: {self.device}.")
+
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            torch_dtype=torch.bfloat16,
+            device_map={"": self.device} if gpu_id is not None else "auto",
+        )
+
+        print(f"Loaded {self.model_id} model on device: {self.device}.")
+
+        self.model.eval()
+
+    @override
+    def complete_single_partial_query(
+        self,
+        text_with_mask: str,
+        target_content: str,
+        augmented_context: str = "",
+        top_k: int = 20,
+    ) -> dict[str, Any]:
+        """
+        Processes a single partial query and returns the predicted content and log probabilities.
+
+        Args:
+            text_with_mask: The text with a mask indicating the position to be filled.
+            target_content: The expected content to fill in the mask.
+            augmented_context: Additional context to help with the prediction.
+            top_k: The number of top predictions to consider.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the following:
+                - "predicted_content" (str): The predicted content for the masked position.
+                - "target_content_logprob" (float): The log probability of the target content.
+                - "predicted_content_top_logprobs" (list[list[dict[str, Any]]]): Each outer list
+                contains predicitons at the same token position, and each inner list contains the
+                top k predictions for that token position, including the token and its log
+                probability.
+        """
+        if self.prediction_method == PredictionMethod.LOGPROBS_FROM_LOGITS:
+            return self.__get_logprobs_from_logits(
+                text_with_mask=text_with_mask,
+                target_content=target_content,
+                augmented_context=augmented_context,
+                top_k=top_k,
+            )
+        if self.prediction_method == PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE:
+            return self.__get_logprobs_from_text_response(
+                text_with_mask=text_with_mask,
+                target_content=target_content,
+                augmented_context=augmented_context,
+                top_k=top_k,
+            )
+        raise ValueError(f"Unknown prediction method: {self.prediction_method}")
+
+    def __get_logprobs_from_logits(
+        self,
+        text_with_mask: str,
+        target_content: str,
+        augmented_context: str,
+        top_k: int,
+    ) -> dict[str, Any]:
+        """
+        Processes a single partial query and returns the predicted content and log probabilities.
+
+        Args:
+            text_with_mask: The text with a mask indicating the position to be filled.
+            target_content: The expected content to fill in the mask.
+            augmented_context: Additional context to help with the prediction.
+            top_k: The number of top predictions to consider.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the following:
+                - "predicted_content" (str): The predicted content for the masked position.
+                - "target_content_logprob" (float): The log probability of the target content.
+                - "predicted_content_top_logprobs" (list[list[dict[str, Any]]]): Each outer list
+                contains predicitons at the same token position, and each inner list contains the
+                top k predictions for that token position, including the token and its log
+                probability.
+        """
+        text_completion_prompt = "/no_think" + self.prediction_method.build_text_completion_prompt(
+            text_with_mask=text_with_mask,
+            augmented_context=augmented_context,
+            top_k=top_k,
+        )
+
+        # Encode the prompt.
+        input_ids = self.tokenizer.encode(text_completion_prompt, return_tensors="pt").to(self.device)
+
+        # Get model outputs (logits for each token).
+        with torch.no_grad():
+            outputs = self.model(input_ids)
+
+        # Extract logits for the next token (last position).
+        next_token_logits = outputs.logits[0, -1, :]
+
+        return self.prepare_results_from_predicted_token_logits(
+            target_content=target_content,
+            predicted_token_logits=next_token_logits,
+            top_k=top_k,
+        )
+
+    def __get_logprobs_from_text_response(
+        self,
+        text_with_mask: str,
+        target_content: str,
+        augmented_context: str,
+        top_k: int,
+    ) -> dict[str, Any]:
+        """Prompts the model to output the top 20 token predictions and their logprobs in JSON format, parses the response, and returns the result dict."""
+        text_completion_prompt = self.prediction_method.build_text_completion_prompt(
+            text_with_mask=text_with_mask,
+            augmented_context=augmented_context,
+            top_k=top_k,
+        )
+
+        messages = [
+            {"role": "user", "content": text_completion_prompt},
         ]
 
-        return {
-            "predicted_content": top_logprobs[0][0]["token"],
-            "target_content_logprob": target_content_logprob,
-            "predicted_content_top_logprobs": top_logprobs,
-        }
+        inputs = self.tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            enable_thinking=False,
+            return_tensors="pt",
+            return_dict=True,
+        ).to(self.device)
+
+        # Retry to extract and parse the JSON list.
+        max_retries = 3
+        top_logprobs = None
+        raw_response = ""
+        error = None
+        for attempt in range(max_retries):
+            # Generate response from the model (no output_scores).
+            set_seed(42 + attempt)
+            outputs = cast(
+                GenerateOutput,
+                self.model.generate(
+                    **inputs,
+                    max_new_tokens=10_000,
+                    temperature=0.7,
+                    return_dict_in_generate=True,
+                ),
+            )
+
+            # Decode the generated text.
+            generated_ids = outputs.sequences[0][inputs.input_ids.shape[1] :]
+            raw_response = self.tokenizer.decode(generated_ids)
+            # print(f"Model response: {raw_reponse}")
+
+            # Only look into the content between </think> and <|im_end|>.
+            start_marker = "</think>"
+            end_marker = "<|im_end|>"
+            start_idx = raw_response.find(start_marker)
+            end_idx = raw_response.find(end_marker, start_idx + len(start_marker))
+            if start_idx != -1 and end_idx != -1:
+                response = raw_response[start_idx + len(start_marker) : end_idx]
+            else:
+                response = raw_response
+
+            top_logprobs, error = BaseRAGTextCompleter.prepare_top_logprobs_from_json_response(
+                json_response=response,
+            )
+            if error is not None:
+                print(f"Attempt {attempt + 1}: {error}")
+                continue
+            if top_logprobs is not None:
+                break
+
+        top_logprobs = [top_logprobs] if top_logprobs is not None else None
+        additional_info = {"raw_model_output": raw_response}
+        additional_info |= {"error": error} if error else {}
+
+        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
+            target_content=target_content,
+            top_logprobs=top_logprobs,
+            additional_info=additional_info,
+        )
+
+
+class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
+    """
+    A base implementation of a RAG text completer using the GPT-OSS model. This class does not implement
+    the `get_augmented_context` method, which should be provided by concrete subclasses to define
+    how augmented context is retrieved.
+    """
+
+    def __init__(
+        self,
+        model_id: str = "openai/gpt-oss-120b",
+        gpu_id: int | None = None,
+        prediction_method: PredictionMethod = PredictionMethod.LOGPROBS_FROM_LOGITS,
+    ) -> None:
+        """
+        Initializes the text completer.
+
+        Args:
+            model_id: The GPT-OSS model Id to use for text completion.
+            gpu_id: The GPU Id to use for the model, if any.
+            prediction_method: The method to use for predicting log probabilities.
+        """
+        super().__init__(model_id=model_id, gpu_id=gpu_id, prediction_method=prediction_method)
+
+        print(f"Loading {self.model_id} model on device: {self.device}.")
+
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            device_map={"": self.device} if gpu_id is not None else "auto",
+        )
+
+        print(f"Loaded {self.model_id} model on device: {self.device}.")
+
+        self.model.eval()
+
+    @override
+    def complete_single_partial_query(
+        self,
+        text_with_mask: str,
+        target_content: str,
+        augmented_context: str = "",
+        top_k: int = 20,
+    ) -> dict[str, Any]:
+        """
+        Processes a single partial query and returns the predicted content and log probabilities.
+
+        Args:
+            text_with_mask: The text with a mask indicating the position to be filled.
+            target_content: The expected content to fill in the mask.
+            augmented_context: Additional context to help with the prediction.
+            top_k: The number of top predictions to consider.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the following:
+                - "predicted_content" (str): The predicted content for the masked position.
+                - "target_content_logprob" (float): The log probability of the target content.
+                - "predicted_content_top_logprobs" (list[list[dict[str, Any]]]): Each outer list
+                contains predicitons at the same token position, and each inner list contains the
+                top k predictions for that token position, including the token and its log
+                probability.
+        """
+        if self.prediction_method == PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE:
+            return self.__get_logprobs_directly(
+                text_with_mask=text_with_mask,
+                target_content=target_content,
+                augmented_context=augmented_context,
+                top_k=top_k,
+            )
+        if self.prediction_method == PredictionMethod.LOGPROBS_FROM_LOGITS:
+            return self.__get_logprobs_from_logits(
+                text_with_mask=text_with_mask,
+                target_content=target_content,
+                augmented_context=augmented_context,
+                top_k=top_k,
+            )
+        raise ValueError(f"Unknown prediction method: {self.prediction_method}")
+
+    def __get_logprobs_directly(
+        self,
+        text_with_mask: str,
+        target_content: str,
+        augmented_context: str,
+        top_k: int,
+    ) -> dict[str, Any]:
+        """Prompts the model to output the top 20 token predictions and their logprobs in JSON format, parses the response, and returns the result dict."""
+        text_completion_prompt = self.prediction_method.build_text_completion_prompt(
+            text_with_mask=text_with_mask,
+            augmented_context=augmented_context,
+            top_k=top_k,
+        )
+
+        messages = [
+            {"role": "user", "content": text_completion_prompt},
+        ]
+
+        inputs = self.tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            reasoning_effort="low",
+            return_tensors="pt",
+            return_dict=True,
+        ).to(self.device)
+
+        # Retry to extract and parse the JSON list.
+        max_retries = 3
+        top_logprobs = None
+        decoded_text = ""
+        error = None
+        for attempt in range(max_retries):
+            # Generate response from the model (no output_scores).
+            set_seed(42 + attempt)
+            outputs = cast(
+                GenerateOutput,
+                self.model.generate(
+                    **inputs,
+                    max_new_tokens=10_000,
+                    temperature=0.7,
+                    # do_sample=False,
+                    return_dict_in_generate=True,
+                ),
+            )
+
+            # Decode the generated text.
+            generated_ids = outputs.sequences[0][inputs.input_ids.shape[1] :]
+            decoded_text = self.tokenizer.decode(generated_ids)
+            # print(f"Model response: {decoded_text}")
+
+            # Only look into the content between <|start|>assistant<|channel|>final<|message|> and <|return|>.
+            start_marker = "<|start|>assistant<|channel|>final<|message|>"
+            end_marker = "<|return|>"
+            start_idx = decoded_text.find(start_marker)
+            end_idx = decoded_text.find(end_marker, start_idx + len(start_marker))
+            if start_idx != -1 and end_idx != -1:
+                relevant_content = decoded_text[start_idx + len(start_marker) : end_idx]
+            else:
+                relevant_content = decoded_text
+
+            top_logprobs, error = BaseRAGTextCompleter.prepare_top_logprobs_from_json_response(
+                json_response=relevant_content,
+            )
+            if error is not None:
+                print(f"Attempt {attempt + 1}: {error}")
+                continue
+            if top_logprobs is not None:
+                break
+
+        top_logprobs = [top_logprobs] if top_logprobs is not None else None
+        additional_info = {"raw_model_output": decoded_text}
+        additional_info |= {"error": error} if error else {}
+
+        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
+            target_content=target_content,
+            top_logprobs=top_logprobs,
+            additional_info=additional_info,
+        )
+
+    def __get_logprobs_from_logits(
+        self,
+        text_with_mask: str,
+        target_content: str,
+        augmented_context: str,
+        top_k: int,
+    ) -> dict[str, Any]:
+        text_completion_prompt = self.prediction_method.build_text_completion_prompt(
+            text_with_mask=text_with_mask,
+            augmented_context=augmented_context,
+            top_k=top_k,
+        )
+        messages = [
+            {"role": "user", "content": text_completion_prompt},
+        ]
+
+        inputs = self.tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            reasoning_effort="low",
+            return_tensors="pt",
+            return_dict=True,
+        ).to(self.device)
+
+        # Retry logic for finding the start marker
+        start_marker = "<|start|>assistant<|channel|>final<|message|>"
+        start_marker_tokens = self.tokenizer.encode(start_marker, add_special_tokens=False)
+        max_retries = 5
+        offset = None
+        outputs = None
+        decoded_text = ""
+
+        for retry_count in range(max_retries):
+            outputs = cast(
+                GenerateOutput,
+                self.model.generate(
+                    **inputs,
+                    max_new_tokens=10_000,
+                    do_sample=False,
+                    output_scores=True,  # return logits
+                    return_dict_in_generate=True,  # return a dict including scores
+                ),
+            )
+
+            # Slice out the generated portion.
+            generated_ids = outputs.sequences[0][inputs.input_ids.shape[1] :]  # generated tokens only
+
+            # Decode full generated text (optional, for inspection).
+            decoded_text = self.tokenizer.decode(generated_ids)
+            # print(f"Generated text (attempt {retry_count + 1}): {decoded_text}")
+
+            for i in range(len(generated_ids) - len(start_marker_tokens) + 1):
+                if all(generated_ids[i + j] == start_marker_tokens[j] for j in range(len(start_marker_tokens))):
+                    offset = i
+                    break
+
+            if offset is not None:
+                print(f"Found start marker at offset {offset} on attempt {retry_count + 1}")
+                break
+            print(f"Start marker not found on attempt {retry_count + 1}, retrying...")
+
+        if offset is None or outputs is None or outputs.scores is None:
+            print(f"Could not find start marker '{start_marker}' after {max_retries} attempts")
+            # Output results.
+            return {
+                "predicted_content": "<Not Finished Correctly>",
+                "target_content_logprob": float("-inf"),
+                "predicted_content_top_logprobs": [[{"token": target_content, "logprob": float("-inf")}]],
+                "raw_model_output": decoded_text,
+            }
+
+        next_token_idx = offset + len(start_marker_tokens)
+
+        # Extract logits for the next token.
+        next_token_logits = outputs.scores[next_token_idx][0]
+
+        return self.prepare_results_from_predicted_token_logits(
+            target_content=target_content,
+            predicted_token_logits=next_token_logits,
+            top_k=top_k,
+        )

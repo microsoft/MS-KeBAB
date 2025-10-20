@@ -64,13 +64,15 @@ class TextCompletionTaskBase(Task):
         """
         return DocumentJsonlReader(self.__documents).read_items()
 
-    def generate_partial_queries(self, verbose: bool = False) -> Iterable[dict[str, str]]:
+    def generate_partial_queries(self, verbose: bool = False, words_after_mask: int = 0) -> Iterable[dict[str, str]]:
         """
         Generate partial queries for participants to fill in.
 
         Args:
             verbose: Defaults to False. If True, includes skipped words with an empty
             "text_with_mask" field for debugging.
+            words_after_mask: Defaults to 0. Number of non-whitespace words/tokens to include
+            after the mask position.
 
         Returns:
             Iterable[dict[str, str]]: An iterable of dicts, where each dictionary contains:
@@ -96,7 +98,14 @@ class TextCompletionTaskBase(Task):
                             "document_id": doc.document_id,
                         }
                     continue
-                text_with_mask = "".join([*words[:i], TextCompletionTaskBase.MASK])
+                # Find the end index by counting non-whitespace words/tokens after the mask.
+                end_index = i + 1
+                word_count = 0
+                while end_index < len(words) and word_count < words_after_mask:
+                    if words[end_index].strip():
+                        word_count += 1
+                    end_index += 1
+                text_with_mask = "".join([*words[:i], TextCompletionTaskBase.MASK, *words[i + 1 : end_index]])
                 yield {
                     "text_with_mask": text_with_mask,
                     "target_content": word,

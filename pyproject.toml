@@ -14,7 +14,7 @@ dependencies = [
     "requests",
     "tqdm",
     "tiktoken",
-    "transformers==4.50.3",
+    "transformers==4.55.0",
     "sentence-transformers",
     "nltk", # TODO(atorunova): replace with editdistance?
     "scipy",
@@ -40,6 +40,11 @@ dev = [
     "pytest-cov",
     "pytest-mock",
     "ruff",
+    "torch>=2.8.0",
+
+    # GPU support for gpt-oss requires triton, which does not support Windows builds.
+    # "triton@git+https://github.com/triton-lang/triton.git@d441626",
+    # "triton-kernels@git+https://github.com/triton-lang/triton.git@d441626#subdirectory=python/triton_kernels",
 ]
 
 [tool.uv.build-backend]
