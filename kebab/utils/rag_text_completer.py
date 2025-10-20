@@ -125,6 +125,7 @@ class BaseRAGTextCompleter(ABC):
         target_content: str,
         top_logprobs: list[list[dict[str, Any]]] | None,
         additional_info: dict[str, Any] | None = None,
+        allow_target_content_as_prefix: bool = True,
     ) -> dict[str, Any]:
         """
         Processes the top log probabilities and prepares the results.
@@ -133,6 +134,7 @@ class BaseRAGTextCompleter(ABC):
             target_content: The expected content to fill in the mask.
             top_logprobs: A list of lists containing the top log probabilities for each token position.
             additional_info: Additional information to include in the results.
+            allow_target_content_as_prefix: Whether to allow the target content to be a prefix of the predicted token.
 
         Returns:
             dict[str, Any]: A dictionary including the following:
@@ -164,7 +166,10 @@ class BaseRAGTextCompleter(ABC):
         for logprob in top_logprobs[0]:
             token = logprob["token"].strip().lower()
             if (
-                target_content_lower.startswith(token) or token.startswith(target_content_lower)
+                # Check if the predicted token matches the target content or a prefix of it.
+                target_content_lower.startswith(token)
+                # When `allow_target_content_as_prefix` is True, also allow the target content to be a prefix of the predicted token.
+                or (allow_target_content_as_prefix and token.startswith(target_content_lower))
             ) and token:  # Ensure non-empty token.
                 prefix_logprobs.append(logprob["logprob"])
         if prefix_logprobs:
