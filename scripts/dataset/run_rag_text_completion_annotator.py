@@ -59,14 +59,16 @@ if __name__ == "__main__":
             return ""
 
     # Run the text completer.
-    # annotator = DummyPhiRAGTextCompleter()
-    # annotator = DummyGptOssRAGTextCompleter(
-    #     model_id="openai/gpt-oss-20b", gpu_id=3, prediction_method=PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE
-    # )
     # Qwen/Qwen3-0.6B, Qwen/Qwen3-1.7B, Qwen/Qwen3-4B, Qwen/Qwen3-8B, Qwen/Qwen3-14B, Qwen/Qwen3-32B
     annotator = DummyQwenRAGTextCompleter(
         model_id="Qwen/Qwen3-14B", prediction_method=PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE
     )
+    # Examples of using other models:
+    # annotator = DummyPhiRAGTextCompleter()
+    # annotator = DummyGptOssRAGTextCompleter(
+    #     model_id="openai/gpt-oss-20b", gpu_id=3, prediction_method=PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE
+    # )
+
     results = list(
         annotator.complete_partial_queries(
             partial_queries=queries,

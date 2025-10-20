@@ -126,7 +126,21 @@ class BaseRAGTextCompleter(ABC):
         top_logprobs: list[list[dict[str, Any]]] | None,
         additional_info: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """TODO."""
+        """
+        Processes the top log probabilities and prepares the results.
+
+        Args:
+            target_content: The expected content to fill in the mask.
+            top_logprobs: A list of lists containing the top log probabilities for each token position.
+            additional_info: Additional information to include in the results.
+
+        Returns:
+            dict[str, Any]: A dictionary including the following:
+                - "predicted_content" (str): The predicted content for the masked position.
+                - "target_content_logprob" (float): The log probability of the target content.
+                - "predicted_content_top_logprobs" (list[list[dict[str, Any]]]): Each outer list
+                  contains the top log probabilities for the corresponding token position.
+        """
         if top_logprobs is None or len(top_logprobs) == 0 or len(top_logprobs[0]) == 0:
             results = {
                 "predicted_content": "<Not Finished Correctly>",
@@ -165,17 +179,25 @@ class BaseRAGTextCompleter(ABC):
         }
         if additional_info:
             results |= additional_info
+
         return results
 
     @staticmethod
     def get_target_content_logprob_with_fallback(result: dict[str, Any], top_k: int = 20) -> float:
-        """TODO."""
+        """
+        Gets the target content log probability with fallback.
+
+        Args:
+            result: A dictionary containing the result of text completion.
+            top_k: The number of top predictions considered at each token position.
+        """
         if result["target_content_logprob"] != float("-inf"):
             return result["target_content_logprob"]
         # Fallback to the smallest log probability among the top k predicted tokens when the
         # target content log probability is -inf.
         target_content_logprob = result["predicted_content_top_logprobs"][0][-1]["logprob"]
-        # Fallback to a small value to avoid -inf log probability.
+        # Fallback to a small value to avoid -inf log probability or when the prob is larger than 1 / top_k
+        # which usually means a shorter list of predictions being returned.
         if target_content_logprob > math.log(1 / top_k) or target_content_logprob == float("-inf"):
             target_content_logprob = math.log(1 / 100_000)
         return target_content_logprob
@@ -184,7 +206,16 @@ class BaseRAGTextCompleter(ABC):
     def prepare_top_logprobs_from_json_response(
         json_response: str,
     ) -> tuple[list[dict[str, Any]] | None, str | None]:
-        """TODO."""
+        """
+        Prepares the top log probabilities from the JSON response.
+
+        Args:
+            json_response: The JSON response string from the model.
+
+        Returns:
+            tuple[list[dict[str, Any]] | None, str | None]: A tuple containing the list of top log
+            probabilities and an error message if any.
+        """
         match = re.search(r"(\[.*?\])", json_response, re.DOTALL)
         error = None
         if not match:
@@ -295,7 +326,14 @@ class PredictionMethod(Enum):
     LOGPROBS_FROM_TEXT_RESPONSE = "logprobs_from_text_response"
 
     def build_text_completion_prompt(self, text_with_mask: str, augmented_context: str, top_k: int) -> str:
-        """Build text completion prompt based on the prediction method."""
+        """
+        Builds text completion prompt based on the prediction method.
+
+        Args:
+            text_with_mask: The text with a mask indicating the position to be filled.
+            augmented_context: Additional context to help with the prediction.
+            top_k: The number of top predictions to consider at each token position.
+        """
         if self == PredictionMethod.LOGPROBS_FROM_LOGITS:
             return PredictionMethod.__build_logprobs_from_logits_prompt(
                 text_with_mask=text_with_mask, augmented_context=augmented_context
@@ -310,7 +348,13 @@ class PredictionMethod(Enum):
 
     @staticmethod
     def __build_base_text_completion_prompt(text_with_mask: str, augmented_context: str) -> str:
-        """TODO."""
+        """
+        Builds the base text completion prompt.
+
+        Args:
+            text_with_mask: The text with a mask indicating the position to be filled.
+            augmented_context: Additional context to help with the prediction.
+        """
         base_text_completion_prompt = f"""
 You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context.
 
@@ -328,7 +372,13 @@ Now, complete the following text by predicting the missing word, represented by 
 
     @staticmethod
     def __build_logprobs_from_logits_prompt(text_with_mask: str, augmented_context: str) -> str:
-        """TODO."""
+        """
+        Builds a prompt that asks the model to output the single best token prediction.
+
+        Args:
+            text_with_mask: The text with a mask indicating the position to be filled.
+            augmented_context: Additional context to help with the prediction.
+        """
         text_completion_prompt = f"""{
             PredictionMethod.__build_base_text_completion_prompt(
                 text_with_mask=text_with_mask, augmented_context=augmented_context
@@ -347,7 +397,14 @@ Answer: """
         augmented_context: str,
         top_k: int,
     ) -> str:
-        # Compose a prompt that asks the model to output top token predictions and their probs in JSON format.
+        """
+        Builds a prompt that asks the model to output top token predictions and their probs in JSON format.
+
+        Args:
+            text_with_mask: The text with a mask indicating the position to be filled.
+            augmented_context: Additional context to help with the prediction.
+            top_k: The number of top predictions to consider at each token position.
+        """
         text_completion_prompt = f"""{
             PredictionMethod.__build_base_text_completion_prompt(
                 text_with_mask=text_with_mask, augmented_context=augmented_context
@@ -367,7 +424,7 @@ Answer: """
 
 
 class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
-    """TODO."""
+    """A base implementation of a RAG text completer using a local model."""
 
     model_id: str
     tokenizer: Any
@@ -398,7 +455,14 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
     def prepare_results_from_predicted_token_logits(
         self, target_content: str, predicted_token_logits: torch.Tensor, top_k: int
     ) -> dict[str, Any]:
-        """TODO."""
+        """
+        Processes the predicted token logits and prepares the results.
+
+        Args:
+            target_content: The expected content to fill in the mask.
+            predicted_token_logits: The logits for the predicted tokens.
+            top_k: The number of top predictions to consider at each token position.
+        """
         # Compute log probabilities over the vocabulary.
         log_probs = torch.nn.functional.log_softmax(predicted_token_logits, dim=-1)
 
@@ -641,7 +705,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         augmented_context: str,
         top_k: int,
     ) -> dict[str, Any]:
-        """Prompts the model to output the top 20 token predictions and their logprobs in JSON format, parses the response, and returns the result dict."""
+        """Prompts the model to output the top token predictions and their probs in JSON format, parses the response, and returns the result dict."""
         text_completion_prompt = self.prediction_method.build_text_completion_prompt(
             text_with_mask=text_with_mask,
             augmented_context=augmented_context,
@@ -681,7 +745,6 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             # Decode the generated text.
             generated_ids = outputs.sequences[0][inputs.input_ids.shape[1] :]
             raw_response = self.tokenizer.decode(generated_ids)
-            # print(f"Model response: {raw_reponse}")
 
             # Only look into the content between </think> and <|im_end|>.
             start_marker = "</think>"
@@ -796,7 +859,7 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         augmented_context: str,
         top_k: int,
     ) -> dict[str, Any]:
-        """Prompts the model to output the top 20 token predictions and their logprobs in JSON format, parses the response, and returns the result dict."""
+        """Prompts the model to output the top token predictions and their probs in JSON format, parses the response, and returns the result dict."""
         text_completion_prompt = self.prediction_method.build_text_completion_prompt(
             text_with_mask=text_with_mask,
             augmented_context=augmented_context,
@@ -875,6 +938,7 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         augmented_context: str,
         top_k: int,
     ) -> dict[str, Any]:
+        """Prompts the model and extracts log probabilities from the output logits."""
         text_completion_prompt = self.prediction_method.build_text_completion_prompt(
             text_with_mask=text_with_mask,
             augmented_context=augmented_context,
