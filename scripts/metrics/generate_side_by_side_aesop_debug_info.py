@@ -186,3 +186,7 @@ def main():
         output_filename = args.output_dir / file1.name.replace(".xlsx", "_comparison.xlsx")
         generate_side_by_side_comparison(file1, file2, output_filename, suffixes=("_1", "_2"))
         print(f"Comparison file for {file1.name} saved to {args.output_dir}")
+
+
+if __name__ == "__main__":
+    main()

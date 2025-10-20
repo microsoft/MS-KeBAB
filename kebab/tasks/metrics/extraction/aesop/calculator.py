@@ -209,6 +209,31 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         self.metrics_factory = MetricsFactory(config, property_schema)
         self.logger = self.logger or logging.getLogger("Value-Averaged-AESOP")
 
+    def preprocess_entities(self, entities: Iterable[Entity]) -> list[Entity]:
+        """Preprocess entities by removing specified properties.
+
+        Args:
+            entities: Iterable of Entity objects to preprocess.
+
+        Returns:
+            List of preprocessed Entity objects.
+        """
+        preprocessed_entities = [entity for entity in entities if "time" not in entity.properties.get("type", [])]
+        for property_to_skip in self.config.properties_to_skip:
+            for entity in preprocessed_entities:
+                if property_to_skip in entity.properties:
+                    del entity.properties[property_to_skip]
+
+        def has_complex_type(value: Any) -> bool:  # noqa: ANN401
+            """Check if a value is of complex type (list or dict)."""
+            return isinstance(value, list | dict)
+
+        for entity in preprocessed_entities:
+            for property_name, property_values in entity.properties.items():
+                if any(has_complex_type(value) for value in property_values):
+                    entity.properties[property_name] = [str(value) for value in property_values]
+        return preprocessed_entities
+
     def run(self, prediction: Iterable[ExtractionOutput], ground_truth: Iterable[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
         metrics = {"per_document_metrics": {}, "dataset_metrics": {}}
@@ -227,22 +252,8 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1} with ID {gt.document.document_id}")
 
-            # gt_entities = [entity for entity in gt.entities if "time" not in entity.properties.get("type", [])]
-            # pred_entities = [entity for entity in pred.entities if "time" not in entity.properties.get("type", [])]
-            gt_entities = gt.entities.copy()
-            pred_entities = pred.entities.copy()
-            for property_to_skip in self.metrics_factory.properties_to_skip:
-                for entity in gt_entities:
-                    if property_to_skip in entity.properties:
-                        del entity.properties[property_to_skip]
-                for entity in pred_entities:
-                    if property_to_skip in entity.properties:
-                        del entity.properties[property_to_skip]
-
-            context = {}
-            context["gt_entities"] = gt_entities
-            context["pred_entities"] = pred_entities
-
+            gt_entities = self.preprocess_entities(gt.entities)
+            pred_entities = self.preprocess_entities(pred.entities)
             gt_property_counts = Counter()
             for entity in gt_entities:
                 gt_property_counts.update(entity.properties.keys())
