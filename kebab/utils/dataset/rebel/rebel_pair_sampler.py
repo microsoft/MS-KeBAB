@@ -258,7 +258,9 @@ class RebelPairSampler:
             for entity_id in entity_ids:
                 ent_id_to_conf_ent_ids[entity_id].update(entity_ids)
 
-        ent_id_to_conf_ent_ids = {entity_id: sorted(values) for entity_id, values in ent_id_to_conf_ent_ids.items()}
+        ent_id_to_conf_ent_ids = {
+            entity_id: sorted(values) for entity_id, values in sorted(ent_id_to_conf_ent_ids.items())
+        }
         logging.info(f"Built the confusing entities map, keys = {len(ent_id_to_conf_ent_ids):,}")
 
         return ent_id_to_conf_ent_ids
