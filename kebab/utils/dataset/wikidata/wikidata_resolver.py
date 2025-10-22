@@ -137,29 +137,33 @@ class WikidataResolver:
                 self._logger.warning("Type hierarchy not provided; not attaching types to entity metadata.")
                 self.attach_types = False
 
-        # collect all referenced IDs (for which we'll need to get Wikidata entities)
-        self._logger.info("Collecting all referenced IDs")
-        referenced_ids = self.collect_referenced_ids()
+        wikidata_entities: dict[str, wikidata_utils.WikidataEntity] = {}
 
         # load wikidata properties and type hierarchy (if available)
         wikidata_properties: dict[str, dict] = {}
         type_id_to_node: dict[str, dict] = {}
+
         if self._has_properties:
             self._logger.info("Loading Wikidata properties")
             wikidata_properties = wikidata_utils.load_properties(self.wikidata_properties_path)  # type: ignore[arg-type]
+
         if self._has_type_hierarchy:
             self._logger.info("Loading Wikidata type hierarchy")
             _, type_id_to_node = wikidata_utils.load_type_hierarchy(self.wikidata_type_hierarchy_path)  # type: ignore[arg-type]
 
-        # load and query wikidata entities (if available)
-        wikidata_entities: dict[str, wikidata_utils.WikidataEntity] = {}
-        if self._has_simple_entities:
-            self._logger.info("Loading Wikidata simple entities")
-            wikidata_entities = wikidata_utils.collect_wikidata_entities(
-                referenced_ids,
-                wikidata_entities_path=self.wikidata_simple_entities_path,  # type: ignore[arg-type]
-                query_api=self.query_api,
-            )
+        if self.resolve_property_values:
+            # collect all referenced IDs (for which we'll need to get Wikidata entities)
+            self._logger.info("Collecting all referenced IDs")
+            referenced_ids = self.collect_referenced_ids()
+
+            # load and query wikidata entities (if available)
+            if self._has_simple_entities:
+                self._logger.info("Loading Wikidata simple entities")
+                wikidata_entities = wikidata_utils.collect_wikidata_entities(
+                    referenced_ids,
+                    wikidata_entities_path=self.wikidata_simple_entities_path,  # type: ignore[arg-type]
+                    query_api=self.query_api,
+                )
 
         # substitute all properties and values
         self._logger.info("Substituting values into entities")
