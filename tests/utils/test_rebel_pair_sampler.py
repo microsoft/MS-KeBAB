@@ -34,45 +34,45 @@ def test_get_confusing_entities_map_and_sample() -> None:
             "entity_id": "Entity_1",
             "properties": {"name": ["John", "John Doe"]},
             "metadata": {
-                "doc_id": "0",
-                "source_text_hash": "0",
                 "fragment_id": "1",
+                "title": "Sample Title A",
+                "entity_id": "Entity_1",
             },
         },
         {
             "entity_id": "Entity_1",
             "properties": {"name": ["Doe"]},
             "metadata": {
-                "doc_id": "0",
-                "source_text_hash": "0",
                 "fragment_id": "2",
+                "title": "Sample Title A",
+                "entity_id": "Entity_1",
             },
         },
         {
             "entity_id": "Entity_2",
             "properties": {"name": ["Doe"]},
             "metadata": {
-                "doc_id": "0",
-                "source_text_hash": "0",
                 "fragment_id": "3",
+                "title": "Sample Title B",
+                "entity_id": "Entity_2",
             },
         },
         {
             "entity_id": "Entity_3",
             "properties": {"name": ["John"]},
             "metadata": {
-                "doc_id": "0",
-                "source_text_hash": "0",
                 "fragment_id": "4",
+                "title": "Sample Title C",
+                "entity_id": "Entity_3",
             },
         },
         {
             "entity_id": "Entity_4",
             "properties": {"name": ["Amy"]},
             "metadata": {
-                "doc_id": "0",
-                "source_text_hash": "0",
                 "fragment_id": "5",
+                "title": "Sample Title D",
+                "entity_id": "Entity_4",
             },
         },
     ]

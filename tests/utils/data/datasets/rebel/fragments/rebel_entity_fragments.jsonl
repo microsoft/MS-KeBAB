@@ -1,2 +1,2 @@
-{"entity_id": "Q223419", "properties": {"name": ["Alexander Johnson"], "P39": ["Q1209571"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "4"}}
-{"entity_id": "Q1484", "properties": {"name": ["Crystal Peak Mountain"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "5"}}
+{"entity_id": "Q223419", "properties": {"name": ["Alexander Johnson"], "P39": ["Q1209571"]}, "metadata": {"fragment_id": "4", "title": "Alexander Johnson Biography", "entity_id": "Q223419"}}
+{"entity_id": "Q1484", "properties": {"name": ["Crystal Peak Mountain"]}, "metadata": {"fragment_id": "5", "title": "Crystal Peak Overview", "entity_id": "Q1484"}}

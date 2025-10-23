@@ -10,8 +10,8 @@ This can be run on T-REx dataset as well.
 - Optionally, verify that the Wikidata property keys exist in the Wikidata properties file.
 
 Example output:
-{"entity_id": "Q33298", "properties": {"name": ["Filipino"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "0"}}
-{"entity_id": "Q918448", "properties": {"name": ["denomination"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "1"}}
+{"entity_id": "Q2038835", "properties": {"name": ["Trinity Peninsula"], "P361": ["Graham Land"], "P30": ["Antarctica"]}, "metadata": {"fragment_id": "1", "title": "Coburg Peak", "entity_id": "Q5139027"}}
+{"entity_id": "Q618370", "properties": {"name": ["Graham Land"], "P30": ["Antarctica"]}, "metadata": {"fragment_id": "2", "title": "Coburg Peak", "entity_id": "Q5139027"}}
 """
 
 from __future__ import annotations
