@@ -252,9 +252,7 @@ class RebelSplitSampler:
 
         # load and optionally type-filter base linking pairs
         pairs, labels = self._load_and_filter_linking_pairs(
-            self.base_linking_dataset_path,
-            self.base_linking_ground_truth_path,
-            fragment_to_entity,
+            self.base_linking_dataset_path, self.base_linking_ground_truth_path
         )
         self._logger.info(f"Loaded base linking pairs: {len(pairs)}")
 
@@ -341,10 +339,7 @@ class RebelSplitSampler:
         return mapping
 
     def _load_and_filter_linking_pairs(
-        self,
-        ds_path: Path,
-        gt_path: Path,
-        fragment_to_entity: dict[str, str],
+        self, ds_path: Path, gt_path: Path
     ) -> tuple[list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]], list[bool]]:
         """Load all base linking pairs and ground-truth labels, apply optional type filtering."""
         pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]] = []
@@ -364,8 +359,8 @@ class RebelSplitSampler:
 
                 # attach entity ids (these were removed in base linking dataset)
                 try:
-                    left.entity_id = fragment_to_entity[left.metadata["fragment_id"]]
-                    right.entity_id = fragment_to_entity[right.metadata["fragment_id"]]
+                    left.entity_id = left.metadata["entity_id"]
+                    right.entity_id = right.metadata["entity_id"]
                 except KeyError as ex:
                     self._logger.debug(f"Missing fragment->entity mapping at line {i}: {ex}")
                     continue
@@ -493,8 +488,8 @@ class RebelSplitSampler:
             for prop_name in set((left.properties or {}).keys()).union((right.properties or {}).keys()):
                 property_counter[prop_name] += 1
 
-            included_fragment_ids.add(left.metadata["fragment_id"])
-            included_fragment_ids.add(right.metadata["fragment_id"])
+            included_fragment_ids.add(left.metadata.get("fragment_id") or left.metadata.get("fragment_ids", [])[0])
+            included_fragment_ids.add(right.metadata.get("fragment_id") or right.metadata.get("fragment_ids", [])[0])
 
         self._logger.info(
             f"Sampled {len(sampled_pairs)}/{cfg.pair_count_limit} pairs; positives: {sum(sampled_labels)}"
@@ -618,7 +613,8 @@ class RebelSplitSampler:
             if cfg.include_all_linking_fragments_first:
                 sorted_fragments = sorted(
                     fragments,
-                    key=lambda f: f.metadata.get("fragment_id") not in included_fragment_ids,
+                    key=lambda f: f.metadata.get("fragment_id")
+                    or f.metadata.get("fragment_ids", [])[0] not in included_fragment_ids,
                 )
             else:
                 sorted_fragments = fragments

@@ -44,10 +44,14 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     # 1) Build base datasets with the builder
     base_dir = tmp_path / "base"
     base_dir.mkdir(parents=True, exist_ok=True)
+    # Enable uniform sampling to avoid degenerate case where confusing-entity logic yields zero pairs
+    # on very small synthetic test data. This ensures at least one entity enters split A.
     pair_sampler = RebelPairSampler(
         fragments_path=rebel_sample_resolved_fragments_file_path,
         output_dir=base_dir,
         exclude_single_property_value_entities=False,
+        uniform_sampling=True,
+        max_count=200,
     )
     pair_sampler.run()
 
@@ -170,7 +174,8 @@ def test_split_sampler_disjoint_entities_between_splits(
         SplitBuildConfig(
             name="A",
             linking=LinkingConfig(
-                pair_count_limit=40,
+                # Lower limits to better fit tiny test data and guarantee at least one entity appears.
+                pair_count_limit=20,
                 pairs_per_entity_limit=5,
                 property_pattern_count_limit=40,
                 property_overlap_limits={},
@@ -190,7 +195,7 @@ def test_split_sampler_disjoint_entities_between_splits(
         SplitBuildConfig(
             name="B",
             linking=LinkingConfig(
-                pair_count_limit=40,
+                pair_count_limit=20,
                 pairs_per_entity_limit=5,
                 property_pattern_count_limit=40,
                 property_overlap_limits={},

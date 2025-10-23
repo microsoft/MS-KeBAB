@@ -179,22 +179,22 @@ def sample_fragments_for_merge() -> tuple[list[ResolvedWikidataEntity], dict[str
         {
             "entity_id": "E1",
             "properties": {"name": ["A"]},
-            "metadata": {"fragment_id": "1", "type": ["t"]},
+            "metadata": {"fragment_id": "1", "type": ["t"], "entity_id": "E1", "title": "Title A"},
         },
         {
             "entity_id": "E1",
             "properties": {"name": ["B"]},
-            "metadata": {"fragment_id": "2", "type": ["t"]},
+            "metadata": {"fragment_id": "2", "type": ["t"], "entity_id": "E1", "title": "Title B"},
         },
         {
             "entity_id": "E1",
             "properties": {"name": ["C", "A"]},
-            "metadata": {"fragment_id": "3", "type": ["t"]},
+            "metadata": {"fragment_id": "3", "type": ["t"], "entity_id": "E1", "title": "Title C"},
         },
         {  # single-fragment entity
             "entity_id": "E2",
             "properties": {"name": ["X"]},
-            "metadata": {"fragment_id": "4", "type": ["s"]},
+            "metadata": {"fragment_id": "4", "type": ["s"], "entity_id": "E2", "title": "Title X"},
         },
     ]
     fragments = [ResolvedWikidataEntity.from_dict(d) for d in frag_dicts]
@@ -213,7 +213,7 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     merged = RebelPairSampler.generate_merged_fragment(0, fragments, entity_idx, max_fragments=3, rng=rng)
 
     # base fragment included
-    assert fragments[0].metadata["fragment_id"] in merged.metadata["fragment_id"]
+    assert fragments[0].metadata["fragment_id"] in merged.metadata["fragment_ids"]
 
     # original metadata fields preserved
     assert merged.metadata["type"] == fragments[0].metadata["type"]
@@ -225,10 +225,13 @@ def test_generate_merged_fragment(sample_fragments_for_merge) -> None:
     # merged fragment names should come from all fragments
     assert set(merged.names).issubset({"A", "B", "C"})
 
-    # when only one fragment exists for the entity, no merge occurs
+    # when only one fragment exists for the entity, a merged representation is still produced
     single = RebelPairSampler.generate_merged_fragment(3, fragments, entity_idx, max_fragments=3, rng=rng)
-    assert single is fragments[3]
-    assert "merge_count" not in single.metadata
+    assert single.metadata["merge_count"] == 1
+    assert single.metadata.get("fragment_ids") == [fragments[3].metadata["fragment_id"]]
+    # entity_id and title metadata should be present
+    assert "entity_id" in single.metadata
+    assert single.metadata["entity_id"] == fragments[3].entity_id
 
     # no deduplication of values
     # create new fragments collection where we take fragment 3, which has "C" and "A" in names, multiple times
@@ -383,6 +386,8 @@ def test_generate_merged_fragment_seed_determinism() -> None:
     )
 
     assert merged_a.metadata["fragment_ids"] == merged_b.metadata["fragment_ids"]
+    # entity_id metadata should be consistent for deterministic merges
+    assert merged_a.metadata.get("entity_id") == merged_b.metadata.get("entity_id")
 
     rng_c = np.random.default_rng(2025)
     merged_c = RebelPairSampler.generate_merged_fragment(
@@ -466,9 +471,21 @@ def test_end_to_end_seed_determinism(tmp_path: Path) -> None:
 def test_exclude_singleton_entities(tmp_path: Path) -> None:
     """Test excluding singleton (single-property single-value) entities."""
     data = [
-        {"entity_id": "E_singleton", "properties": {"name": ["Solo"]}, "metadata": {"fragment_id": "1"}},
-        {"entity_id": "E_multi", "properties": {"name": ["Alpha"]}, "metadata": {"fragment_id": "2"}},
-        {"entity_id": "E_multi", "properties": {"name": ["Beta"]}, "metadata": {"fragment_id": "3"}},
+        {
+            "entity_id": "E_singleton",
+            "properties": {"name": ["Solo"]},
+            "metadata": {"fragment_id": "1", "entity_id": "E_singleton"},
+        },
+        {
+            "entity_id": "E_multi",
+            "properties": {"name": ["Alpha"]},
+            "metadata": {"fragment_id": "2", "entity_id": "E_multi"},
+        },
+        {
+            "entity_id": "E_multi",
+            "properties": {"name": ["Beta"]},
+            "metadata": {"fragment_id": "3", "entity_id": "E_multi"},
+        },
     ]
 
     fragments = [ResolvedWikidataEntity.from_dict(d) for d in data]

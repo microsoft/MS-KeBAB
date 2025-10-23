@@ -24,7 +24,7 @@ def _fragment(entity_id: str, frag_id: str) -> dict:
     return {
         "entity_id": entity_id,
         "properties": {"name": [f"{entity_id}-{frag_id}"]},
-        "metadata": {"fragment_id": frag_id, "type": ["T"]},
+        "metadata": {"fragment_id": frag_id, "type": ["T"], "entity_id": entity_id},
     }
 
 

@@ -619,12 +619,14 @@ class RebelPairSampler:
 
         selected_fragments = [fragments[fragment_indices[i]] for i in indices]
         merged_fragment = ResolvedWikidataEntity.merge(selected_fragments, deduplicate_values=deduplicate_values)
-        merged_fragment.metadata["fragment_id"] = selected_fragments[0].metadata["fragment_id"]
         merged_fragment.metadata["fragment_ids"] = [f.metadata["fragment_id"] for f in selected_fragments]
-        merged_fragment.metadata["type"] = fragment.wikidata_type
         merged_fragment.metadata["merge_count"] = r
-        merged_fragment.metadata["entity_id"] = sorted({f.metadata["entity_id"] for f in selected_fragments})
-        merged_fragment.metadata["title"] = sorted({f.metadata["title"] for f in selected_fragments})
+        merged_fragment.metadata["type"] = fragment.wikidata_type
+
+        if "entity_id" in fragment.metadata:
+            merged_fragment.metadata["entity_id"] = fragment.metadata["entity_id"]
+        if "title" in fragment.metadata:
+            merged_fragment.metadata["title"] = fragment.metadata["title"]
 
         return merged_fragment
 
