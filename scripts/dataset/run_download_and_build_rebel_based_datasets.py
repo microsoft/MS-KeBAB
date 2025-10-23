@@ -25,6 +25,9 @@ Resolution behaviour:
 - "Resolve property values" (default: disabled) will use / extract simple entities as needed.
 - "Resolve / attach types" (default: disabled) will use / extract a type hierarchy as needed.
 
+Example usage (from repository root):
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py
+
 Notes:
 - Extraction of missing Wikidata artifacts requires a standard Wikidata JSON dump (``latest-all.json``) which can be
     downloaded from https://dumps.wikimedia.org/wikidatawiki/entities/ (unpacked size > 1 TB). Only artifacts required
@@ -197,7 +200,7 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
     "--run-extract-fragments/--no-run-extract-fragments",
     default=True,
     help=(
-        "Whether to run step 2: extract REBEL fragments. If disabled, expects "
+        "Whether to run the step: extract REBEL fragments. If disabled, expects "
         "existing outputs under <working_dir>/REBEL/rebel_fragments/extracted."
     ),
 )
@@ -205,7 +208,7 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
     "--run-filter/--no-run-filter",
     default=True,
     help=(
-        "Whether to run step 4: filter degenerate fragments. If disabled, expects "
+        "Whether to run the step: filter degenerate fragments. If disabled, expects "
         "existing outputs under <working_dir>/REBEL/rebel_fragments/filtered or will use prior step."
     ),
 )
@@ -213,14 +216,14 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
     "--run-sample-pairs/--no-run-sample-pairs",
     default=True,
     help=(
-        "Whether to run step 5: sample base pairs for linking/clustering. If disabled, "
+        "Whether to run the step: sample base pairs for linking/clustering. If disabled, "
         "expects existing base datasets under <working_dir>/REBEL/<dataset>/base."
     ),
 )
 @click.option(
     "--run-split/--no-run-split",
     default=True,
-    help=("Whether to run step 6: produce dataset splits."),
+    help=("Whether to run the step: produce dataset splits."),
 )
 @click.option(
     "--seed",

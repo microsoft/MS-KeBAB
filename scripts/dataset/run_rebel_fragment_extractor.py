@@ -15,7 +15,7 @@ from kebab.utils.dataset.rebel.rebel_fragment_extractor import RebelFragmentExtr
 @click.option(
     "--rebel-dir",
     type=Path,
-    default=Path.cwd() / "data" / "REBEL" / "rebel_original_dataset" / "full",
+    default=Path.cwd() / "data" / "REBEL" / "rebel_original_dataset",
     help="Path to the REBEL data directory (will be *json/*.jsonl-globbed against).",
 )
 @click.option(

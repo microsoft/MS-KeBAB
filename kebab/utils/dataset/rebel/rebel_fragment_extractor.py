@@ -24,6 +24,7 @@ from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 
+from kebab.utils.dataset.wikidata import wikidata_utils
 from kebab.utils.dataset.wikidata.wikidata_utils import WikidataEntity
 from kebab.utils.io_helpers import resolve_path
 
@@ -199,7 +200,7 @@ class RebelFragmentExtractor:
             entity_uri = item["uri"]
             entity_id = cls.get_entity_id_from_uri(entity_uri)
 
-            if not entity_id or not entity_id.startswith("Q"):
+            if not entity_id or not wikidata_utils.ENTITY_REFERENCE_REGEX_PATTERN.match(entity_id):
                 invalid_entities += 1
                 continue
 
@@ -226,9 +227,6 @@ class RebelFragmentExtractor:
         if apply_filter and main_entity_uri not in entity_uris:
             stats["main_entity_not_found"] += 1
             return {}
-
-        if invalid_entities:
-            logging.debug(f"Found {invalid_entities} invalid entities in the document")
 
         not_found_objects = 0
 
@@ -377,7 +375,7 @@ class RebelFragmentExtractor:
         error_count = 0
         err = None
 
-        json_files = list(self.rebel_dir.glob("*.json"))
+        json_files = sorted(self.rebel_dir.glob("*.json"))
         self._logger.info(f"Found {len(json_files)} JSON files in the directory")
 
         for count, file in enumerate(json_files, start=1):
@@ -390,7 +388,7 @@ class RebelFragmentExtractor:
 
             self._logger.info(f"Processed {count}/{len(json_files)} ({100 * count / len(json_files):.2f}%) files")
 
-        jsonl_files = list(self.rebel_dir.glob("*.jsonl"))
+        jsonl_files = sorted(self.rebel_dir.glob("*.jsonl"))
         self._logger.info(f"Found {len(jsonl_files)} JSONL files in the directory")
 
         for count, file in enumerate(jsonl_files, start=1):
