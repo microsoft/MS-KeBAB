@@ -454,3 +454,46 @@ def test_end_to_end_seed_determinism(tmp_path: Path) -> None:
     ld3 = _read(sampler3.linking_dataset_output_path)
     gt3 = _read(sampler3.linking_ground_truth_output_path)
     assert ld1 != ld3 or gt1 != gt3
+
+
+def test_exclude_singleton_entities(tmp_path: Path) -> None:
+    """Test excluding singleton (single-property single-value) entities."""
+    data = [
+        {"entity_id": "E_singleton", "properties": {"name": ["Solo"]}, "metadata": {"fragment_id": "1"}},
+        {"entity_id": "E_multi", "properties": {"name": ["Alpha"]}, "metadata": {"fragment_id": "2"}},
+        {"entity_id": "E_multi", "properties": {"name": ["Beta"]}, "metadata": {"fragment_id": "3"}},
+    ]
+
+    fragments = [ResolvedWikidataEntity.from_dict(d) for d in data]
+    frag_path = tmp_path / "fragments.jsonl"
+    with open(frag_path, "w", encoding="utf-8") as f:
+        for frag in fragments:
+            f.write(frag.to_json(minimal_repr=True) + "\n")
+
+    sampler = RebelPairSampler(
+        fragments_path=frag_path,
+        output_dir=tmp_path / "out_exclude",
+        max_count=10,
+        exclude_single_property_value_entities=True,
+    )
+    sampler.run()
+
+    # Confusing entities map should only include E_multi (since singleton excluded)
+    with open(sampler.confusing_entities_map_output_path, encoding="utf-8") as f:
+        lines = [line.strip() for line in f if line.strip()]
+    # When only one entity remains after exclusion, it will be confusing only with itself
+    assert all("E_singleton" not in line for line in lines)
+    assert any("E_multi" in line for line in lines)
+
+    # Now run without exclusion -> both entities present
+    sampler2 = RebelPairSampler(
+        fragments_path=frag_path,
+        output_dir=tmp_path / "out_include",
+        max_count=10,
+        exclude_single_property_value_entities=False,
+    )
+    sampler2.run()
+    with open(sampler2.confusing_entities_map_output_path, encoding="utf-8") as f:
+        lines2 = [line.strip() for line in f if line.strip()]
+    assert any("E_singleton" in line for line in lines2)
+    assert any("E_multi" in line for line in lines2)

@@ -101,6 +101,7 @@ class RebelPairSampler:
     fragment_generation_output_dir: Path
     fragment_generation_dataset_output_path: Path
     uniform_sampling: bool
+    exclude_single_property_value_entities: bool
 
     def __init__(
         self,
@@ -112,6 +113,7 @@ class RebelPairSampler:
         merge_distribution: MergeDistributionMode | None = None,
         deduplicate_values: bool = True,
         uniform_sampling: bool = False,
+        exclude_single_property_value_entities: bool = False,
         seed: int | None = None,
     ):
         """
@@ -125,6 +127,8 @@ class RebelPairSampler:
             merge_distribution: Distribution mode for sampling the number of fragments to merge (ZIPF or TRIANGULAR).
             deduplicate_values: Whether to deduplicate property values in the merged fragments.
             uniform_sampling: If True, sample pairs uniformly across all entities (no confusable-entities logic).
+            exclude_single_property_value_entities: If True, exclude entities (all their fragments) whose
+                merged representation would contain only one property value.
             seed: Optional seed to make sampling deterministic across Python's `random` and NumPy.
         """
         self._logger = logging.getLogger(self.__class__.__name__)
@@ -136,6 +140,7 @@ class RebelPairSampler:
         self.merge_distribution = merge_distribution or MergeDistributionMode.ZIPF
         self.deduplicate_values = deduplicate_values
         self.uniform_sampling = uniform_sampling
+        self.exclude_single_property_value_entities = exclude_single_property_value_entities
         self.linking_output_dir = self.output_dir / "linking" / "base"
         self.linking_output_dir.mkdir(parents=True, exist_ok=True)
         self.linking_dataset_output_path = self.linking_output_dir / self.LINKING_DATASET_FILENAME
@@ -172,6 +177,9 @@ class RebelPairSampler:
         # load the input fragments
         fragments: list[ResolvedWikidataEntity] = self.load_fragments()
         fragments = sorted(fragments, key=lambda f: f.entity_id)
+
+        if self.exclude_single_property_value_entities:
+            fragments = self._filter_single_property_value_entities(fragments)
 
         # construct fragment index to fragment-indices-of-the-same-entity map
         entity_id_to_fragment_indices = defaultdict(list)
@@ -246,13 +254,13 @@ class RebelPairSampler:
 
         name_to_entity_ids = defaultdict(set)
 
-        # build the dictionary that maps every name occurring in the fragments to the set of entity ids
+        # Build the dictionary that maps every name occurring in the fragments to the set of entity ids
         # that have that name in their fragments
         for fragment in fragments:
             for name in fragment.names:
                 name_to_entity_ids[name.lower() if use_lowercase else name].add(fragment.entity_id)
 
-        # build the entity_id to confusing entity_ids map
+        # Build the entity_id to confusing entity_ids map
         ent_id_to_conf_ent_ids = defaultdict(set)
         for entity_ids in name_to_entity_ids.values():
             for entity_id in entity_ids:
@@ -622,6 +630,34 @@ class RebelPairSampler:
         merged_fragment.metadata["merge_count"] = r
 
         return merged_fragment
+
+    def _filter_single_property_value_entities(
+        self, fragments: list[ResolvedWikidataEntity]
+    ) -> list[ResolvedWikidataEntity]:
+        """Exclude all fragments belonging to entities that have exactly one property with exactly one value."""
+        ent_to_fragments: dict[str, list[ResolvedWikidataEntity]] = defaultdict(list)
+        for fragment in fragments:
+            ent_to_fragments[fragment.entity_id].append(fragment)
+
+        excluded_entities: set[str] = set()
+        for ent_id, frags in ent_to_fragments.items():
+            merged = ResolvedWikidataEntity.merge(frags, deduplicate_values=self.deduplicate_values)
+            non_empty_props = [v for values in merged.properties.values() for v in values if v]
+            if len(non_empty_props) <= 1:
+                excluded_entities.add(ent_id)
+
+        if not excluded_entities:
+            return fragments
+
+        before = len(fragments)
+        filtered = [f for f in fragments if f.entity_id not in excluded_entities]
+        self._logger.info(
+            "Excluded %s singleton entities (single property-single value) removing %s fragments",
+            f"{len(excluded_entities):,}",
+            f"{before - len(filtered):,}",
+        )
+
+        return filtered
 
 
 class _RandomSet:

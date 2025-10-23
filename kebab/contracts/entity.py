@@ -316,7 +316,8 @@ class Entity:
                 if key in entity_dict and not entity_dict[key]:
                     del entity_dict[key]
 
-            entity_dict["metadata"] = {k: v for k, v in entity_dict["metadata"].items() if v is not None}
+            if "metadata" in entity_dict:
+                entity_dict["metadata"] = {k: v for k, v in entity_dict["metadata"].items() if v is not None}
 
         return entity_dict
 
