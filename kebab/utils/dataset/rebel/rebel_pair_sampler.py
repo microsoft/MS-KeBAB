@@ -565,6 +565,7 @@ class RebelPairSampler:
         include_base_fragment: bool = True,
         deduplicate_values: bool = True,
         rng: np.random.Generator | None = None,
+        enforce_min_property_values: bool = False,
     ) -> ResolvedWikidataEntity:
         """
         Generate a merged fragment by merging up to `max_fragments` from the list of fragments.
@@ -578,13 +579,17 @@ class RebelPairSampler:
             include_base_fragment: Whether to always include the base fragment in the merge.
             deduplicate_values: Whether to deduplicate property values in the merged fragment.
             rng: Optional NumPy random Generator to use for deterministic sampling.
+            enforce_min_property_values: When True, ensure that the merged fragment contains strictly more than one
+                property value in total (across all properties).
 
         Returns:
             A merged ResolvedWikidataEntity preserving original metadata.
         """
         fragment = fragments[fragment_idx]
         entity_id = fragment.entity_id
-        fragment_indices = [fragment_idx]  # start with the base fragment
+
+        # Start with the base fragment followed by all other fragments of the entity
+        fragment_indices = [fragment_idx]
         fragment_indices.extend(i for i in entity_id_to_fragment_indices[entity_id] if i != fragment_idx)
 
         if len(fragment_indices) == 1:
@@ -593,13 +598,22 @@ class RebelPairSampler:
             f.metadata["merge_count"] = 1
             return f
 
+        rng = rng or np.random.default_rng()
+
+        # When enforcing min property values - shuffle the fragment indices
+        if enforce_min_property_values:
+            # preserve base at index 0 if include_base_fragment else allow full shuffle
+            rest = fragment_indices[1:]
+            rng.shuffle(rest)
+            fragment_indices = [fragment_indices[0], *rest] if include_base_fragment else rest
+
         n = len(fragment_indices)
         if max_fragments:
             n = min(n, max_fragments)
 
+        # Sampling step (initial selection)
         if distribution == MergeDistributionMode.ZIPF:
-            p = np.arange(1, n + 1, dtype=np.float32)
-            p = 1 / p
+            p = 1 / np.arange(1, n + 1, dtype=np.float32)
         elif distribution == MergeDistributionMode.TRIANGULAR:
             p = np.arange(n, 0, -1, dtype=np.float32)
         else:
@@ -607,15 +621,44 @@ class RebelPairSampler:
 
         if p is not None:
             p /= p.sum()
-            rng = rng or np.random.default_rng()
             r = rng.choice(n, p=p) + 1
             indices = rng.choice(n, size=int(r), replace=False).tolist()
-
             if include_base_fragment and 0 not in indices:
-                indices[0] = 0  # ensure the base fragment is always included
+                # ensure base fragment is present by replacing a random index
+                indices[0] = 0
         else:
-            indices = list(range(n))
+            indices = list(range(n))  # take all
             r = n
+
+        # Apply max_fragments cap (unless enforcing min property values may require more later)
+        if max_fragments is not None and not enforce_min_property_values and len(indices) > max_fragments:
+            indices = rng.choice(indices, size=max_fragments, replace=False).tolist()
+            r = len(indices)
+
+        # Enforce min property values
+        if enforce_min_property_values:
+            # Start from current selection
+            selected_set = set(indices)
+
+            def merged_unique_value_count(sel_indices: list[int]) -> int:
+                """Compute the total number of unique property values across selected fragments."""
+                sel_frags = [fragments[fragment_indices[i]] for i in sel_indices]
+                unique_vals: set[str] = set()
+                for f in sel_frags:
+                    for vals in f.properties.values():
+                        for v in vals:
+                            if v:
+                                unique_vals.add(v)
+                return len(unique_vals)
+
+            # Keep adding while total property values <=1 and we have unused fragments
+            while merged_unique_value_count(list(selected_set)) <= 1 and len(selected_set) < len(fragment_indices):
+                for extra_idx in range(len(fragment_indices)):
+                    if extra_idx not in selected_set:
+                        selected_set.add(extra_idx)
+                        break
+            indices = list(selected_set)
+            r = len(indices)
 
         selected_fragments = [fragments[fragment_indices[i]] for i in indices]
         merged_fragment = ResolvedWikidataEntity.merge(selected_fragments, deduplicate_values=deduplicate_values)

@@ -400,6 +400,81 @@ def test_generate_merged_fragment_seed_determinism() -> None:
     )
 
 
+def test_generate_merged_fragment_enforce_min_property_values() -> None:
+    """When enforce_min_property_values=True and initial sample would yield only one property value, we add more.
+
+    Scenario: three fragments for entity E where each fragment contributes exactly one distinct name value.
+    With max_fragments=1 and distribution ZIPF, we would normally sample a single fragment (one property value).
+    The enforcement should cause at least two fragments to be merged (merge_count >=2) producing >1 property value.
+    """
+    fragments = [
+        ResolvedWikidataEntity.from_dict(
+            {"entity_id": "E", "properties": {"name": ["A"]}, "metadata": {"fragment_id": "1"}}
+        ),
+        ResolvedWikidataEntity.from_dict(
+            {"entity_id": "E", "properties": {"name": ["B"]}, "metadata": {"fragment_id": "2"}}
+        ),
+        ResolvedWikidataEntity.from_dict(
+            {"entity_id": "E", "properties": {"name": ["C"]}, "metadata": {"fragment_id": "3"}}
+        ),
+    ]
+    mapping: dict[str, list[int]] = defaultdict(list)
+    for idx, f in enumerate(fragments):
+        mapping[f.entity_id].append(idx)
+
+    rng = np.random.default_rng(42)
+    merged = RebelPairSampler.generate_merged_fragment(
+        0,
+        fragments,
+        mapping,
+        max_fragments=1,  # would restrict to 1 normally
+        distribution=MergeDistributionMode.ZIPF,
+        rng=rng,
+        enforce_min_property_values=True,
+    )
+
+    # enforcement should ensure more than one property value overall
+    total_values = sum(len([v for v in vals if v]) for vals in merged.properties.values())
+    assert total_values > 1, "Expected more than one property value after enforcement"
+    assert merged.metadata["merge_count"] >= 2
+
+
+def test_generate_merged_fragment_enforce_min_property_values_all_single_value_same() -> None:
+    """If all fragments together still yield only a single property value, enforcement selects all fragments."""
+    fragments = [
+        ResolvedWikidataEntity.from_dict(
+            {"entity_id": "E", "properties": {"name": ["A"]}, "metadata": {"fragment_id": "1"}}
+        ),
+        ResolvedWikidataEntity.from_dict(
+            {"entity_id": "E", "properties": {"name": ["A"]}, "metadata": {"fragment_id": "2"}}
+        ),
+        ResolvedWikidataEntity.from_dict(
+            {"entity_id": "E", "properties": {"name": ["A"]}, "metadata": {"fragment_id": "3"}}
+        ),
+    ]
+    mapping: dict[str, list[int]] = defaultdict(list)
+    for idx, f in enumerate(fragments):
+        mapping[f.entity_id].append(idx)
+
+    rng = np.random.default_rng(0)
+    merged = RebelPairSampler.generate_merged_fragment(
+        1,
+        fragments,
+        mapping,
+        max_fragments=1,
+        distribution=MergeDistributionMode.ZIPF,
+        rng=rng,
+        enforce_min_property_values=True,
+        deduplicate_values=False,  # ensure we don't hide duplicates when counting raw enforcement condition
+    )
+
+    # Because all fragments have identical single value, total unique property values remains 1.
+    # Enforcement should have exhausted all fragments (merge_count == 3)
+    assert merged.metadata["merge_count"] == 3
+    unique_values = {v for vals in merged.properties.values() for v in vals if v}
+    assert len(unique_values) == 1
+
+
 def test_end_to_end_seed_determinism(tmp_path: Path) -> None:
     """RebelPairSampler.run produces identical files with the same seed, and different with a different seed."""
     fragments = _make_fragments_for_seed_tests()
