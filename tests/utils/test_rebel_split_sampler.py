@@ -47,6 +47,7 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     pair_sampler = RebelPairSampler(
         fragments_path=rebel_sample_resolved_fragments_file_path,
         output_dir=base_dir,
+        exclude_single_property_value_entities=False,
     )
     pair_sampler.run()
 
@@ -157,7 +158,11 @@ def test_split_sampler_disjoint_entities_between_splits(
     """Ensure entity sets used by different splits are disjoint as intended."""
     # Build base
     base_dir = tmp_path / "base"
-    pair_sampler = RebelPairSampler(fragments_path=rebel_sample_resolved_fragments_file_path, output_dir=base_dir)
+    pair_sampler = RebelPairSampler(
+        fragments_path=rebel_sample_resolved_fragments_file_path,
+        output_dir=base_dir,
+        exclude_single_property_value_entities=False,
+    )
     pair_sampler.run()
 
     # Two small splits

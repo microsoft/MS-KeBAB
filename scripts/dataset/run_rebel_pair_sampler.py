@@ -57,8 +57,8 @@ from kebab.utils.dataset.rebel.rebel_pair_sampler import MergeDistributionMode, 
 @click.option(
     "--exclude-singleton-entities/--include-singleton-entities",
     is_flag=True,
-    default=False,
-    help="Exclude entities whose merged fragments contain exactly one property with one value (default: include).",
+    default=True,
+    help=("Exclude entities whose merged fragments contain exactly one property with one value (default: exclude)."),
 )
 @click.command()
 def main(

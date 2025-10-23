@@ -113,7 +113,7 @@ class RebelPairSampler:
         merge_distribution: MergeDistributionMode | None = None,
         deduplicate_values: bool = True,
         uniform_sampling: bool = False,
-        exclude_single_property_value_entities: bool = False,
+        exclude_single_property_value_entities: bool = True,
         seed: int | None = None,
     ):
         """

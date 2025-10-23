@@ -116,7 +116,11 @@ def test_get_confusing_entities_map_and_sample() -> None:
 
 def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) -> None:
     """Test building linking and clustering datasets from the resolved REBEL fragments."""
-    builder = RebelPairSampler(fragments_path=rebel_sample_resolved_fragments_file_path, output_dir=tmp_path)
+    builder = RebelPairSampler(
+        fragments_path=rebel_sample_resolved_fragments_file_path,
+        output_dir=tmp_path,
+        exclude_single_property_value_entities=False,
+    )
     builder.run()
 
     output_file = builder.linking_dataset_output_path
@@ -413,6 +417,7 @@ def test_end_to_end_seed_determinism(tmp_path: Path) -> None:
         max_merge_fragments=3,
         merge_distribution=MergeDistributionMode.ZIPF,
         seed=777,
+        exclude_single_property_value_entities=False,
     )
     sampler2 = RebelPairSampler(
         fragments_path=frag_path,
@@ -421,6 +426,7 @@ def test_end_to_end_seed_determinism(tmp_path: Path) -> None:
         max_merge_fragments=3,
         merge_distribution=MergeDistributionMode.ZIPF,
         seed=777,
+        exclude_single_property_value_entities=False,
     )
 
     sampler1.run()
@@ -434,6 +440,7 @@ def test_end_to_end_seed_determinism(tmp_path: Path) -> None:
         max_merge_fragments=3,
         merge_distribution=MergeDistributionMode.ZIPF,
         seed=778,
+        exclude_single_property_value_entities=False,
     )
     sampler3.run()
 
