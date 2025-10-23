@@ -588,7 +588,10 @@ class RebelPairSampler:
         fragment_indices.extend(i for i in entity_id_to_fragment_indices[entity_id] if i != fragment_idx)
 
         if len(fragment_indices) == 1:
-            return fragment
+            f = ResolvedWikidataEntity.from_dict(fragment.to_dict())
+            f.metadata["fragment_ids"] = [f.metadata["fragment_id"]]
+            f.metadata["merge_count"] = 1
+            return f
 
         n = len(fragment_indices)
         if max_fragments:
@@ -620,6 +623,8 @@ class RebelPairSampler:
         merged_fragment.metadata["fragment_ids"] = [f.metadata["fragment_id"] for f in selected_fragments]
         merged_fragment.metadata["type"] = fragment.wikidata_type
         merged_fragment.metadata["merge_count"] = r
+        merged_fragment.metadata["entity_id"] = sorted({f.metadata["entity_id"] for f in selected_fragments})
+        merged_fragment.metadata["title"] = sorted({f.metadata["title"] for f in selected_fragments})
 
         return merged_fragment
 
