@@ -74,7 +74,7 @@ def document_debug_output_to_excel(
 
     def property_precision_formula(property_id: str) -> str:
         """Return excel formula for property precision."""
-        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}) / SUMIFS({col("num_pred_values")}, {conditions(property_id)})"""
+        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}) / SUMIFS({col("num_pred_values")}, {conditions(property_id)}, {col("num_gt_values")}, ">0")"""
 
     def property_recall_formula(property_id: str) -> str:
         """Return excel formula for property recall."""
