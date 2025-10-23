@@ -42,9 +42,6 @@ class RebelFragmentExtractor:
 
     ENTITY_FRAGMENTS_FILENAME: str = "rebel_entity_fragments.jsonl"
 
-    INCLUDE_TITLE_AS_PROPERTY: bool = False
-    INCLUDE_MENTION_AS_PROPERTY: bool = False
-
     SPLIT_INTO_SUB_DOCUMENTS: bool = False  # Applies only to T-REx dataset (REBEL doesn't have sentence boundaries)
 
     DEBUG_DUMP_DOC_FILES: bool = False  # whether to dump the original document file records as separate files
@@ -208,15 +205,9 @@ class RebelFragmentExtractor:
 
             if entity_id not in fragments:
                 fragment = WikidataEntity(entity_id=entity_id)
-                fragment.metadata["doc_id"] = doc_id
-                fragment.metadata["source_text_hash"] = source_text_hash
                 fragment.metadata["fragment_id"] = str(cls._UNSAFE_FRAGMENT_COUNTER)
-
-                if cls.INCLUDE_TITLE_AS_PROPERTY:
-                    fragment.properties["trex_title"].append(record["title"])
-
-                if cls.INCLUDE_MENTION_AS_PROPERTY:
-                    fragment.properties["trex_mention"].append(record["text"])
+                fragment.metadata["title"] = record["title"]
+                fragment.metadata["entity_id"] = record["uri"]
 
                 cls._UNSAFE_FRAGMENT_COUNTER += 1
 

@@ -222,14 +222,6 @@ class RebelPairSampler:
         with open(fragments_path, encoding="utf-8") as f:
             for line in f:
                 fragment = ResolvedWikidataEntity.from_json(line)
-
-                # discard unused data
-                if "doc_id" in fragment.metadata:
-                    del fragment.metadata["doc_id"]
-
-                if "source_text_hash" in fragment.metadata:
-                    del fragment.metadata["source_text_hash"]
-
                 fragments.append(fragment)
 
         self._logger.info(f"Loaded {len(fragments):,} fragments")
