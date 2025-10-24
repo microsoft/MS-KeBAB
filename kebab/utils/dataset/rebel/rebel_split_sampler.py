@@ -243,11 +243,11 @@ class RebelSplitSampler:
         """Build all requested splits in the specified order (Test -> Validation -> Train)."""
         self._logger.info(f"Sampling REBEL split with {len(self.splits)} splits; output_dir={self.output_dir}")
 
-        # load mapping from fragment_id -> entity_id
+        # load mapping from fragment_id -> entity_id (this is based on all non-filtered-out entities)
         fragment_to_entity = self._load_fragment_to_entity_map(self.base_fragment_to_entity_map_path)
         self._logger.info(f"Loaded fragment->entity map: {len(fragment_to_entity)} entries")
 
-        # Build fragment lookup (used for linking-set expansion)
+        # Build fragment lookup (used for linking-set expansion; this is based on sampled confusing pairs)
         fragment_lookup = self._build_fragment_lookup()
 
         # load and optionally type-filter base linking pairs
@@ -277,7 +277,7 @@ class RebelSplitSampler:
             fragset_gen_dir.mkdir(parents=True, exist_ok=True)
 
             sampled_pairs, sampled_labels, linking_entity_counter, included_fragment_ids = self._sample_linking_pairs(
-                pairs, labels, disallowed_entity_ids, split.linking
+                pairs, labels, disallowed_entity_ids, split.linking, self.base_linking_dataset_path
             )
 
             # write linking outputs
@@ -383,8 +383,19 @@ class RebelSplitSampler:
                 ):
                     continue
 
+                left.metadata = {"id": self._get_fragment_id(left)}
+                for p in left.properties:
+                    left.properties[p] = None  # type: ignore
+
+                right.metadata = {"id": self._get_fragment_id(right)}
+                for p in right.properties:
+                    right.properties[p] = None  # type: ignore
+
                 pairs.append((left, right))
                 labels.append(bool(json.loads(line_gt)))
+
+                if i > 0 and i % 100_000 == 0:
+                    self._logger.info(f"Read {i + 1:,d} pairs, kept {len(pairs):,d}")
 
         assert len(pairs) == len(labels)
         self._logger.info(
@@ -405,6 +416,7 @@ class RebelSplitSampler:
         labels: list[bool],
         disallowed_entity_ids: set[str],
         cfg: LinkingConfig,
+        ds_path: Path,
     ) -> tuple[
         list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
         list[bool],
@@ -428,6 +440,8 @@ class RebelSplitSampler:
         class_counter: Counter[bool] = Counter()
 
         included_fragment_ids: set[str] = set()
+
+        id_to_fragment = defaultdict(list)
 
         iterations = 0
         for i in indices:
@@ -488,8 +502,46 @@ class RebelSplitSampler:
             for prop_name in set((left.properties or {}).keys()).union((right.properties or {}).keys()):
                 property_counter[prop_name] += 1
 
-            included_fragment_ids.add(left.metadata.get("fragment_id") or left.metadata.get("fragment_ids", [])[0])
-            included_fragment_ids.add(right.metadata.get("fragment_id") or right.metadata.get("fragment_ids", [])[0])
+            id_to_fragment[left.metadata["id"]].append(left)
+            id_to_fragment[right.metadata["id"]].append(right)
+
+        # Re-attach the full metadata and properties
+        with (
+            open(resolve_path(ds_path), encoding="utf-8") as f_ds,
+        ):
+            for i, line_ds in enumerate(f_ds):
+                d = json.loads(line_ds)
+                left = ResolvedWikidataEntity.from_dict(d[0])
+                right = ResolvedWikidataEntity.from_dict(d[1])
+
+                left_id = self._get_fragment_id(left)
+                if left_id in id_to_fragment:
+                    for fragment in id_to_fragment[left_id]:
+                        fragment.metadata = left.metadata
+                        fragment.properties = left.properties
+
+                right_id = self._get_fragment_id(right)
+                if right_id in id_to_fragment:
+                    for fragment in id_to_fragment[right_id]:
+                        fragment.metadata = right.metadata
+                        fragment.properties = right.properties
+
+                if i > 0 and i % 100_000 == 0:
+                    self._logger.info(f"Reattaching metadata and properties: read {i:,d} pairs")
+
+        for left, right in sampled_pairs:
+            assert "fragment_id" in left.metadata or "fragment_ids" in left.metadata
+            assert "fragment_id" in right.metadata or "fragment_ids" in right.metadata
+
+            if "fragment_id" in left.metadata:
+                included_fragment_ids.add(left.metadata["fragment_id"])
+            else:
+                included_fragment_ids.update(left.metadata["fragment_ids"])
+
+            if "fragment_id" in right.metadata:
+                included_fragment_ids.add(right.metadata["fragment_id"])
+            else:
+                included_fragment_ids.update(right.metadata["fragment_ids"])
 
         self._logger.info(
             f"Sampled {len(sampled_pairs)}/{cfg.pair_count_limit} pairs; positives: {sum(sampled_labels)}"
@@ -497,6 +549,8 @@ class RebelSplitSampler:
             f" iterations: {iterations};"
             f" acceptance: {(100.0 * len(sampled_pairs) / iterations) if iterations else 0.0:.2f}%; entities: {len(linking_entity_counter)}"
         )
+
+        self._logger.info(f"Included fragment ids: {len(included_fragment_ids):,d}")
 
         self._logger.info("Top 10 types: " + ", ".join(f"{t}:{c}" for t, c in type_counter.most_common(10)))
         self._logger.info("Top 10 properties: " + ", ".join(f"{p}:{c}" for p, c in property_counter.most_common(10)))
@@ -509,7 +563,7 @@ class RebelSplitSampler:
         sampled_pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
         sampled_labels: list[bool],
         linking_entity_counter: Counter[str],
-        fragment_lookup: dict[str, ResolvedWikidataEntity],
+        fragment_lookup: dict[str, dict],
     ) -> None:
         """Write merged linking dataset plus a set (unmerged) variant."""
         split_dir.mkdir(parents=True, exist_ok=True)
@@ -525,7 +579,7 @@ class RebelSplitSampler:
             expanded: list[dict] = []
             for fid in frag_ids:
                 fragment = fragment_lookup[fid]
-                expanded.append(fragment.without_entity_id().to_dict(minimal_repr=True))
+                expanded.append(fragment)
             return expanded
 
         with (
@@ -562,16 +616,16 @@ class RebelSplitSampler:
             len(linking_entity_counter),
         )
 
-    def _build_fragment_lookup(self) -> dict[str, ResolvedWikidataEntity]:
-        """Build lookup of fragment_id -> fragment entity from base clustering dataset (once per run)."""
-        lookup: dict[str, ResolvedWikidataEntity] = {}
+    def _build_fragment_lookup(self) -> dict[str, dict]:
+        """Build lookup of fragment_id -> fragment from base clustering dataset."""
+        lookup: dict[str, dict] = {}
         try:
             with open(self.base_clustering_dataset_path, encoding="utf-8") as f_ds:
                 for line in f_ds:
                     frag = ResolvedWikidataEntity.from_dict(json.loads(line))
                     fid = frag.metadata.get("fragment_id")
                     if fid and fid not in lookup:
-                        lookup[fid] = frag
+                        lookup[fid] = frag.without_entity_id().without_metadata().to_dict(minimal_repr=True)
             self._logger.info(f"Fragment lookup size: {len(lookup)}")
         except FileNotFoundError:
             self._logger.warning("Clustering dataset not found; linking-set dataset will use merged fragments only")
@@ -833,6 +887,12 @@ class RebelSplitSampler:
             f"Fragment set generation: wrote {total_records} data points to {ds_out} for {len(ent_to_fragments)} entities"
         )
 
+    @classmethod
+    def _get_fragment_id(cls, fragment: ResolvedWikidataEntity) -> tuple[int, ...]:
+        t = fragment.metadata["fragment_ids"] or [fragment.metadata["fragment_id"]]
+        t = tuple(sorted(int(v) for v in t))
+        return t
+
 
 def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     """Provide default configs for Test, Validation, Train splits."""
@@ -898,9 +958,9 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
     train = SplitBuildConfig(
         name="train",
         linking=LinkingConfig(
-            pair_count_limit=100_000,
-            pairs_per_entity_limit=100,
-            property_pattern_count_limit=2_000,
+            pair_count_limit=5_000_000,
+            pairs_per_entity_limit=1_000,
+            property_pattern_count_limit=10_000,
             property_overlap_limits={1: 0.55},
             single_class_ratio_limit=0.76,
             seed=get_next_seed(),
