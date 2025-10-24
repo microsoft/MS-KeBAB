@@ -151,7 +151,7 @@ class WikidataResolver:
             self._logger.info("Loading Wikidata type hierarchy")
             _, type_id_to_node = wikidata_utils.load_type_hierarchy(self.wikidata_type_hierarchy_path)  # type: ignore[arg-type]
 
-        if self.resolve_property_values:
+        if self.resolve_property_values or self.attach_types:
             # collect all referenced IDs (for which we'll need to get Wikidata entities)
             self._logger.info("Collecting all referenced IDs")
             referenced_ids = self.collect_referenced_ids()

@@ -546,6 +546,7 @@ class RebelPairSampler:
                     max_fragments=None,
                     include_base_fragment=False,
                     deduplicate_values=self.deduplicate_values,
+                    enforce_min_property_values=True,
                     rng=self.rng,
                 )
 
@@ -605,7 +606,7 @@ class RebelPairSampler:
             # preserve base at index 0 if include_base_fragment else allow full shuffle
             rest = fragment_indices[1:]
             rng.shuffle(rest)
-            fragment_indices = [fragment_indices[0], *rest] if include_base_fragment else rest
+            fragment_indices = [fragment_indices[0], *rest]
 
         n = len(fragment_indices)
         if max_fragments:
