@@ -1,0 +1,719 @@
+{
+    "name": "redocred schema",
+    "data_types": [
+      {
+        "data_type_id": "text",
+        "value_type": "Text",
+        "description": "text",
+        "category_values": []
+      },
+      {
+        "data_type_id": "date",
+        "value_type": "Date",
+        "description": "date",
+        "category_values": []
+      }
+    ],
+    "properties": [
+      {
+        "property_id": "type",
+        "data_type_id": "text",
+        "description": "type",
+        "display_name": "type",
+        "is_collection": true
+      },
+      {
+        "property_id": "name",
+        "data_type_id": "text",
+        "description": "name",
+        "display_name": "name",
+        "is_collection": true
+      },
+      {
+        "property_id": "definitions",
+        "data_type_id": "text",
+        "description": "definitions",
+        "display_name": "definitions",
+        "is_collection": true
+      },
+      {
+        "property_id": "descriptions",
+        "data_type_id": "text",
+        "description": "descriptions",
+        "display_name": "descriptions",
+        "is_collection": true
+      },
+      {
+        "property_id": "country",
+        "data_type_id": "text",
+        "description": "country",
+        "display_name": "country",
+        "is_collection": true
+      },
+      {
+        "property_id": "located in the administrative territorial entity",
+        "data_type_id": "text",
+        "description": "located in the administrative territorial entity",
+        "display_name": "located in the administrative territorial entity",
+        "is_collection": true
+      },
+      {
+        "property_id": "country of citizenship",
+        "data_type_id": "text",
+        "description": "country of citizenship",
+        "display_name": "country of citizenship",
+        "is_collection": true
+      },
+      {
+        "property_id": "contains the administrative territorial entity",
+        "data_type_id": "text",
+        "description": "contains the administrative territorial entity",
+        "display_name": "contains the administrative territorial entity",
+        "is_collection": true
+      },
+      {
+        "property_id": "part of",
+        "data_type_id": "text",
+        "description": "part of",
+        "display_name": "part of",
+        "is_collection": true
+      },
+      {
+        "property_id": "notable work",
+        "data_type_id": "text",
+        "description": "notable work",
+        "display_name": "notable work",
+        "is_collection": true
+      },
+      {
+        "property_id": "publication date",
+        "data_type_id": "date",
+        "description": "publication date",
+        "display_name": "publication date",
+        "is_collection": true
+      },
+      {
+        "property_id": "has part(s)",
+        "data_type_id": "text",
+        "description": "has part(s)",
+        "display_name": "has part(s)",
+        "is_collection": true
+      },
+      {
+        "property_id": "performer",
+        "data_type_id": "text",
+        "description": "performer",
+        "display_name": "performer",
+        "is_collection": true
+      },
+      {
+        "property_id": "date of birth",
+        "data_type_id": "date",
+        "description": "date of birth",
+        "display_name": "date of birth",
+        "is_collection": true
+      },
+      {
+        "property_id": "member of",
+        "data_type_id": "text",
+        "description": "member of",
+        "display_name": "member of",
+        "is_collection": true
+      },
+      {
+        "property_id": "participant in",
+        "data_type_id": "text",
+        "description": "participant in",
+        "display_name": "participant in",
+        "is_collection": true
+      },
+      {
+        "property_id": "applies to jurisdiction",
+        "data_type_id": "text",
+        "description": "applies to jurisdiction",
+        "display_name": "applies to jurisdiction",
+        "is_collection": true
+      },
+      {
+        "property_id": "country of origin",
+        "data_type_id": "text",
+        "description": "country of origin",
+        "display_name": "country of origin",
+        "is_collection": true
+      },
+      {
+        "property_id": "inception",
+        "data_type_id": "text",
+        "description": "inception",
+        "display_name": "inception",
+        "is_collection": true
+      },
+      {
+        "property_id": "date of death",
+        "data_type_id": "date",
+        "description": "date of death",
+        "display_name": "date of death",
+        "is_collection": true
+      },
+      {
+        "property_id": "continent",
+        "data_type_id": "text",
+        "description": "continent",
+        "display_name": "continent",
+        "is_collection": true
+      },
+      {
+        "property_id": "record label",
+        "data_type_id": "text",
+        "description": "record label",
+        "display_name": "record label",
+        "is_collection": true
+      },
+      {
+        "property_id": "place of birth",
+        "data_type_id": "text",
+        "description": "place of birth",
+        "display_name": "place of birth",
+        "is_collection": true
+      },
+      {
+        "property_id": "present in work",
+        "data_type_id": "text",
+        "description": "present in work",
+        "display_name": "present in work",
+        "is_collection": true
+      },
+      {
+        "property_id": "spouse",
+        "data_type_id": "text",
+        "description": "spouse",
+        "display_name": "spouse",
+        "is_collection": true
+      },
+      {
+        "property_id": "conflict",
+        "data_type_id": "text",
+        "description": "conflict",
+        "display_name": "conflict",
+        "is_collection": true
+      },
+      {
+        "property_id": "participant",
+        "data_type_id": "text",
+        "description": "participant",
+        "display_name": "participant",
+        "is_collection": true
+      },
+      {
+        "property_id": "cast member",
+        "data_type_id": "text",
+        "description": "cast member",
+        "display_name": "cast member",
+        "is_collection": true
+      },
+      {
+        "property_id": "child",
+        "data_type_id": "text",
+        "description": "child",
+        "display_name": "child",
+        "is_collection": true
+      },
+      {
+        "property_id": "located in or next to body of water",
+        "data_type_id": "text",
+        "description": "located in or next to body of water",
+        "display_name": "located in or next to body of water",
+        "is_collection": true
+      },
+      {
+        "property_id": "author",
+        "data_type_id": "text",
+        "description": "author",
+        "display_name": "author",
+        "is_collection": true
+      },
+      {
+        "property_id": "followed by",
+        "data_type_id": "text",
+        "description": "followed by",
+        "display_name": "followed by",
+        "is_collection": true
+      },
+      {
+        "property_id": "follows",
+        "data_type_id": "text",
+        "description": "follows",
+        "display_name": "follows",
+        "is_collection": true
+      },
+      {
+        "property_id": "father",
+        "data_type_id": "text",
+        "description": "father",
+        "display_name": "father",
+        "is_collection": true
+      },
+      {
+        "property_id": "sibling",
+        "data_type_id": "text",
+        "description": "sibling",
+        "display_name": "sibling",
+        "is_collection": true
+      },
+      {
+        "property_id": "developer",
+        "data_type_id": "text",
+        "description": "developer",
+        "display_name": "developer",
+        "is_collection": true
+      },
+      {
+        "property_id": "owned by",
+        "data_type_id": "text",
+        "description": "owned by",
+        "display_name": "owned by",
+        "is_collection": true
+      },
+      {
+        "property_id": "creator",
+        "data_type_id": "text",
+        "description": "creator",
+        "display_name": "creator",
+        "is_collection": true
+      },
+      {
+        "property_id": "director",
+        "data_type_id": "text",
+        "description": "director",
+        "display_name": "director",
+        "is_collection": true
+      },
+      {
+        "property_id": "educated at",
+        "data_type_id": "text",
+        "description": "educated at",
+        "display_name": "educated at",
+        "is_collection": true
+      },
+      {
+        "property_id": "languages spoken, written or signed",
+        "data_type_id": "text",
+        "description": "languages spoken, written or signed",
+        "display_name": "languages spoken, written or signed",
+        "is_collection": true
+      },
+      {
+        "property_id": "employer",
+        "data_type_id": "text",
+        "description": "employer",
+        "display_name": "employer",
+        "is_collection": true
+      },
+      {
+        "property_id": "member of political party",
+        "data_type_id": "text",
+        "description": "member of political party",
+        "display_name": "member of political party",
+        "is_collection": true
+      },
+      {
+        "property_id": "located in/on physical feature",
+        "data_type_id": "text",
+        "description": "located in/on physical feature",
+        "display_name": "located in/on physical feature",
+        "is_collection": true
+      },
+      {
+        "property_id": "religion or worldview",
+        "data_type_id": "text",
+        "description": "religion or worldview",
+        "display_name": "religion or worldview",
+        "is_collection": true
+      },
+      {
+        "property_id": "location",
+        "data_type_id": "text",
+        "description": "location",
+        "display_name": "location",
+        "is_collection": true
+      },
+      {
+        "property_id": "league",
+        "data_type_id": "text",
+        "description": "league",
+        "display_name": "league",
+        "is_collection": true
+      },
+      {
+        "property_id": "award received",
+        "data_type_id": "text",
+        "description": "award received",
+        "display_name": "award received",
+        "is_collection": true
+      },
+      {
+        "property_id": "head of government",
+        "data_type_id": "text",
+        "description": "head of government",
+        "display_name": "head of government",
+        "is_collection": true
+      },
+      {
+        "property_id": "publisher",
+        "data_type_id": "text",
+        "description": "publisher",
+        "display_name": "publisher",
+        "is_collection": true
+      },
+      {
+        "property_id": "legislative body",
+        "data_type_id": "text",
+        "description": "legislative body",
+        "display_name": "legislative body",
+        "is_collection": true
+      },
+      {
+        "property_id": "official language",
+        "data_type_id": "text",
+        "description": "official language",
+        "display_name": "official language",
+        "is_collection": true
+      },
+      {
+        "property_id": "place of death",
+        "data_type_id": "text",
+        "description": "place of death",
+        "display_name": "place of death",
+        "is_collection": true
+      },
+      {
+        "property_id": "instance of",
+        "data_type_id": "text",
+        "description": "instance of",
+        "display_name": "instance of",
+        "is_collection": true
+      },
+      {
+        "property_id": "parent organization",
+        "data_type_id": "text",
+        "description": "parent organization",
+        "display_name": "parent organization",
+        "is_collection": true
+      },
+      {
+        "property_id": "headquarters location",
+        "data_type_id": "text",
+        "description": "headquarters location",
+        "display_name": "headquarters location",
+        "is_collection": true
+      },
+      {
+        "property_id": "start time",
+        "data_type_id": "date",
+        "description": "start time",
+        "display_name": "start time",
+        "is_collection": true
+      },
+      {
+        "property_id": "original broadcaster",
+        "data_type_id": "text",
+        "description": "original broadcaster",
+        "display_name": "original broadcaster",
+        "is_collection": true
+      },
+      {
+        "property_id": "producer",
+        "data_type_id": "text",
+        "description": "producer",
+        "display_name": "producer",
+        "is_collection": true
+      },
+      {
+        "property_id": "point in time",
+        "data_type_id": "date",
+        "description": "point in time",
+        "display_name": "point in time",
+        "is_collection": true
+      },
+      {
+        "property_id": "part of the series",
+        "data_type_id": "text",
+        "description": "part of the series",
+        "display_name": "part of the series",
+        "is_collection": true
+      },
+      {
+        "property_id": "characters",
+        "data_type_id": "text",
+        "description": "characters",
+        "display_name": "characters",
+        "is_collection": true
+      },
+      {
+        "property_id": "head of state",
+        "data_type_id": "text",
+        "description": "head of state",
+        "display_name": "head of state",
+        "is_collection": true
+      },
+      {
+        "property_id": "work location",
+        "data_type_id": "text",
+        "description": "work location",
+        "display_name": "work location",
+        "is_collection": true
+      },
+      {
+        "property_id": "composer",
+        "data_type_id": "text",
+        "description": "composer",
+        "display_name": "composer",
+        "is_collection": true
+      },
+      {
+        "property_id": "genre",
+        "data_type_id": "text",
+        "description": "genre",
+        "display_name": "genre",
+        "is_collection": true
+      },
+      {
+        "property_id": "founded by",
+        "data_type_id": "text",
+        "description": "founded by",
+        "display_name": "founded by",
+        "is_collection": true
+      },
+      {
+        "property_id": "dissolved, abolished or demolished date",
+        "data_type_id": "date",
+        "description": "dissolved, abolished or demolished date",
+        "display_name": "dissolved, abolished or demolished date",
+        "is_collection": true
+      },
+      {
+        "property_id": "screenwriter",
+        "data_type_id": "text",
+        "description": "screenwriter",
+        "display_name": "screenwriter",
+        "is_collection": true
+      },
+      {
+        "property_id": "military branch",
+        "data_type_id": "text",
+        "description": "military branch",
+        "display_name": "military branch",
+        "is_collection": true
+      },
+      {
+        "property_id": "mouth of the watercourse",
+        "data_type_id": "text",
+        "description": "mouth of the watercourse",
+        "display_name": "mouth of the watercourse",
+        "is_collection": true
+      },
+      {
+        "property_id": "operator",
+        "data_type_id": "text",
+        "description": "operator",
+        "display_name": "operator",
+        "is_collection": true
+      },
+      {
+        "property_id": "capital",
+        "data_type_id": "text",
+        "description": "capital",
+        "display_name": "capital",
+        "is_collection": true
+      },
+      {
+        "property_id": "has subsidiary",
+        "data_type_id": "text",
+        "description": "has subsidiary",
+        "display_name": "has subsidiary",
+        "is_collection": true
+      },
+      {
+        "property_id": "mother",
+        "data_type_id": "text",
+        "description": "mother",
+        "display_name": "mother",
+        "is_collection": true
+      },
+      {
+        "property_id": "capital of",
+        "data_type_id": "text",
+        "description": "capital of",
+        "display_name": "capital of",
+        "is_collection": true
+      },
+      {
+        "property_id": "member of sports team",
+        "data_type_id": "text",
+        "description": "member of sports team",
+        "display_name": "member of sports team",
+        "is_collection": true
+      },
+      {
+        "property_id": "manufacturer",
+        "data_type_id": "text",
+        "description": "manufacturer",
+        "display_name": "manufacturer",
+        "is_collection": true
+      },
+      {
+        "property_id": "ethnic group",
+        "data_type_id": "text",
+        "description": "ethnic group",
+        "display_name": "ethnic group",
+        "is_collection": true
+      },
+      {
+        "property_id": "platform",
+        "data_type_id": "text",
+        "description": "platform",
+        "display_name": "platform",
+        "is_collection": true
+      },
+      {
+        "property_id": "production company",
+        "data_type_id": "text",
+        "description": "production company",
+        "display_name": "production company",
+        "is_collection": true
+      },
+      {
+        "property_id": "basin country",
+        "data_type_id": "text",
+        "description": "basin country",
+        "display_name": "basin country",
+        "is_collection": true
+      },
+      {
+        "property_id": "subclass of",
+        "data_type_id": "text",
+        "description": "subclass of",
+        "display_name": "subclass of",
+        "is_collection": true
+      },
+      {
+        "property_id": "chairperson",
+        "data_type_id": "text",
+        "description": "chairperson",
+        "display_name": "chairperson",
+        "is_collection": true
+      },
+      {
+        "property_id": "end time",
+        "data_type_id": "date",
+        "description": "end time",
+        "display_name": "end time",
+        "is_collection": true
+      },
+      {
+        "property_id": "original language of film or TV show",
+        "data_type_id": "text",
+        "description": "original language of film or TV show",
+        "display_name": "original language of film or TV show",
+        "is_collection": true
+      },
+      {
+        "property_id": "location of formation",
+        "data_type_id": "text",
+        "description": "location of formation",
+        "display_name": "location of formation",
+        "is_collection": true
+      },
+      {
+        "property_id": "parent taxon",
+        "data_type_id": "text",
+        "description": "parent taxon",
+        "display_name": "parent taxon",
+        "is_collection": true
+      },
+      {
+        "property_id": "replaced by",
+        "data_type_id": "text",
+        "description": "replaced by",
+        "display_name": "replaced by",
+        "is_collection": true
+      },
+      {
+        "property_id": "replaces",
+        "data_type_id": "text",
+        "description": "replaces",
+        "display_name": "replaces",
+        "is_collection": true
+      },
+      {
+        "property_id": "lyrics by",
+        "data_type_id": "text",
+        "description": "lyrics by",
+        "display_name": "lyrics by",
+        "is_collection": true
+      },
+      {
+        "property_id": "narrative location",
+        "data_type_id": "text",
+        "description": "narrative location",
+        "display_name": "narrative location",
+        "is_collection": true
+      },
+      {
+        "property_id": "residence",
+        "data_type_id": "text",
+        "description": "residence",
+        "display_name": "residence",
+        "is_collection": true
+      },
+      {
+        "property_id": "territory claimed by",
+        "data_type_id": "text",
+        "description": "territory claimed by",
+        "display_name": "territory claimed by",
+        "is_collection": true
+      },
+      {
+        "property_id": "position held",
+        "data_type_id": "text",
+        "description": "position held",
+        "display_name": "position held",
+        "is_collection": true
+      },
+      {
+        "property_id": "product or material produced or service provided",
+        "data_type_id": "text",
+        "description": "product or material produced or service provided",
+        "display_name": "product or material produced or service provided",
+        "is_collection": true
+      },
+      {
+        "property_id": "influenced by",
+        "data_type_id": "text",
+        "description": "influenced by",
+        "display_name": "influenced by",
+        "is_collection": true
+      },
+      {
+        "property_id": "separated from",
+        "data_type_id": "text",
+        "description": "separated from",
+        "display_name": "separated from",
+        "is_collection": true
+      },
+      {
+        "property_id": "twinned administrative body",
+        "data_type_id": "text",
+        "description": "twinned administrative body",
+        "display_name": "twinned administrative body",
+        "is_collection": true
+      },
+      {
+        "property_id": "unemployment rate",
+        "data_type_id": "text",
+        "description": "unemployment rate",
+        "display_name": "unemployment rate",
+        "is_collection": false
+      }
+    ]
+  }
