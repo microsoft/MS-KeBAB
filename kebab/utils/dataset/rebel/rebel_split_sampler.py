@@ -771,7 +771,11 @@ class RebelSplitSampler:
 
     @classmethod
     def _get_fragment_id(cls, fragment: ResolvedWikidataEntity) -> tuple[int, ...]:
-        t = fragment.metadata["fragment_ids"] or [fragment.metadata["fragment_id"]]
+        t = (
+            fragment.metadata["fragment_ids"]
+            if "fragment_ids" in fragment.metadata
+            else [fragment.metadata["fragment_id"]]
+        )
         t = tuple(sorted(int(v) for v in t))
         return t
 

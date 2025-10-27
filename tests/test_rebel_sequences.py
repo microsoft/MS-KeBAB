@@ -32,8 +32,8 @@ def test_sequences_per_entity_sampling(tmp_path):
     base_dir = tmp_path
 
     # Two entities, five fragments each
-    e1_frags = [_fragment("E1", f"f1{i}") for i in range(5)]
-    e2_frags = [_fragment("E2", f"f2{i}") for i in range(5)]
+    e1_frags = [_fragment("E1", f"1{i}") for i in range(5)]
+    e2_frags = [_fragment("E2", f"2{i}") for i in range(5)]
 
     clustering_dataset = e1_frags + e2_frags
     clustering_gt = ["E1"] * len(e1_frags) + ["E2"] * len(e2_frags)
