@@ -180,7 +180,7 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
 )
 @click.option(
     "--resolve-types/--no-resolve-types",
-    default=False,
+    default=True,
     help=(
         "Attach and resolve Wikidata types. Uses <working_dir>/Wikidata/type_hierarchy/wikidata_type_hierarchy.jsonl "
         "if present; otherwise extracts it (requires latest-all.json). Enables type-based filtering."
@@ -198,7 +198,7 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
 )
 @click.option(
     "--run-extract-fragments/--no-run-extract-fragments",
-    default=True,
+    default=False,
     help=(
         "Whether to run the step: extract REBEL fragments. If disabled, expects "
         "existing outputs under <working_dir>/REBEL/rebel_fragments/extracted."
@@ -370,7 +370,7 @@ def main(
         f"types={resolve_types} (path={type_hierarchy_path})"
     )
 
-    # 2) Extract fragments from REBEL dataset (optional)
+    # 2) Extract fragments from REBEL dataset
     if run_extract_fragments:
         logger.info(
             f"Extracting REBEL fragments from {rebel_original_dir} -> {rebel_fragments_extracted} (surface_forms={True})"
@@ -387,7 +387,7 @@ def main(
     # Determine input path for subsequent steps depending on what was run
     current_fragments_path = rebel_fragments_extracted / "rebel_entity_fragments.jsonl"
 
-    # 3) Resolve Wikidata names/types/values where possible given available inputs (optional)
+    # 3) Resolve Wikidata names/types/values where possible given available inputs
     if resolve_property_names or resolve_property_values or resolve_types:
         logger.info(
             "Resolving Wikidata fields ("
@@ -411,7 +411,7 @@ def main(
     else:
         logger.info("Skipping Wikidata resolution (flag disabled)")
 
-    # 4) Filter out degenerate fragments (optional)
+    # 4) Filter out degenerate fragments
     if run_filter:
         logger.info(
             f"Filtering degenerate fragments (drop_without_type={bool(resolve_types)}) -> {rebel_fragments_filtered}"
@@ -426,8 +426,9 @@ def main(
     else:
         logger.info("Skipping fragment filtering (flag disabled)")
 
-    # 5) Build base datasets (linking/clustering) (optional)
-    max_pair_count = 10_000_000
+    # 5) Build base datasets (linking/clustering)
+    # max_pair_count = 15_000_000
+    max_pair_count = 150_000
     if run_sample_pairs:
         logger.info(
             f"Sampling base pairs (max_count={max_pair_count}, max_merge_fragments={10}, merge_distribution={MergeDistributionMode.ZIPF}, "
@@ -446,7 +447,7 @@ def main(
     else:
         logger.info("Skipping pair sampling (flag disabled)")
 
-    # 6) Produce splits for all tasks (optional)
+    # 6) Produce splits for all tasks
     if run_split:
         logger.info(f"Producing dataset splits -> {rebel_root}")
         split_sampler = RebelSplitSampler(

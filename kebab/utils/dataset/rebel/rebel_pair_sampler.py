@@ -670,7 +670,7 @@ class RebelPairSampler:
         if "entity_id" in fragment.metadata:
             merged_fragment.metadata["entity_id"] = fragment.metadata["entity_id"]
         if "title" in fragment.metadata:
-            merged_fragment.metadata["title"] = fragment.metadata["title"]
+            merged_fragment.metadata["title"] = sorted({f.metadata["title"] for f in selected_fragments})
 
         return merged_fragment
 

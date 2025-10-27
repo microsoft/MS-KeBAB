@@ -112,6 +112,18 @@ class WikidataEntity(Entity):
 
         return entity_dict
 
+    def __str__(self) -> str:
+        """String representation of the entity."""
+        s = f"{self.entity_id}: " if self.entity_id else ""
+        s += f"{self.name} | "
+
+        properties_str = "|".join(
+            f"{prop_id}:{','.join(sorted(values))}" for prop_id, values in sorted(self.properties.items())
+        )
+
+        s += properties_str
+        return s
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create a WikidataEntity from a dictionary."""

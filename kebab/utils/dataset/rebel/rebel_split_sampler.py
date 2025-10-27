@@ -348,6 +348,8 @@ class RebelSplitSampler:
         required_types = self.required_entity_types
         excluded_types = self.excluded_entity_types
 
+        id_to_fragment = {}
+
         with (
             open(resolve_path(ds_path), encoding="utf-8") as f_ds,
             open(resolve_path(gt_path), encoding="utf-8") as f_gt,
@@ -383,13 +385,25 @@ class RebelSplitSampler:
                 ):
                     continue
 
-                left.metadata = {"id": self._get_fragment_id(left)}
-                for p in left.properties:
-                    left.properties[p] = None  # type: ignore
+                f_id = self._get_fragment_id(left)
+                if f_id not in id_to_fragment:
+                    left.metadata = {"id": f_id}
+                    for p in left.properties:
+                        left.properties[p] = None  # type: ignore
 
-                right.metadata = {"id": self._get_fragment_id(right)}
-                for p in right.properties:
-                    right.properties[p] = None  # type: ignore
+                    id_to_fragment[f_id] = left
+
+                left = id_to_fragment[f_id]
+
+                f_id = self._get_fragment_id(right)
+                if f_id not in id_to_fragment:
+                    right.metadata = {"id": f_id}
+                    for p in right.properties:
+                        right.properties[p] = None  # type: ignore
+
+                    id_to_fragment[f_id] = right
+
+                right = id_to_fragment[f_id]
 
                 pairs.append((left, right))
                 labels.append(bool(json.loads(line_gt)))
@@ -441,7 +455,7 @@ class RebelSplitSampler:
 
         included_fragment_ids: set[str] = set()
 
-        id_to_fragment = defaultdict(list)
+        id_to_fragment = {}
 
         iterations = 0
         for i in indices:
@@ -502,8 +516,8 @@ class RebelSplitSampler:
             for prop_name in set((left.properties or {}).keys()).union((right.properties or {}).keys()):
                 property_counter[prop_name] += 1
 
-            id_to_fragment[left.metadata["id"]].append(left)
-            id_to_fragment[right.metadata["id"]].append(right)
+            id_to_fragment[left.metadata["id"]] = left
+            id_to_fragment[right.metadata["id"]] = right
 
         # Re-attach the full metadata and properties
         with (
@@ -516,15 +530,15 @@ class RebelSplitSampler:
 
                 left_id = self._get_fragment_id(left)
                 if left_id in id_to_fragment:
-                    for fragment in id_to_fragment[left_id]:
-                        fragment.metadata = left.metadata
-                        fragment.properties = left.properties
+                    fragment = id_to_fragment[left_id]
+                    fragment.metadata = left.metadata
+                    fragment.properties = left.properties
 
                 right_id = self._get_fragment_id(right)
                 if right_id in id_to_fragment:
-                    for fragment in id_to_fragment[right_id]:
-                        fragment.metadata = right.metadata
-                        fragment.properties = right.properties
+                    fragment = id_to_fragment[right_id]
+                    fragment.metadata = right.metadata
+                    fragment.properties = right.properties
 
                 if i > 0 and i % 100_000 == 0:
                     self._logger.info(f"Reattaching metadata and properties: read {i:,d} pairs")
