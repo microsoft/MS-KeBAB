@@ -175,7 +175,7 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
 )
 @click.option(
     "--resolve-types/--no-resolve-types",
-    default=True,
+    default=False,
     help=(
         "Attach and resolve Wikidata types. Uses <working_dir>/Wikidata/type_hierarchy/wikidata_type_hierarchy.jsonl "
         "if present; otherwise extracts it (requires latest-all.json). Enables type-based filtering."
@@ -193,7 +193,7 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
 )
 @click.option(
     "--run-extract-fragments/--no-run-extract-fragments",
-    default=False,
+    default=True,
     help=(
         "Whether to run the step: extract REBEL fragments. If disabled, expects "
         "existing outputs under <working_dir>/REBEL/rebel_fragments/extracted."
@@ -422,8 +422,7 @@ def main(
         logger.info("Skipping fragment filtering (flag disabled)")
 
     # 5) Build base datasets (linking/clustering)
-    # max_pair_count = 15_000_000
-    max_pair_count = 150_000
+    max_pair_count = 20_000_000
     if run_sample_pairs:
         logger.info(
             f"Sampling base pairs (max_count={max_pair_count}, max_merge_fragments={10}, merge_distribution={MergeDistributionMode.ZIPF}, "
