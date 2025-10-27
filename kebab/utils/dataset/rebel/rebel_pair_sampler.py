@@ -78,7 +78,6 @@ class RebelPairSampler:
     CLUSTERING_GROUND_TRUTH_FILENAME: str = "rebel_clustering_ground_truth.jsonl"
     ENTITY_GENERATION_DATASET_FILENAME: str = "rebel_entity_generation_dataset.jsonl"
     FRAGMENT_GENERATION_DATASET_FILENAME: str = "rebel_fragment_generation_dataset.jsonl"
-    FRAGMENT_TO_ENTITY_MAP_FILENAME: str = "rebel_fragment_to_entity_map.jsonl"
     CONFUSING_ENTITIES_MAP_FILENAME: str = "rebel_confusing_entities_map.jsonl"
 
     _logger: logging.Logger
@@ -91,7 +90,6 @@ class RebelPairSampler:
     linking_output_dir: Path
     linking_dataset_output_path: Path
     linking_ground_truth_output_path: Path
-    fragment_to_entity_map_output_path: Path
     confusing_entities_map_output_path: Path
     clustering_output_dir: Path
     clustering_dataset_output_path: Path
@@ -145,7 +143,6 @@ class RebelPairSampler:
         self.linking_output_dir.mkdir(parents=True, exist_ok=True)
         self.linking_dataset_output_path = self.linking_output_dir / self.LINKING_DATASET_FILENAME
         self.linking_ground_truth_output_path = self.linking_output_dir / self.LINKING_GROUND_TRUTH_FILENAME
-        self.fragment_to_entity_map_output_path = self.linking_output_dir / self.FRAGMENT_TO_ENTITY_MAP_FILENAME
         self.confusing_entities_map_output_path = self.linking_output_dir / self.CONFUSING_ENTITIES_MAP_FILENAME
         self.clustering_output_dir = self.output_dir / "clustering" / "base"
         self.clustering_output_dir.mkdir(parents=True, exist_ok=True)
@@ -436,12 +433,6 @@ class RebelPairSampler:
         entity_id_to_fragment_indices: dict[str, list[int]],
     ) -> None:
         """Write the pairwise linking and clustering datasets."""
-        # write the fragment id to entity id map (as tuples)
-        fragment_to_entity_map = {fragment.metadata["fragment_id"]: fragment.entity_id for fragment in fragments}
-        with open(self.fragment_to_entity_map_output_path, mode="w", encoding="utf-8") as f:
-            for fragment_id, entity_id in fragment_to_entity_map.items():
-                f.write(json.dumps((fragment_id, entity_id)) + "\n")
-
         # write the pairwise linking dataset
         entity_ids = set()
         count = 0

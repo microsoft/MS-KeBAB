@@ -114,9 +114,6 @@ def _collect_rebel_output_files(rebel_root: Path) -> list[Path]:
         task_dir = rebel_root / task / "base"
         if task_dir.exists():
             output_files.extend(list(task_dir.glob("*.jsonl")))
-    map_file = rebel_root / "rebel_fragment_to_entity_map.jsonl"
-    if map_file.exists():
-        output_files.append(map_file)
     for task in [
         "linking",
         "clustering",

@@ -13,7 +13,6 @@ Workflow:
 Input layout (produced by RebelPairSampler into input_dir):
 - input_dir/linking/base/rebel_linking_dataset.jsonl
 - input_dir/linking/base/rebel_linking_ground_truth.jsonl
-- input_dir/rebel_fragment_to_entity_map.jsonl
 - input_dir/clustering/base/rebel_clustering_dataset.jsonl
 - input_dir/clustering/base/rebel_clustering_ground_truth.jsonl
 - input_dir/entity_generation/base/rebel_entity_generation_dataset.jsonl
@@ -122,7 +121,6 @@ class RebelSplitSampler:
     type_filter: TypeFilter | None
     base_linking_dataset_path: Path
     base_linking_ground_truth_path: Path
-    base_fragment_to_entity_map_path: Path
     base_clustering_dataset_path: Path
     base_clustering_ground_truth_path: Path
     base_entity_generation_dataset_path: Path
@@ -155,10 +153,6 @@ class RebelSplitSampler:
         self.base_linking_dataset_path = self.input_dir / "linking" / "base" / RebelPairSampler.LINKING_DATASET_FILENAME
         self.base_linking_ground_truth_path = (
             self.input_dir / "linking" / "base" / RebelPairSampler.LINKING_GROUND_TRUTH_FILENAME
-        )
-        # fragment->entity map is written at the base_dir root by RebelPairSampler
-        self.base_fragment_to_entity_map_path = (
-            self.input_dir / "linking" / "base" / RebelPairSampler.FRAGMENT_TO_ENTITY_MAP_FILENAME
         )
         self.base_clustering_dataset_path = (
             self.input_dir / "clustering" / "base" / RebelPairSampler.CLUSTERING_DATASET_FILENAME
@@ -221,10 +215,6 @@ class RebelSplitSampler:
     def run(self) -> None:
         """Build all requested splits in the specified order (Test -> Validation -> Train)."""
         self._logger.info(f"Sampling REBEL split with {len(self.splits)} splits; output_dir={self.output_dir}")
-
-        # load mapping from fragment_id -> entity_id (this is based on all non-filtered-out entities)
-        fragment_to_entity = self._load_fragment_to_entity_map(self.base_fragment_to_entity_map_path)
-        self._logger.info(f"Loaded fragment->entity map: {len(fragment_to_entity)} entries")
 
         # Build fragment lookup (used for linking-set expansion; this is based on sampled confusing pairs)
         fragment_lookup = self._build_fragment_lookup()
@@ -297,15 +287,6 @@ class RebelSplitSampler:
 
             # update disallowed entities for next splits
             disallowed_entity_ids.update(entities_to_include)
-
-    @staticmethod
-    def _load_fragment_to_entity_map(path: Path) -> dict[str, str]:
-        mapping: dict[str, str] = {}
-        with open(resolve_path(path), encoding="utf-8") as f:
-            for line in f:
-                frag_id, ent_id = json.loads(line)
-                mapping[frag_id] = ent_id
-        return mapping
 
     def _load_and_filter_linking_pairs(
         self, ds_path: Path, gt_path: Path

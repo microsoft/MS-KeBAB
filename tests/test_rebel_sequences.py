@@ -38,7 +38,7 @@ def test_sequences_per_entity_sampling(tmp_path):
     clustering_dataset = e1_frags + e2_frags
     clustering_gt = ["E1"] * len(e1_frags) + ["E2"] * len(e2_frags)
 
-    # Base linking dataset: one positive pair per entity (needs fragment_to_entity resolution)
+    # Base linking dataset: one positive pair per entity
     linking_pairs = [
         [
             dict(e1_frags[0].items()),
@@ -51,8 +51,6 @@ def test_sequences_per_entity_sampling(tmp_path):
     ]
     linking_gt = [True, True]
 
-    frag_to_ent_map = [[f["metadata"]["fragment_id"], f["entity_id"]] for f in clustering_dataset]
-
     # Entity generation + fragment generation reuse clustering fragments (merged vs single not required for test)
     entity_gen_dataset = clustering_dataset
     fragment_gen_dataset = clustering_dataset
@@ -60,7 +58,6 @@ def test_sequences_per_entity_sampling(tmp_path):
     # Write files
     _write_jsonl(base_dir / "linking/base/rebel_linking_dataset.jsonl", linking_pairs)
     _write_jsonl(base_dir / "linking/base/rebel_linking_ground_truth.jsonl", linking_gt)
-    _write_jsonl(base_dir / "linking/base/rebel_fragment_to_entity_map.jsonl", frag_to_ent_map)
     _write_jsonl(base_dir / "clustering/base/rebel_clustering_dataset.jsonl", clustering_dataset)
     _write_jsonl(base_dir / "clustering/base/rebel_clustering_ground_truth.jsonl", clustering_gt)
     _write_jsonl(base_dir / "entity_generation/base/rebel_entity_generation_dataset.jsonl", entity_gen_dataset)

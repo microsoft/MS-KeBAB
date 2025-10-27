@@ -16,7 +16,6 @@ Example output:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import typing
@@ -181,10 +180,6 @@ class RebelFragmentExtractor:
                 stats["short_text_documents"] += 1
                 return {}
 
-        # use text + title md5 hash as a global unique source_id
-        text = record["title"] + "\n" + record["text"]
-        source_text_hash = hashlib.md5(text.encode()).hexdigest()  # noqa: S324
-        doc_id = record["docid"]
         main_entity_uri = record["uri"]
 
         invalid_entities = 0
