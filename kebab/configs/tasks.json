@@ -71,48 +71,6 @@
       "ground_truth": "./REBEL/linking/test/rebel_linking_ground_truth.jsonl"
     }
   },
-  "Linking-REBEL-Incremental-Train": {
-    "task": "Linking",
-    "data": {
-      "entity_fragment_pairs": "./REBEL/incremental_linking/train/rebel_linking_dataset.jsonl",
-      "ground_truth": "./REBEL/incremental_linking/train/rebel_linking_ground_truth.jsonl"
-    }
-  },
-  "Linking-REBEL-Incremental-Validation": {
-    "task": "Linking",
-    "data": {
-      "entity_fragment_pairs": "./REBEL/incremental_linking/dev/rebel_linking_dataset.jsonl",
-      "ground_truth": "./REBEL/incremental_linking/dev/rebel_linking_ground_truth.jsonl"
-    }
-  },
-  "Linking-REBEL-Incremental-Test": {
-    "task": "Linking",
-    "data": {
-      "entity_fragment_pairs": "./REBEL/incremental_linking/test/rebel_linking_dataset.jsonl",
-      "ground_truth": "./REBEL/incremental_linking/test/rebel_linking_ground_truth.jsonl"
-    }
-  },
-  "Linking-REBEL-Incremental-Set-Train": {
-    "task": "Linking",
-    "data": {
-      "entity_fragment_pairs": "./REBEL/incremental_set_linking/train/rebel_set_linking_dataset.jsonl",
-      "ground_truth": "./REBEL/incremental_set_linking/train/rebel_set_linking_ground_truth.jsonl"
-    }
-  },
-  "Linking-REBEL-Incremental-Set-Validation": {
-    "task": "Linking",
-    "data": {
-      "entity_fragment_pairs": "./REBEL/incremental_set_linking/dev/rebel_set_linking_dataset.jsonl",
-      "ground_truth": "./REBEL/incremental_set_linking/dev/rebel_set_linking_ground_truth.jsonl"
-    }
-  },
-  "Linking-REBEL-Incremental-Set-Test": {
-    "task": "Linking",
-    "data": {
-      "entity_fragment_pairs": "./REBEL/incremental_set_linking/test/rebel_set_linking_dataset.jsonl",
-      "ground_truth": "./REBEL/incremental_set_linking/test/rebel_set_linking_ground_truth.jsonl"
-    }
-  },
   "Clustering-REBEL-Train": {
     "task": "Clustering",
     "data": {

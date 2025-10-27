@@ -122,8 +122,6 @@ def _collect_rebel_output_files(rebel_root: Path) -> list[Path]:
         "clustering",
         "entity_generation",
         "fragment_generation",
-        "incremental_linking",
-        "incremental_set_linking",
     ]:
         task_dir = rebel_root / task
         if task_dir.exists():
