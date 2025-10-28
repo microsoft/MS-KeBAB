@@ -639,11 +639,12 @@ class RebelPairSampler:
                 return len(unique_vals)
 
             # Keep adding while total property values <=1 and we have unused fragments
+            cursor = 0
             while merged_unique_value_count(list(selected_set)) <= 1 and len(selected_set) < n:
-                for extra_idx in range(n):
-                    if extra_idx not in selected_set:
-                        selected_set.add(extra_idx)
-                        break
+                while cursor < n and cursor in selected_set:
+                    cursor += 1
+                selected_set.add(cursor)
+                cursor += 1
             indices = list(selected_set)
             r = len(indices)
 
