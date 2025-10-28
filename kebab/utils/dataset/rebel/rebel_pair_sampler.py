@@ -635,17 +635,12 @@ class RebelPairSampler:
             def merged_unique_value_count(sel_indices: list[int]) -> int:
                 """Compute the total number of unique property values across selected fragments."""
                 sel_frags = [fragments[fragment_indices[i]] for i in sel_indices]
-                unique_vals: set[str] = set()
-                for f in sel_frags:
-                    for vals in f.properties.values():
-                        for v in vals:
-                            if v:
-                                unique_vals.add(v)
+                unique_vals = {v for f in sel_frags for vals in f.properties.values() for v in vals if v}
                 return len(unique_vals)
 
             # Keep adding while total property values <=1 and we have unused fragments
-            while merged_unique_value_count(list(selected_set)) <= 1 and len(selected_set) < len(fragment_indices):
-                for extra_idx in range(len(fragment_indices)):
+            while merged_unique_value_count(list(selected_set)) <= 1 and len(selected_set) < n:
+                for extra_idx in range(n):
                     if extra_idx not in selected_set:
                         selected_set.add(extra_idx)
                         break

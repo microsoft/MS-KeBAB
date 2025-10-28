@@ -335,25 +335,17 @@ class RebelSplitSampler:
                 ):
                     continue
 
-                f_id = self._get_fragment_id(left)
-                if f_id not in id_to_fragment:
-                    left.metadata = {"id": f_id}
-                    for p in left.properties:
-                        left.properties[p] = None  # type: ignore
+                def _trim_fragment(fragment: ResolvedWikidataEntity) -> None:
+                    """Trim fragment to only keep property names (no values) and the fragment's id."""
+                    fragment_id = self._get_fragment_id(fragment)
+                    fragment.metadata = {"id": fragment_id}
+                    for p in fragment.properties:
+                        fragment.properties[p] = None  # type: ignore
 
-                    id_to_fragment[f_id] = left
-
-                left = id_to_fragment[f_id]
-
-                f_id = self._get_fragment_id(right)
-                if f_id not in id_to_fragment:
-                    right.metadata = {"id": f_id}
-                    for p in right.properties:
-                        right.properties[p] = None  # type: ignore
-
-                    id_to_fragment[f_id] = right
-
-                right = id_to_fragment[f_id]
+                # Drop all property values and metadata so that the collection of all fragments fits in memory easier
+                # We'll re-attach them later for the sampled pairs only
+                _trim_fragment(left)
+                _trim_fragment(right)
 
                 pairs.append((left, right))
                 labels.append(bool(json.loads(line_gt)))
