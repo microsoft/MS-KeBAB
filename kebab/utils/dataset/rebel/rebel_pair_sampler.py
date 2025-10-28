@@ -622,15 +622,11 @@ class RebelPairSampler:
             indices = list(range(n))  # take all
             r = n
 
-        # Apply max_fragments cap (unless enforcing min property values may require more later)
-        if max_fragments is not None and not enforce_min_property_values and len(indices) > max_fragments:
-            indices = rng.choice(indices, size=max_fragments, replace=False).tolist()
-            r = len(indices)
-
         # Enforce min property values
         if enforce_min_property_values:
             # Start from current selection
             selected_set = set(indices)
+            n = len(fragment_indices)  # no longer capped by max_fragments
 
             def merged_unique_value_count(sel_indices: list[int]) -> int:
                 """Compute the total number of unique property values across selected fragments."""

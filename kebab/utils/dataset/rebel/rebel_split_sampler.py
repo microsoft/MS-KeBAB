@@ -335,17 +335,26 @@ class RebelSplitSampler:
                 ):
                     continue
 
-                def _trim_fragment(fragment: ResolvedWikidataEntity) -> None:
-                    """Trim fragment to only keep property names (no values) and the fragment's id."""
+                def _trim_fragment(fragment: ResolvedWikidataEntity) -> ResolvedWikidataEntity:
+                    """
+                    Trim fragment to only keep property names (no values) and the fragment's id.
+                    Also deduplicate fragments by id to save memory.
+                    """
                     fragment_id = self._get_fragment_id(fragment)
-                    fragment.metadata = {"id": fragment_id}
-                    for p in fragment.properties:
-                        fragment.properties[p] = None  # type: ignore
+
+                    if fragment_id not in id_to_fragment:
+                        fragment.metadata = {"id": fragment_id}
+                        for p in fragment.properties:
+                            fragment.properties[p] = None  # type: ignore
+
+                        id_to_fragment[fragment_id] = fragment
+
+                    return id_to_fragment[fragment_id]
 
                 # Drop all property values and metadata so that the collection of all fragments fits in memory easier
                 # We'll re-attach them later for the sampled pairs only
-                _trim_fragment(left)
-                _trim_fragment(right)
+                left = _trim_fragment(left)
+                right = _trim_fragment(right)
 
                 pairs.append((left, right))
                 labels.append(bool(json.loads(line_gt)))
@@ -470,17 +479,16 @@ class RebelSplitSampler:
                 left = ResolvedWikidataEntity.from_dict(d[0])
                 right = ResolvedWikidataEntity.from_dict(d[1])
 
-                left_id = self._get_fragment_id(left)
-                if left_id in id_to_fragment:
-                    fragment = id_to_fragment[left_id]
-                    fragment.metadata = left.metadata
-                    fragment.properties = left.properties
+                def _try_reattach(fragment: ResolvedWikidataEntity) -> None:
+                    """Re-attach full metadata and properties to the fragment if it was sampled."""
+                    f_id = self._get_fragment_id(fragment)
+                    if f_id in id_to_fragment:
+                        f = id_to_fragment[f_id]
+                        f.metadata = fragment.metadata
+                        f.properties = fragment.properties
 
-                right_id = self._get_fragment_id(right)
-                if right_id in id_to_fragment:
-                    fragment = id_to_fragment[right_id]
-                    fragment.metadata = right.metadata
-                    fragment.properties = right.properties
+                _try_reattach(left)
+                _try_reattach(right)
 
                 if i > 0 and i % 100_000 == 0:
                     self._logger.info(f"Reattaching metadata and properties: read {i:,d} pairs")
