@@ -17,7 +17,13 @@ from pathlib import Path
 from typing import Any, override
 
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
-from kebab.utils.rag_text_completer import BasePhiRAGTextCompleter, BaseRAGTextCompleter
+from kebab.utils.rag_text_completer import (
+    BaseGptOssRAGTextCompleter,
+    BasePhiRAGTextCompleter,
+    BaseQwenRAGTextCompleter,
+    BaseRAGTextCompleter,
+    PredictionMethod,
+)
 
 
 if __name__ == "__main__":
@@ -38,10 +44,33 @@ if __name__ == "__main__":
         def get_augmented_context(self, query: dict[str, Any]) -> str:
             return ""
 
+    class DummyGptOssRAGTextCompleter(BaseGptOssRAGTextCompleter):
+        """A local class with a dummy RAG function."""
+
+        @override
+        def get_augmented_context(self, query: dict[str, Any]) -> str:
+            return ""
+
+    class DummyQwenRAGTextCompleter(BaseQwenRAGTextCompleter):
+        """A local class with a dummy RAG function."""
+
+        @override
+        def get_augmented_context(self, query: dict[str, Any]) -> str:
+            return ""
+
     # Run the text completer.
-    phi_annotator = DummyPhiRAGTextCompleter()
+    # Qwen/Qwen3-0.6B, Qwen/Qwen3-1.7B, Qwen/Qwen3-4B, Qwen/Qwen3-8B, Qwen/Qwen3-14B, Qwen/Qwen3-32B
+    annotator = DummyQwenRAGTextCompleter(
+        model_id="Qwen/Qwen3-14B", prediction_method=PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE
+    )
+    # Examples of using other models:
+    # annotator = DummyPhiRAGTextCompleter()
+    # annotator = DummyGptOssRAGTextCompleter(
+    #     model_id="openai/gpt-oss-20b", gpu_id=3, prediction_method=PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE
+    # )
+
     results = list(
-        phi_annotator.complete_partial_queries(
+        annotator.complete_partial_queries(
             partial_queries=queries,
             verbose=True,
         )
@@ -51,14 +80,8 @@ if __name__ == "__main__":
     for result in results:
         if result["text_with_mask"] != "":
             predicted_content = result["predicted_content"]
-            if result["target_content_logprob"] != float("-inf"):
-                results_to_evaluate.append((predicted_content, result["target_content_logprob"]))
-            else:
-                # Fallback to the smallest log probability among the top k predicted tokens when the
-                # target content log probability is -inf.
-                results_to_evaluate.append(
-                    (predicted_content, result["predicted_content_top_logprobs"][0][-1]["logprob"])
-                )
+            target_content_logprob = BaseRAGTextCompleter.get_target_content_logprob_with_fallback(result)
+            results_to_evaluate.append((predicted_content, target_content_logprob))
 
     # Write the results to a file.
     output_to_evaulate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_to_eval.jsonl")

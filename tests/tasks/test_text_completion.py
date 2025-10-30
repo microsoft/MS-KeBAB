@@ -81,3 +81,23 @@ def test_text_completion_generate_verbose_partial_queries(text_completion_task) 
         {"text_with_mask": "The capital of France is <mask>", "target_content": "Paris", "document_id": "doc_0"},
         {"text_with_mask": "", "target_content": ".", "document_id": "doc_0"},
     ]
+
+
+def test_text_completion_generate_partial_queries_with_words_after_mask(text_completion_task) -> None:
+    # Act
+    partial_queries = list(text_completion_task.generate_partial_queries(words_after_mask=1))
+
+    # Assert
+    # The partial queries should include non-whitespace words/punctuations after the mask.
+    assert partial_queries == [
+        {"text_with_mask": "The <mask> of", "target_content": "capital", "document_id": "doc_0"},
+        {"text_with_mask": "The capital <mask> France", "target_content": "of", "document_id": "doc_0"},
+        {"text_with_mask": "The capital of <mask> is", "target_content": "France", "document_id": "doc_0"},
+        {"text_with_mask": "The capital of France <mask> Paris", "target_content": "is", "document_id": "doc_0"},
+        {"text_with_mask": "The capital of France is <mask>.", "target_content": "Paris", "document_id": "doc_0"},
+        {"text_with_mask": "The <mask> of", "target_content": "capital", "document_id": "doc_1"},
+        {"text_with_mask": "The capital <mask> China", "target_content": "of", "document_id": "doc_1"},
+        {"text_with_mask": "The capital of <mask> is", "target_content": "China", "document_id": "doc_1"},
+        {"text_with_mask": "The capital of China <mask> Beijing", "target_content": "is", "document_id": "doc_1"},
+        {"text_with_mask": "The capital of China is <mask>.", "target_content": "Beijing", "document_id": "doc_1"},
+    ]
