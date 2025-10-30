@@ -235,21 +235,21 @@ class BaseRAGTextCompleter(ABC):
             return None, error
         try:
             # Clean up top_probs: combine probabilities for duplicate tokens and normalize.
-            token_prob_map = {}
+            word_prob_map = {}
             for item in top_probs:
-                token = item.get("word", "")
+                word = item.get("word", "")
                 prob = item.get("prob", 0.0)
-                if token in token_prob_map:
-                    token_prob_map[token] += prob
+                if word in word_prob_map:
+                    word_prob_map[word] += prob
                 else:
-                    token_prob_map[token] = prob
+                    word_prob_map[word] = prob
             # Normalize probabilities so they sum to 1.
-            total_prob = sum(token_prob_map.values())
+            total_prob = sum(word_prob_map.values())
             if total_prob > 0:
-                for token in token_prob_map:
-                    token_prob_map[token] /= total_prob
+                for word in word_prob_map:
+                    word_prob_map[word] /= total_prob
             # Convert back to list format: use "token" as the key so that the format is consistent with the result from logits.
-            top_probs = [{"token": token, "prob": prob} for token, prob in token_prob_map.items() if prob > 0.0]
+            top_probs = [{"token": token, "prob": prob} for token, prob in word_prob_map.items() if prob > 0.0]
 
             # Sort top_probs by "prob" descending.
             top_probs_sorted = sorted(top_probs, key=lambda x: x.get("prob", 1 / 100_000), reverse=True)
