@@ -8,6 +8,7 @@ from kebab import mskebab
 
 
 def main():
+    """Entrypoint function to run the extraction benchmark on existing predictions."""
     parser = argparse.ArgumentParser(
         description="Example extraction benchmark runner using an existing predictions file."
     )
