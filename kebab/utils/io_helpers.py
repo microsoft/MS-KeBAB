@@ -96,7 +96,8 @@ class StringLineReader(ItemReader[str]):
             Iterable[str]: An iterable of lines from the document.
         """
         with open(self.path, encoding="utf-8", newline="\n") as f:
-            yield from f
+            for line in f:
+                yield line.rstrip()
 
 
 class ItemJsonlReader[DataItemType](ItemReader[DataItemType]):

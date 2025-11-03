@@ -22,6 +22,7 @@ from kebab.utils.io_helpers import (
     ClusterPairJsonlReader,
     ItemJsonlReader,
     ItemJsonlWriter,
+    StringLineReader,
     resolve_path,
     save_dict_to_json,
 )
@@ -108,7 +109,7 @@ class LinkingTask(Task):
             adjust_to_test_prior: If True, adjust the log-odds to match the prior on the test set.
             debugging_info_path: Optional path for loading debugging information, where each line
             contains the debugging info for each prediction in the same order. If available, the
-            info will be written to the spreadsheet.
+            info will be written to the spreadsheet.  Embedded tabs create separate columns.
 
         Returns:
             dict[str, float]: Evaluation metrics dictionary.
@@ -230,7 +231,7 @@ class LinkingTask(Task):
     ) -> list[dict]:
         """Create a per-sample dictionary describing the prediction outcome."""
         if debugging_info_path:
-            debugging_infos = ItemJsonlReader[str](debugging_info_path, converter=str).read_items()
+            debugging_infos = StringLineReader(debugging_info_path).read_items()
         else:
             debugging_infos = []
 
