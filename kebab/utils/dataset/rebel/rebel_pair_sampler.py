@@ -470,8 +470,8 @@ class RebelPairSampler:
                 seen_prop_strings.add(prop_str)
 
                 record = (
-                    left_fragment.without_entity_id().to_dict(minimal_repr=True),
-                    right_fragment.without_entity_id().to_dict(minimal_repr=True),
+                    left_fragment.to_dict(minimal_repr=True),
+                    right_fragment.to_dict(minimal_repr=True),
                 )
                 f_ds.write(json.dumps(record) + "\n")
 
@@ -495,7 +495,7 @@ class RebelPairSampler:
                 if fragment.entity_id not in entity_ids:
                     continue
 
-                f_ds.write(fragment.without_entity_id().to_json(minimal_repr=True) + "\n")
+                f_ds.write(fragment.to_json(minimal_repr=True) + "\n")
 
                 label = fragment.entity_id
                 f_gt.write(json.dumps(label) + "\n")
@@ -650,8 +650,8 @@ class RebelPairSampler:
         merged_fragment.metadata["merge_count"] = r
         merged_fragment.metadata["type"] = fragment.wikidata_type
 
-        if "entity_id" in fragment.metadata:
-            merged_fragment.metadata["entity_id"] = fragment.metadata["entity_id"]
+        if "title_entity_id" in fragment.metadata:
+            merged_fragment.metadata["title_entity_id"] = fragment.metadata["title_entity_id"]
         if "title" in fragment.metadata:
             merged_fragment.metadata["title"] = sorted({f.metadata["title"] for f in selected_fragments})
 

@@ -41,7 +41,7 @@ def test_extract_entities_uri_mode(rebel_single_record_file_path: Path) -> None:
     assert entity.properties["name"] == ["Acme Widget Pro"]
     # metadata now contains 'title' and 'entity_id' instead of 'doc_id' and 'source_text_hash'
     assert entity.metadata["title"] == "Acme Widget Pro"
-    assert entity.metadata["entity_id"] == "Q1001000"
+    assert entity.metadata["title_entity_id"] == "Q1001000"
     # In URI mode, property values should be entity IDs
     assert entity.properties["P176"] == ["Q2002000"]  # manufacturer -> Acme Corporation (as URI)
 
@@ -68,7 +68,7 @@ def test_extract_entities_surface_form_mode(rebel_single_record_file_path: Path)
 
     assert entity.properties["name"] == ["Acme Widget Pro"]
     assert entity.metadata["title"] == "Acme Widget Pro"
-    assert entity.metadata["entity_id"] == "Q1001000"
+    assert entity.metadata["title_entity_id"] == "Q1001000"
     # In surface form mode, property values should be surface forms
     assert entity.properties["P176"] == ["Acme Corporation"]  # manufacturer -> Acme Corporation (as surface form)
 
@@ -95,7 +95,7 @@ def test_extract_entities(rebel_single_record_file_path: Path) -> None:
 
     assert entity.properties["name"] == ["Acme Widget Pro"]
     assert entity.metadata["title"] == "Acme Widget Pro"
-    assert entity.metadata["entity_id"] == "Q1001000"
+    assert entity.metadata["title_entity_id"] == "Q1001000"
 
     for entity in entities.values():
         assert entity.source_ids == []

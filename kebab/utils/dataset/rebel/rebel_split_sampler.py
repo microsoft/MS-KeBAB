@@ -309,14 +309,6 @@ class RebelSplitSampler:
                 left = ResolvedWikidataEntity.from_dict(d[0])
                 right = ResolvedWikidataEntity.from_dict(d[1])
 
-                # attach entity ids (these were removed in base linking dataset)
-                try:
-                    left.entity_id = left.metadata["entity_id"]
-                    right.entity_id = right.metadata["entity_id"]
-                except KeyError as ex:
-                    self._logger.debug(f"Missing fragment->entity mapping at line {i}: {ex}")
-                    continue
-
                 if required_types and (
                     not set(left.wikidata_type or []).intersection(required_types)
                     or not set(right.wikidata_type or []).intersection(required_types)
@@ -552,8 +544,8 @@ class RebelSplitSampler:
         ):
             for left, right in sampled_pairs:
                 merged_pair = [
-                    left.without_entity_id().to_dict(minimal_repr=True),
-                    right.without_entity_id().to_dict(minimal_repr=True),
+                    left.to_dict(minimal_repr=True),
+                    right.to_dict(minimal_repr=True),
                 ]
                 f_ds.write(json.dumps(merged_pair) + "\n")
                 f_set_ds.write(json.dumps([expand(left), expand(right)]) + "\n")
@@ -589,7 +581,7 @@ class RebelSplitSampler:
                     frag = ResolvedWikidataEntity.from_dict(json.loads(line))
                     fid = frag.metadata.get("fragment_id")
                     if fid and fid not in lookup:
-                        lookup[fid] = frag.without_entity_id().without_metadata().to_dict(minimal_repr=True)
+                        lookup[fid] = frag.without_metadata().to_dict(minimal_repr=True)
             self._logger.info(f"Fragment lookup size: {len(lookup)}")
         except FileNotFoundError:
             self._logger.warning("Clustering dataset not found; linking-set dataset will use merged fragments only")
@@ -640,7 +632,7 @@ class RebelSplitSampler:
             selected = sorted_fragments[: cfg.fragments_per_entity_limit]
             records.extend(
                 (
-                    fragment.without_entity_id().to_dict(minimal_repr=True),
+                    fragment.to_dict(minimal_repr=True),
                     entity_id,
                 )
                 for fragment in selected
@@ -675,7 +667,7 @@ class RebelSplitSampler:
                 entity_id = fragment.entity_id
                 if entity_id not in entities_to_include:
                     continue
-                f_out.write(json.dumps(fragment.without_entity_id().to_dict(minimal_repr=True)) + "\n")
+                f_out.write(json.dumps(fragment.to_dict(minimal_repr=True)) + "\n")
                 count += 1
 
         self._logger.info(f"Entity generation: wrote {count} records to {ds_out}")
@@ -699,7 +691,7 @@ class RebelSplitSampler:
                 entity_id = fragment.entity_id
                 if entity_id not in entities_to_include:
                     continue
-                f_out.write(json.dumps(fragment.without_entity_id().to_dict(minimal_repr=True)) + "\n")
+                f_out.write(json.dumps(fragment.to_dict(minimal_repr=True)) + "\n")
                 count += 1
 
         self._logger.info(f"Fragment generation: wrote {count} records to {ds_out}")
@@ -742,7 +734,7 @@ class RebelSplitSampler:
                     seq_len = rng.randint(1, max_len)
                     sampled = rng.sample(fragments, seq_len)
                     rng.shuffle(sampled)
-                    frag_list = [f.without_entity_id().to_dict(minimal_repr=True) for f in sampled]
+                    frag_list = [f.to_dict(minimal_repr=True) for f in sampled]
                     f_out.write(json.dumps(frag_list) + "\n")
                     total_records += 1
 
@@ -776,8 +768,8 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
             pair_count_limit=5000,
             pairs_per_entity_limit=50,
             property_pattern_count_limit=100,
-            property_overlap_limits={1: 0.35},
-            single_class_ratio_limit=0.76,
+            property_overlap_limits={1: 0.07},
+            single_class_ratio_limit=0.99,  # naturally ~50/50
             seed=get_next_seed(),
         ),
         clustering=ClusteringConfig(
@@ -796,8 +788,8 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
             pair_count_limit=5000,
             pairs_per_entity_limit=50,
             property_pattern_count_limit=100,
-            property_overlap_limits={1: 0.35},
-            single_class_ratio_limit=0.76,
+            property_overlap_limits={1: 0.07},
+            single_class_ratio_limit=0.99,  # naturally ~50/50
             seed=get_next_seed(),
         ),
         clustering=ClusteringConfig(
@@ -815,7 +807,7 @@ def default_splits(seed: int | None = None) -> list[SplitBuildConfig]:
             pairs_per_entity_limit=1_000,
             property_pattern_count_limit=10_000,
             property_overlap_limits={1: 0.55},
-            single_class_ratio_limit=0.76,
+            single_class_ratio_limit=0.8,
             seed=get_next_seed(),
         ),
         clustering=ClusteringConfig(

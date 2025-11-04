@@ -202,7 +202,7 @@ class RebelFragmentExtractor:
                 fragment = WikidataEntity(entity_id=entity_id)
                 fragment.metadata["fragment_id"] = str(cls._UNSAFE_FRAGMENT_COUNTER)
                 fragment.metadata["title"] = record["title"]
-                fragment.metadata["entity_id"] = record["uri"]
+                fragment.metadata["title_entity_id"] = record["uri"]
 
                 cls._UNSAFE_FRAGMENT_COUNTER += 1
 
