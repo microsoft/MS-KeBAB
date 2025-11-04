@@ -55,10 +55,17 @@ def main() -> None:
     (log_odds_without_overlap, log_odds_with_overlap) = train(islice(training_instance.read_items(), 10000))
     print("Done.")
 
+    def make_list(e: Entity | list[Entity]) -> list[Entity]:
+        """Ensure we have a list of entities."""
+        return e if isinstance(e, list) else [e]
+
+    def get_names(e: Entity | list[Entity]) -> set[str]:
+        """Get all names from an entity or list of entities."""
+        return {name for ent in make_list(e) for name in ent.properties["name"]}
+
     # Run the simple linker (link by name overlap) on the test data
     shared_names_count = [
-        len(set(pair[0].properties["name"]).intersection(pair[1].properties["name"]))
-        for pair, label in task_instance.read_items()
+        len(get_names(pair[0]).intersection(get_names(pair[1]))) for pair, label in task_instance.read_items()
     ]
     predictions = [log_odds_with_overlap if count > 0 else log_odds_without_overlap for count in shared_names_count]
     predictions_file = output_dir / "predictions.jsonl"
@@ -72,7 +79,6 @@ def main() -> None:
     # Compute metrics
     metrics = task_instance.evaluate(
         predictions_file,
-        output_dir=output_dir,
         result_output_path=output_dir / "metrics.json",
         debugging_info_path=debugging_info_path,
     )
