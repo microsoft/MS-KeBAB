@@ -4,7 +4,7 @@ The linking task is to decide if two entity fragments come from the same entity 
 
 # Metrics
 
-The main metric for ordering different linking systems is the average log-probability of the correct label.  This the main metric because it rewards systems for being appropriately uncertain (it is a so-called "proper scoring rule").  Secondary metrics include precision (how often a True prediction was correct) and recall (how many True pairs were labelled True).  These metrics ignore the uncertainty in the predictions.
+The main metric for ordering different linking systems is the average log-probability of the correct label.  This is the main metric because it rewards systems for being appropriately uncertain (it is a so-called "proper scoring rule").  Secondary metrics include precision (how often a True prediction was correct) and recall (how many True pairs were labelled True).  These metrics ignore the uncertainty in the predictions.
 
 # Debugging
 

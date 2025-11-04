@@ -5,6 +5,10 @@
 set -e
 
 # Style check
+echo "Ruff is checking code formatting..."
+echo "If this step fails with 'would reformat', it means some files do not follow Ruff's style rules."
+echo "To fix this locally, run: ruff check . --fix"
+echo "You can also use the Ruff VS Code extension to view and fix issues interactively."
 uv run ruff format --check 
 
 # Organise imports

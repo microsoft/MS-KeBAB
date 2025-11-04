@@ -80,7 +80,7 @@ class LinkingTask(Task):
         )
         return zip_longest(entity_pairs, labels)
 
-    def write_items(self, path: Path, items: Iterable[bool]) -> None:
+    def write_items(self, path: Path, items: Iterable[bool | float]) -> None:
         """
         Write items, i.e. boolean labels, to the specified path.
 
@@ -88,7 +88,7 @@ class LinkingTask(Task):
             path: The file path where the boolean labels should be written.
             items: An iterable of boolean labels to be written to the file.
         """
-        ItemJsonlWriter[bool](path).write_items(items)
+        ItemJsonlWriter[bool | float](path).write_items(items)
 
     def evaluate(
         self,
@@ -230,10 +230,7 @@ class LinkingTask(Task):
         debugging_info_path: Path | None = None,
     ) -> list[dict]:
         """Create a per-sample dictionary describing the prediction outcome."""
-        if debugging_info_path:
-            debugging_infos = StringLineReader(debugging_info_path).read_items()
-        else:
-            debugging_infos = []
+        debugging_infos = StringLineReader(debugging_info_path).read_items() if debugging_info_path else []
 
         records: list[dict] = []
         for (left, right), gt_label, score, prediction, debugging_info in zip_longest(
