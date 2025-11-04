@@ -329,6 +329,7 @@ class PredictionMethod(Enum):
 
     LOGPROBS_FROM_LOGITS = "logprobs_from_logits"
     LOGPROBS_FROM_TEXT_RESPONSE = "logprobs_from_text_response"
+    WORD_FROM_TEXT_RESPONSE = "word_from_text_response"
 
     def build_text_completion_prompt(self, text_with_mask: str, augmented_context: str, top_k: int) -> str:
         """
@@ -348,6 +349,11 @@ class PredictionMethod(Enum):
                 text_with_mask=text_with_mask,
                 augmented_context=augmented_context,
                 top_k=top_k,
+            )
+        if self == PredictionMethod.WORD_FROM_TEXT_RESPONSE:
+            return self.__build_word_from_text_response_prompt(
+                text_with_mask=text_with_mask,
+                augmented_context=augmented_context,
             )
         raise ValueError(f"Unknown prediction method: {self}")
 
@@ -423,6 +429,34 @@ Each element must be an object with:
   - "prob": a float representing its probability.
 Your response must be a JSON array, like this:
 [{{"word":"pred1","prob": 0.432}},{{"word":"pred2","prob": 0.312}},...]
+
+Answer: """
+        return text_completion_prompt
+
+    @staticmethod
+    def __build_word_from_text_response_prompt(
+        text_with_mask: str,
+        augmented_context: str,
+    ) -> str:
+        """
+        Builds a prompt that asks the model to sample a single word from its probability distribution.
+
+        Args:
+            text_with_mask: The text with a mask indicating the position to be filled.
+            augmented_context: Additional context to help with the prediction.
+        """
+        text_completion_prompt = f"""{
+            PredictionMethod.__build_base_text_completion_prompt(
+                text_with_mask=text_with_mask, augmented_context=augmented_context
+            )
+        }
+Sample the **single alphanumeric word** that completes the masked position "{
+            TextCompletionTaskBase.MASK
+        }" for the given text by drawing once from your internal probability distribution.
+Rules:
+- Do not choose the most likely word deterministically.
+- Output exactly one **single alphanumeric word**.
+- Do not normalize or re-rank; sample once from the native distribution.
 
 Answer: """
         return text_completion_prompt
