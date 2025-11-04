@@ -9,9 +9,10 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
+import xlsxwriter
 from sentence_transformers import SentenceTransformer
 
 from kebab.contracts.entity import Entity, Property, PropertySchema
@@ -139,7 +140,7 @@ def document_debug_output_to_excel(
     debug_info.to_excel(writer, sheet_name=sheet_name, columns=ordered_columns, index=False)
 
     # Get the xlsxwriter workbook and worksheet objects.
-    workbook = writer.book
+    workbook = cast(xlsxwriter.Workbook, writer.book)
     worksheet = writer.sheets[sheet_name]
     if merge_rows:
         # Merge cells for document_id, original_text, and original_extraction

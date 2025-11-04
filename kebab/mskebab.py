@@ -42,12 +42,14 @@ class Benchmark:
         """Return copy of task list."""
         return list(self.__tasks_by_name.values())
 
-    def __init__(self, config_path: Path, root_for_relative_paths: Path | None = None):
+    def __init__(self, config_path: Path | None = None, root_for_relative_paths: Path | None = None):
         """Initialize entry point."""
         self.root_for_relative_paths = root_for_relative_paths or Path.cwd()
         self.__tasks_by_type = {}
         self.__tasks_by_name = {}
 
+        if config_path is None:
+            config_path = Path(__file__).parents[0] / "configs" / "tasks.json"
         with open(config_path) as f:
             task_config = json.load(f)
 
