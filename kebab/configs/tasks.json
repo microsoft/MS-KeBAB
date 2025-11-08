@@ -3,7 +3,7 @@
     "task": "Extraction",
     "data": {
       "extracts": "./Re-DocRED/Extractions/train/extracts.jsonl",
-      "schema": "./kebab/configs/extraction/default_property_schema.json",
+      "schema": "../kebab/configs/extraction/default_property_schema.json",
       "ground_truth": "./Re-DocRED/Extractions/train/entities.jsonl"
     }
   },
@@ -11,7 +11,7 @@
     "task": "Extraction",
     "data": {
       "extracts": "./Re-DocRED/Extractions/test/extracts.jsonl",
-      "schema": "./kebab/configs/extraction/default_property_schema.json",
+      "schema": "../kebab/configs/extraction/default_property_schema.json",
       "ground_truth": "./Re-DocRED/Extractions/test/entities.jsonl"
     }
   },
@@ -19,7 +19,7 @@
     "task": "Extraction",
     "data": {
       "extracts": "./Re-DocRED/Extractions/dev/extracts.jsonl",
-      "schema": "./kebab/configs/extraction/default_property_schema.json"
+      "schema": "../kebab/configs/extraction/default_property_schema.json"
     }
   },
   "Linking-MAVE-TBD": {

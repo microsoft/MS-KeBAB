@@ -59,7 +59,7 @@ class ExtractionTask(Task):
     ):
         """Initialize an extraction task."""
         super().__init__(name, schema, root_for_relative_paths=root_for_relative_paths)
-        self.__extracts = resolve_path(extracts)
+        self.__extracts = resolve_path(extracts, root_for_relative_paths)
         if ground_truth is not None:
             self.__ground_truth = resolve_path(ground_truth, root_for_relative_paths)
         self.metrics_config = load_dict_from_json(

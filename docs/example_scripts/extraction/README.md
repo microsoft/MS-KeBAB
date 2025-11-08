@@ -1,42 +1,19 @@
-# Entity extraction evaluation example
+# Entity extraction task overview
 
-This directory provides a minimal, runnable example of evaluating entity extraction with MS-KeBAB.
+Entity extraction task is to extract entity fragments from the given text extract.
 
-## Folder structure
+## Dataset format
 
-- `extraction_example.py` – runnable script.
-- `tasks.json` – task configuration (points to data + metric config).
-- `data/`
-  - `redocred_small_extracts.jsonl` – documents / extracts (one JSON object per line) consumed as input.
-  - `redocred_small_entities.jsonl` – ground‑truth extracted entities (aligned line‑wise with extracts).
-  - `property_schema.json` – property schema used in ground truth
-  - `metrics_config.json` – metric configuration (overrides defaults).
-  - `predictions.jsonl` – sample model output (for demonstration).
-
-## Quick Start
-
-* install the package (in repo root):
-
-```bash
-uv sync
-```
-
-* run evaluation (from this directory):
-
-```bash
-uv run extraction_example.py \
-  --predictions ./data/predictions.jsonl \
-  --output_dir ./output_dir
-```
-
-This will produce an output directory with:
-- `metrics.json` – AESOP metrics - per file and aggregated across dataset
-- `debug_output/` directory with debug .xlsx files if specified in `metrics_config.json`.
-
+Evaluation dataset consists of 2 JSON lines files.
+One contains extracts (one per line) and the other one lists of entities on the corresponding lines.
+Extracts are represented by [Document](../../../kebab/contracts/document.py) class
+serialized to JSON, entities are represented by [Entity](../../../kebab/contracts/entity.py) class
+serialized to JSON.
 
 ## Predictions format
 
-Each line is a list of entity fragments for the corresponding line in extracts file
+Each line is a list of entity fragments for the corresponding line in extracts file.
+Entity fragments are consumed by [Entity](../../../kebab/contracts/entity.py) class.
 
 Entity fragment structure:
 ```json
@@ -55,7 +32,13 @@ Notes:
 - Values are lists (even for singletons).
 - Order of entities within a line is not used for scoring (matching is distance-based).
 
-## Property schema structure
+## Configuration files
+
+Extraction benchmark also needs property schema and metrics configuration to work.
+The default ones are located in the [configs](../../../kebab/configs/extraction/default_property_schema.json) folder.
+If needed, they can be modified and provided to the benchmark.
+
+### Property schema structure
 
 ```json
 {
@@ -86,7 +69,7 @@ Notes:
 }
 ```
 
-## Metrics configuration file structure
+### Metrics configuration file structure
 
 Example:
 ```json
@@ -126,35 +109,21 @@ Supported element distance function names (see definitions [here](../../../kebab
 
 All produced distances are in [0,1] (lower = closer).
 
-## Debug output structure
+## Output structure
+
+### Metrics
+
+Extraction evaluation produces metrics.json file with all the per-file and document-level metrics (currently AESOP).
+
+### Debug output
 
 For each document in the dataset evaluation produces a debug info file with filename "<document_id>_debug_info.xlsx" with document-level metrics and file "debug_info.xlsx" for the whole dataset. It contains debug information for all the files and dataset-level metrics.
 
-![debug info excel file screenshot](./data/debug_info_example.png "Debug info example")
+![debug info excel file screenshot](./debug_info_example.png "Debug info example")
 
 Each row in debug info file contains detailed information on whether a particular value in prediction was matched to ground truth and what was the matching score. Also, for each property number of predicted values in ground truth and prediction is recorded for metrics computation. Entity matching scores are given for debugging purposes and not used in metric computation.
 
-![aesop computation screenshot](./data/aesop_computation.png "AESOP computation")
+![aesop computation screenshot](./aesop_computation.png "AESOP computation")
 
 To the right of the property-level debug information there are per-property precision and recall metrics calculated using excel formulas for readability.
 
-## Adding a New Extraction Task
-
-1. Prepare `extracts.jsonl` (one document per line).
-2. Prepare aligned `ground_truth_entities.jsonl` (each line: JSON array of entity objects).
-3. Create / adapt a `property_schema.json` for your ground truth entities.
-4. Create a metric config JSON.
-5. Add an entry in a `tasks.json` file:
-```json
-{
-  "MyTask": {
-    "task": "Extraction",
-    "data": {
-      "extracts": "path/to/extracts.jsonl",
-      "schema": "path/to/property_schema.json",
-      "ground_truth": "path/to/ground_truth_entities.jsonl",
-      "metrics_config": "path/to/metrics_config.json"
-    }
-  }
-}
-```
