@@ -650,11 +650,6 @@ class RebelPairSampler:
         merged_fragment.metadata["merge_count"] = r
         merged_fragment.metadata["type"] = fragment.wikidata_type
 
-        if "title_entity_id" in fragment.metadata:
-            merged_fragment.metadata["title_entity_id"] = fragment.metadata["title_entity_id"]
-        if "title" in fragment.metadata:
-            merged_fragment.metadata["title"] = sorted({f.metadata["title"] for f in selected_fragments})
-
         return merged_fragment
 
     def _filter_single_property_value_entities(

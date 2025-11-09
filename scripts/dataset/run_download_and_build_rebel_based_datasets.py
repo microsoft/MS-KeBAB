@@ -28,6 +28,12 @@ Resolution behaviour:
 Example usage (from repository root):
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py
 
+    # With type resolution enabled (internal use case)
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --resolve-types --no-verify-md5
+
+    # From pair sampling onwards (expects existing prior outputs)
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-run-filter
+
 Notes:
 - Extraction of missing Wikidata artifacts requires a standard Wikidata JSON dump (``latest-all.json``) which can be
     downloaded from https://dumps.wikimedia.org/wikidatawiki/entities/ (unpacked size > 1 TB). Only artifacts required
