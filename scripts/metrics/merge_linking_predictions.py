@@ -10,6 +10,13 @@ import pandas as pd
 
 def main():
     """Entry point for the script to generate merged linking predictions TSV files."""
+    if sys.argv.__len__() == 1:
+        print("Usage: uv run merge_linking_predictions.py <folder1> <folder2> ...")
+        print("This will merge all linking_predictions*.tsv files from the specified folders.")
+        print("The merged file will be named 'merged_linking_predictions.tsv'.")
+        print("Each system's columns will be suffixed with the folder name, excluding the common prefix.")
+        print("If a tsv file has a suffix in its name (after 'linking_predictions'), that suffix will also be added.")
+        return
     folders = sys.argv[1:]
     # Find the common prefix of all folder names
     common_prefix = Path(os.path.commonprefix(folders))
