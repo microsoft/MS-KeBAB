@@ -1,6 +1,7 @@
 # A command-line utility that will read all tsv files
 # whose names start with "linking_predictions" in a folder
 # and merge them into a single predictions file.
+import os
 import sys
 from pathlib import Path
 
@@ -10,16 +11,19 @@ import pandas as pd
 def main():
     """Entry point for the script to generate merged linking predictions TSV files."""
     folders = sys.argv[1:]
-    print(f"Merging linking predictions from folders: {folders}")
+    # Find the common prefix of all folder names
+    common_prefix = Path(os.path.commonprefix(folders))
     output_filename = "merged_linking_predictions.tsv"
     merged_data_frame = None
     system_columns = ["log_odds", "predicted_label", "debugging_info"]
     for folder in folders:
         folder_path = Path(folder)
+        folder_suffix = folder_path.name.replace(common_prefix.name, "")
+        if folder_suffix:
+            folder_suffix = "_" + folder_suffix
         tsv_files = list(folder_path.glob("linking_predictions*.tsv"))
-        print(f"Merging {len(tsv_files)} files in folder {folder} into {output_filename}")
         for tsv_file in tsv_files:
-            suffix = tsv_file.stem.replace("linking_predictions", "")
+            suffix = folder_suffix + tsv_file.stem.replace("linking_predictions", "")
             print(f"  Reading file {tsv_file} with suffix '{suffix}'")
             df = pd.read_csv(tsv_file, sep="\t")
             # Remove empty columns

@@ -23,3 +23,11 @@ A detailed breakdown of results on the task is output to the file 'linking_predi
 | *predicted_label* | TRUE iff log_odds > 0 |
 | *left_entity_id* and *right_entity_id* | The WikiData id of the entities |
 | *debugging_info* | Linker-specific information provided to the evaluate method via debugging_info_path |
+
+# Comparing models
+
+You can compare the predictions of multiple models by running the script 
+```
+uv run scripts/metrics/merge_linking_predictions.py folder1 folder2 ...
+```
+where the folders contain the linking_predictions files.  The folder names (without their common prefix) will be appended to the log_odds and predicted_label columns.  You can put multiple linking_predictions files into the same folder by giving them different suffixes.  Then the suffixes will also be appended.
