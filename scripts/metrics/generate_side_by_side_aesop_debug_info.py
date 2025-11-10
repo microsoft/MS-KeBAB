@@ -170,8 +170,8 @@ def generate_side_by_side_comparison(
 def main():
     """Entry point for the script to generate side-by-side comparison of debug info XLSX files."""
     parser = ArgumentParser(description="Generate side-by-side comparison of debug info XLSX files.")
-    parser.add_argument("dir1", type=Path, help="Directories containing sets of debug info XSLX files.")
-    parser.add_argument("dir2", type=Path, help="Directories containing sets of debug info XLSX files.")
+    parser.add_argument("dir1", type=Path, help="Directory containing sets of debug info XSLX files.")
+    parser.add_argument("dir2", type=Path, help="Directory containing sets of debug info XLSX files.")
     parser.add_argument("output_dir", type=Path, help="Directory to save the comparison XLSX files.")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
