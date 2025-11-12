@@ -42,7 +42,6 @@ class ValueAveragedAesopConfig(MetricConfig):
     property_score_functions: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWithScores]]
     property_schema: PropertySchema
     properties_to_skip: set[str] = field(default_factory=set)
-    debug_output_dir: Path | None = None
 
     @staticmethod
     def from_dict(config: dict[str, Any], property_schema: PropertySchema) -> ValueAveragedAesopConfig:
@@ -70,14 +69,12 @@ class ValueAveragedAesopConfig(MetricConfig):
                     if property_schema.properties[property_name].is_collection
                     else SingleValuePropertyDistance(element_distance)
                 )
-        debug_output_dir = config.get("debug_output_dir")
         return ValueAveragedAesopConfig(
             matching_score_function=EntityDistance.from_dict(config["entity_distance"], property_schema),
             matching_threshold=config["matching_threshold"],
             property_score_functions=property_score_functions,
             property_schema=property_schema,
             properties_to_skip=properties_to_skip,
-            debug_output_dir=Path(debug_output_dir) if debug_output_dir else None,
         )
 
 
@@ -247,7 +244,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
     Similarly, we compute recall scores for each property and average them to obtain the average recall.
     """
 
-    def __init__(self, config: ValueAveragedAesopConfig, logger: logging.Logger | None = None):
+    def __init__(self, config: ValueAveragedAesopConfig, logger: logging.Logger | None = None, debug_output_path: Path | None = None):
         """Configure value-averaged-AESOP metric calculator.
 
         Args:
@@ -256,6 +253,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         """
         self.config = config
         self.logger = logger or logging.getLogger("Value-Averaged-AESOP")
+        self.debug_output_path = debug_output_path
 
     def run(self, prediction: Iterable[ExtractionOutput], ground_truth: Iterable[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
@@ -263,9 +261,9 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         debug_info = {}
         metrics_accumulator = MetricsAccumulator()
         self.logger.info("Starting AESOP metric calculation")
-        self.logger.info(f"Debug output directory: {self.config.debug_output_dir}")
-        if self.config.debug_output_dir:
-            self.config.debug_output_dir.mkdir(parents=True, exist_ok=True)
+        self.logger.info(f"Debug output directory: {self.debug_output_path}")
+        if self.debug_output_path:
+            self.debug_output_path.mkdir(parents=True, exist_ok=True)
         self.logger.info("Debug output directory created")
 
         def process_document(
@@ -325,7 +323,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             document_metrics = document_metrics_accumulator.accumulate_metrics()
             metrics["per_document_metrics"][doc_id] = document_metrics
             metrics_accumulator.update(document_metrics_accumulator)
-            if self.config.debug_output_dir:
+            if self.debug_output_path is not None:
                 if document_debug_info is None:
                     self.logger.warning(f"No debug info for document {doc_id}, skipping")
                     continue
@@ -333,7 +331,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 document_debug_output_to_excel(
                     document_debug_info,
                     document_metrics["property_precision"].keys(),
-                    self.config.debug_output_dir / f"{doc_id}_debug_info.xlsx",
+                    self.debug_output_path / f"{doc_id}_debug_info.xlsx",
                     merge_rows=False,
                 )
                 debug_info[doc_id] = document_debug_info
@@ -348,7 +346,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         elapsed = time.time() - start
         self.logger.info(f"Metrics accumulation time: {elapsed:.2f} seconds")
         entity_and_property_stats.log_statistics(self.logger)
-        if self.config.debug_output_dir:
+        if self.debug_output_path is not None:
             if len(debug_info) == 0:
                 self.logger.warning("No debug info collected, skipping saving to XLSX")
             else:
@@ -357,10 +355,10 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 document_debug_output_to_excel(
                     debug_info_df,
                     metrics["dataset_metrics"]["property_precision"].keys(),
-                    self.config.debug_output_dir / "debug_info.xlsx",
+                    self.debug_output_path / "debug_info.xlsx",
                     merge_rows=False,
                 )
-                self.logger.info(f"Debug info saved to {self.config.debug_output_dir / 'debug_info.csv'}")
+                self.logger.info(f"Debug info saved to {self.debug_output_path / 'debug_info.csv'}")
         return metrics
 
 
@@ -413,5 +411,4 @@ def make_default_value_averaged_aesop_config(
         matching_threshold=matching_threshold,
         property_score_functions=property_to_score,
         property_schema=property_schema,
-        debug_output_dir=None,
     )

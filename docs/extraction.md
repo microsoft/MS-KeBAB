@@ -6,14 +6,14 @@ Entity extraction task is to extract entity fragments from the given text extrac
 
 Evaluation dataset consists of 2 JSON lines files.
 One contains extracts (one per line) and the other one lists of entities on the corresponding lines.
-Extracts are represented by [Document](../../../kebab/contracts/document.py) class
-serialized to JSON, entities are represented by [Entity](../../../kebab/contracts/entity.py) class
+Extracts are represented by [Document](../kebab/contracts/document.py) class
+serialized to JSON, entities are represented by [Entity](../kebab/contracts/entity.py) class
 serialized to JSON.
 
 ## Predictions format
 
 Each line is a list of entity fragments for the corresponding line in extracts file.
-Entity fragments are consumed by [Entity](../../../kebab/contracts/entity.py) class.
+Entity fragments are consumed by [Entity](../kebab/contracts/entity.py) class.
 
 Entity fragment structure:
 ```json
@@ -35,7 +35,7 @@ Notes:
 ## Configuration files
 
 Extraction benchmark also needs property schema and metrics configuration to work.
-The default ones are located in the [configs](../../../kebab/configs/extraction/default_property_schema.json) folder.
+The default ones are located in the [configs](../kebab/configs/extraction/default_property_schema.json) folder.
 If needed, they can be modified and provided to the benchmark.
 
 ### Property schema structure
@@ -94,18 +94,17 @@ Example:
       "definitions": { "name": "EmbeddingDistance" }
     },
     "properties_to_skip": [], // exclude properties from AESOP computation
-    "debug_output_dir": "./output_dir/debug_output"  // if present, benchmarking code produces XLSX files with detailed information on how entities and properties were matched and their matching scores
   }
 }
 ```
 Notes:
 
-Supported element distance function names (see definitions [here](../../../kebab/tasks/metrics/extraction/aesop/distances.py)):
+Supported element distance function names (see definitions [here](../kebab/tasks/metrics/extraction/aesop/distances.py)):
 - `TokenDistance` (Jaccard distance over token ids)
 - `EmbeddingDistance` (cosine distance between SentenceTransformer embeddings)
 - `EditDistance`
 - `BinaryMatchDistance`
-- `TypeNameDistance` (like binary match, but matches `miscellaneous` type to any type;specific to ReDocRED)
+- `TypeNameDistance` (like binary match, but matches `miscellaneous` type to any type;specific to ReDocRED) 
 
 All produced distances are in [0,1] (lower = closer).
 
@@ -127,3 +126,5 @@ Each row in debug info file contains detailed information on whether a particula
 
 To the right of the property-level debug information there are per-property precision and recall metrics calculated using excel formulas for readability.
 
+These debug spreadsheets can be merged together to make a side-by-side comparison of different extractors.
+The script to merge them is located at [../scripts/metrics/generate_side_by_side_aesop_debug_info.py](../scripts/metrics/generate_side_by_side_aesop_debug_info.py)
