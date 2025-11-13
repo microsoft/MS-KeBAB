@@ -5,44 +5,100 @@ import argparse
 import re
 import sys
 from collections.abc import Iterable
+from collections import Counter
 from pathlib import Path
 
 from kebab import mskebab
 from kebab.contracts.entity import Entity
+from kebab.tasks.metrics.extraction.calculator import ExtractionOutput
 
 
-def generate_predictions(task_instance: mskebab.Task) -> Iterable[list[Entity]]:
-    """Generate example predictions for the given extraction task.
+class SimpleExtractor:
 
-    Args:
-        task_instance: The extraction task instance for which to generate predictions.
+    def __init__(self):
+        """Initialize the simple extractor."""
+        uppercase_char = "[{}]".format("".join(chr(i) for i in range(sys.maxunicode) if chr(i).isupper()))
+        name_pattern = rf"\"?{uppercase_char}[\w']+( {uppercase_char}[\w']+)*\"?"
+        type_pattern = r"\w+( \w+){0,1}"
+        self.pattern = rf"(?P<name>{name_pattern})( \(.*\))* (is|are|was|were|refers to) (a|an|the) (?P<type>{type_pattern})"
+        self.name_exclusion_list = [] # List of names to exclude from extraction
 
-    Returns:
-        Path to the generated predictions JSONL file.
-    """
-    uppercase_char = "[{}]".format("".join(chr(i) for i in range(sys.maxunicode) if chr(i).isupper()))
-    name_pattern = rf"\"?{uppercase_char}[\w']+( {uppercase_char}[\w']+)*\"?"
-    type_pattern = r"\w+( \w+){0,1}"
-    pattern = rf"(?P<name>{name_pattern})( \(.*\))* (is|are|was|were|refers to) (a|an|the) (?P<type>{type_pattern})"
-    for item in task_instance.read_items():
-        text = item.document.data["text"]
-        matches = re.finditer(pattern, text)
-        entities = []
-        for id_, match in enumerate(matches):
-            name = match.group("name")
-            entity_type = match.group("type")
-            if name not in ["It", "They", "He", "She", "This", "That", "There", "Those"]:
-                entities.append(
-                    Entity(
-                        entity_id=str(id_),
-                        properties={
-                            "name": [name],
-                            "type": [entity_type],
-                        },
+    
+    def _get_cliff_point(self, counter: Counter) -> int:
+        """Identify a cliff point in the frequency distribution of items in the counter.
+
+        Args:
+            counter: A Counter object containing item frequencies.
+
+        Returns:
+            An integer representing the cliff point frequency.
+        """
+        previous_count = None
+        previous_diff = None
+        for idx, (_, count) in enumerate(counter.most_common()):
+            if previous_count is not None:
+                diff = previous_count - count
+                if previous_diff is not None and diff < 0.01 * previous_diff:
+                    return idx - 1
+                previous_diff = diff
+            previous_count = count
+        return len(counter)
+    
+    def train(self, training_data: Iterable[ExtractionOutput]) -> None:
+        """Train the extractor on the provided training data.
+
+        Args:
+            training_data: An iterable of lists of EExtractionOutput objects representing the training data.
+        """
+        false_positive_names_counter = Counter()
+        false_positive_types_counter = Counter()
+        for item in training_data:
+            text = item.document.data["text"]
+            entity_names = set()
+            for entity in item.entities:
+                entity_names.update(entity.properties.get("name", []))
+            matches = re.finditer(self.pattern, text)
+            for match in matches:
+                name = match.group("name")
+                if name not in entity_names:
+                    false_positive_names_counter[name] += 1
+
+        for name, count in false_positive_names_counter.most_common(self._get_cliff_point(false_positive_names_counter)):
+            print(name, count)
+            self.name_exclusion_list.append(name)
+        
+        print("Names to exclude:", self.name_exclusion_list)
+
+    def generate_predictions(self, validation_data: Iterable[ExtractionOutput]) -> Iterable[list[Entity]]:
+        """Generate example predictions for the given extraction task.
+
+        Args:
+            validation_data: An iterable of ExtractionOutput objects representing the validation data.
+
+        Returns:
+            An iterable of lists of Entity objects representing the predictions.
+        """
+        
+        for item in validation_data:
+            text = item.document.data["text"]
+            matches = re.finditer(self.pattern, text)
+            entities = []
+            for id_, match in enumerate(matches):
+                name = match.group("name")
+                entity_type = match.group("type")
+                if name not in self.name_exclusion_list:
+                    properties = {
+                        "name": [name],
+                        "type": [entity_type],
+                    }
+                    entities.append(
+                        Entity(
+                            entity_id=str(id_),
+                            properties=properties,
+                        )
                     )
-                )
 
-        yield entities
+            yield entities
 
 
 def main():
@@ -60,12 +116,15 @@ def main():
     repo_root = Path(__file__).parents[4]
     predictions_file = Path("predictions.jsonl")
     # Initialize benchmark and task instance
-    benchmark = mskebab.Benchmark(
-        config_path=repo_root / "kebab" / "configs" / "tasks.json", root_for_relative_paths=repo_root / "data"
-    )
+    benchmark = mskebab.Benchmark(root_for_relative_paths=repo_root / "data")
+    train_task_instance = benchmark.tasks_by_name["Extraction-ReDocRED-Train"]
     task_instance = benchmark.tasks_by_name["Extraction-ReDocRED-Test"]
+    # Train the extractor predictions
+    extractor = SimpleExtractor()
+    extractor.train(train_task_instance.read_items())
     # Generate predictions and write to file
-    task_instance.write_items(predictions_file, generate_predictions(task_instance))
+    predictions = extractor.generate_predictions(task_instance.read_items())
+    task_instance.write_items(predictions_file, predictions)
     # Evaluate predictions
     args.output_dir.mkdir(parents=True, exist_ok=True)
     task_instance.evaluate(predictions_file, result_output_path=args.output_dir / "metrics.json")
