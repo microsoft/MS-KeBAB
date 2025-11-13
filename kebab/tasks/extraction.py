@@ -134,8 +134,12 @@ class ExtractionTask(Task):
                 metric_config_dict,
                 cast(PropertySchema, self.read_schema()),  # in extraction, schema is not optional
             )
-            debug_output_path = result_output_path.parent / "debug_output" if result_output_path and collect_debug_info else None
-            metric_results = metric_calculator_cls(metric_config, logger, debug_output_path).run(pred_extractions, self.read_items())  # type: ignore
+            debug_output_path = (
+                result_output_path.parent / "debug_output" if result_output_path and collect_debug_info else None
+            )
+            metric_results = metric_calculator_cls(metric_config, logger, debug_output_path).run(  # type: ignore
+                pred_extractions, self.read_items()
+            )
             metrics[metric_name] = metric_results
         if result_output_path:
             save_dict_to_json(metrics, result_output_path)

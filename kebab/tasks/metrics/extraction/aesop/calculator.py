@@ -244,12 +244,18 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
     Similarly, we compute recall scores for each property and average them to obtain the average recall.
     """
 
-    def __init__(self, config: ValueAveragedAesopConfig, logger: logging.Logger | None = None, debug_output_path: Path | None = None):
+    def __init__(
+        self,
+        config: ValueAveragedAesopConfig,
+        logger: logging.Logger | None = None,
+        debug_output_path: Path | None = None,
+    ):
         """Configure value-averaged-AESOP metric calculator.
 
         Args:
             config: Configuration object containing AESOP metric parameters.
             logger: Optional logger instance for logging metric computation progress.
+            debug_output_path: Optional path to save debug information Excel files.
         """
         self.config = config
         self.logger = logger or logging.getLogger("Value-Averaged-AESOP")

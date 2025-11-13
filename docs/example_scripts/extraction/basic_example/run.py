@@ -4,8 +4,8 @@
 import argparse
 import re
 import sys
-from collections.abc import Iterable
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
 
 from kebab import mskebab
@@ -14,18 +14,20 @@ from kebab.tasks.metrics.extraction.calculator import ExtractionOutput
 
 
 class SimpleExtractor:
+    """A simple extractor that uses regex patterns to extract entities from text."""
 
     def __init__(self):
         """Initialize the simple extractor."""
         uppercase_char = "[{}]".format("".join(chr(i) for i in range(sys.maxunicode) if chr(i).isupper()))
         name_pattern = rf"\"?{uppercase_char}[\w']+( {uppercase_char}[\w']+)*\"?"
         type_pattern = r"\w+( \w+){0,1}"
-        self.pattern = rf"(?P<name>{name_pattern})( \(.*\))* (is|are|was|were|refers to) (a|an|the) (?P<type>{type_pattern})"
-        self.name_exclusion_list = [] # List of names to exclude from extraction
+        self.pattern = (
+            rf"(?P<name>{name_pattern})( \(.*\))* (is|are|was|were|refers to) (a|an|the) (?P<type>{type_pattern})"
+        )
+        self.name_exclusion_list = []  # List of names to exclude from extraction
 
-    
-    def _get_cliff_point(self, counter: Counter) -> int:
-        """Identify a cliff point in the frequency distribution of items in the counter.
+    def _get_elbow_point(self, counter: Counter) -> int:
+        """Identify an elbow point in the frequency distribution of items in the counter.
 
         Args:
             counter: A Counter object containing item frequencies.
@@ -43,7 +45,7 @@ class SimpleExtractor:
                 previous_diff = diff
             previous_count = count
         return len(counter)
-    
+
     def train(self, training_data: Iterable[ExtractionOutput]) -> None:
         """Train the extractor on the provided training data.
 
@@ -51,7 +53,6 @@ class SimpleExtractor:
             training_data: An iterable of lists of EExtractionOutput objects representing the training data.
         """
         false_positive_names_counter = Counter()
-        false_positive_types_counter = Counter()
         for item in training_data:
             text = item.document.data["text"]
             entity_names = set()
@@ -63,10 +64,9 @@ class SimpleExtractor:
                 if name not in entity_names:
                     false_positive_names_counter[name] += 1
 
-        for name, count in false_positive_names_counter.most_common(self._get_cliff_point(false_positive_names_counter)):
-            print(name, count)
+        for name, _ in false_positive_names_counter.most_common(self._get_elbow_point(false_positive_names_counter)):
             self.name_exclusion_list.append(name)
-        
+
         print("Names to exclude:", self.name_exclusion_list)
 
     def generate_predictions(self, validation_data: Iterable[ExtractionOutput]) -> Iterable[list[Entity]]:
@@ -78,7 +78,6 @@ class SimpleExtractor:
         Returns:
             An iterable of lists of Entity objects representing the predictions.
         """
-        
         for item in validation_data:
             text = item.document.data["text"]
             matches = re.finditer(self.pattern, text)
@@ -109,9 +108,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Example extraction benchmark runner using an existing predictions file."
     )
-    parser.add_argument(
-        "--output_dir", type=Path, help="Optional output directory for results", default=Path("output_dir")
-    )
+    parser.add_argument("--output_dir", type=Path, help="Optional output directory for results", default=Path("output"))
     args = parser.parse_args()
     repo_root = Path(__file__).parents[4]
     predictions_file = Path("predictions.jsonl")
