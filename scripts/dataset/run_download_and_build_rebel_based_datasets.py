@@ -32,7 +32,10 @@ Example usage (from repository root):
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --resolve-types --no-verify-md5
 
     # From pair sampling onwards (expects existing prior outputs)
-    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-run-filter
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-run-filter
+
+    # From splitting onwards (expects existing base datasets)
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-run-filter --no-run-sample-pairs
 
 Notes:
 - Extraction of missing Wikidata artifacts requires a standard Wikidata JSON dump (``latest-all.json``) which can be

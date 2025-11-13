@@ -113,6 +113,7 @@ class RebelSplitSampler:
     SET_LINKING_DATASET_FILENAME: str = "rebel_linking_set_dataset.jsonl"
     SET_LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_set_ground_truth.jsonl"
     FRAGMENT_SET_GENERATION_DATASET_FILENAME: str = "rebel_fragment_set_generation_dataset.jsonl"
+    NEGATIVE_FRAGMENT_SET_GENERATION_DATASET_FILENAME: str = "rebel_negative_fragment_set_generation_dataset.jsonl"
 
     _logger: logging.Logger
     input_dir: Path
@@ -282,6 +283,14 @@ class RebelSplitSampler:
                 self._derive_fragment_set_generation(
                     fragset_gen_dir,
                     entities_to_include,
+                    split.fragment_set_generation,
+                )
+
+                # negative fragment set generation derived from negative linking pairs
+                self._derive_negative_fragment_set_generation(
+                    fragset_gen_dir,
+                    sampled_pairs,
+                    sampled_labels,
                     split.fragment_set_generation,
                 )
 
@@ -740,6 +749,65 @@ class RebelSplitSampler:
 
         self._logger.info(
             f"Fragment set generation: wrote {total_records} data points to {ds_out} for {len(ent_to_fragments)} entities"
+        )
+
+    def _derive_negative_fragment_set_generation(
+        self,
+        out_dir: Path,
+        sampled_pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
+        sampled_labels: list[bool],
+        cfg: FragmentSetGenerationConfig,
+    ) -> None:
+        """Derive negative fragment set generation dataset from negative-labeled linking pairs."""
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ds_out = out_dir / self.NEGATIVE_FRAGMENT_SET_GENERATION_DATASET_FILENAME
+
+        # Build fragment lookup from clustering dataset
+        fragment_id_lookup: dict[str, dict] = {}
+        with open(self.base_clustering_dataset_path, encoding="utf-8") as f_ds:
+            for line in f_ds:
+                frag = ResolvedWikidataEntity.from_dict(json.loads(line))
+                fid = frag.metadata.get("fragment_id")
+                assert fid not in fragment_id_lookup
+                fragment_id_lookup[str(fid)] = frag.without_metadata().to_dict(minimal_repr=True)
+
+        # rng = random.Random(cfg.seed)
+        written = 0
+        negative_pairs_total = 0
+
+        def collect_fragment_dicts(entity: ResolvedWikidataEntity) -> list[dict]:
+            raw_ids = entity.metadata.get("fragment_ids") or [entity.metadata.get("fragment_id")]
+            frag_ids = cast(list[str], list(raw_ids))
+            frags: list[dict] = []
+
+            for fid in frag_ids:
+                fid_str = str(fid)
+                frag_obj = fragment_id_lookup.get(fid_str)
+                assert frag_obj is not None
+                frags.append(frag_obj)
+
+            return frags
+
+        with open(ds_out, "w", encoding="utf-8") as f_out:
+            for (left, right), label in zip(sampled_pairs, sampled_labels, strict=False):
+                if label:  # only negatives
+                    continue
+
+                negative_pairs_total += 1
+                left_frags = collect_fragment_dicts(left)
+                right_frags = collect_fragment_dicts(right)
+
+                merged = left_frags + right_frags
+                # rng.shuffle(merged)
+                f_out.write(json.dumps(merged) + "\n")
+                written += 1
+
+        self._logger.info(
+            "Negative fragment set generation: wrote %d records to %s (from %d sampled negative pairs; lookup size=%d)",
+            written,
+            ds_out,
+            negative_pairs_total,
+            len(fragment_id_lookup),
         )
 
     @classmethod
