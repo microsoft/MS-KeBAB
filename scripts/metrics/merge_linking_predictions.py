@@ -43,5 +43,6 @@ def main():
         merged_data_frame.to_csv(output_filename, sep="\t", index=False)
         print(f"Finished merging files into {output_filename}")
 
+
 if __name__ == "__main__":
     main()

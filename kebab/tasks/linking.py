@@ -6,7 +6,6 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable
 from dataclasses import dataclass
-from itertools import zip_longest
 from logging import Logger
 from pathlib import Path
 from typing import cast
@@ -78,7 +77,7 @@ class LinkingTask(Task):
             if self.ground_truth is not None
             else iter([])
         )
-        return zip_longest(entity_pairs, labels)
+        return zip(entity_pairs, labels, strict=True)
 
     def write_items(self, path: Path, items: Iterable[bool | float]) -> None:
         """
@@ -230,15 +229,13 @@ class LinkingTask(Task):
         debugging_info_path: Path | None = None,
     ) -> list[dict]:
         """Create a per-sample dictionary describing the prediction outcome."""
-        debugging_infos = StringLineReader(debugging_info_path).read_items() if debugging_info_path else []
+        debugging_infos = (
+            StringLineReader(debugging_info_path).read_items() if debugging_info_path else [None] * len(log_odds)
+        )
 
         records: list[dict] = []
-        for (left, right), gt_label, score, prediction, debugging_info in zip_longest(
-            pairs,
-            gt_labels,
-            log_odds,
-            predictions,
-            debugging_infos,
+        for (left, right), gt_label, score, prediction, debugging_info in zip(
+            pairs, gt_labels, log_odds, predictions, debugging_infos, strict=True
         ):
             # If a side is a list of fragments, merge into one entity for reporting.
             left_entity = Entity.merge(left) if isinstance(left, list) else left

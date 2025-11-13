@@ -86,5 +86,6 @@ def main() -> None:
         print(f"{key}: {value}")
     print(f"You can view a detailed breakdown of results in the file {output_dir}/linking_predictions.tsv")
 
+
 if __name__ == "__main__":
     main()
