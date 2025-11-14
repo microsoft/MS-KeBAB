@@ -111,7 +111,7 @@ def main():
     parser.add_argument("--output_dir", type=Path, help="Optional output directory for results", default=Path("output"))
     args = parser.parse_args()
     repo_root = Path(__file__).parents[4]
-    predictions_file = Path("predictions.jsonl")
+    predictions_file = args.output_dir / "predictions.jsonl"
     # Initialize benchmark and task instance
     benchmark = mskebab.Benchmark(root_for_relative_paths=repo_root / "data")
     train_task_instance = benchmark.tasks_by_name["Extraction-ReDocRED-Train"]

@@ -32,7 +32,6 @@
                 "name": "EmbeddingDistance"
             }
         },
-        "properties_to_skip": [],
-        "debug_output_dir": "./output_dir/debug_output"
+        "properties_to_skip": []
     }
 }

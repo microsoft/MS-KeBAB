@@ -46,7 +46,6 @@
             "email": {
                 "name": "BinaryMatchDistance"
             }
-        },
-        "debug_output_dir": "./tests/data/extraction/debug_output"
+        }
     }
 }
