@@ -1,8 +1,8 @@
 # A command-line utility that will read all tsv files
 # whose names start with "linking_predictions" in a folder
 # and merge them into a single predictions file.
+import argparse
 import os
-import sys
 from pathlib import Path
 
 import pandas as pd
@@ -10,14 +10,17 @@ import pandas as pd
 
 def main():
     """Entry point for the script to generate merged linking predictions TSV files."""
-    if sys.argv.__len__() == 1:
-        print("Usage: uv run merge_linking_predictions.py <folder1> <folder2> ...")
-        print("This will merge all linking_predictions*.tsv files from the specified folders.")
-        print("The merged file will be named 'merged_linking_predictions.tsv'.")
-        print("Each system's columns will be suffixed with the folder name, excluding the common prefix.")
-        print("If a tsv file has a suffix in its name (after 'linking_predictions'), that suffix will also be added.")
-        return
-    folders = sys.argv[1:]
+    parser = argparse.ArgumentParser(
+        description="""
+    This will merge all linking_predictions*.tsv files from the specified folders.
+    The merged file will be named 'merged_linking_predictions.tsv'.
+    Each system's columns will be suffixed with the folder name, excluding the common prefix.
+    If a tsv file has a suffix in its name (after 'linking_predictions'), that suffix will also be added.
+    """
+    )
+    parser.add_argument("folder", nargs="+", type=Path, help="folder to merge")
+    args = parser.parse_args()
+    folders = args.folder
     # Find the common prefix of all folder names
     common_prefix = Path(os.path.commonprefix(folders))
     output_filename = "merged_linking_predictions.tsv"
@@ -28,13 +31,13 @@ def main():
         folder_suffix = folder_path.name.replace(common_prefix.name, "")
         if folder_suffix:
             folder_suffix = "_" + folder_suffix
-        tsv_files = list(folder_path.glob("linking_predictions*.tsv"))
-        for tsv_file in tsv_files:
+        for tsv_file in folder_path.glob("linking_predictions*.tsv"):
             suffix = folder_suffix + tsv_file.stem.replace("linking_predictions", "")
             print(f"  Reading file {tsv_file} with suffix '{suffix}'")
             df = pd.read_csv(tsv_file, sep="\t")
             # Remove empty columns
             df = df.dropna(axis=1, how="all")
+            # We hope that join_columns are the same across dataframes and that a combined value of these columns uniquely identifies the row.
             join_columns = df.columns.difference(system_columns).tolist()
             # Add suffix to all system_columns
             df = df.rename(columns={c: c + suffix for c in system_columns})
