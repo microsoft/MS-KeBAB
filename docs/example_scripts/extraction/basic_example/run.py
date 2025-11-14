@@ -50,7 +50,7 @@ class SimpleExtractor:
         """Train the extractor on the provided training data.
 
         Args:
-            training_data: An iterable of lists of EExtractionOutput objects representing the training data.
+            training_data: An iterable of ExtractionOutput objects representing the training data.
         """
         false_positive_names_counter = Counter()
         for item in training_data:
@@ -125,6 +125,8 @@ def main():
     # Evaluate predictions
     args.output_dir.mkdir(parents=True, exist_ok=True)
     task_instance.evaluate(predictions_file, result_output_path=args.output_dir / "metrics.json")
+    print(f"Benchmarking completed. Metrics saved to {args.output_dir}/metrics.json")
+    print(f"You can view detailed extraction debug info Excel files in the {args.output_dir}/debug_output/ directory.")
 
 
 if __name__ == "__main__":
