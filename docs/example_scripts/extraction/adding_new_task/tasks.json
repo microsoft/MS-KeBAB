@@ -1,0 +1,11 @@
+{  
+  "Extraction-ReDocRED-Small": {
+    "task": "Extraction",
+    "data": {
+      "extracts": "./data/redocred_small_extracts.jsonl",
+      "schema": "./data/property_schema.json",
+      "ground_truth": "./data/redocred_small_entities.jsonl",
+      "metrics_config": "./data/metrics_config.json"
+    }
+  }
+}

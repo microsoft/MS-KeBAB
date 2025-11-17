@@ -1,0 +1,130 @@
+# Entity extraction task overview
+
+Entity extraction task is to extract entity fragments from the given text extract.
+
+## Dataset format
+
+Evaluation dataset consists of 2 JSON lines files.
+One contains extracts (one per line) and the other one lists of entities on the corresponding lines.
+Extracts are represented by [Document](../kebab/contracts/document.py) class
+serialized to JSON, entities are represented by [Entity](../kebab/contracts/entity.py) class
+serialized to JSON.
+
+## Predictions format
+
+Each line is a list of entity fragments for the corresponding line in extracts file.
+Entity fragments are consumed by [Entity](../kebab/contracts/entity.py) class.
+
+Entity fragment structure:
+```json
+{
+  "entity_id": "<string-id>",
+  "properties": {
+    "<property_id>": ["<value1>", "<value2>", "..."]
+  },
+  "source_ids": [], // source IDs that contributed to the entity
+  "evidence_map": {} // map from property ID to a list that maps each value index to a list of evidence indices that support it.
+}
+```
+
+Notes:
+- `properties` keys must match `property_id` values in the schema.
+- Values are lists (even for singletons).
+- Order of entities within a line is not used for scoring (matching is distance-based).
+
+## Configuration files
+
+Extraction benchmark also needs property schema and metrics configuration to work.
+The default ones are located in the [configs](../kebab/configs/extraction/default_property_schema.json) folder.
+If needed, they can be modified and provided to the benchmark.
+
+### Property schema structure
+
+```json
+{
+    "name": "my schema",
+    "data_types": [ // datatypes of property values
+      {
+        "data_type_id": "text",
+        "value_type": "Text",
+        "description": "text",
+        "category_values": []
+      },
+      {
+        "data_type_id": "date",
+        "value_type": "Date",
+        "description": "date",
+        "category_values": []
+      }
+    ],
+    "properties": [ // all property ids in ground truth
+      {
+        "property_id": "<property_id>",
+        "data_type_id": "text",
+        "description": "<description>",
+        "display_name": "<property_name>",
+        "is_collection": true
+      },
+    ]
+}
+```
+
+### Metrics configuration file structure
+
+Example:
+```json
+{
+  "aesop": { // use AESOP metric
+    "entity_distance": { // settings for entity matching
+      "property_to_distance": { // per-property distance function overrides
+        "name": {
+          "distance_function": { "name": "EmbeddingDistance" },
+          "weight": 1 // unnormalised weight for the property in the weighted average
+        }
+      },
+      "default_property_distance": { "name": "TokenDistance" },
+      "default_property_weight": 0
+    },
+    "matching_threshold": 0.5, // matching threshold for entity matching
+    "default_property_distance": { "name": "TokenDistance" },
+    "property_distance_functions": { // per-property distance function overrides
+      "name": { "name": "EmbeddingDistance" },
+      "type": { "name": "TypeNameDistance" },
+      "descriptions": { "name": "EmbeddingDistance" },
+      "definitions": { "name": "EmbeddingDistance" }
+    },
+    "properties_to_skip": [], // exclude properties from AESOP computation
+  }
+}
+```
+Notes:
+
+Supported element distance function names (see definitions [here](../kebab/tasks/metrics/extraction/aesop/distances.py)):
+- `TokenDistance` (Jaccard distance over token ids)
+- `EmbeddingDistance` (cosine distance between SentenceTransformer embeddings)
+- `EditDistance`
+- `BinaryMatchDistance`
+- `TypeNameDistance` (like binary match, but matches `miscellaneous` type to any type;specific to ReDocRED) 
+
+All produced distances are in [0,1] (lower = closer).
+
+## Output structure
+
+### Metrics
+
+Extraction evaluation produces metrics.json file with all the per-file and document-level metrics (currently AESOP).
+
+### Debug output
+
+For each document in the dataset evaluation produces a debug info file with filename "<document_id>_debug_info.xlsx" with document-level metrics and file "debug_info.xlsx" for the whole dataset. It contains debug information for all the files and dataset-level metrics.
+
+![debug info excel file screenshot](./debug_info_example.png "Debug info example")
+
+Each row in debug info file contains detailed information on whether a particular value in prediction was matched to ground truth and what was the matching score. Also, for each property number of predicted values in ground truth and prediction is recorded for metrics computation. Entity matching scores are given for debugging purposes and not used in metric computation.
+
+![aesop computation screenshot](./aesop_computation.png "AESOP computation")
+
+To the right of the property-level debug information there are per-property precision and recall metrics calculated using excel formulas for readability.
+
+These debug spreadsheets can be merged together to make a side-by-side comparison of different extractors.
+The script to merge them is located at [../scripts/metrics/generate_side_by_side_aesop_debug_info.py](../scripts/metrics/generate_side_by_side_aesop_debug_info.py)
