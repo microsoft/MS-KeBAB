@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable
-from itertools import zip_longest
 from logging import Logger
 from pathlib import Path
 
@@ -67,7 +66,7 @@ class ClusteringTask(Task):
             if self.ground_truth is not None
             else iter([])
         )
-        return zip_longest(entities, labels)
+        return zip(entities, labels, strict=True)
 
     def write_items(self, path: Path, items: Iterable[str]) -> None:
         """

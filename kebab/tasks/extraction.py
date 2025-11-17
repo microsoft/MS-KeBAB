@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from itertools import zip_longest
 from pathlib import Path
 from typing import ClassVar, cast
 
@@ -82,7 +81,7 @@ class ExtractionTask(Task):
         )
         return (
             ExtractionOutput(document=extract, entities=entity_list)
-            for extract, entity_list in zip_longest(extracts, entity_lists)
+            for extract, entity_list in zip(extracts, entity_lists, strict=True)
         )
 
     def write_items(self, path: Path, items: Iterable[list[Entity]]) -> None:
