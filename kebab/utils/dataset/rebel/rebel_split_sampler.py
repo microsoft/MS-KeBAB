@@ -1,32 +1,34 @@
-"""
-Create Test/Validation/Train datasets from a base REBEL dataset, focusing on more diverse samples.
+"""Create split datasets (e.g., Test/Validation/Train) from a base REBEL dataset.
 
-Workflow:
-- Load the base linking dataset.
-- Optionally filter by entity types using the Wikidata type hierarchy.
-- Sample a more "interesting" Test split using heuristic limits (per-entity, property-pattern,
-  property-overlap distribution, and class balance), then a Validation split that excludes Test entities,
-  and finally a Train split that excludes entities from both Test and Validation.
-- Derive Clustering and Generation datasets for each split based on the entities used in the split by
-  subsetting the corresponding base datasets.
+Workflow summary:
+1. Load the base linking dataset.
+2. Optionally apply type filtering using the Wikidata type hierarchy.
+3. Sample a heuristically balanced linking subset (entity, property-pattern, overlap, class balance constraints).
+4. Derive auxiliary datasets (clustering, entity generation, fragment generation, fragment set generation).
+5. Derive positive/negative linking generation datasets (each record is a raw pair) for sequence generation tasks.
 
 Input layout (produced by RebelPairSampler into input_dir):
-- input_dir/linking/base/rebel_linking_dataset.jsonl
-- input_dir/linking/base/rebel_linking_ground_truth.jsonl
-- input_dir/clustering/base/rebel_clustering_dataset.jsonl
-- input_dir/clustering/base/rebel_clustering_ground_truth.jsonl
-- input_dir/entity_generation/base/rebel_entity_generation_dataset.jsonl
-- input_dir/fragment_generation/base/rebel_fragment_generation_dataset.jsonl
+* input_dir/linking/base/rebel_linking_dataset.jsonl
+* input_dir/linking/base/rebel_linking_ground_truth.jsonl
+* input_dir/clustering/base/rebel_clustering_dataset.jsonl
+* input_dir/clustering/base/rebel_clustering_ground_truth.jsonl
+* input_dir/entity_generation/base/rebel_entity_generation_dataset.jsonl
+* input_dir/fragment_generation/base/rebel_fragment_generation_dataset.jsonl
 
 Output layout (within output_dir):
-- output_dir/linking/<split>/rebel_linking_dataset.jsonl
-- output_dir/linking/<split>/rebel_linking_ground_truth.jsonl
-- output_dir/linking/<split>/rebel_linking_used_entities.jsonl
-- output_dir/clustering/<split>/rebel_clustering_dataset.jsonl
-- output_dir/clustering/<split>/rebel_clustering_ground_truth.jsonl
-- output_dir/entity_generation/<split>/rebel_entity_generation_dataset.jsonl
-- output_dir/fragment_generation/<split>/rebel_fragment_generation_dataset.jsonl
-- output_dir/fragment_set_generation/<split>/rebel_fragment_set_generation_dataset.jsonl
+* output_dir/linking/<split>/rebel_linking_dataset.jsonl
+* output_dir/linking/<split>/rebel_linking_ground_truth.jsonl
+* output_dir/linking/<split>/rebel_linking_used_entities.jsonl
+* output_dir/linking/<split>/rebel_linking_generation_positive_dataset.jsonl
+* output_dir/linking/<split>/rebel_linking_generation_negative_dataset.jsonl
+* output_dir/linking/<split>/rebel_linking_set_dataset.jsonl
+* output_dir/linking/<split>/rebel_linking_set_ground_truth.jsonl
+* output_dir/clustering/<split>/rebel_clustering_dataset.jsonl
+* output_dir/clustering/<split>/rebel_clustering_ground_truth.jsonl
+* output_dir/entity_generation/<split>/rebel_entity_generation_dataset.jsonl
+* output_dir/fragment_generation/<split>/rebel_fragment_generation_dataset.jsonl
+* output_dir/fragment_set_generation/<split>/rebel_fragment_set_generation_dataset.jsonl
+* output_dir/fragment_set_generation/<split>/rebel_negative_fragment_set_generation_dataset.jsonl
 """
 
 from __future__ import annotations
@@ -108,12 +110,18 @@ class TypeFilter:
 
 
 class RebelSplitSampler:
-    """Create Test/Validation/Train datasets from a base REBEL dataset in a single run."""
+    """Create requested splits from a base REBEL dataset in a single run.
+
+    Adds per-split positive/negative linking generation datasets:
+    Each record is the original pair (minimal representation) routed by its label.
+    """
 
     SET_LINKING_DATASET_FILENAME: str = "rebel_linking_set_dataset.jsonl"
     SET_LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_set_ground_truth.jsonl"
     FRAGMENT_SET_GENERATION_DATASET_FILENAME: str = "rebel_fragment_set_generation_dataset.jsonl"
     NEGATIVE_FRAGMENT_SET_GENERATION_DATASET_FILENAME: str = "rebel_negative_fragment_set_generation_dataset.jsonl"
+    LINKING_GENERATION_POSITIVE_DATASET_FILENAME: str = "rebel_linking_generation_positive_dataset.jsonl"
+    LINKING_GENERATION_NEGATIVE_DATASET_FILENAME: str = "rebel_linking_generation_negative_dataset.jsonl"
 
     _logger: logging.Logger
     input_dir: Path
@@ -291,7 +299,6 @@ class RebelSplitSampler:
                     fragset_gen_dir,
                     sampled_pairs,
                     sampled_labels,
-                    split.fragment_set_generation,
                 )
 
             # update disallowed entities for next splits
@@ -537,6 +544,8 @@ class RebelSplitSampler:
         set_ds_out = split_dir / self.SET_LINKING_DATASET_FILENAME
         set_gt_out = split_dir / self.SET_LINKING_GROUND_TRUTH_FILENAME
         used_ents_out = split_dir / "rebel_linking_used_entities.jsonl"
+        pos_gen_out = split_dir / self.LINKING_GENERATION_POSITIVE_DATASET_FILENAME
+        neg_gen_out = split_dir / self.LINKING_GENERATION_NEGATIVE_DATASET_FILENAME
 
         def expand(entity: ResolvedWikidataEntity) -> list[dict]:
             raw_ids = entity.metadata.get("fragment_ids") or [entity.metadata.get("fragment_id")]
@@ -550,14 +559,20 @@ class RebelSplitSampler:
         with (
             open(ds_out, "w", encoding="utf-8") as f_ds,
             open(set_ds_out, "w", encoding="utf-8") as f_set_ds,
+            open(pos_gen_out, "w", encoding="utf-8") as f_pos_gen,
+            open(neg_gen_out, "w", encoding="utf-8") as f_neg_gen,
         ):
-            for left, right in sampled_pairs:
-                merged_pair = [
-                    left.to_dict(minimal_repr=True),
-                    right.to_dict(minimal_repr=True),
-                ]
+            for (left, right), label in zip(sampled_pairs, sampled_labels, strict=False):
+                merged_pair = [left.to_dict(minimal_repr=True), right.to_dict(minimal_repr=True)]
+                # Vanilla linking dataset
                 f_ds.write(json.dumps(merged_pair) + "\n")
+                # Set-variant expansion
                 f_set_ds.write(json.dumps([expand(left), expand(right)]) + "\n")
+                # Generation datasets (positive / negative separation)
+                if label:
+                    f_pos_gen.write(json.dumps(merged_pair) + "\n")
+                else:
+                    f_neg_gen.write(json.dumps(merged_pair) + "\n")
 
         with (
             open(gt_out, "w", encoding="utf-8") as f_gt,
@@ -573,11 +588,13 @@ class RebelSplitSampler:
                 f_ents.write(json.dumps(ent_id) + "\n")
 
         self._logger.info(
-            "Wrote linking outputs: %s, %s (set variant: %s, %s), entities=%d",
+            "Wrote linking outputs: %s, %s (set variant: %s, %s) generation(+/-): %s, %s entities=%d",
             ds_out,
             gt_out,
             set_ds_out,
             set_gt_out,
+            pos_gen_out,
+            neg_gen_out,
             len(linking_entity_counter),
         )
 
@@ -756,7 +773,6 @@ class RebelSplitSampler:
         out_dir: Path,
         sampled_pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
         sampled_labels: list[bool],
-        cfg: FragmentSetGenerationConfig,
     ) -> None:
         """Derive negative fragment set generation dataset from negative-labeled linking pairs."""
         out_dir.mkdir(parents=True, exist_ok=True)
