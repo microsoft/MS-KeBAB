@@ -125,6 +125,10 @@ class RebelSplitSampler:
     LINKING_GENERATION_POSITIVE_DATASET_FILENAME: str = "rebel_linking_generation_positive_dataset.jsonl"
     LINKING_GENERATION_NEGATIVE_DATASET_FILENAME: str = "rebel_linking_generation_negative_dataset.jsonl"
 
+    ENABLE_FRAGMENT_TRIMMING: bool = (
+        False  # Trim fragments before sampling and reattach info later (saves memory, enable on a <128GB RAM)
+    )
+
     _logger: logging.Logger
     input_dir: Path
     output_dir: Path
@@ -346,26 +350,28 @@ class RebelSplitSampler:
                 ):
                     continue
 
-                def _trim_fragment(fragment: ResolvedWikidataEntity) -> ResolvedWikidataEntity:
-                    """
-                    Trim fragment to only keep property names (no values) and the fragment's id.
-                    Also deduplicate fragments by id to save memory.
-                    """
-                    fragment_id = self._get_fragment_id(fragment)
+                if self.ENABLE_FRAGMENT_TRIMMING:
 
-                    if fragment_id not in id_to_fragment:
-                        fragment.metadata = {"id": fragment_id}
-                        for p in fragment.properties:
-                            fragment.properties[p] = None  # type: ignore
+                    def _trim_fragment(fragment: ResolvedWikidataEntity) -> ResolvedWikidataEntity:
+                        """Trim fragment to only keep property names (no values) and the fragment id.
 
-                        id_to_fragment[fragment_id] = fragment
+                        Also deduplicates fragments by id to save memory.
+                        """
+                        fragment_id = self._get_fragment_id(fragment)
 
-                    return id_to_fragment[fragment_id]
+                        if fragment_id not in id_to_fragment:
+                            fragment.metadata = {"id": fragment_id}
+                            for p in fragment.properties:
+                                fragment.properties[p] = None  # type: ignore
 
-                # Drop all property values and metadata so that the collection of all fragments fits in memory easier
-                # We'll re-attach them later for the sampled pairs only
-                left = _trim_fragment(left)
-                right = _trim_fragment(right)
+                            id_to_fragment[fragment_id] = fragment
+
+                        return id_to_fragment[fragment_id]
+
+                    # Drop all property values and metadata so that the collection of all fragments fits in memory
+                    # more easily. We'll re-attach them later for the sampled pairs only.
+                    left = _trim_fragment(left)
+                    right = _trim_fragment(right)
 
                 pairs.append((left, right))
                 labels.append(bool(json.loads(line_gt)))
@@ -481,28 +487,29 @@ class RebelSplitSampler:
             id_to_fragment[left.metadata["id"]] = left
             id_to_fragment[right.metadata["id"]] = right
 
-        # Re-attach the full metadata and properties
-        with (
-            open(resolve_path(ds_path), encoding="utf-8") as f_ds,
-        ):
-            for i, line_ds in enumerate(f_ds):
-                d = json.loads(line_ds)
-                left = ResolvedWikidataEntity.from_dict(d[0])
-                right = ResolvedWikidataEntity.from_dict(d[1])
+        # Re-attach the full metadata and properties if trimming was enabled.
+        if self.ENABLE_FRAGMENT_TRIMMING and id_to_fragment:
+            with (
+                open(resolve_path(ds_path), encoding="utf-8") as f_ds,
+            ):
+                for i, line_ds in enumerate(f_ds):
+                    d = json.loads(line_ds)
+                    left = ResolvedWikidataEntity.from_dict(d[0])
+                    right = ResolvedWikidataEntity.from_dict(d[1])
 
-                def _try_reattach(fragment: ResolvedWikidataEntity) -> None:
-                    """Re-attach full metadata and properties to the fragment if it was sampled."""
-                    f_id = self._get_fragment_id(fragment)
-                    if f_id in id_to_fragment:
-                        f = id_to_fragment[f_id]
-                        f.metadata = fragment.metadata
-                        f.properties = fragment.properties
+                    def _try_reattach(fragment: ResolvedWikidataEntity) -> None:
+                        """Re-attach full metadata and properties to the fragment if it was sampled."""
+                        f_id = self._get_fragment_id(fragment)
+                        if f_id in id_to_fragment:
+                            f = id_to_fragment[f_id]
+                            f.metadata = fragment.metadata
+                            f.properties = fragment.properties
 
-                _try_reattach(left)
-                _try_reattach(right)
+                    _try_reattach(left)
+                    _try_reattach(right)
 
-                if i > 0 and i % 100_000 == 0:
-                    self._logger.info(f"Reattaching metadata and properties: read {i:,d} pairs")
+                    if i > 0 and i % 100_000 == 0:
+                        self._logger.info(f"Reattaching metadata and properties: read {i:,d} pairs")
 
         for left, right in sampled_pairs:
             assert "fragment_id" in left.metadata or "fragment_ids" in left.metadata
