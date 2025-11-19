@@ -12,7 +12,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from logging import Logger
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
@@ -31,6 +31,12 @@ class TextCompletionTaskBase(Task):
 
     MASK: str = "<mask>"
     """The token used to mask the text in text completion tasks."""
+
+    SCHEMA_ID_TO_TEXT_FIELD_MAP: ClassVar[dict[str, str]] = {
+        "plain_text": "text",
+        "email": "body",
+    }
+    """Mapping from schemas to the corresponding text field names."""
 
     __documents: Path
 
@@ -83,7 +89,7 @@ class TextCompletionTaskBase(Task):
         max_word_length = 30
         docs = self.read_items()
         for doc in docs:
-            text = doc.data["text"]
+            text = doc.data[TextCompletionTaskBase.SCHEMA_ID_TO_TEXT_FIELD_MAP[doc.schema.schema_id]]
             # Split text into alphanumeric words, consecutive spaces/tabs, and punctuations.
             # TODO (allenwang-ms): Use a more sophisticated tokenizer for better handling of
             # punctuations, special characters, non-Latin scripts, etc.

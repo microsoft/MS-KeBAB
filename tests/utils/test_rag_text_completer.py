@@ -40,7 +40,7 @@ def text_completion_task() -> TextCompletionUsingDocumentsTask:
 
 def test_rag_text_completer(text_completion_task) -> None:
     # Arrange
-    predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "predicted_contents.jsonl"
+    predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "document_predictions.jsonl"
     expected_predictions = list(ItemJsonlReader[dict[str, str | float]](predictions_file_path).read_items())
     text_completer = MockRAGTextCompleter()
 
