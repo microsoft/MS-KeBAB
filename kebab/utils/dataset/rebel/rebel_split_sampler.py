@@ -125,9 +125,8 @@ class RebelSplitSampler:
     LINKING_GENERATION_POSITIVE_DATASET_FILENAME: str = "rebel_linking_generation_positive_dataset.jsonl"
     LINKING_GENERATION_NEGATIVE_DATASET_FILENAME: str = "rebel_linking_generation_negative_dataset.jsonl"
 
-    ENABLE_FRAGMENT_TRIMMING: bool = (
-        False  # Trim fragments before sampling and reattach info later (saves memory, enable on a <128GB RAM)
-    )
+    # Trim fragments before sampling and reattach info later (saves memory, enable on a <128GB RAM)
+    ENABLE_FRAGMENT_TRIMMING: bool = False
 
     _logger: logging.Logger
     input_dir: Path
