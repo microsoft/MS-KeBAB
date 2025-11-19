@@ -24,3 +24,8 @@ def metrics_config() -> dict[str, Any]:
     from kebab.utils.io_helpers import load_dict_from_json
 
     return load_dict_from_json(Path(__file__).parents[2] / "data" / "extraction" / "metrics_config.json")["aesop"]
+
+@pytest.fixture
+def debug_data_path() -> Path:
+    """Path to debug info test data."""
+    return Path(__file__).parents[2] / "data" / "extraction" / "debug_info_data"
