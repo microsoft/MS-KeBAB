@@ -92,7 +92,9 @@ class SplitBuildConfig:
     name: str
     linking: LinkingConfig
     clustering: ClusteringConfig
-    fragment_set_generation: FragmentSetGenerationConfig
+    build_set_linking_datasets: bool = False
+    build_set_generation_datasets: bool = False
+    fragment_set_generation: FragmentSetGenerationConfig | None = None
 
 
 @dataclass
@@ -261,6 +263,7 @@ class RebelSplitSampler:
                 sampled_labels,
                 linking_entity_counter,
                 fragment_lookup,
+                build_set_linking_datasets=split.build_set_linking_datasets,
             )
 
             # Entities used in this split
@@ -287,7 +290,7 @@ class RebelSplitSampler:
             )
 
             # derive fragment set generation
-            if split.fragment_set_generation is not None:
+            if split.build_set_generation_datasets and split.fragment_set_generation is not None:
                 self._derive_fragment_set_generation(
                     fragset_gen_dir,
                     entities_to_include,
@@ -536,6 +539,8 @@ class RebelSplitSampler:
         sampled_labels: list[bool],
         linking_entity_counter: Counter[str],
         fragment_lookup: dict[str, dict],
+        *,
+        build_set_linking_datasets: bool = False,
     ) -> None:
         """Write merged linking dataset plus a set (unmerged) variant."""
         split_dir.mkdir(parents=True, exist_ok=True)
@@ -558,45 +563,67 @@ class RebelSplitSampler:
 
         with (
             open(ds_out, "w", encoding="utf-8") as f_ds,
-            open(set_ds_out, "w", encoding="utf-8") as f_set_ds,
             open(pos_gen_out, "w", encoding="utf-8") as f_pos_gen,
             open(neg_gen_out, "w", encoding="utf-8") as f_neg_gen,
         ):
-            for (left, right), label in zip(sampled_pairs, sampled_labels, strict=False):
-                merged_pair = [left.to_dict(minimal_repr=True), right.to_dict(minimal_repr=True)]
-                # Vanilla linking dataset
-                f_ds.write(json.dumps(merged_pair) + "\n")
-                # Set-variant expansion
-                f_set_ds.write(json.dumps([expand(left), expand(right)]) + "\n")
-                # Generation datasets (positive / negative separation)
-                if label:
-                    f_pos_gen.write(json.dumps(merged_pair) + "\n")
-                else:
-                    f_neg_gen.write(json.dumps(merged_pair) + "\n")
+            if build_set_linking_datasets:
+                with open(set_ds_out, "w", encoding="utf-8") as f_set_ds:
+                    for (left, right), label in zip(sampled_pairs, sampled_labels, strict=False):
+                        merged_pair = [left.to_dict(minimal_repr=True), right.to_dict(minimal_repr=True)]
+                        # Vanilla linking dataset
+                        f_ds.write(json.dumps(merged_pair) + "\n")
+                        # Set-variant expansion
+                        f_set_ds.write(json.dumps([expand(left), expand(right)]) + "\n")
+                        # Generation datasets (positive / negative separation)
+                        if label:
+                            f_pos_gen.write(json.dumps(merged_pair) + "\n")
+                        else:
+                            f_neg_gen.write(json.dumps(merged_pair) + "\n")
+            else:
+                for (left, right), label in zip(sampled_pairs, sampled_labels, strict=False):
+                    merged_pair = [left.to_dict(minimal_repr=True), right.to_dict(minimal_repr=True)]
+                    # Vanilla linking dataset
+                    f_ds.write(json.dumps(merged_pair) + "\n")
+                    # Generation datasets (positive / negative separation)
+                    if label:
+                        f_pos_gen.write(json.dumps(merged_pair) + "\n")
+                    else:
+                        f_neg_gen.write(json.dumps(merged_pair) + "\n")
 
-        with (
-            open(gt_out, "w", encoding="utf-8") as f_gt,
-            open(set_gt_out, "w", encoding="utf-8") as f_set_gt,
-        ):
+        with open(gt_out, "w", encoding="utf-8") as f_gt:
             for label in sampled_labels:
                 line = json.dumps(bool(label)) + "\n"
                 f_gt.write(line)
-                f_set_gt.write(line)
+
+        if build_set_linking_datasets:
+            with open(set_gt_out, "w", encoding="utf-8") as f_set_gt:
+                for label in sampled_labels:
+                    f_set_gt.write(json.dumps(bool(label)) + "\n")
 
         with open(used_ents_out, "w", encoding="utf-8") as f_ents:
             for ent_id in linking_entity_counter:
                 f_ents.write(json.dumps(ent_id) + "\n")
 
-        self._logger.info(
-            "Wrote linking outputs: %s, %s (set variant: %s, %s) generation(+/-): %s, %s entities=%d",
-            ds_out,
-            gt_out,
-            set_ds_out,
-            set_gt_out,
-            pos_gen_out,
-            neg_gen_out,
-            len(linking_entity_counter),
-        )
+        if build_set_linking_datasets:
+            self._logger.info(
+                "Wrote linking outputs: %s, %s (set variant: %s, %s) generation(+/-): %s, %s entities=%d",
+                ds_out,
+                gt_out,
+                set_ds_out,
+                set_gt_out,
+                pos_gen_out,
+                neg_gen_out,
+                len(linking_entity_counter),
+            )
+        else:
+            self._logger.info(
+                "Wrote linking outputs: %s, %s generation(+/-): %s, %s entities=%d (set variant disabled)",
+                ds_out,
+                gt_out,
+                pos_gen_out,
+                neg_gen_out,
+                len(linking_entity_counter),
+            )
 
     def _build_fragment_lookup(self) -> dict[str, dict]:
         """Build lookup of fragment_id -> fragment from base clustering dataset."""
