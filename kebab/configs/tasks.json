@@ -29,7 +29,7 @@
       "ground_truth": "https://some.public/download/link"
     }
   },
-    "Linking-REBEL-Set-Train": {
+  "Linking-REBEL-Set-Train": {
     "task": "Linking",
     "data": {
       "entity_fragment_pairs": "./REBEL/linking/train/rebel_linking_set_dataset.jsonl",
@@ -126,6 +126,42 @@
     "task": "EntityGeneration",
     "data": {
       "entities": "./REBEL/fragment_generation/test/rebel_fragment_generation_dataset.jsonl"
+    }
+  },
+  "FragmentGeneration-REBEL-Linking-Positive-Train": {
+    "task": "FragmentSetGeneration",
+    "data": {
+      "entity_fragment_sets": "./REBEL/linking/train/rebel_linking_generation_positive_dataset.jsonl"
+    }
+  },
+  "FragmentGeneration-REBEL-Linking-Positive-Validation": {
+    "task": "FragmentSetGeneration",
+    "data": {
+      "entity_fragment_sets": "./REBEL/linking/dev/rebel_linking_generation_positive_dataset.jsonl"
+    }
+  },
+  "FragmentGeneration-REBEL-Linking-Positive-Test": {
+    "task": "FragmentSetGeneration",
+    "data": {
+      "entity_fragment_sets": "./REBEL/linking/test/rebel_linking_generation_positive_dataset.jsonl"
+    }
+  },
+  "FragmentGeneration-REBEL-Linking-Negative-Train": {
+    "task": "FragmentSetGeneration",
+    "data": {
+      "entity_fragment_sets": "./REBEL/linking/train/rebel_linking_generation_negative_dataset.jsonl"
+    }
+  },
+  "FragmentGeneration-REBEL-Linking-Negative-Validation": {
+    "task": "FragmentSetGeneration",
+    "data": {
+      "entity_fragment_sets": "./REBEL/linking/dev/rebel_linking_generation_negative_dataset.jsonl"
+    }
+  },
+  "FragmentGeneration-REBEL-Linking-Negative-Test": {
+    "task": "FragmentSetGeneration",
+    "data": {
+      "entity_fragment_sets": "./REBEL/linking/test/rebel_linking_generation_negative_dataset.jsonl"
     }
   }
 }

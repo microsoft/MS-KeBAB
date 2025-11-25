@@ -483,8 +483,9 @@ class RebelSplitSampler:
             for prop_name in set((left.properties or {}).keys()).union((right.properties or {}).keys()):
                 property_counter[prop_name] += 1
 
-            id_to_fragment[left.metadata["id"]] = left
-            id_to_fragment[right.metadata["id"]] = right
+            if self.ENABLE_FRAGMENT_TRIMMING:
+                id_to_fragment[left.metadata["id"]] = left
+                id_to_fragment[right.metadata["id"]] = right
 
         # Re-attach the full metadata and properties if trimming was enabled.
         if self.ENABLE_FRAGMENT_TRIMMING and id_to_fragment:
