@@ -263,7 +263,7 @@ class RebelSplitSampler:
                 disallowed_entity_ids=disallowed_entity_ids,
                 cfg=split.linking,
                 rng=rng,
-                base_path=self.base_linking_dataset_path,
+                ds_path=self.base_linking_dataset_path,
             )
 
             # write linking outputs
@@ -292,16 +292,18 @@ class RebelSplitSampler:
             self._derive_entity_generation(
                 entity_gen_dir,
                 entities_to_include,
+                rng=rng,
             )
 
             # derive fragment generation
             self._derive_fragment_generation(
                 fragment_gen_dir,
                 entities_to_include,
+                rng=rng,
             )
 
             # derive fragment set generation
-            if split.build_set_generation_datasets and split.fragment_set_generation is not None:
+            if split.fragment_set_generation is not None:
                 self._derive_fragment_set_generation(
                     fragset_gen_dir,
                     entities_to_include,
@@ -313,6 +315,7 @@ class RebelSplitSampler:
                     fragset_gen_dir,
                     sampled_pairs,
                     sampled_labels,
+                    split.fragment_set_generation,
                 )
 
             # update disallowed entities for next splits
@@ -578,10 +581,11 @@ class RebelSplitSampler:
                 expanded.append(fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True))
             return expanded
 
-        # Shuffle the sampled pairs and labels together
+        # Shuffle the sampled pairs and labels together (if any)
         pairs_and_labels = list(zip(sampled_pairs, sampled_labels, strict=True))
-        rng.shuffle(pairs_and_labels)
-        sampled_pairs[:], sampled_labels[:] = zip(*pairs_and_labels, strict=True)
+        if pairs_and_labels:
+            rng.shuffle(pairs_and_labels)
+            sampled_pairs[:], sampled_labels[:] = zip(*pairs_and_labels, strict=True)
 
         with (
             open(ds_out, "w", encoding="utf-8") as f_ds,
@@ -740,15 +744,12 @@ class RebelSplitSampler:
                 f_ds_out.write(json.dumps(frag_obj) + "\n")
                 f_gt_out.write(json.dumps(entity_id) + "\n")
 
-    def _derive_entity_generation(
-        self, out_dir: Path, entities_to_include: set[str], cfg: FragmentSetGenerationConfig
-    ) -> None:
+    def _derive_entity_generation(self, out_dir: Path, entities_to_include: set[str], rng: random.Random) -> None:
         """Derive entity generation dataset for the split by subsetting the base entity generation dataset."""
         out_dir.mkdir(parents=True, exist_ok=True)
         ds_out = out_dir / RebelPairSampler.ENTITY_GENERATION_DATASET_FILENAME
         count = 0
 
-        rng = random.Random(cfg.seed)  # noqa: S311
         records: list[dict] = []
 
         with open(self.base_entity_generation_dataset_path, encoding="utf-8") as f_ds:
@@ -770,15 +771,12 @@ class RebelSplitSampler:
 
         self._logger.info(f"Entity generation: wrote {count} records to {ds_out}")
 
-    def _derive_fragment_generation(
-        self, out_dir: Path, entities_to_include: set[str], cfg: FragmentSetGenerationConfig
-    ) -> None:
+    def _derive_fragment_generation(self, out_dir: Path, entities_to_include: set[str], rng: random.Random) -> None:
         """Derive fragment generation dataset for the split by subsetting the base fragment generation dataset."""
         out_dir.mkdir(parents=True, exist_ok=True)
         ds_out = out_dir / RebelPairSampler.FRAGMENT_GENERATION_DATASET_FILENAME
         count = 0
 
-        rng = random.Random(cfg.seed)  # noqa: S311
         records: list[dict] = []
 
         with open(self.base_fragment_generation_dataset_path, encoding="utf-8") as f_ds:

@@ -231,7 +231,7 @@ def test_shuffled_properties_structure_and_contents(sample_entity_1: Entity) -> 
     invariants and set equality, not specific order.
     """
 
-    shuffled = sample_entity_1.shuffled_properties()
+    shuffled = sample_entity_1.with_shuffled_properties()
 
     # Same entity id and metadata
     assert shuffled.entity_id == sample_entity_1.entity_id
@@ -279,5 +279,5 @@ def test_shuffled_properties_does_not_mutate_original(sample_entity_1: Entity) -
     """Calling shuffled_properties() must not mutate the original entity."""
 
     original_dict = sample_entity_1.to_dict()
-    _ = sample_entity_1.shuffled_properties()
+    _ = sample_entity_1.with_shuffled_properties()
     assert sample_entity_1.to_dict() == original_dict

@@ -334,8 +334,9 @@ class Entity:
         entity.entity_id = ""
         return entity
 
-    def with_shuffled_properties(self, rng: random.Random) -> Self:
+    def with_shuffled_properties(self, rng: random.Random | None = None) -> Self:
         """Return a new entity with shuffled property keys and values."""
+        rng = rng or random.Random()  # noqa: S311
         entity = self.__class__.from_dict(self.to_dict())
 
         # Shuffle values (and corresponding evidence) within each property.
