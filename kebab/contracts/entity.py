@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import random
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from copy import deepcopy
@@ -333,16 +334,14 @@ class Entity:
         entity.entity_id = ""
         return entity
 
-    def with_shuffled_properties(self) -> Self:
+    def with_shuffled_properties(self, rng: random.Random) -> Self:
         """Return a new entity with shuffled property keys and values."""
-        from random import shuffle
-
         entity = self.__class__.from_dict(self.to_dict())
 
         # Shuffle values (and corresponding evidence) within each property.
         for property_id, property_values in list(entity.properties.items()):
             indices = list(range(len(property_values)))
-            shuffle(indices)
+            rng.shuffle(indices)
             if not indices:
                 continue
 
@@ -354,7 +353,7 @@ class Entity:
 
         # Shuffle property IDs by rebuilding the dict from a shuffled key list.
         property_ids = list(entity.properties.keys())
-        shuffle(property_ids)
+        rng.shuffle(property_ids)
 
         shuffled_properties: dict[str, list[Any]] = {}
         shuffled_evidence_map: dict[str, list[list[int]]] = defaultdict(list)

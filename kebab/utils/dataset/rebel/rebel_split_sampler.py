@@ -255,8 +255,15 @@ class RebelSplitSampler:
             fragset_gen_dir = self.output_dir / "fragment_set_generation" / split.name
             fragset_gen_dir.mkdir(parents=True, exist_ok=True)
 
+            rng = random.Random(split.linking.seed)  # noqa: S311
+
             sampled_pairs, sampled_labels, linking_entity_counter, included_fragment_ids = self._sample_linking_pairs(
-                pairs, labels, disallowed_entity_ids, split.linking, self.base_linking_dataset_path
+                pairs,
+                labels,
+                disallowed_entity_ids=disallowed_entity_ids,
+                cfg=split.linking,
+                rng=rng,
+                base_path=self.base_linking_dataset_path,
             )
 
             # write linking outputs
@@ -266,6 +273,7 @@ class RebelSplitSampler:
                 sampled_labels,
                 linking_entity_counter,
                 fragment_lookup,
+                rng,
                 build_set_linking_datasets=split.build_set_linking_datasets,
             )
 
@@ -395,8 +403,10 @@ class RebelSplitSampler:
         self,
         pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
         labels: list[bool],
+        *,
         disallowed_entity_ids: set[str],
         cfg: LinkingConfig,
+        rng: random.Random,
         ds_path: Path,
     ) -> tuple[
         list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
@@ -405,8 +415,6 @@ class RebelSplitSampler:
         set[str],
     ]:
         """Heuristic sampling to produce a more interesting subset."""
-        rng = random.Random(cfg.seed)  # noqa: S311 - pseudo-random is fine for dataset sampling
-
         indices = list(range(len(pairs)))
         rng.shuffle(indices)
 
@@ -545,7 +553,8 @@ class RebelSplitSampler:
         sampled_pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
         sampled_labels: list[bool],
         linking_entity_counter: Counter[str],
-        fragment_lookup: dict[str, dict],
+        fragment_lookup: dict[str, ResolvedWikidataEntity],
+        rng: random.Random,
         *,
         build_set_linking_datasets: bool = False,
     ) -> None:
@@ -562,11 +571,17 @@ class RebelSplitSampler:
         def expand(entity: ResolvedWikidataEntity) -> list[dict]:
             raw_ids = entity.metadata.get("fragment_ids") or [entity.metadata.get("fragment_id")]
             frag_ids = cast(list[str], list(raw_ids))
+            rng.shuffle(frag_ids)
             expanded: list[dict] = []
             for fid in frag_ids:
                 fragment = fragment_lookup[fid]
-                expanded.append(fragment)
+                expanded.append(fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True))
             return expanded
+
+        # Shuffle the sampled pairs and labels together
+        pairs_and_labels = list(zip(sampled_pairs, sampled_labels, strict=True))
+        rng.shuffle(pairs_and_labels)
+        sampled_pairs[:], sampled_labels[:] = zip(*pairs_and_labels, strict=True)
 
         with (
             open(ds_out, "w", encoding="utf-8") as f_ds,
@@ -576,11 +591,19 @@ class RebelSplitSampler:
             if build_set_linking_datasets:
                 with open(set_ds_out, "w", encoding="utf-8") as f_set_ds:
                     for (left, right), label in zip(sampled_pairs, sampled_labels, strict=False):
-                        merged_pair = [left.to_dict(minimal_repr=True), right.to_dict(minimal_repr=True)]
+                        merged_pair = [
+                            left.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                            right.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                        ]
+                        rng.shuffle(merged_pair)
+                        l, r = merged_pair  # noqa: E741
+
                         # Vanilla linking dataset
                         f_ds.write(json.dumps(merged_pair) + "\n")
+
                         # Set-variant expansion
-                        f_set_ds.write(json.dumps([expand(left), expand(right)]) + "\n")
+                        f_set_ds.write(json.dumps([expand(l), expand(r)]) + "\n")
+
                         # Generation datasets (positive / negative separation)
                         if label:
                             f_pos_gen.write(json.dumps(merged_pair) + "\n")
@@ -588,9 +611,15 @@ class RebelSplitSampler:
                             f_neg_gen.write(json.dumps(merged_pair) + "\n")
             else:
                 for (left, right), label in zip(sampled_pairs, sampled_labels, strict=False):
-                    merged_pair = [left.to_dict(minimal_repr=True), right.to_dict(minimal_repr=True)]
+                    merged_pair = [
+                        left.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                        right.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                    ]
+                    rng.shuffle(merged_pair)
+
                     # Vanilla linking dataset
                     f_ds.write(json.dumps(merged_pair) + "\n")
+
                     # Generation datasets (positive / negative separation)
                     if label:
                         f_pos_gen.write(json.dumps(merged_pair) + "\n")
@@ -632,16 +661,16 @@ class RebelSplitSampler:
                 len(linking_entity_counter),
             )
 
-    def _build_fragment_lookup(self) -> dict[str, dict]:
+    def _build_fragment_lookup(self) -> dict[str, ResolvedWikidataEntity]:
         """Build lookup of fragment_id -> fragment from base clustering dataset."""
-        lookup: dict[str, dict] = {}
+        lookup: dict[str, ResolvedWikidataEntity] = {}
         try:
             with open(self.base_clustering_dataset_path, encoding="utf-8") as f_ds:
                 for line in f_ds:
                     frag = ResolvedWikidataEntity.from_dict(json.loads(line))
                     fid = frag.metadata.get("fragment_id")
                     if fid and fid not in lookup:
-                        lookup[fid] = frag.without_metadata().to_dict(minimal_repr=True)
+                        lookup[fid] = frag.without_metadata()
             self._logger.info(f"Fragment lookup size: {len(lookup)}")
         except FileNotFoundError:
             self._logger.warning("Clustering dataset not found; linking-set dataset will use merged fragments only")
@@ -658,6 +687,8 @@ class RebelSplitSampler:
         out_dir.mkdir(parents=True, exist_ok=True)
         ds_out = out_dir / RebelPairSampler.CLUSTERING_DATASET_FILENAME
         gt_out = out_dir / RebelPairSampler.CLUSTERING_GROUND_TRUTH_FILENAME
+
+        rng = random.Random(cfg.seed)  # noqa: S311
 
         clustering_entities: dict[str, list[ResolvedWikidataEntity]] = defaultdict(list)
         with (
@@ -692,7 +723,7 @@ class RebelSplitSampler:
             selected = sorted_fragments[: cfg.fragments_per_entity_limit]
             records.extend(
                 (
-                    fragment.to_dict(minimal_repr=True),
+                    fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
                     entity_id,
                 )
                 for fragment in selected
@@ -701,22 +732,23 @@ class RebelSplitSampler:
             entities_included += 1
 
         # Shuffle the combined list
-        rng = random.Random(cfg.seed)  # noqa: S311 - pseudo-random is fine for dataset sampling
+
         rng.shuffle(records)
+
         with open(ds_out, "w", encoding="utf-8") as f_ds_out, open(gt_out, "w", encoding="utf-8") as f_gt_out:
             for frag_obj, entity_id in records:
                 f_ds_out.write(json.dumps(frag_obj) + "\n")
                 f_gt_out.write(json.dumps(entity_id) + "\n")
 
     def _derive_entity_generation(
-        self,
-        out_dir: Path,
-        entities_to_include: set[str],
+        self, out_dir: Path, entities_to_include: set[str], cfg: FragmentSetGenerationConfig
     ) -> None:
         """Derive entity generation dataset for the split by subsetting the base entity generation dataset."""
         out_dir.mkdir(parents=True, exist_ok=True)
         ds_out = out_dir / RebelPairSampler.ENTITY_GENERATION_DATASET_FILENAME
         count = 0
+
+        rng = random.Random(cfg.seed)  # noqa: S311
 
         with (
             open(self.base_entity_generation_dataset_path, encoding="utf-8") as f_ds,
@@ -727,20 +759,20 @@ class RebelSplitSampler:
                 entity_id = fragment.entity_id
                 if entity_id not in entities_to_include:
                     continue
-                f_out.write(json.dumps(fragment.to_dict(minimal_repr=True)) + "\n")
+                f_out.write(json.dumps(fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True)) + "\n")
                 count += 1
 
         self._logger.info(f"Entity generation: wrote {count} records to {ds_out}")
 
     def _derive_fragment_generation(
-        self,
-        out_dir: Path,
-        entities_to_include: set[str],
+        self, out_dir: Path, entities_to_include: set[str], cfg: FragmentSetGenerationConfig
     ) -> None:
         """Derive fragment generation dataset for the split by subsetting the base fragment generation dataset."""
         out_dir.mkdir(parents=True, exist_ok=True)
         ds_out = out_dir / RebelPairSampler.FRAGMENT_GENERATION_DATASET_FILENAME
         count = 0
+
+        rng = random.Random(cfg.seed)  # noqa: S311
 
         with (
             open(self.base_fragment_generation_dataset_path, encoding="utf-8") as f_ds,
@@ -751,7 +783,7 @@ class RebelSplitSampler:
                 entity_id = fragment.entity_id
                 if entity_id not in entities_to_include:
                     continue
-                f_out.write(json.dumps(fragment.to_dict(minimal_repr=True)) + "\n")
+                f_out.write(json.dumps(fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True)) + "\n")
                 count += 1
 
         self._logger.info(f"Fragment generation: wrote {count} records to {ds_out}")
@@ -777,7 +809,7 @@ class RebelSplitSampler:
                 if entity_id in entities_to_include:
                     ent_to_fragments[entity_id].append(fragment)
 
-        rng = random.Random(cfg.seed)  # noqa: S311 - pseudo-random is fine for dataset sampling
+        rng = random.Random(cfg.seed)  # noqa: S311
         total_records = 0
 
         with open(ds_out, "w", encoding="utf-8") as f_out:
@@ -794,7 +826,7 @@ class RebelSplitSampler:
                     seq_len = rng.randint(1, max_len)
                     sampled = rng.sample(fragments, seq_len)
                     rng.shuffle(sampled)
-                    frag_list = [f.to_dict(minimal_repr=True) for f in sampled]
+                    frag_list = [f.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True) for f in sampled]
                     f_out.write(json.dumps(frag_list) + "\n")
                     total_records += 1
 
@@ -807,10 +839,13 @@ class RebelSplitSampler:
         out_dir: Path,
         sampled_pairs: list[tuple[ResolvedWikidataEntity, ResolvedWikidataEntity]],
         sampled_labels: list[bool],
+        cfg: FragmentSetGenerationConfig,
     ) -> None:
         """Derive negative fragment set generation dataset from negative-labeled linking pairs."""
         out_dir.mkdir(parents=True, exist_ok=True)
         ds_out = out_dir / self.NEGATIVE_FRAGMENT_SET_GENERATION_DATASET_FILENAME
+
+        rng = random.Random(cfg.seed)  # noqa: S311
 
         # Build fragment lookup from clustering dataset
         fragment_id_lookup: dict[str, dict] = {}
@@ -819,9 +854,10 @@ class RebelSplitSampler:
                 frag = ResolvedWikidataEntity.from_dict(json.loads(line))
                 fid = frag.metadata.get("fragment_id")
                 assert fid not in fragment_id_lookup
-                fragment_id_lookup[str(fid)] = frag.without_metadata().to_dict(minimal_repr=True)
+                fragment_id_lookup[str(fid)] = (
+                    frag.without_metadata().with_shuffled_properties(rng=rng).to_dict(minimal_repr=True)
+                )
 
-        # rng = random.Random(cfg.seed)
         written = 0
         negative_pairs_total = 0
 
@@ -848,7 +884,7 @@ class RebelSplitSampler:
                 right_frags = collect_fragment_dicts(right)
 
                 merged = left_frags + right_frags
-                # rng.shuffle(merged)
+                rng.shuffle(merged)
                 f_out.write(json.dumps(merged) + "\n")
                 written += 1
 
