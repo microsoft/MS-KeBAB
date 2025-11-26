@@ -749,18 +749,24 @@ class RebelSplitSampler:
         count = 0
 
         rng = random.Random(cfg.seed)  # noqa: S311
+        records: list[dict] = []
 
-        with (
-            open(self.base_entity_generation_dataset_path, encoding="utf-8") as f_ds,
-            open(ds_out, "w", encoding="utf-8") as f_out,
-        ):
+        with open(self.base_entity_generation_dataset_path, encoding="utf-8") as f_ds:
             for line in f_ds:
                 fragment = ResolvedWikidataEntity.from_dict(json.loads(line))
                 entity_id = fragment.entity_id
                 if entity_id not in entities_to_include:
                     continue
-                f_out.write(json.dumps(fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True)) + "\n")
+                records.append(
+                    fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                )
                 count += 1
+
+        rng.shuffle(records)
+
+        with open(ds_out, "w", encoding="utf-8") as f_out:
+            for rec in records:
+                f_out.write(json.dumps(rec) + "\n")
 
         self._logger.info(f"Entity generation: wrote {count} records to {ds_out}")
 
@@ -773,18 +779,24 @@ class RebelSplitSampler:
         count = 0
 
         rng = random.Random(cfg.seed)  # noqa: S311
+        records: list[dict] = []
 
-        with (
-            open(self.base_fragment_generation_dataset_path, encoding="utf-8") as f_ds,
-            open(ds_out, "w", encoding="utf-8") as f_out,
-        ):
+        with open(self.base_fragment_generation_dataset_path, encoding="utf-8") as f_ds:
             for line in f_ds:
                 fragment = ResolvedWikidataEntity.from_dict(json.loads(line))
                 entity_id = fragment.entity_id
                 if entity_id not in entities_to_include:
                     continue
-                f_out.write(json.dumps(fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True)) + "\n")
+                records.append(
+                    fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                )
                 count += 1
+
+        rng.shuffle(records)
+
+        with open(ds_out, "w", encoding="utf-8") as f_out:
+            for rec in records:
+                f_out.write(json.dumps(rec) + "\n")
 
         self._logger.info(f"Fragment generation: wrote {count} records to {ds_out}")
 
@@ -811,24 +823,30 @@ class RebelSplitSampler:
 
         rng = random.Random(cfg.seed)  # noqa: S311
         total_records = 0
+        records: list[list[dict]] = []
+
+        for fragments in ent_to_fragments.values():
+            fragment_count = len(fragments)
+            max_len = min(cfg.max_fragments_per_entity, fragment_count)
+            if max_len == 0:
+                continue
+
+            seq_cap = cfg.sequences_per_entity or fragment_count
+            seq_target = min(seq_cap, fragment_count)
+
+            for _ in range(seq_target):
+                seq_len = rng.randint(1, max_len)
+                sampled = rng.sample(fragments, seq_len)
+                rng.shuffle(sampled)
+                frag_list = [f.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True) for f in sampled]
+                records.append(frag_list)
+                total_records += 1
+
+        rng.shuffle(records)
 
         with open(ds_out, "w", encoding="utf-8") as f_out:
-            for fragments in ent_to_fragments.values():
-                fragment_count = len(fragments)
-                max_len = min(cfg.max_fragments_per_entity, fragment_count)
-                if max_len == 0:
-                    continue
-
-                seq_cap = cfg.sequences_per_entity or fragment_count
-                seq_target = min(seq_cap, fragment_count)
-
-                for _ in range(seq_target):
-                    seq_len = rng.randint(1, max_len)
-                    sampled = rng.sample(fragments, seq_len)
-                    rng.shuffle(sampled)
-                    frag_list = [f.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True) for f in sampled]
-                    f_out.write(json.dumps(frag_list) + "\n")
-                    total_records += 1
+            for frag_list in records:
+                f_out.write(json.dumps(frag_list) + "\n")
 
         self._logger.info(
             f"Fragment set generation: wrote {total_records} data points to {ds_out} for {len(ent_to_fragments)} entities"
