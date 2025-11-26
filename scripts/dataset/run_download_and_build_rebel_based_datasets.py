@@ -28,6 +28,9 @@ Resolution behaviour:
 Example usage (from repository root):
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py
 
+    # Quick run from pair-sampling onwards to verify the logic
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-run-filter --max-pair-count 100000
+
     # With type resolution enabled (internal use case)
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --resolve-types --no-verify-md5
 
@@ -241,6 +244,13 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
     default=True,
     help=("Whether to verify/create MD5 checksums for all output files."),
 )
+@click.option(
+    "--max-pair-count",
+    type=int,
+    default=20_000_000,
+    show_default=True,
+    help=("Maximum number of pairs to sample when building base datasets."),
+)
 def main(
     working_dir: Path,
     download_rebel: bool,
@@ -250,6 +260,7 @@ def main(
     resolve_types: bool,
     wikidata_json_dump_path: Path | None,
     seed: int,
+    max_pair_count: int,
     run_extract_fragments: bool,
     run_filter: bool,
     run_sample_pairs: bool,
@@ -431,7 +442,6 @@ def main(
         logger.info("Skipping fragment filtering (flag disabled)")
 
     # 5) Build base datasets (linking/clustering)
-    max_pair_count = 20_000_000
     if run_sample_pairs:
         logger.info(
             f"Sampling base pairs (max_count={max_pair_count}, max_merge_fragments={10}, merge_distribution={MergeDistributionMode.ZIPF}, "
