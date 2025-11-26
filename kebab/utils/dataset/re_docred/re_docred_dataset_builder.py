@@ -105,21 +105,30 @@ class ReDocRedDatasetBuilder:
         entries = self._load_dataset()
         wikidata_properties = wikidata_utils.load_properties(self.wikidata_properties_path)
         extraction_dataset = []
-        property_to_data_type = {}
+        property_to_data_type = {
+            "name": DataType.from_dict(
+                {"data_type_id": "text", "value_type": ValueType.TEXT.value, "description": "text"}
+            ),
+            "type": DataType.from_dict(
+                {"data_type_id": "text", "value_type": ValueType.TEXT.value, "description": "text"}
+            ),
+        }
         for entry in entries:
             example = self.extract_example(entry, wikidata_properties)
-            for prop, dt in example["property_to_data_type"].items():
-                if prop not in property_to_data_type:
-                    property_to_data_type[prop] = dt
-                else:
-                    if property_to_data_type[prop].data_type_id != dt.data_type_id:
-                        raise ValueError(
-                            f"Conflicting data types for property {prop}: "
-                            f"{property_to_data_type[prop].data_type_id} vs {dt.data_type_id}"
+            for entity in example["entities"]:
+                for prop in entity.properties:
+                    if prop not in property_to_data_type:
+                        property_to_data_type[prop] = DataType.from_dict(
+                            {
+                                "data_type_id": "reference",
+                                "value_type": ValueType.REFERENCE.value,
+                                "description": "reference to another entity",
+                            }
                         )
-            del example["property_to_data_type"]
             extraction_dataset.append(example)
-        property_schema = self.build_property_schema(property_to_data_type, [entity for example in extraction_dataset for entity in example["entities"]])
+        property_schema = self.build_property_schema(
+            property_to_data_type,
+            [entity for example in extraction_dataset for entity in example["entities"]])
 
         # save the dataset
         self._write_dataset(extraction_dataset)
@@ -209,8 +218,8 @@ class ReDocRedDatasetBuilder:
         })
         return property_schema
 
-    def filter_entities_and_record_data_types(self, entities: list[Entity]) -> tuple[list[Entity], dict[str, DataType]]:
-        """Filter out entities based on certain criteria and record data types of properties."""
+    def filter_entities(self, entities: list[Entity]) -> list[Entity]:
+        """Filter out entities based on certain criteria."""
         filtered_entities = []
         dropped_entity_ids = set()
         for entity in entities:
@@ -220,37 +229,15 @@ class ReDocRedDatasetBuilder:
                 continue
             filtered_entities.append(entity)
         # update properties to remove references to dropped entities
-        property_to_value_types = defaultdict(set)
-        property_to_value_types["name"].add(ValueType.TEXT)
-        property_to_value_types["type"].add(ValueType.TEXT)
         for entity in filtered_entities:
             properties_to_drop = set()
             for prop, values in entity.properties.items():
                 if prop in ("name", "type"):
                     continue
                 updated_values = set()
-                dropped_values = False
                 for value in values:
-                    if value in dropped_entity_ids:
-                        dropped_values = True
-                    else:
+                    if value not in dropped_entity_ids:
                         updated_values.add(value)
-                if not dropped_values:
-                    property_to_value_types[prop].add(ValueType.REFERENCE)
-                else:
-                    if len(updated_values) > 0:
-                        property_to_value_types[prop].add(ValueType.REFERENCE)
-                    else:
-                        # try to promote values for dropped references
-                        # if this causes adding conflicting value types, do not promote the values
-                        # and drop the property entirely
-                        updated_values = set()
-                        if prop not in property_to_value_types:
-                            property_to_value_types[prop] = set()
-                            for value in values:
-                                names = entities[int(value)].properties["name"]
-                                property_to_value_types[prop].add(get_value_type(prop, names))
-                                updated_values.update(names)
                 if not updated_values:
                     self._logger.debug(
                         f"filtering all values of the property {prop} in entity {entity.to_json()}."
@@ -259,16 +246,7 @@ class ReDocRedDatasetBuilder:
                 entity.properties[prop] = sorted(updated_values)
             for prop_name in properties_to_drop:
                 del entity.properties[prop_name]
-        # check there's no conflicting value types
-        property_to_data_type = {}
-        for prop, value_types in property_to_value_types.items():
-            if len(value_types) > 1:
-                raise ValueError(f"Property {prop} has conflicting value types: {value_types}")
-            value_type = next(iter(value_types))
-            data_type_id = value_type.name.lower()
-            property_to_data_type[prop] = DataType.from_dict(
-                {"data_type_id": data_type_id, "value_type": value_type.value, "description": data_type_id}
-            )
+
         # # update entity IDs to be consecutive
         # id_map = {entity.entity_id: str(idx) for idx, entity in enumerate(filtered_entities)}
         # for entity in filtered_entities:
@@ -280,16 +258,16 @@ class ReDocRedDatasetBuilder:
         #             continue
         #         updated_values = {id_map[v] for v in values if v in id_map}
         #         entity.properties[prop] = sorted(updated_values)
-        return filtered_entities, property_to_data_type
+        return filtered_entities
 
     def extract_example(self, entry: dict, wikidata_properties: dict) -> dict:
         """Extract an example from the Re-DocRED dataset."""
         entities = self.extract_entities(entry)
         entities = self.extract_properties(entry, entities, wikidata_properties)
         entities = [Entity(str(i), {k: sorted(v) for k, v in entity.items()}) for i, entity in enumerate(entities)]
-        entities, property_to_data_type = self.filter_entities_and_record_data_types(entities)
+        entities = self.filter_entities(entities)
         document = self.get_document(entry)
-        return {"document": document, "entities": entities, "property_to_data_type": property_to_data_type}
+        return {"document": document, "entities": entities}
 
     def _load_dataset(self) -> Iterable[dict]:
         """Load Re-DocRED data from multiple files, iteratively."""
