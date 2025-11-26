@@ -350,7 +350,7 @@ class Entity:
 
             if property_id in entity.evidence_map:
                 value_to_evidence = entity.evidence_map[property_id]
-                entity.evidence_map[property_id] = [value_to_evidence[i] for i in indices if i < len(value_to_evidence)]
+                entity.evidence_map[property_id] = [value_to_evidence[i] for i in indices]
 
         # Shuffle property IDs by rebuilding the dict from a shuffled key list.
         property_ids = list(entity.properties.keys())
