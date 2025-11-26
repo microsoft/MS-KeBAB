@@ -320,6 +320,9 @@ class Entity:
             if "metadata" in entity_dict:
                 entity_dict["metadata"] = {k: v for k, v in entity_dict["metadata"].items() if v is not None}
 
+                if not entity_dict["metadata"]:
+                    del entity_dict["metadata"]
+
         return entity_dict
 
     def without_metadata(self) -> Self:
@@ -341,10 +344,11 @@ class Entity:
 
         # Shuffle values (and corresponding evidence) within each property.
         for property_id, property_values in list(entity.properties.items()):
+            if not property_values:
+                continue
+
             indices = list(range(len(property_values)))
             rng.shuffle(indices)
-            if not indices:
-                continue
 
             entity.properties[property_id] = [property_values[i] for i in indices]
 

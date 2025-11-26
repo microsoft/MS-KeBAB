@@ -97,21 +97,6 @@ class WikidataEntity(Entity):
         """Set the types of the entity."""
         self.properties[TypeProperties.INSTANCE_OF.value] = value
 
-    def to_dict(self, minimal_repr: bool = False) -> dict:
-        """Convert the WikidataEntity to a dictionary."""
-        entity_dict = super().to_dict(minimal_repr=minimal_repr)
-
-        if minimal_repr and "metadata" in entity_dict:
-            metadata_dict = entity_dict["metadata"]
-            for key in ["description", "wikipedia_title"]:
-                if key in metadata_dict and not metadata_dict[key]:
-                    del metadata_dict[key]
-
-            if not entity_dict["metadata"]:
-                del entity_dict["metadata"]
-
-        return entity_dict
-
     def __str__(self) -> str:
         """String representation of the entity."""
         s = f"{self.entity_id}: " if self.entity_id else ""

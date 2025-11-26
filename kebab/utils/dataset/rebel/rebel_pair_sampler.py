@@ -581,23 +581,16 @@ class RebelPairSampler:
         entity_id = fragment.entity_id
 
         # Start with the base fragment followed by all other fragments of the entity
-        fragment_indices = [fragment_idx]
-        fragment_indices.extend(i for i in entity_id_to_fragment_indices[entity_id] if i != fragment_idx)
+        rest = [i for i in entity_id_to_fragment_indices[entity_id] if i != fragment_idx]
+        rng = rng or np.random.default_rng()
+        rng.shuffle(rest)
+        fragment_indices = [fragment_idx, *rest]
 
         if len(fragment_indices) == 1:
             f = ResolvedWikidataEntity.from_dict(fragment.to_dict())
             f.metadata["fragment_ids"] = [f.metadata["fragment_id"]]
             f.metadata["merge_count"] = 1
             return f
-
-        rng = rng or np.random.default_rng()
-
-        # When enforcing min property values - shuffle the fragment indices
-        if enforce_min_property_values:
-            # preserve base at index 0 if include_base_fragment else allow full shuffle
-            rest = fragment_indices[1:]
-            rng.shuffle(rest)
-            fragment_indices = [fragment_indices[0], *rest]
 
         n = len(fragment_indices)
         if max_fragments:
@@ -636,7 +629,7 @@ class RebelPairSampler:
 
             # Keep adding while total property values <=1 and we have unused fragments
             cursor = 0
-            while merged_unique_value_count(list(selected_set)) <= 1 and len(selected_set) < n:
+            while merged_unique_value_count(list(selected_set)) <= 1:
                 while cursor < n and cursor in selected_set:
                     cursor += 1
                 selected_set.add(cursor)

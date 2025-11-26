@@ -572,14 +572,14 @@ class RebelSplitSampler:
         neg_gen_out = split_dir / self.LINKING_GENERATION_NEGATIVE_DATASET_FILENAME
 
         def expand(entity: ResolvedWikidataEntity) -> list[dict]:
+            """Expand a merged entity into its set of fragments.
+
+            Shuffle every time because the same fragment can be used more than once (as part of different pre-merged bigger fragments).
+            """
             raw_ids = entity.metadata.get("fragment_ids") or [entity.metadata.get("fragment_id")]
-            frag_ids = cast(list[str], list(raw_ids))
-            rng.shuffle(frag_ids)
-            expanded: list[dict] = []
-            for fid in frag_ids:
-                fragment = fragment_lookup[fid]
-                expanded.append(fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True))
-            return expanded
+            return [
+                fragment_lookup[fid].with_shuffled_properties(rng=rng).to_dict(minimal_repr=True) for fid in raw_ids
+            ]
 
         # Shuffle the sampled pairs and labels together (if any)
         pairs_and_labels = list(zip(sampled_pairs, sampled_labels, strict=True))
@@ -591,44 +591,32 @@ class RebelSplitSampler:
             open(ds_out, "w", encoding="utf-8") as f_ds,
             open(pos_gen_out, "w", encoding="utf-8") as f_pos_gen,
             open(neg_gen_out, "w", encoding="utf-8") as f_neg_gen,
+            open(set_ds_out, "w", encoding="utf-8") as f_set_ds,
         ):
-            if build_set_linking_datasets:
-                with open(set_ds_out, "w", encoding="utf-8") as f_set_ds:
-                    for (left, right), label in zip(sampled_pairs, sampled_labels, strict=False):
-                        merged_pair = [
-                            left.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
-                            right.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
-                        ]
-                        rng.shuffle(merged_pair)
-                        l, r = merged_pair  # noqa: E741
+            for (left, right), label in pairs_and_labels:
+                # shuffle fragment ids in the metadata of each
+                merged_pair = [
+                    left.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                    right.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                ]
+                rng.shuffle(merged_pair)
+                l, r = merged_pair  # noqa: E741
 
-                        # Vanilla linking dataset
-                        f_ds.write(json.dumps(merged_pair) + "\n")
+                # The main linking dataset
+                f_ds.write(json.dumps(merged_pair) + "\n")
 
-                        # Set-variant expansion
-                        f_set_ds.write(json.dumps([expand(l), expand(r)]) + "\n")
+                # Set-variant expansion
+                if build_set_linking_datasets:
+                    f_set_ds.write(json.dumps([expand(l), expand(r)]) + "\n")
 
-                        # Generation datasets (positive / negative separation)
-                        if label:
-                            f_pos_gen.write(json.dumps(merged_pair) + "\n")
-                        else:
-                            f_neg_gen.write(json.dumps(merged_pair) + "\n")
-            else:
-                for (left, right), label in zip(sampled_pairs, sampled_labels, strict=False):
-                    merged_pair = [
-                        left.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
-                        right.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
-                    ]
-                    rng.shuffle(merged_pair)
+                # Generation datasets (positive / negative separation)
+                if label:
+                    f_pos_gen.write(json.dumps(merged_pair) + "\n")
+                else:
+                    f_neg_gen.write(json.dumps(merged_pair) + "\n")
 
-                    # Vanilla linking dataset
-                    f_ds.write(json.dumps(merged_pair) + "\n")
-
-                    # Generation datasets (positive / negative separation)
-                    if label:
-                        f_pos_gen.write(json.dumps(merged_pair) + "\n")
-                    else:
-                        f_neg_gen.write(json.dumps(merged_pair) + "\n")
+        if not build_set_linking_datasets:
+            set_ds_out.unlink()
 
         with open(gt_out, "w", encoding="utf-8") as f_gt:
             for label in sampled_labels:
@@ -736,7 +724,6 @@ class RebelSplitSampler:
             entities_included += 1
 
         # Shuffle the combined list
-
         rng.shuffle(records)
 
         with open(ds_out, "w", encoding="utf-8") as f_ds_out, open(gt_out, "w", encoding="utf-8") as f_gt_out:
