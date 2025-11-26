@@ -333,6 +333,42 @@ class Entity:
         entity.entity_id = ""
         return entity
 
+    def with_shuffled_properties(self) -> Self:
+        """Return a new entity with shuffled property keys and values."""
+        from random import shuffle
+
+        entity = self.__class__.from_dict(self.to_dict())
+
+        # Shuffle values (and corresponding evidence) within each property.
+        for property_id, property_values in list(entity.properties.items()):
+            indices = list(range(len(property_values)))
+            shuffle(indices)
+            if not indices:
+                continue
+
+            entity.properties[property_id] = [property_values[i] for i in indices]
+
+            if property_id in entity.evidence_map:
+                value_to_evidence = entity.evidence_map[property_id]
+                entity.evidence_map[property_id] = [value_to_evidence[i] for i in indices if i < len(value_to_evidence)]
+
+        # Shuffle property IDs by rebuilding the dict from a shuffled key list.
+        property_ids = list(entity.properties.keys())
+        shuffle(property_ids)
+
+        shuffled_properties: dict[str, list[Any]] = {}
+        shuffled_evidence_map: dict[str, list[list[int]]] = defaultdict(list)
+
+        for property_id in property_ids:
+            shuffled_properties[property_id] = entity.properties[property_id]
+            if property_id in entity.evidence_map:
+                shuffled_evidence_map[property_id] = entity.evidence_map[property_id]
+
+        entity.properties = defaultdict(list, shuffled_properties)
+        entity.evidence_map = defaultdict(list, shuffled_evidence_map)
+
+        return entity
+
     def filter_values(self, filter_func: Callable[[str, Any], bool]) -> Self | None:
         """Return a new entity with filtered values.
 

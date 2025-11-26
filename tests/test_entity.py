@@ -222,3 +222,62 @@ def test_remove_sources(sample_entity_1: Entity) -> None:
         expected=None,
         remove_sources_list=["source1", "source2"],
     )
+
+
+def test_shuffled_properties_structure_and_contents(sample_entity_1: Entity) -> None:
+    """Shuffled entity preserves values/evidence but changes ordering.
+
+    The method is intended for randomization, so we only assert structural
+    invariants and set equality, not specific order.
+    """
+
+    shuffled = sample_entity_1.shuffled_properties()
+
+    # Same entity id and metadata
+    assert shuffled.entity_id == sample_entity_1.entity_id
+    assert shuffled.metadata == sample_entity_1.metadata
+
+    # Same set of property ids
+    assert set(shuffled.properties.keys()) == set(sample_entity_1.properties.keys())
+
+    # For each property id, values form the same multiset
+    for prop_id, values in sample_entity_1.properties.items():
+        assert sorted(shuffled.properties[prop_id]) == sorted(values)
+
+    # Evidence map keys are the same
+    assert set(shuffled.evidence_map.keys()) == set(sample_entity_1.evidence_map.keys())
+
+    # For each property, evidence lists line up with value list lengths
+    for prop_id, values in shuffled.properties.items():
+        evidences = shuffled.evidence_map.get(prop_id, [])
+        # evidence list may be shorter if some values had no evidence
+        assert len(evidences) <= len(values)
+
+        # All evidence indices must be valid source indices
+        for evidence_list in evidences:
+            for idx in evidence_list:
+                assert 0 <= idx < len(shuffled.source_ids)
+
+        # As set, evidences must match original evidences
+        original_evidences = sample_entity_1.evidence_map.get(prop_id, [])
+        assert {tuple(sorted(e)) for e in evidences} == {tuple(sorted(e)) for e in original_evidences}
+
+    # Evidence map not broken
+    assert len(shuffled.properties["prop1"]) == 2
+    for idx, value in enumerate(shuffled.properties["prop1"]):
+        evid = shuffled.evidence_map["prop1"][idx]
+        if value == "value11":
+            assert evid == [0]
+        elif value == "value12":
+            assert evid == [1]
+
+    assert shuffled.properties["prop2"] == ["value31"]
+    assert shuffled.evidence_map["prop2"] == [[0]]
+
+
+def test_shuffled_properties_does_not_mutate_original(sample_entity_1: Entity) -> None:
+    """Calling shuffled_properties() must not mutate the original entity."""
+
+    original_dict = sample_entity_1.to_dict()
+    _ = sample_entity_1.shuffled_properties()
+    assert sample_entity_1.to_dict() == original_dict
