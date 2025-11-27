@@ -281,3 +281,54 @@ def test_shuffled_properties_does_not_mutate_original(sample_entity_1: Entity) -
     original_dict = sample_entity_1.to_dict()
     _ = sample_entity_1.with_shuffled_properties()
     assert sample_entity_1.to_dict() == original_dict
+
+
+def test_sorted_properties_orders_values_and_properties() -> None:
+    """with_sorted_properties sorts values and property IDs, with name first."""
+
+    entity = Entity(
+        entity_id="e1",
+        properties={
+            "b": ["beta", "alpha"],
+            "name": ["Bob", "Alice"],
+            "a": ["z", "y"],
+        },
+        source_ids=["s1", "s2"],
+        evidence_map={
+            "b": [[0], [1]],
+            "name": [[0], [1]],
+            "a": [[0], [1]],
+        },
+    )
+
+    sorted_entity = entity.with_sorted_properties()
+
+    # name must be first, remaining properties lexicographically sorted
+    assert list(sorted_entity.properties.keys()) == ["name", "a", "b"]
+
+    # Values within each property are sorted and evidence follows
+    assert sorted_entity.properties["name"] == ["Alice", "Bob"]
+    assert sorted_entity.evidence_map["name"] == [[1], [0]]
+
+    assert sorted_entity.properties["a"] == ["y", "z"]
+    assert sorted_entity.evidence_map["a"] == [[1], [0]]
+
+    assert sorted_entity.properties["b"] == ["alpha", "beta"]
+    assert sorted_entity.evidence_map["b"] == [[1], [0]]
+
+
+def test_sorted_properties_without_name_property() -> None:
+    """with_sorted_properties falls back to pure lexicographic order without name."""
+
+    entity = Entity(
+        entity_id="e2",
+        properties={
+            "c": ["2"],
+            "a": ["1"],
+            "b": ["3"],
+        },
+    )
+
+    sorted_entity = entity.with_sorted_properties()
+
+    assert list(sorted_entity.properties.keys()) == ["a", "b", "c"]
