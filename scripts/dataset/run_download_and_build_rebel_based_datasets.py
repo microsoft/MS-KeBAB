@@ -29,16 +29,16 @@ Example usage (from repository root):
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py
 
     # Quick run from pair-sampling onwards to verify the logic
-    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-run-filter --max-pair-count 100000
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-resolve-property-values --no-run-filter --max-pair-count 100000
 
     # With type resolution enabled (internal use case)
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --resolve-types --no-verify-md5
 
     # From pair sampling onwards (expects existing prior outputs)
-    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-run-filter
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-resolve-property-values --no-run-filter
 
     # From splitting onwards (expects existing base datasets)
-    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-run-filter --no-run-sample-pairs
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-resolve-property-values --no-run-filter --no-run-sample-pairs
 
 Notes:
 - Extraction of missing Wikidata artifacts requires a standard Wikidata JSON dump (``latest-all.json``) which can be
@@ -425,6 +425,12 @@ def main(
         current_fragments_path = rebel_fragments_resolved / "rebel_entity_fragments.jsonl"
     else:
         logger.info("Skipping Wikidata resolution (flag disabled)")
+        # If we skip resolution but resolved outputs already exist, advance to them
+        # so that later steps (e.g., filtering/sampling) operate on the most
+        # processed data.
+        resolved_path = rebel_fragments_resolved / "rebel_entity_fragments.jsonl"
+        if _exists(resolved_path):
+            current_fragments_path = resolved_path
 
     # 4) Filter out degenerate fragments
     if run_filter:
@@ -440,6 +446,11 @@ def main(
         current_fragments_path = rebel_fragments_filtered / "rebel_entity_fragments.jsonl"
     else:
         logger.info("Skipping fragment filtering (flag disabled)")
+        # If we skip filtering but filtered outputs already exist, advance to them
+        # so that subsequent steps (e.g., sampling) operate on the most processed data.
+        filtered_path = rebel_fragments_filtered / "rebel_entity_fragments.jsonl"
+        if _exists(filtered_path):
+            current_fragments_path = filtered_path
 
     # 5) Build base datasets (linking/clustering)
     if run_sample_pairs:
