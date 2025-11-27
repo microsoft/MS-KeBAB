@@ -495,7 +495,7 @@ class RebelPairSampler:
                 if fragment.entity_id not in entity_ids:
                     continue
 
-                f_ds.write(fragment.to_json(minimal_repr=True) + "\n")
+                f_ds.write(fragment.with_sorted_properties().to_json(minimal_repr=True) + "\n")
 
                 label = fragment.entity_id
                 f_gt.write(json.dumps(label) + "\n")
@@ -624,8 +624,8 @@ class RebelPairSampler:
             def merged_unique_value_count(sel_indices: list[int]) -> int:
                 """Compute the total number of unique property values across selected fragments."""
                 sel_frags = [fragments[fragment_indices[i]] for i in sel_indices]
-                unique_vals = {v for f in sel_frags for vals in f.properties.values() for v in vals if v}
-                return len(unique_vals)
+                values = [v for f in sel_frags for vals in f.properties.values() for v in vals if v]
+                return len(values)
 
             # Keep adding while total property values <=1 and we have unused fragments
             cursor = 0
@@ -642,6 +642,7 @@ class RebelPairSampler:
         merged_fragment.metadata["fragment_ids"] = [f.metadata["fragment_id"] for f in selected_fragments]
         merged_fragment.metadata["merge_count"] = r
         merged_fragment.metadata["type"] = fragment.wikidata_type
+        merged_fragment = merged_fragment.with_sorted_properties()
 
         return merged_fragment
 

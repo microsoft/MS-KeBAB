@@ -577,9 +577,7 @@ class RebelSplitSampler:
             Shuffle every time because the same fragment can be used more than once (as part of different pre-merged bigger fragments).
             """
             raw_ids = entity.metadata.get("fragment_ids") or [entity.metadata.get("fragment_id")]
-            return [
-                fragment_lookup[fid].with_shuffled_properties(rng=rng).to_dict(minimal_repr=True) for fid in raw_ids
-            ]
+            return [fragment_lookup[fid].to_dict(minimal_repr=True) for fid in raw_ids]
 
         # Shuffle the sampled pairs and labels together (if any)
         pairs_and_labels = list(zip(sampled_pairs, sampled_labels, strict=True))
@@ -596,8 +594,8 @@ class RebelSplitSampler:
             for (left, right), label in pairs_and_labels:
                 # shuffle fragment ids in the metadata of each
                 merged_pair = [
-                    left.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
-                    right.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                    left.to_dict(minimal_repr=True),
+                    right.to_dict(minimal_repr=True),
                 ]
                 rng.shuffle(merged_pair)
                 l, r = merged_pair  # noqa: E741
@@ -715,7 +713,7 @@ class RebelSplitSampler:
             selected = sorted_fragments[: cfg.fragments_per_entity_limit]
             records.extend(
                 (
-                    fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                    fragment.to_dict(minimal_repr=True),
                     entity_id,
                 )
                 for fragment in selected
@@ -746,7 +744,7 @@ class RebelSplitSampler:
                 if entity_id not in entities_to_include:
                     continue
                 records.append(
-                    fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                    fragment.to_dict(minimal_repr=True),
                 )
                 count += 1
 
@@ -773,7 +771,7 @@ class RebelSplitSampler:
                 if entity_id not in entities_to_include:
                     continue
                 records.append(
-                    fragment.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True),
+                    fragment.to_dict(minimal_repr=True),
                 )
                 count += 1
 
@@ -823,7 +821,7 @@ class RebelSplitSampler:
                 seq_len = rng.randint(1, max_len)
                 sampled = rng.sample(fragments, seq_len)
                 rng.shuffle(sampled)
-                frag_list = [f.with_shuffled_properties(rng=rng).to_dict(minimal_repr=True) for f in sampled]
+                frag_list = [f.to_dict(minimal_repr=True) for f in sampled]
                 records.append(frag_list)
                 total_records += 1
 
@@ -857,9 +855,7 @@ class RebelSplitSampler:
                 frag = ResolvedWikidataEntity.from_dict(json.loads(line))
                 fid = frag.metadata.get("fragment_id")
                 assert fid not in fragment_id_lookup
-                fragment_id_lookup[str(fid)] = (
-                    frag.without_metadata().with_shuffled_properties(rng=rng).to_dict(minimal_repr=True)
-                )
+                fragment_id_lookup[str(fid)] = frag.without_metadata().to_dict(minimal_repr=True)
 
         written = 0
         negative_pairs_total = 0
