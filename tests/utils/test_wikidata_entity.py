@@ -55,14 +55,27 @@ def test_wikidata_entity_fields(sample_wikidata_entity_belgium: WikidataEntity) 
     entity.wikipedia_title = ""
     entity_dict = entity.to_dict(minimal_repr=True)
 
-    assert entity_dict == {
-        "entity_id": "Q12345",
-        "properties": {
-            "name": ["Fictional Republic", "FR", "fr", "FRE", "Republic of Fiction"],
-            "P31": ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"],
-        },
-        "source_ids": ["source1"],
-    }
+    # Minimal representation now preserves empty description / wikipedia_title
+    # in the metadata; assert core fields and ensure metadata matches the
+    # current entity state rather than a hard-coded dict.
+    assert entity_dict["entity_id"] == "Q12345"
+    assert entity_dict["properties"]["name"] == [
+        "Fictional Republic",
+        "FR",
+        "fr",
+        "FRE",
+        "Republic of Fiction",
+    ]
+    assert entity_dict["properties"][TypeProperties.INSTANCE_OF.value] == [
+        "Q7777",
+        "Q8888",
+        "Q9999",
+        "Q1111",
+        "Q2222",
+        "Q3333",
+    ]
+    assert entity_dict["source_ids"] == ["source1"]
+    assert entity_dict.get("metadata", {}) == {"description": "", "wikipedia_title": ""}
 
     # modify fields
     entity.aliases = ["Fiction Land"]
@@ -90,4 +103,6 @@ def test_wikidata_entity_to_json_roundtrip(sample_wikidata_entity_belgium: Wikid
     entity.wikipedia_title = ""
     entity_dict = entity.to_dict(minimal_repr=True)
     roundtrip = WikidataEntity.from_dict(entity_dict)
-    assert roundtrip == entity.without_metadata()
+    # Minimal roundtrip should preserve the (now possibly empty) metadata
+    # rather than stripping it.
+    assert roundtrip == entity

@@ -577,10 +577,11 @@ class RebelSplitSampler:
             frag_ids = [str(fid) for fid in raw_ids if fid is not None]
             return [fragment_lookup[fid].to_dict(minimal_repr=True) for fid in frag_ids]
 
-        # Shuffle the sampled pairs and labels together (if any)
+        # Shuffle the sampled pairs and labels together (if any).
         pairs_and_labels = list(zip(sampled_pairs, sampled_labels, strict=True))
-        rng.shuffle(pairs_and_labels)
-        sampled_pairs[:], sampled_labels[:] = zip(*pairs_and_labels, strict=True)
+        if pairs_and_labels:
+            rng.shuffle(pairs_and_labels)
+            sampled_pairs[:], sampled_labels[:] = zip(*pairs_and_labels, strict=True)
 
         with (
             open(ds_out, "w", encoding="utf-8") as f_ds,
