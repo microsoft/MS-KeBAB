@@ -21,6 +21,7 @@ class MockRAGTextCompleter(BaseRAGTextCompleter):
         text_with_mask: str,
         target_content: str,
         augmented_context: str = "",
+        seed: int = 42,
     ) -> dict[str, Any]:
         # Dummy logic for testing.
         return {

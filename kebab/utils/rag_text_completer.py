@@ -51,6 +51,7 @@ class BaseRAGTextCompleter(ABC):
         text_with_mask: str,
         target_content: str,
         augmented_context: str = "",
+        seed: int = 42,
     ) -> dict[str, Any]:
         """
         Processes a single partial query and returns the predicted content and log probabilities.
@@ -59,6 +60,7 @@ class BaseRAGTextCompleter(ABC):
             text_with_mask: The text with a mask indicating the position to be filled.
             target_content: The expected content to fill in the mask.
             augmented_context: Additional context to help with the prediction.
+            seed: seed for the random number generator.
 
         Returns:
             dict[str, Any]: A dictionary requiring the following:
@@ -70,6 +72,7 @@ class BaseRAGTextCompleter(ABC):
     def complete_partial_queries(
         self,
         partial_queries: Iterable[dict[str, Any]],
+        seed: int = 42,
         verbose: bool = False,
     ) -> Iterable[dict[str, Any]]:
         """
@@ -79,6 +82,7 @@ class BaseRAGTextCompleter(ABC):
         Args:
             partial_queries: An iterable of dictionaries, where each dictionary represents a partial
             query to complete.
+            seed: seed for the random number generator.
             verbose: Defaults to False. If True, includes additional information such as the
             original partial query and augmented context in the results for debugging.
 
@@ -109,6 +113,7 @@ class BaseRAGTextCompleter(ABC):
                 text_with_mask=query["text_with_mask"],
                 target_content=query["target_content"],
                 augmented_context=augmented_context,
+                seed=seed,
             )
             result["predicted_content"] = result_single_query["predicted_content"]
             result["target_content_logprob"] = result_single_query["target_content_logprob"]
@@ -492,7 +497,11 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
         self.prediction_method = prediction_method
 
     def prepare_results_from_predicted_token_logits(
-        self, target_content: str, predicted_token_logits: torch.Tensor, top_k: int
+        self,
+        target_content: str,
+        predicted_token_logits: torch.Tensor,
+        top_k: int,
+        additional_info: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Processes the predicted token logits and prepares the results.
@@ -501,6 +510,7 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
             target_content: The expected content to fill in the mask.
             predicted_token_logits: The logits for the predicted tokens.
             top_k: The number of top predictions to consider.
+            additional_info: Optional dictionary containing additional information.
         """
         # Compute log probabilities over the vocabulary.
         log_probs = torch.nn.functional.log_softmax(predicted_token_logits, dim=-1)
@@ -519,6 +529,7 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
         return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
             target_content=target_content,
             top_logprobs=top_logprobs,
+            additional_info=additional_info,
         )
 
 
@@ -566,6 +577,7 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         text_with_mask: str,
         target_content: str,
         augmented_context: str = "",
+        seed: int = 42,
         top_k: int = 20,
     ) -> dict[str, Any]:
         """
@@ -575,6 +587,7 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             text_with_mask: The text with a mask indicating the position to be filled.
             target_content: The expected content to fill in the mask.
             augmented_context: Additional context to help with the prediction.
+            seed: seed for the random number generator.
             top_k: The number of top predictions to consider.
 
         Returns:
@@ -654,6 +667,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         text_with_mask: str,
         target_content: str,
         augmented_context: str = "",
+        seed: int = 42,
         top_k: int = 20,
     ) -> dict[str, Any]:
         """
@@ -663,6 +677,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             text_with_mask: The text with a mask indicating the position to be filled.
             target_content: The expected content to fill in the mask.
             augmented_context: Additional context to help with the prediction.
+            seed: seed for the random number generator.
             top_k: The number of top predictions to consider.
 
         Returns:
@@ -686,6 +701,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
                 text_with_mask=text_with_mask,
                 target_content=target_content,
                 augmented_context=augmented_context,
+                seed=seed,
                 top_k=top_k,
             )
         raise ValueError(f"Unknown prediction method: {self.prediction_method}")
@@ -721,20 +737,78 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             top_k=top_k,
         )
 
-        # Encode the prompt.
-        input_ids = self.tokenizer.encode(text_completion_prompt, return_tensors="pt").to(self.device)
+        # Encode the prompt (returns both input_ids and attention_mask).
+        model_inputs = self.tokenizer(text_completion_prompt, return_tensors="pt").to(self.device)
+        input_ids = model_inputs.input_ids
+        attention_mask = model_inputs.attention_mask
 
-        # Get model outputs (logits for each token).
-        with torch.no_grad():
-            outputs = self.model(input_ids)
+        # Generate tokens to let the model output whitespace/thinking if needed.
+        # We use greedy decoding (do_sample=False) to see what the model most likely wants to output.
+        outputs = cast(
+            GenerateOutput,
+            self.model.generate(
+                input_ids,
+                attention_mask=attention_mask,
+                max_new_tokens=10_000,  # Allow a few tokens to skip potential whitespace.
+                do_sample=False,
+                output_scores=True,
+                return_dict_in_generate=True,
+            ),
+        )
 
-        # Extract logits for the next token (last position).
-        next_token_logits = outputs.logits[0, -1, :]
+        # Decode the generated text.
+        generated_ids = outputs.sequences[0][input_ids.shape[1] :]
+        raw_response = self.tokenizer.decode(generated_ids)
+
+        # Find start of answer (after last occurrence of "</think>" or "<|im_start|>").
+        think_marker = "</think>"
+        im_start_marker = "<|im_start|>"
+        last_think_pos = raw_response.rfind(think_marker)
+        last_im_start_pos = raw_response.rfind(im_start_marker)
+
+        start_search_pos = 0
+        if last_think_pos == -1 and last_im_start_pos == -1:
+            start_search_pos = 0
+        elif last_think_pos > last_im_start_pos:
+            start_search_pos = last_think_pos + len(think_marker)
+        else:
+            start_search_pos = last_im_start_pos + len(im_start_marker)
+        # Find first non-whitespace char index.
+        target_char_index = -1
+        for idx in range(start_search_pos, len(raw_response)):
+            if not raw_response[idx].isspace():
+                target_char_index = idx
+                break
+
+        next_token_logits = None
+        if target_char_index != -1 and outputs.scores is not None:
+            # Find which token corresponds to this character.
+            for i in range(len(generated_ids)):
+                # Decode up to current token.
+                decoded_prefix = self.tokenizer.decode(generated_ids[: i + 1])
+                if len(decoded_prefix) > target_char_index:
+                    # This token covers the target character.
+                    # outputs.scores[i] contains logits for the i-th generated token.
+                    next_token_logits = outputs.scores[i][0]
+                    break
+        error = None
+        if next_token_logits is None:
+            error = "Could not locate target token logits, falling back to last token logits or re-computation."
+            if outputs.scores:
+                next_token_logits = outputs.scores[-1][0]
+            else:
+                with torch.no_grad():
+                    outputs = self.model(input_ids)
+                next_token_logits = outputs.logits[0, -1, :]
+
+        additional_info = {"raw_model_output": raw_response}
+        additional_info |= {"error": error} if error else {}
 
         return self.prepare_results_from_predicted_token_logits(
             target_content=target_content,
             predicted_token_logits=next_token_logits,
             top_k=top_k,
+            additional_info=additional_info,
         )
 
     def __get_logprobs_from_text_response(
@@ -742,6 +816,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         text_with_mask: str,
         target_content: str,
         augmented_context: str,
+        seed: int,
         top_k: int,
     ) -> dict[str, Any]:
         """Prompts the model to output the top word predictions and their probs in JSON format, parses the response, and returns the result dict."""
@@ -770,7 +845,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         error = None
         for attempt in range(max_retries):
             # Generate response from the model (no output_scores).
-            set_seed(42 + attempt)
+            set_seed(seed + attempt)
             outputs = cast(
                 GenerateOutput,
                 self.model.generate(
@@ -855,6 +930,7 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         text_with_mask: str,
         target_content: str,
         augmented_context: str = "",
+        seed: int = 42,
         top_k: int = 20,
     ) -> dict[str, Any]:
         """
@@ -864,6 +940,7 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             text_with_mask: The text with a mask indicating the position to be filled.
             target_content: The expected content to fill in the mask.
             augmented_context: Additional context to help with the prediction.
+            seed:: seed for the random number generator.
             top_k: The number of top predictions to consider.
 
         Returns:
