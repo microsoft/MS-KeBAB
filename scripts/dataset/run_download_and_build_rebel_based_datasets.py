@@ -26,7 +26,11 @@ Resolution behaviour:
 - "Resolve / attach types" (default: disabled) will use / extract a type hierarchy as needed.
 
 Example usage (from repository root):
+    # Public build
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py
+
+    # Public rebuild
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel
 
     # Quick run from pair-sampling onwards to verify the logic
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-resolve-property-values --no-run-filter --max-pair-count 100000
