@@ -26,7 +26,20 @@ Resolution behaviour:
 - "Resolve / attach types" (default: disabled) will use / extract a type hierarchy as needed.
 
 Example usage (from repository root):
+    # Public rebuild
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py
+
+    # Quick run from pair-sampling onwards to verify the logic
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-resolve-property-values --no-run-filter --max-pair-count 100000
+
+    # With type resolution enabled (internal use case)
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --resolve-types --no-verify-md5
+
+    # From pair sampling onwards (expects existing prior outputs)
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-resolve-property-values --no-run-filter
+
+    # From splitting onwards (expects existing base datasets)
+    uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-resolve-property-values --no-run-filter --no-run-sample-pairs
 
 Notes:
 - Extraction of missing Wikidata artifacts requires a standard Wikidata JSON dump (``latest-all.json``) which can be
@@ -114,16 +127,11 @@ def _collect_rebel_output_files(rebel_root: Path) -> list[Path]:
         task_dir = rebel_root / task / "base"
         if task_dir.exists():
             output_files.extend(list(task_dir.glob("*.jsonl")))
-    map_file = rebel_root / "rebel_fragment_to_entity_map.jsonl"
-    if map_file.exists():
-        output_files.append(map_file)
     for task in [
         "linking",
         "clustering",
         "entity_generation",
         "fragment_generation",
-        "incremental_linking",
-        "incremental_set_linking",
     ]:
         task_dir = rebel_root / task
         if task_dir.exists():
@@ -237,6 +245,13 @@ def _verify_md5_file(md5_file: Path, rebel_root: Path, logger: logging.Logger) -
     default=True,
     help=("Whether to verify/create MD5 checksums for all output files."),
 )
+@click.option(
+    "--max-pair-count",
+    type=int,
+    default=20_000_000,
+    show_default=True,
+    help=("Maximum number of pairs to sample when building base datasets."),
+)
 def main(
     working_dir: Path,
     download_rebel: bool,
@@ -246,6 +261,7 @@ def main(
     resolve_types: bool,
     wikidata_json_dump_path: Path | None,
     seed: int,
+    max_pair_count: int,
     run_extract_fragments: bool,
     run_filter: bool,
     run_sample_pairs: bool,
@@ -370,7 +386,7 @@ def main(
         f"types={resolve_types} (path={type_hierarchy_path})"
     )
 
-    # 2) Extract fragments from REBEL dataset (optional)
+    # 2) Extract fragments from REBEL dataset
     if run_extract_fragments:
         logger.info(
             f"Extracting REBEL fragments from {rebel_original_dir} -> {rebel_fragments_extracted} (surface_forms={True})"
@@ -387,7 +403,7 @@ def main(
     # Determine input path for subsequent steps depending on what was run
     current_fragments_path = rebel_fragments_extracted / "rebel_entity_fragments.jsonl"
 
-    # 3) Resolve Wikidata names/types/values where possible given available inputs (optional)
+    # 3) Resolve Wikidata names/types/values where possible given available inputs
     if resolve_property_names or resolve_property_values or resolve_types:
         logger.info(
             "Resolving Wikidata fields ("
@@ -410,8 +426,14 @@ def main(
         current_fragments_path = rebel_fragments_resolved / "rebel_entity_fragments.jsonl"
     else:
         logger.info("Skipping Wikidata resolution (flag disabled)")
+        # If we skip resolution but resolved outputs already exist, advance to them
+        # so that later steps (e.g., filtering/sampling) operate on the most
+        # processed data.
+        resolved_path = rebel_fragments_resolved / "rebel_entity_fragments.jsonl"
+        if _exists(resolved_path):
+            current_fragments_path = resolved_path
 
-    # 4) Filter out degenerate fragments (optional)
+    # 4) Filter out degenerate fragments
     if run_filter:
         logger.info(
             f"Filtering degenerate fragments (drop_without_type={bool(resolve_types)}) -> {rebel_fragments_filtered}"
@@ -425,9 +447,13 @@ def main(
         current_fragments_path = rebel_fragments_filtered / "rebel_entity_fragments.jsonl"
     else:
         logger.info("Skipping fragment filtering (flag disabled)")
+        # If we skip filtering but filtered outputs already exist, advance to them
+        # so that subsequent steps (e.g., sampling) operate on the most processed data.
+        filtered_path = rebel_fragments_filtered / "rebel_entity_fragments.jsonl"
+        if _exists(filtered_path):
+            current_fragments_path = filtered_path
 
-    # 5) Build base datasets (linking/clustering) (optional)
-    max_pair_count = 10_000_000
+    # 5) Build base datasets (linking/clustering)
     if run_sample_pairs:
         logger.info(
             f"Sampling base pairs (max_count={max_pair_count}, max_merge_fragments={10}, merge_distribution={MergeDistributionMode.ZIPF}, "
@@ -446,7 +472,7 @@ def main(
     else:
         logger.info("Skipping pair sampling (flag disabled)")
 
-    # 6) Produce splits for all tasks (optional)
+    # 6) Produce splits for all tasks
     if run_split:
         logger.info(f"Producing dataset splits -> {rebel_root}")
         split_sampler = RebelSplitSampler(

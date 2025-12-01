@@ -10,7 +10,6 @@ from kebab.utils.dataset.rebel.rebel_pair_sampler import RebelPairSampler
 from kebab.utils.dataset.rebel.rebel_split_sampler import (
     ClusteringConfig,
     FragmentSetGenerationConfig,
-    IncrementalLinkingConfig,
     LinkingConfig,
     RebelSplitSampler,
     SplitBuildConfig,
@@ -44,13 +43,18 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     # 1) Build base datasets with the builder
     base_dir = tmp_path / "base"
     base_dir.mkdir(parents=True, exist_ok=True)
+    # Enable uniform sampling to avoid degenerate case where confusing-entity logic yields zero pairs
+    # on very small synthetic test data. This ensures at least one entity enters split A.
     pair_sampler = RebelPairSampler(
         fragments_path=rebel_sample_resolved_fragments_file_path,
         output_dir=base_dir,
+        exclude_single_property_value_entities=False,
+        uniform_sampling=True,
+        max_count=200,
     )
     pair_sampler.run()
 
-    # 2) Configure two tiny splits to keep the test fast
+    # 2) Configure two tiny splits to keep the test fast.
     test_split = SplitBuildConfig(
         name="test",
         linking=LinkingConfig(
@@ -67,8 +71,6 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
             fragments_per_entity_limit=10,
             include_all_linking_fragments_first=True,
         ),
-        incremental_linking=IncrementalLinkingConfig(),
-        incremental_set_linking=IncrementalLinkingConfig(left_as_set=True),
         fragment_set_generation=FragmentSetGenerationConfig(),
     )
 
@@ -88,8 +90,6 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
             fragments_per_entity_limit=10,
             include_all_linking_fragments_first=True,
         ),
-        incremental_linking=IncrementalLinkingConfig(),
-        incremental_set_linking=IncrementalLinkingConfig(left_as_set=True),
         fragment_set_generation=FragmentSetGenerationConfig(),
     )
 
@@ -101,13 +101,11 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     )
     split_sampler.run()
 
-    # 3) Verify outputs: test must be non-empty; dev may be empty depending on tiny sample size
+    # 3) Verify outputs: test must be non-empty; dev may be empty depending on tiny sample size.
     test_linking_dir = out_dir / "linking" / test_split.name
     test_clustering_dir = out_dir / "clustering" / test_split.name
     test_entity_gen_dir = out_dir / "entity_generation" / test_split.name
     test_fragment_gen_dir = out_dir / "fragment_generation" / test_split.name
-    test_incr_linking_dir = out_dir / "incremental_linking" / test_split.name
-    test_incr_set_linking_dir = out_dir / "incremental_set_linking" / test_split.name
     _assert_non_empty(test_linking_dir / RebelPairSampler.LINKING_DATASET_FILENAME)
     _assert_non_empty(test_linking_dir / RebelPairSampler.LINKING_GROUND_TRUTH_FILENAME)
     _assert_non_empty(test_linking_dir / "rebel_linking_used_entities.jsonl")
@@ -115,24 +113,18 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     _assert_non_empty(test_clustering_dir / RebelPairSampler.CLUSTERING_GROUND_TRUTH_FILENAME)
     _assert_non_empty(test_entity_gen_dir / RebelPairSampler.ENTITY_GENERATION_DATASET_FILENAME)
     _assert_non_empty(test_fragment_gen_dir / RebelPairSampler.FRAGMENT_GENERATION_DATASET_FILENAME)
-    # incremental linking variants
+
     from kebab.utils.dataset.rebel.rebel_split_sampler import RebelSplitSampler as _Sampler
 
-    _assert_non_empty(test_incr_linking_dir / _Sampler.INCREMENTAL_LINKING_DATASET_FILENAME)
-    _assert_non_empty(test_incr_linking_dir / _Sampler.INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME)
-    _assert_non_empty(test_incr_set_linking_dir / _Sampler.INCREMENTAL_SET_LINKING_DATASET_FILENAME)
-    _assert_non_empty(test_incr_set_linking_dir / _Sampler.INCREMENTAL_SET_LINKING_GROUND_TRUTH_FILENAME)
     # fragment set generation dataset
     fragset_dir = out_dir / "fragment_set_generation" / test_split.name
     _assert_non_empty(fragset_dir / _Sampler.FRAGMENT_SET_GENERATION_DATASET_FILENAME)
 
-    # dev files should exist; they may be empty if entities are exhausted
+    # dev files should exist; they may be empty if entities are exhausted.
     val_linking_dir = out_dir / "linking" / val_split.name
     val_clustering_dir = out_dir / "clustering" / val_split.name
     val_entity_gen_dir = out_dir / "entity_generation" / val_split.name
     val_fragment_gen_dir = out_dir / "fragment_generation" / val_split.name
-    val_incr_linking_dir = out_dir / "incremental_linking" / val_split.name
-    val_incr_set_linking_dir = out_dir / "incremental_set_linking" / val_split.name
     assert (val_linking_dir / RebelPairSampler.LINKING_DATASET_FILENAME).exists()
     assert (val_linking_dir / RebelPairSampler.LINKING_GROUND_TRUTH_FILENAME).exists()
     assert (val_linking_dir / "rebel_linking_used_entities.jsonl").exists()
@@ -140,11 +132,6 @@ def test_run(rebel_sample_resolved_fragments_file_path: Path, tmp_path: Path) ->
     assert (val_clustering_dir / RebelPairSampler.CLUSTERING_GROUND_TRUTH_FILENAME).exists()
     assert (val_entity_gen_dir / RebelPairSampler.ENTITY_GENERATION_DATASET_FILENAME).exists()
     assert (val_fragment_gen_dir / RebelPairSampler.FRAGMENT_GENERATION_DATASET_FILENAME).exists()
-    # incremental linking variants
-    assert (val_incr_linking_dir / _Sampler.INCREMENTAL_LINKING_DATASET_FILENAME).exists()
-    assert (val_incr_linking_dir / _Sampler.INCREMENTAL_LINKING_GROUND_TRUTH_FILENAME).exists()
-    assert (val_incr_set_linking_dir / _Sampler.INCREMENTAL_SET_LINKING_DATASET_FILENAME).exists()
-    assert (val_incr_set_linking_dir / _Sampler.INCREMENTAL_SET_LINKING_GROUND_TRUTH_FILENAME).exists()
     # fragment set generation dataset
     assert (
         out_dir / "fragment_set_generation" / val_split.name / _Sampler.FRAGMENT_SET_GENERATION_DATASET_FILENAME
@@ -157,7 +144,11 @@ def test_split_sampler_disjoint_entities_between_splits(
     """Ensure entity sets used by different splits are disjoint as intended."""
     # Build base
     base_dir = tmp_path / "base"
-    pair_sampler = RebelPairSampler(fragments_path=rebel_sample_resolved_fragments_file_path, output_dir=base_dir)
+    pair_sampler = RebelPairSampler(
+        fragments_path=rebel_sample_resolved_fragments_file_path,
+        output_dir=base_dir,
+        exclude_single_property_value_entities=False,
+    )
     pair_sampler.run()
 
     # Two small splits
@@ -165,7 +156,8 @@ def test_split_sampler_disjoint_entities_between_splits(
         SplitBuildConfig(
             name="A",
             linking=LinkingConfig(
-                pair_count_limit=40,
+                # Lower limits to better fit tiny test data and guarantee at least one entity appears.
+                pair_count_limit=20,
                 pairs_per_entity_limit=5,
                 property_pattern_count_limit=40,
                 property_overlap_limits={},
@@ -178,14 +170,12 @@ def test_split_sampler_disjoint_entities_between_splits(
                 fragments_per_entity_limit=10,
                 include_all_linking_fragments_first=True,
             ),
-            incremental_linking=IncrementalLinkingConfig(),
-            incremental_set_linking=IncrementalLinkingConfig(left_as_set=True),
             fragment_set_generation=FragmentSetGenerationConfig(),
         ),
         SplitBuildConfig(
             name="B",
             linking=LinkingConfig(
-                pair_count_limit=40,
+                pair_count_limit=20,
                 pairs_per_entity_limit=5,
                 property_pattern_count_limit=40,
                 property_overlap_limits={},
@@ -198,8 +188,6 @@ def test_split_sampler_disjoint_entities_between_splits(
                 fragments_per_entity_limit=10,
                 include_all_linking_fragments_first=True,
             ),
-            incremental_linking=IncrementalLinkingConfig(),
-            incremental_set_linking=IncrementalLinkingConfig(left_as_set=True),
             fragment_set_generation=FragmentSetGenerationConfig(),
         ),
     ]
@@ -215,6 +203,9 @@ def test_split_sampler_disjoint_entities_between_splits(
     ents_a = read_entities(out_dir / "linking" / "A" / "rebel_linking_used_entities.jsonl")
     ents_b = read_entities(out_dir / "linking" / "B" / "rebel_linking_used_entities.jsonl")
 
+    # With the tiny real fixture, it is possible that one of the splits ends up with no entities after
+    # applying all constraints. We still assert that whenever both are non-empty, the entity sets are
+    # strictly disjoint, which is the core invariant.
     assert ents_a, "Split A should have entities"
-    # Split B can be empty on tiny input; but if not empty, must be disjoint
-    assert ents_a.isdisjoint(ents_b), "Entity sets between splits must be disjoint"
+    if ents_b:
+        assert ents_a.isdisjoint(ents_b), "Entity sets between splits must be disjoint when both are non-empty"

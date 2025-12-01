@@ -27,6 +27,7 @@ class TaskType(Enum):
     TextCompletionUsingKB = 6
     QuestionAnsweringUsingDocuments = 7
     QuestionAnsweringUsingKB = 8
+    FragmentSetGeneration = 9
 
 
 class Task(ABC):

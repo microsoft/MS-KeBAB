@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import random
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from copy import deepcopy
@@ -316,6 +317,12 @@ class Entity:
                 if key in entity_dict and not entity_dict[key]:
                     del entity_dict[key]
 
+            if "metadata" in entity_dict:
+                entity_dict["metadata"] = {k: v for k, v in entity_dict["metadata"].items() if v is not None}
+
+                if not entity_dict["metadata"]:
+                    del entity_dict["metadata"]
+
         return entity_dict
 
     def without_metadata(self) -> Self:
@@ -329,6 +336,74 @@ class Entity:
         entity = self.__class__.from_dict(self.to_dict())
         entity.entity_id = ""
         return entity
+
+    def with_shuffled_properties(self, rng: random.Random | None = None) -> Self:  # all uses become sorted
+        """Return a new entity with shuffled property keys and values."""
+        rng = rng or random.Random()  # noqa: S311
+        entity = self.__class__.from_dict(self.to_dict())
+
+        # Shuffle values (and corresponding evidence) within each property.
+        for property_id, property_values in list(entity.properties.items()):
+            if not property_values:
+                continue
+
+            indices = list(range(len(property_values)))
+            rng.shuffle(indices)
+            entity.remap_property_values(property_id, indices)
+
+        # Shuffle property IDs by rebuilding the dict from a shuffled key list.
+        property_ids = list(entity.properties.keys())
+        rng.shuffle(property_ids)
+        entity.remap_properties(property_ids)
+
+        return entity
+
+    def with_sorted_properties(self) -> Self:
+        """Return a new entity with sorted property keys and values.
+
+        The special property "name", if present, is always placed first.
+        """
+        entity = self.__class__.from_dict(self.to_dict())
+
+        # Sort values (and corresponding evidence) within each property.
+        for property_id, property_values in list(entity.properties.items()):
+            if not property_values:
+                continue
+
+            indices = sorted(range(len(property_values)), key=lambda i: property_values[i])
+            entity.remap_property_values(property_id, indices)
+
+        # Sort property IDs by rebuilding the dict from a sorted key list.
+        property_ids = sorted(entity.properties.keys())
+
+        if "name" in entity.properties:
+            property_ids = ["name"] + [pid for pid in property_ids if pid != "name"]
+
+        entity.remap_properties(property_ids)
+
+        return entity
+
+    def remap_property_values(self, property_id: str, indices: list[int]) -> None:
+        """Remap values and evidence for a single property according to indices."""
+        property_values = self.properties[property_id]
+        self.properties[property_id] = [property_values[i] for i in indices]
+
+        if property_id in self.evidence_map:
+            value_to_evidence = self.evidence_map[property_id]
+            self.evidence_map[property_id] = [value_to_evidence[i] for i in indices]
+
+    def remap_properties(self, property_ids: list[str]) -> None:
+        """Remap property order (and corresponding evidence) according to property_ids."""
+        remapped_properties: dict[str, list[Any]] = {}
+        remapped_evidence_map: dict[str, list[list[int]]] = defaultdict(list)
+
+        for property_id in property_ids:
+            remapped_properties[property_id] = self.properties[property_id]
+            if property_id in self.evidence_map:
+                remapped_evidence_map[property_id] = self.evidence_map[property_id]
+
+        self.properties = defaultdict(list, remapped_properties)
+        self.evidence_map = defaultdict(list, remapped_evidence_map)
 
     def filter_values(self, filter_func: Callable[[str, Any], bool]) -> Self | None:
         """Return a new entity with filtered values.

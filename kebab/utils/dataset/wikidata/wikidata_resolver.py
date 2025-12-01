@@ -151,7 +151,7 @@ class WikidataResolver:
             self._logger.info("Loading Wikidata type hierarchy")
             _, type_id_to_node = wikidata_utils.load_type_hierarchy(self.wikidata_type_hierarchy_path)  # type: ignore[arg-type]
 
-        if self.resolve_property_values:
+        if self.resolve_property_values or self.attach_types:
             # collect all referenced IDs (for which we'll need to get Wikidata entities)
             self._logger.info("Collecting all referenced IDs")
             referenced_ids = self.collect_referenced_ids()
@@ -264,7 +264,8 @@ class WikidataResolver:
                         value = ref_value
 
                     if value is not None:
-                        values.append(value)
+                        if value != "":
+                            values.append(value)
                     else:
                         unknown_properties[prop_name] += 1
 
@@ -287,7 +288,7 @@ class WikidataResolver:
             if self.resolve_attached_types:
                 entity_types = [type_id_to_node[t]["name"] if t in type_id_to_node else t for t in entity_types]
 
-            entity.metadata["type"] = entity_types
+            entity.metadata["type"] = [t for t in entity_types if t]
 
         for prop, count in sorted(unknown_properties.items(), key=lambda x: x[1], reverse=True):
             self._logger.warning(f"Unknown values for property {prop}: {count:,}")

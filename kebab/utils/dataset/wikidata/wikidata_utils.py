@@ -97,48 +97,23 @@ class WikidataEntity(Entity):
         """Set the types of the entity."""
         self.properties[TypeProperties.INSTANCE_OF.value] = value
 
-    def to_dict(self, minimal_repr: bool = False) -> dict:
-        """Convert the WikidataEntity to a dictionary."""
-        entity_dict = super().to_dict(minimal_repr=minimal_repr)
+    def __str__(self) -> str:
+        """String representation of the entity."""
+        s = f"{self.entity_id}: " if self.entity_id else ""
+        s += f"{self.name} | "
 
-        if minimal_repr and "metadata" in entity_dict:
-            metadata_dict = entity_dict["metadata"]
-            for key in ["description", "wikipedia_title"]:
-                if key in metadata_dict and not metadata_dict[key]:
-                    del metadata_dict[key]
+        properties_str = "|".join(
+            f"{prop_id}:{','.join(sorted(values))}" for prop_id, values in sorted(self.properties.items())
+        )
 
-            if not entity_dict["metadata"]:
-                del entity_dict["metadata"]
-
-        return entity_dict
+        s += properties_str
+        return s
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create a WikidataEntity from a dictionary."""
-        # TODO(pmyshkov): remove this hacks after the data is re-generated
-        if "id" in data:
-            data["entity_id"] = data.pop("id")
-
-        if "types" in data:
-            data["properties"] = {TypeProperties.INSTANCE_OF.value: data.pop("types")}
-
-        if "name" in data:
-            data["properties"]["name"] = [data.pop("name")]
-
-        if not data["properties"]["name"]:
-            data["properties"]["name"] = []
-
-        if "aliases" in data:
-            data["properties"]["name"].extend(data.pop("aliases"))
-
         if "metadata" not in data:
             data["metadata"] = {}
-
-        if "description" in data:
-            data["metadata"]["description"] = data.pop("description")
-
-        if "wikipedia" in data:
-            data["metadata"]["wikipedia_title"] = data.pop("wikipedia")
 
         return cls(**data)
 

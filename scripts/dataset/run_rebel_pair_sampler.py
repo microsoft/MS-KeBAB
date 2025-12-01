@@ -54,6 +54,12 @@ from kebab.utils.dataset.rebel.rebel_pair_sampler import MergeDistributionMode, 
     default=0,
     help="Random seed to use for sampling.",
 )
+@click.option(
+    "--exclude-singleton-entities/--include-singleton-entities",
+    is_flag=True,
+    default=True,
+    help=("Exclude entities whose merged fragments contain exactly one property with one value (default: exclude)."),
+)
 @click.command()
 def main(
     rebel_fragments_path: Path,
@@ -63,6 +69,7 @@ def main(
     merge_distribution: str,
     deduplicate: bool,
     seed: int | None,
+    exclude_singleton_entities: bool,
 ) -> None:
     """Run REBEL linking and clustering datasets building steps."""
     logging_helpers.configure_logging()
@@ -74,6 +81,7 @@ def main(
         max_merge_fragments=max_merge_fragments,
         merge_distribution=MergeDistributionMode(merge_distribution) if merge_distribution else None,
         deduplicate_values=deduplicate,
+        exclude_single_property_value_entities=exclude_singleton_entities,
         seed=seed,
     )
 

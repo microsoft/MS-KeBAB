@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from logging import Logger
 from pathlib import Path
 from typing import Any
 
@@ -56,3 +57,19 @@ class FragmentSetGenerationTask(Task):
             items: An iterable of items to be written to the file.
         """
         raise NotImplementedError("write_items is not implemented for FragmentSetGenerationTask")
+
+    def evaluate(
+        self, predictions: Path, result_output_path: Path | None = None, logger: Logger | None = None
+    ) -> dict[str, float]:
+        """
+        Evaluate an output for the task.
+
+        Args:
+            predictions: The path to the predictions file that needs to be evaluated.
+            result_output_path: Optional path to save the evaluation results to.
+            logger: Optional logger to log the evaluation process.
+
+        Returns:
+            dict[str, float]: A dictionary containing the evaluation metrics.
+        """
+        raise NotImplementedError("evaluate is not implemented for FragmentSetGenerationTask")

@@ -10,13 +10,12 @@ This can be run on T-REx dataset as well.
 - Optionally, verify that the Wikidata property keys exist in the Wikidata properties file.
 
 Example output:
-{"entity_id": "Q33298", "properties": {"name": ["Filipino"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "0"}}
-{"entity_id": "Q918448", "properties": {"name": ["denomination"]}, "metadata": {"doc_id": "30111982", "source_text_hash": "4f98100d7d6b507d01f96fa5408ba0a9", "fragment_id": "1"}}
+{"entity_id": "Q2038835", "properties": {"name": ["Trinity Peninsula"], "P361": ["Graham Land"], "P30": ["Antarctica"]}, "metadata": {"fragment_id": "1", "title": "Coburg Peak", "entity_id": "Q5139027"}}
+{"entity_id": "Q618370", "properties": {"name": ["Graham Land"], "P30": ["Antarctica"]}, "metadata": {"fragment_id": "2", "title": "Coburg Peak", "entity_id": "Q5139027"}}
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import typing
@@ -41,9 +40,6 @@ class RebelFragmentExtractor:
     DISALLOWED_NAMES: typing.ClassVar[set[str]] = {"", "it", "he", "she", "they"}
 
     ENTITY_FRAGMENTS_FILENAME: str = "rebel_entity_fragments.jsonl"
-
-    INCLUDE_TITLE_AS_PROPERTY: bool = False
-    INCLUDE_MENTION_AS_PROPERTY: bool = False
 
     SPLIT_INTO_SUB_DOCUMENTS: bool = False  # Applies only to T-REx dataset (REBEL doesn't have sentence boundaries)
 
@@ -184,10 +180,6 @@ class RebelFragmentExtractor:
                 stats["short_text_documents"] += 1
                 return {}
 
-        # use text + title md5 hash as a global unique source_id
-        text = record["title"] + "\n" + record["text"]
-        source_text_hash = hashlib.md5(text.encode()).hexdigest()  # noqa: S324
-        doc_id = record["docid"]
         main_entity_uri = record["uri"]
 
         invalid_entities = 0
@@ -208,15 +200,9 @@ class RebelFragmentExtractor:
 
             if entity_id not in fragments:
                 fragment = WikidataEntity(entity_id=entity_id)
-                fragment.metadata["doc_id"] = doc_id
-                fragment.metadata["source_text_hash"] = source_text_hash
                 fragment.metadata["fragment_id"] = str(cls._UNSAFE_FRAGMENT_COUNTER)
-
-                if cls.INCLUDE_TITLE_AS_PROPERTY:
-                    fragment.properties["trex_title"].append(record["title"])
-
-                if cls.INCLUDE_MENTION_AS_PROPERTY:
-                    fragment.properties["trex_mention"].append(record["text"])
+                fragment.metadata["title"] = record["title"]
+                fragment.metadata["title_entity_id"] = record["uri"]
 
                 cls._UNSAFE_FRAGMENT_COUNTER += 1
 

@@ -15,6 +15,7 @@ from kebab.contracts.task import Task, TaskType
 from kebab.tasks.clustering import ClusteringTask
 from kebab.tasks.entity_generation import EntityGenerationTask
 from kebab.tasks.extraction import ExtractionTask
+from kebab.tasks.fragment_set_generation import FragmentSetGenerationTask
 from kebab.tasks.linking import LinkingTask
 from kebab.tasks.question_answering import QuestionAnsweringUsingDocumentsTask, QuestionAnsweringUsingKBTask
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask, TextCompletionUsingKBTask
@@ -65,6 +66,8 @@ class Benchmark:
                     task_class = LinkingTask
                 case TaskType.Clustering:
                     task_class = ClusteringTask
+                case TaskType.FragmentSetGeneration:
+                    task_class = FragmentSetGenerationTask
                 case TaskType.TextCompletionUsingDocuments:
                     task_class = TextCompletionUsingDocumentsTask
                 case TaskType.TextCompletionUsingKB:
