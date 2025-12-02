@@ -704,6 +704,13 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
                 seed=seed,
                 top_k=top_k,
             )
+        if self.prediction_method == PredictionMethod.WORD_FROM_TEXT_RESPONSE:
+            return self.__get_word_from_text_response(
+                text_with_mask=text_with_mask,
+                target_content=target_content,
+                augmented_context=augmented_context,
+                seed=seed,
+            )
         raise ValueError(f"Unknown prediction method: {self.prediction_method}")
 
     def __get_logprobs_from_logits(
@@ -882,6 +889,74 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         top_logprobs = [top_logprobs] if top_logprobs is not None else None
         additional_info = {"raw_model_output": raw_response}
         additional_info |= {"error": error} if error else {}
+
+        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
+            target_content=target_content,
+            top_logprobs=top_logprobs,
+            additional_info=additional_info,
+        )
+
+    def __get_word_from_text_response(
+        self,
+        text_with_mask: str,
+        target_content: str,
+        augmented_context: str,
+        seed: int,
+    ) -> dict[str, Any]:
+        """Prompts the model to output a single word prediction, parses the response, and returns the result dict."""
+        text_completion_prompt = self.prediction_method.build_text_completion_prompt(
+            text_with_mask=text_with_mask,
+            augmented_context=augmented_context,
+            top_k=1,
+        )
+
+        messages = [
+            {"role": "user", "content": text_completion_prompt},
+        ]
+
+        inputs = self.tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            enable_thinking=True,
+            return_tensors="pt",
+            return_dict=True,
+        ).to(self.device)
+
+        # Retry to extract and parse the JSON list.
+        max_retries = 3
+        predicted_word = None
+        raw_response = ""
+        for attempt in range(max_retries):
+            # Generate response from the model (no output_scores).
+            set_seed(seed + attempt)
+            outputs = cast(
+                GenerateOutput,
+                self.model.generate(
+                    **inputs,
+                    max_new_tokens=10_000,
+                    temperature=0.7,
+                    return_dict_in_generate=True,
+                ),
+            )
+
+            # Decode the generated text.
+            generated_ids = outputs.sequences[0][inputs.input_ids.shape[1] :]
+            raw_response = self.tokenizer.decode(generated_ids)
+
+            # Only look into the content between "</think>" and "<|im_end|>".
+            start_marker = "</think>"
+            end_marker = "<|im_end|>"
+            start_idx = raw_response.find(start_marker)
+            content_start = start_idx + len(start_marker) if start_idx != -1 else 0
+            end_idx = raw_response.find(end_marker, content_start)
+            predicted_word = raw_response[content_start:end_idx] if end_idx != -1 else raw_response[content_start:]
+
+            if predicted_word:
+                break
+
+        top_logprobs = [[{"token": predicted_word, "logprob": 0.0}]] if predicted_word else None
+        additional_info = {"raw_model_output": raw_response}
+        additional_info |= {"error": "Response is empty."} if not predicted_word else {}
 
         return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
             target_content=target_content,
