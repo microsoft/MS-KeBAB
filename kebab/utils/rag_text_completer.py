@@ -450,6 +450,8 @@ Answer: """
             text_with_mask: The text with a mask indicating the position to be filled.
             augmented_context: Additional context to help with the prediction.
         """
+        # TODO (allenwang-ms): The following prompt needs to be refined/tested to ensure the model
+        # behaves as expected.
         text_completion_prompt = f"""{
             PredictionMethod.__build_base_text_completion_prompt(
                 text_with_mask=text_with_mask, augmented_context=augmented_context
@@ -750,7 +752,6 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         attention_mask = model_inputs.attention_mask
 
         # Generate tokens to let the model output whitespace/thinking if needed.
-        # We use greedy decoding (do_sample=False) to see what the model most likely wants to output.
         outputs = cast(
             GenerateOutput,
             self.model.generate(
@@ -772,7 +773,6 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         im_start_marker = "<|im_start|>"
         last_think_pos = raw_response.rfind(think_marker)
         last_im_start_pos = raw_response.rfind(im_start_marker)
-
         start_search_pos = 0
         if last_think_pos == -1 and last_im_start_pos == -1:
             start_search_pos = 0
@@ -795,12 +795,11 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
                 decoded_prefix = self.tokenizer.decode(generated_ids[: i + 1])
                 if len(decoded_prefix) > target_char_index:
                     # This token covers the target character.
-                    # outputs.scores[i] contains logits for the i-th generated token.
-                    next_token_logits = outputs.scores[i][0]
+                    next_token_logits = outputs.scores[i][0]  # logits for the i-th generated token
                     break
         error = None
         if next_token_logits is None:
-            error = "Could not locate target token logits, falling back to last token logits or re-computation."
+            error = "Could not locate target token logits, falling back to last token logits."
             if outputs.scores:
                 next_token_logits = outputs.scores[-1][0]
             else:
@@ -922,10 +921,11 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             return_dict=True,
         ).to(self.device)
 
-        # Retry to extract and parse the JSON list.
+        # Retry to extract and parse the response.
         max_retries = 3
         predicted_word = None
         raw_response = ""
+        error = None
         for attempt in range(max_retries):
             # Generate response from the model (no output_scores).
             set_seed(seed + attempt)
@@ -951,12 +951,16 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             end_idx = raw_response.find(end_marker, content_start)
             predicted_word = raw_response[content_start:end_idx] if end_idx != -1 else raw_response[content_start:]
 
-            if predicted_word:
-                break
+            if not predicted_word:
+                error = "Could not find a valid word in the response."
+                print(f"Attempt {attempt + 1}: {error}")
+                continue
+            error = None
+            break
 
         top_logprobs = [[{"token": predicted_word, "logprob": 0.0}]] if predicted_word else None
         additional_info = {"raw_model_output": raw_response}
-        additional_info |= {"error": "Response is empty."} if not predicted_word else {}
+        additional_info |= {"error": error} if error else {}
 
         return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
             target_content=target_content,
