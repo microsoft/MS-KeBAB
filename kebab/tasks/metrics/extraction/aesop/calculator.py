@@ -15,19 +15,19 @@ import pandas as pd
 import xlsxwriter
 from sentence_transformers import SentenceTransformer
 
-from kebab.contracts.entity import Entity, Property, PropertySchema
-from kebab.tasks.metrics.extraction.aesop import distances
+from kebab.contracts.entity import Entity, Property, PropertySchema, ValueType
 from kebab.tasks.metrics.extraction.aesop.distances import (
     BinaryMatchDistance,
     EditDistance,
-    ElementDistance,
     EmbeddingDistance,
     EntityDistance,
     PropertyScore,
+    ReferenceResolvingDistance,
     SetPropertyDistance,
     SingleValuePropertyDistance,
     TokenDistance,
     ValueMatchingRecordWithScores,
+    get_element_distance,
 )
 from kebab.tasks.metrics.extraction.aesop.metric_helpers import EntityMatcher, MetricsAccumulator, MetricsComputer
 from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator, MetricConfig
@@ -37,9 +37,9 @@ from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCa
 class ValueAveragedAesopConfig(MetricConfig):
     """Value-averaged-AESOP metric configuration."""
 
-    matching_score_function: Callable[[Entity, Entity], float]
+    matching_score_function: EntityDistance
     matching_threshold: float
-    property_score_functions: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWithScores]]
+    property_score_functions: dict[str, PropertyScore]
     property_schema: PropertySchema
     properties_to_skip: set[str] = field(default_factory=set)
 
@@ -47,13 +47,11 @@ class ValueAveragedAesopConfig(MetricConfig):
     def from_dict(config: dict[str, Any], property_schema: PropertySchema) -> ValueAveragedAesopConfig:
         """Create value-averaged-AESOP metric configuration from dictionary."""
 
-        def get_element_distance(element_distance_params: dict[str, Any]) -> ElementDistance:
-            """Get element distance function from parameters."""
-            element_distance_cls_name = element_distance_params["name"]
-            return getattr(distances, element_distance_cls_name).from_dict(element_distance_params.get("params", {}))
+        mode = getattr(ReferenceResolvingDistance.Mode, config.get("reference_resolving_mode", "values").upper())
 
         default_property_score = PropertyScore(
-            SetPropertyDistance(get_element_distance(config["default_property_distance"]))
+            SetPropertyDistance(ReferenceResolvingDistance(
+                get_element_distance(config["default_property_distance"]), mode))
         )
 
         properties_to_skip = set(config.get("properties_to_skip", []))
@@ -64,18 +62,26 @@ class ValueAveragedAesopConfig(MetricConfig):
                 raise ValueError(f"Property '{property_name}' is not present in the property schema.")
             if property_name not in properties_to_skip:
                 element_distance = get_element_distance(score_config)
+                element_distance = ReferenceResolvingDistance(
+                    element_distance, mode) if property_schema.properties[property_name].data_type.value_type is ValueType.REFERENCE else element_distance
                 property_score_functions[property_name] = PropertyScore(
                     SetPropertyDistance(element_distance)
                     if property_schema.properties[property_name].is_collection
                     else SingleValuePropertyDistance(element_distance)
                 )
         return ValueAveragedAesopConfig(
-            matching_score_function=EntityDistance.from_dict(config["entity_distance"], property_schema),
+            matching_score_function=EntityDistance.from_dict(config["entity_distance"], property_schema, mode),
             matching_threshold=config["matching_threshold"],
             property_score_functions=property_score_functions,
             property_schema=property_schema,
             properties_to_skip=properties_to_skip,
         )
+    
+    def update_with_entity_info(self, gt_entities: dict[str, Entity], pred_entities: dict[str, Entity]) -> None:
+        """Update internal distance functions with entity information for reference resolving distances."""
+        for score_function in self.property_score_functions.values():
+            score_function.update_with_entity_info(gt_entities, pred_entities)
+        self.matching_score_function.update_with_entity_info(gt_entities, pred_entities)
 
 
 def document_debug_output_to_excel(
@@ -279,8 +285,14 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1} with ID {gt.document.document_id}")
 
-            gt_entities = [entity for entity in gt.entities if "time" not in entity.properties.get("type", [])]
-            pred_entities = [entity for entity in pred.entities if "time" not in entity.properties.get("type", [])]
+            # gt_entities = [entity for entity in gt.entities if "time" not in entity.properties.get("type", [])]
+            # pred_entities = [entity for entity in pred.entities if "time" not in entity.properties.get("type", [])]
+            gt_entities = gt.entities.copy()
+            pred_entities = pred.entities.copy()
+            self.config.update_with_entity_info(
+                {entity.entity_id: entity for entity in gt_entities},
+                {entity.entity_id: entity for entity in pred_entities},
+            )
             for property_to_skip in self.config.properties_to_skip:
                 for entity in gt_entities:
                     if property_to_skip in entity.properties:

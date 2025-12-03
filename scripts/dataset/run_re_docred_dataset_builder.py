@@ -16,7 +16,7 @@ from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedData
 @click.option(
     "--re-docred-dir",
     type=Path,
-    default=Path.cwd() / "data" / "Re-DocRED" / "Original Dataset" / "test",
+    default=Path.cwd() / "data" / "Re-DocRED" / "Original Dataset" / "dev",
     help="Path to the Re-DocRED data directory (will be *.json-globbed against).",
 )
 @click.option(
@@ -28,7 +28,7 @@ from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedData
 @click.option(
     "--output-dir",
     type=Path,
-    default=Path.cwd() / "data" / "Re-DocRED" / "Extractions"/ "test",
+    default=Path.cwd() / "data" / "Re-DocRED" / "Extractions"/ "dev_updated",
     help="Path to the output directory ('extracts.jsonl' and 'entities.jsonl' will be created there).",
 )
 @click.option(

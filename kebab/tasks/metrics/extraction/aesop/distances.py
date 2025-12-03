@@ -7,6 +7,7 @@ from __future__ import annotations
 import abc
 import sys
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 
 import nltk
@@ -45,6 +46,10 @@ class ElementDistance(abc.ABC):
     def from_dict(cls, config: dict[str, Any]) -> ElementDistance:
         """Create element distance from dictionary."""
         raise NotImplementedError
+    
+    def update_with_entity_info(self, gt_entities: dict[str, Entity], pred_entities: dict[str, Entity]) -> None:
+        """Update internal distance functions with entity information for reference resolving distances."""
+        return None
 
 
 class TokenDistance(ElementDistance):
@@ -177,9 +182,75 @@ class TypeNameDistance(ElementDistance):
         """Create type name distance from dictionary."""
         return TypeNameDistance(config.get("miscellaneous_distance"))
 
+class ReferenceResolvingDistance(ElementDistance):
+    """Reference resolving distance class.
+        Resolves references in property values and computes distance on resolved values.
+    Modes:
+        - REFERENCES: resolves references to names for both ground truth and prediction values.
+        - VALUES: resolves references to names for ground truth values only, treats prediction values as is.
+        Internal distance is computed as best match between all resolved values.
+    """
+    class Mode(StrEnum):
+        REFERENCES = "references"
+        VALUES = "values"
+
+    def __init__(self, internal_distance: ElementDistance, mode: Mode, gt_entities: dict[str, Entity] | None = None, pred_entities: dict[str, Entity] | None = None):
+        """Initialize reference resolving distance."""
+        self.gt_entities = gt_entities
+        self.pred_entities = pred_entities
+        self.internal_distance = internal_distance
+        self.mode = mode
+
+    def check_constraints(self, property_: Property) -> None:
+        """Check constraints for reference resolving distance."""
+        if property_.data_type.value_type is not ValueType.REFERENCE:
+            raise ValueError("Only ValueType.REFERENCE properties are supported.")
+    
+    def resolve_value(self, value: Any, is_gt: bool) -> Any:
+        """Resolve reference to actual value."""
+        entities = self.gt_entities if is_gt else self.pred_entities
+        if entities is None:
+            raise ValueError("Entities must be provided for reference resolving.")
+        entity = entities.get(str(value))
+        if entity is None:
+            raise ValueError(f"Reference resolution failed: entity with id '{value}' not found.")
+        if is_gt or self.mode == self.Mode.REFERENCES:
+            return entity.properties["name"]
+        return value
+
+    def compute(self, value1: Any, value2: Any, property_: Property) -> float:
+        """Compute distance between property values after resolving references."""
+        resolved_value1 = self.resolve_value(value1, is_gt=True)
+        resolved_value2 = self.resolve_value(value2, is_gt=False)
+        min_distance = 1.0
+        for value1 in enumerate(resolved_value1):
+            for value2 in enumerate(resolved_value2):
+                distance = self.internal_distance(value1, value2, property_)
+                if distance < min_distance: 
+                    min_distance = distance
+        return min_distance
+
+    def update_with_entity_info(self, gt_entities: dict[str, Entity], pred_entities: dict[str, Entity]) -> None:
+        super().update_with_entity_info(gt_entities, pred_entities)
+        self.pred_entities = pred_entities
+        self.gt_entities = gt_entities
+
+    @classmethod
+    def from_dict(cls, config: dict[str, Any]) -> ReferenceResolvingDistance:  # noqa: ARG003
+        """Create reference resolving distance from dictionary."""
+        internal_distance_config = config.get("internal_distance", {})
+        return ReferenceResolvingDistance(get_element_distance(internal_distance_config), config.get("mode", cls.Mode.VALUES))
+
 
 PropertyDistanceValue = tuple[list[float], int]
 PropertyScoreValue = tuple[list[float], int]
+
+
+def get_element_distance(element_distance_params: dict[str, Any]) -> ElementDistance:
+    """Get element distance function from parameters."""
+    element_distance_cls_name = element_distance_params["name"]
+    return globals()[element_distance_cls_name].from_dict(element_distance_params.get("params", {}))
+
 
 
 class PropertyDistance(abc.ABC):
@@ -210,6 +281,10 @@ class PropertyDistance(abc.ABC):
         self.check_constraints(property_)
         return self.compute(gt_entity, pred_entity, property_)
 
+    @abc.abstractmethod
+    def update_with_entity_info(self, gt_entities: dict[str, Entity], pred_entities: dict[str, Entity]) -> None:
+        """Update internal distance functions with entity information for reference resolving distances."""
+        raise NotImplementedError
 
 @dataclass
 class ValueMatchingRecordWithDistances:
@@ -269,6 +344,10 @@ class SingleValuePropertyDistance(PropertyDistance):
         else:
             score = self.element_distance(gt_entity[property_][0], pred_entity[property_][0], property_)
         return ValueMatchingRecordWithDistances(gt_values, pred_values, [score], [], [])
+    
+    def update_with_entity_info(self, gt_entities: dict[str, Entity], pred_entities: dict[str, Entity]) -> None:
+        """Update internal distance functions with entity information for reference resolving distances."""
+        self.element_distance.update_with_entity_info(gt_entities, pred_entities)
 
 
 class SetPropertyDistance(PropertyDistance):
@@ -314,6 +393,10 @@ class SetPropertyDistance(PropertyDistance):
             list(pred_values[unmatched_pred_indices]),
         )
 
+    def update_with_entity_info(self, gt_entities: dict[str, Entity], pred_entities: dict[str, Entity]) -> None:
+        """Update internal distance functions with entity information for reference resolving distances."""
+        self.element_distance.update_with_entity_info(gt_entities, pred_entities)
+
 
 class PropertyScore:
     """Property score class."""
@@ -344,6 +427,10 @@ class PropertyScore:
             value_matching_record.unmatched_gt_values,
             value_matching_record.unmatched_pred_values,
         )
+
+    def update_with_entity_info(self, gt_entities: dict[str, Entity], pred_entities: dict[str, Entity]) -> None:
+        """Update internal distance functions with entity information for reference resolving distances."""
+        self.property_distance.update_with_entity_info(gt_entities, pred_entities)
 
 
 class EntityDistance:
@@ -407,7 +494,7 @@ class EntityDistance:
                 )
 
     @classmethod
-    def from_dict(cls, config: dict[str, Any], property_schema: PropertySchema) -> EntityDistance:
+    def from_dict(cls, config: dict[str, Any], property_schema: PropertySchema, mode: ReferenceResolvingDistance.Mode) -> EntityDistance:
         """Create entity distance from dictionary."""
         property_to_distance_function_and_weight = {}
         default_weight = config.get("default_property_weight", cls.DEFAULT_PROPERTY_WEIGHT)
@@ -417,6 +504,7 @@ class EntityDistance:
             element_distance = getattr(sys.modules[__name__], params["distance_function"]["name"]).from_dict(
                 params["distance_function"].get("params", {})
             )
+            element_distance = ReferenceResolvingDistance(element_distance, mode) if property_schema.properties[property_id].data_type.value_type == ValueType.REFERENCE else element_distance
             property_distance = (
                 SetPropertyDistance(element_distance)
                 if property_schema.properties[property_id].is_collection
@@ -435,6 +523,12 @@ class EntityDistance:
         return EntityDistance(
             property_schema, property_to_distance_function_and_weight, default_property_distance, default_weight
         )
+    
+    def update_with_entity_info(self, gt_entities: dict[str, Entity], pred_entities: dict[str, Entity]) -> None:
+        """Update internal distance functions with entity information for reference resolving distances."""
+        for property_distance, _ in self.property_to_distance_function_and_weight.values():
+            property_distance.update_with_entity_info(gt_entities, pred_entities)
+        self.default_property_distance.update_with_entity_info(gt_entities, pred_entities)
 
 
 #######################################################################################################################
