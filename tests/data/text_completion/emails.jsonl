@@ -1,0 +1,2 @@
+{"document_id":"email_0","schema_id":"email","data":{"from":"allen@email.com","to":["john@email.com"],"cc":[],"subject":"Hello","date":"2024-04-25T00:00:00Z","body":"Is China the most populous country?"}}
+{"document_id":"email_1","schema_id":"email","data":{"from":"john@email.com","to":["allen@email.com"],"cc":[],"subject":"Re: Hello","date":"2024-04-25T12:00:00Z","body":"No, India has the largest population."}}

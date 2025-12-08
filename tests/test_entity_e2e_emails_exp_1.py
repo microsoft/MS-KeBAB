@@ -9,11 +9,11 @@ from kebab.contracts.document import Document, DocumentSchema, DocumentUtilities
 from kebab.contracts.entity import Entity, EntityUtilities, PropertySchema
 
 
-def test_load_document_collection(emails_exp_1_dir_path: Path):
+def test_load_document_collection(document_schema_dir_path: Path, emails_exp_1_dir_path: Path):
     """Test loading a collection of documents from the emails experiment 1."""
     documents = list(
         DocumentUtilities.load_collection(
-            path_to_schema_dir=emails_exp_1_dir_path / "document_schemas",
+            path_to_schema_dir=document_schema_dir_path,
             path_to_documents_dir=emails_exp_1_dir_path / "documents",
         )
     )
@@ -32,9 +32,9 @@ def test_load_document_collection(emails_exp_1_dir_path: Path):
     assert document.data["body"] == "Hello, John, Happy Birthday!"
 
 
-def test_schema_to_from_dict(emails_exp_1_dir_path: Path):
+def test_schema_to_from_dict(document_schema_dir_path: Path):
     """Test converting a schema to and from a dictionary."""
-    schema = next(iter(DocumentUtilities.load_schemas(emails_exp_1_dir_path / "document_schemas").values()))
+    schema = next(iter(DocumentUtilities.load_schemas(document_schema_dir_path).values()))
 
     schema_dict = schema.to_dict()
     new_schema = DocumentSchema.from_dict(schema_dict)
@@ -42,11 +42,11 @@ def test_schema_to_from_dict(emails_exp_1_dir_path: Path):
     assert schema == new_schema
 
 
-def test_document_to_from_json(emails_exp_1_dir_path: Path):
+def test_document_to_from_json(document_schema_dir_path: Path, emails_exp_1_dir_path: Path):
     """Test converting a document to and from a dictionary."""
     documents = list(
         DocumentUtilities.load_collection(
-            path_to_schema_dir=emails_exp_1_dir_path / "document_schemas",
+            path_to_schema_dir=document_schema_dir_path,
             path_to_documents_dir=emails_exp_1_dir_path / "documents",
         )
     )
