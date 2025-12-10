@@ -294,6 +294,8 @@ class MatchedEntitiesScorer:
                 evaluated_property_metrics.property_value_count_gt[gt_idx] += len(self.entities_gt[gt_idx][property_])
             elif property_ in self.entities_pred[pred_idx]:
                 pred_values = self.entities_pred[pred_idx][property_]
+                evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
+                evaluated_property_metrics.unmatched_count += len(pred_values)
                 self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWithScores(
                     [], [], [], [], pred_values
                 )

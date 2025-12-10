@@ -926,13 +926,13 @@ def test_aggregate_across_documents_with_multiple_entities_and_missing_propertie
     assert metrics_accumulator.total_gt_property_value_counts_per_doc["name"] == [1, 1, 1]
     assert metrics_accumulator.total_unmatched_counts_per_doc["name"] == 0
 
-    assert len(metrics_accumulator.total_scores_per_doc["type"]) == 1
+    assert len(metrics_accumulator.total_scores_per_doc["type"]) == 2
     assert metrics_accumulator.total_gt_property_value_counts_per_doc["type"] == [0, 0]
-    assert metrics_accumulator.total_unmatched_counts_per_doc["type"] == 0
+    assert metrics_accumulator.total_unmatched_counts_per_doc["type"] == 2
 
     assert len(metrics_accumulator.total_scores_per_doc["definitions"]) == 1
     assert metrics_accumulator.total_gt_property_value_counts_per_doc["definitions"] == [0]
-    assert metrics_accumulator.total_unmatched_counts_per_doc["definitions"] == 0
+    assert metrics_accumulator.total_unmatched_counts_per_doc["definitions"] == 1
 
     assert metrics["property_precision"]["name"] == 1.0
     assert metrics["property_precision"]["type"] == 0.0
