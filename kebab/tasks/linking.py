@@ -124,7 +124,6 @@ class LinkingTask(Task):
             )
 
         output_dir = result_output_path.parent if result_output_path else Path.cwd()
-        output_dir = output_dir / self.path_safe_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # compute probabilistic metrics (and update the log-odds in-place if needed)
