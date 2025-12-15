@@ -5,83 +5,19 @@ from __future__ import annotations
 
 import logging
 import time
-from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable
+from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import pandas as pd
 import xlsxwriter
 from sentence_transformers import SentenceTransformer
 
-from kebab.contracts.entity import Entity, Property, PropertySchema, ValueType
-from kebab.tasks.metrics.extraction.aesop.distances import (
-    BinaryMatchDistance,
-    EditDistance,
-    EmbeddingDistance,
-    EntityDistance,
-    PropertyScore,
-    ReferenceResolvingDistance,
-    SetPropertyDistance,
-    SingleValuePropertyDistance,
-    TokenDistance,
-    ValueMatchingRecordWithScores,
-    get_element_distance,
-)
-from kebab.tasks.metrics.extraction.aesop.metric_helpers import EntityMatcher, MetricsAccumulator, MetricsComputer
-from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator, MetricConfig
-
-
-@dataclass
-class ValueAveragedAesopConfig(MetricConfig):
-    """Value-averaged-AESOP metric configuration."""
-
-    matching_score_function: EntityDistance
-    matching_threshold: float
-    property_score_functions: dict[str, PropertyScore]
-    property_schema: PropertySchema
-    properties_to_skip: set[str] = field(default_factory=set)
-
-    @staticmethod
-    def from_dict(config: dict[str, Any], property_schema: PropertySchema) -> ValueAveragedAesopConfig:
-        """Create value-averaged-AESOP metric configuration from dictionary."""
-
-        mode = getattr(ReferenceResolvingDistance.Mode, config.get("reference_resolving_mode", "values").upper())
-
-        default_property_score = PropertyScore(
-            SetPropertyDistance(ReferenceResolvingDistance(
-                get_element_distance(config["default_property_distance"]), mode))
-        )
-
-        properties_to_skip = set(config.get("properties_to_skip", []))
-
-        property_score_functions = defaultdict(lambda: default_property_score)
-        for property_name, score_config in config["property_distance_functions"].items():
-            if property_name not in property_schema.properties:
-                raise ValueError(f"Property '{property_name}' is not present in the property schema.")
-            if property_name not in properties_to_skip:
-                element_distance = get_element_distance(score_config)
-                element_distance = ReferenceResolvingDistance(
-                    element_distance, mode) if property_schema.properties[property_name].data_type.value_type is ValueType.REFERENCE else element_distance
-                property_score_functions[property_name] = PropertyScore(
-                    SetPropertyDistance(element_distance)
-                    if property_schema.properties[property_name].is_collection
-                    else SingleValuePropertyDistance(element_distance)
-                )
-        return ValueAveragedAesopConfig(
-            matching_score_function=EntityDistance.from_dict(config["entity_distance"], property_schema, mode),
-            matching_threshold=config["matching_threshold"],
-            property_score_functions=property_score_functions,
-            property_schema=property_schema,
-            properties_to_skip=properties_to_skip,
-        )
-    
-    def update_with_entity_info(self, gt_entities: dict[str, Entity], pred_entities: dict[str, Entity]) -> None:
-        """Update internal distance functions with entity information for reference resolving distances."""
-        for score_function in self.property_score_functions.values():
-            score_function.update_with_entity_info(gt_entities, pred_entities)
-        self.matching_score_function.update_with_entity_info(gt_entities, pred_entities)
+from kebab.tasks.metrics.extraction.aesop.metric_helpers import MetricsAccumulator, MetricsComputer, EntityMatcher
+from kebab.tasks.metrics.extraction.aesop.config import ValueAveragedAesopConfig
+from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator
 
 
 def document_debug_output_to_excel(
@@ -289,10 +225,6 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             # pred_entities = [entity for entity in pred.entities if "time" not in entity.properties.get("type", [])]
             gt_entities = gt.entities.copy()
             pred_entities = pred.entities.copy()
-            self.config.update_with_entity_info(
-                {entity.entity_id: entity for entity in gt_entities},
-                {entity.entity_id: entity for entity in pred_entities},
-            )
             for property_to_skip in self.config.properties_to_skip:
                 for entity in gt_entities:
                     if property_to_skip in entity.properties:
@@ -300,6 +232,12 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 for entity in pred_entities:
                     if property_to_skip in entity.properties:
                         del entity.properties[property_to_skip]
+            
+            context = {
+                "gt_entities": gt_entities,
+                "pred_entities": pred_entities,
+            }
+
             gt_property_counts = Counter()
             for entity in gt_entities:
                 gt_property_counts.update(entity.properties.keys())
@@ -315,15 +253,16 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 gt_property_counts=gt_property_counts,
                 pred_property_counts=pred_property_counts,
             )
+
             entity_matcher = EntityMatcher(gt_entities, pred_entities, self.logger)
             self.logger.info(f"Document {idx + 1}: Matching entities")
-            matched_pairs = entity_matcher.match(self.config.matching_score_function, self.config.matching_threshold)
+            matched_pairs = entity_matcher.match(self.config.get_matching_score_function(context), self.config.matching_threshold)
+            context["matched_pair"] = matched_pairs # type: ignore
             self.logger.info(f"Document {idx + 1}: Computing metrics")
-            metrics_computer = MetricsComputer(gt_entities, pred_entities, self.config.property_schema, self.logger)
-            metrics, document_debug_info = metrics_computer.compute_bipartite_metrics(
-                matched_pairs, self.config.property_score_functions
-            )
+            metrics_computer = MetricsComputer(self.config, self.logger)
+            metrics, document_debug_info = metrics_computer.compute_bipartite_metrics(context)
             self.logger.info(f"Document {idx + 1}: Done")
+
             if document_debug_info is not None:
                 document_debug_info["document_id"] = gt.document.document_id
                 document_debug_info["original_text"] = gt.document.data.get("text", "")
@@ -378,55 +317,3 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 )
                 self.logger.info(f"Debug info saved to {self.debug_output_path / 'debug_info.csv'}")
         return metrics
-
-
-def make_default_value_averaged_aesop_config(
-    property_schema: PropertySchema, matching_threshold: float = 1.0, embed_model: SentenceTransformer | None = None
-) -> ValueAveragedAesopConfig:
-    """Create default value-averaged-AESOP metric config.
-
-    Args:
-        property_schema: Schema defining properties and their data types for entities.
-        matching_threshold: Threshold for entity matching (default: 1.0).
-        embed_model: Optional pre-trained sentence transformer model for embeddings.
-
-    Returns:
-        Configured ValueAveragedAesopConfig instance with default settings.
-    """
-    # Set score functions are used for properties for which we expect multiple values.
-    # Score function always returns a list of scores, even if there is only one value.
-    if embed_model is None:
-        embed_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")  # type: ignore
-
-    set_embedding_score = PropertyScore(SetPropertyDistance(EmbeddingDistance()))
-    set_token_score = PropertyScore(SetPropertyDistance(TokenDistance()))
-    str_score = PropertyScore(SingleValuePropertyDistance(BinaryMatchDistance()))
-    edit_score = PropertyScore(SetPropertyDistance(EditDistance()))
-    embedding_score = PropertyScore(SingleValuePropertyDistance(EmbeddingDistance(model=embed_model)))
-
-    property_to_score = defaultdict(lambda: set_token_score)
-    property_to_score.update(
-        {
-            "descriptions": set_embedding_score,
-            "definitions": set_embedding_score,
-            "objectives": set_embedding_score,
-            "risks": set_embedding_score,
-            "purpose": embedding_score,
-            "url": str_score,
-            "email": str_score,
-            "password": str_score,
-            "name": edit_score,
-        }
-    )
-
-    return ValueAveragedAesopConfig(
-        matching_score_function=EntityDistance(
-            property_schema,
-            {"name": (SetPropertyDistance(TokenDistance()), 1)},
-            default_property_distance=SetPropertyDistance(TokenDistance()),
-            default_property_weight=0,
-        ),
-        matching_threshold=matching_threshold,
-        property_score_functions=property_to_score,
-        property_schema=property_schema,
-    )

@@ -24,6 +24,7 @@ from kebab.tasks.metrics.extraction.aesop.distances import (
     EmbeddingDistance,
     EntityDistance,
     PropertyScore,
+    ReferenceResolvingDistance,
     SetPropertyDistance,
     SingleValuePropertyDistance,
     TokenDistance,
@@ -43,17 +44,24 @@ from sentence_transformers import SentenceTransformer
 embed_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
 encoder = tiktoken.get_encoding("cl100k_base")
 token_score = PropertyScore(SingleValuePropertyDistance(TokenDistance(encoder=encoder)))
+token_score_ref = PropertyScore(SingleValuePropertyDistance(ReferenceResolvingDistance(TokenDistance(encoder=encoder))))
 embedding_score = PropertyScore(SetPropertyDistance(EmbeddingDistance(model=embed_model)))
+embedding_score_ref = PropertyScore(SetPropertyDistance(ReferenceResolvingDistance(EmbeddingDistance(model=embed_model))))
 str_score = PropertyScore(SingleValuePropertyDistance(BinaryMatchDistance()))
+str_score_ref = PropertyScore(SingleValuePropertyDistance(ReferenceResolvingDistance(BinaryMatchDistance())))
 edit_score = PropertyScore(SingleValuePropertyDistance(EditDistance()))
+edit_score_ref = PropertyScore(SingleValuePropertyDistance(ReferenceResolvingDistance(EditDistance())))
 set_token_score = PropertyScore(SetPropertyDistance(TokenDistance(encoder=encoder)))
+set_token_score_ref = PropertyScore(SetPropertyDistance(ReferenceResolvingDistance(TokenDistance(encoder=encoder))))
 
 
 def name_entity_distance(property_schema: PropertySchema) -> EntityDistance:
     return EntityDistance(
         property_schema,
-        {"name": (SingleValuePropertyDistance(TokenDistance()), 1)},
-        default_property_distance=SetPropertyDistance(TokenDistance(encoder=encoder)),
+        {"name": (SingleValuePropertyDistance(TokenDistance()), 1),
+         "type": (SetPropertyDistance(TokenDistance()), 0),
+         "definitions": (SetPropertyDistance(TokenDistance()), 0),},
+        default_property_distance=SetPropertyDistance(ReferenceResolvingDistance(TokenDistance(encoder=encoder))),
         default_property_weight=0,
     )
 
@@ -63,11 +71,25 @@ def to_entities(properties: list[dict[str, Any]]) -> list[Entity]:
         for k, v in property_dict.items():
             if not isinstance(v, list):
                 property_dict[k] = [v]
-    return [
+    entities = [
         Entity.from_dict({"entity_id": str(idx), "properties": property_dict})
         for idx, property_dict in enumerate(properties)
     ]
 
+    name_to_entity_id = {}
+    for entity in entities:
+        for name in entity.properties["name"]:
+            name_to_entity_id[name] = entity.entity_id
+
+    for entity in entities:
+        for property_id, values in entity.properties.items():
+            if property_id in ("name", "type", "definitions"):
+                continue
+            new_values = set()
+            for value in values:
+                new_values.add(name_to_entity_id[value])
+            entity.properties[property_id] = list(new_values)
+    return entities
 
 def dummy_doc() -> Document:
     return Document.from_dict(
@@ -275,20 +297,24 @@ def assert_score_dicts_close(left: dict, right: dict):
 
 
 def test_compute_scores_of_target_entities_with_themselves(property_schema: PropertySchema):
-    ground_truth = to_entities([{"name": "London", "type": "city", "definitions": "Capital of the United Kindgom."}])
+    ground_truth = to_entities([{"name": "London", "type": "city", "definitions": "Capital of the United Kindgom.", "part of": "United Kingdom"},
+                                {"name": "United Kingdom", "type": "country", "definitions": "A country in Europe."}])
     predictions = ground_truth.copy()
 
     entity_matcher = EntityMatcher(ground_truth, predictions)
     matched_pair = entity_matcher.match(name_entity_distance(property_schema))
 
+    print(matched_pair)
+
     properties_union = compute_properties_union(ground_truth, predictions, matched_pair)
 
-    assert properties_union == {"name", "type", "definitions"}
+    assert properties_union == {"name", "type", "definitions", "part of"}
 
     property_to_score = {
         "name": token_score,
         "type": set_token_score,
         "definitions": set_token_score,
+        "part of": token_score_ref,
     }
 
     for key in properties_union:

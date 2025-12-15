@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
+from collections import defaultdict, Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -14,7 +14,7 @@ import pandas as pd
 
 from kebab.contracts.entity import Entity, Property, PropertySchema
 from kebab.tasks.metrics.extraction.aesop.distances import ValueMatchingRecordWithScores, match_items
-
+from kebab.tasks.metrics.extraction.aesop.config import ValueAveragedAesopConfig
 
 @dataclass
 class MatchedPairInfo:
@@ -192,7 +192,7 @@ class MetricsAccumulator:
         )
         metrics["matched_count"] = self.matched_count  # type: ignore
         metrics["unmatched_counts"] = {
-            "extra_gt_entities": self.unmatched_extra_gt_count,
+            "extra_gt_entities": self.unmatched_extra_gt_count,  
             "extra_pred_entities": self.unmatched_extra_pred_count,
             "pairs": self.unmatched_pair_count,
         }
@@ -471,29 +471,18 @@ class MetricsComputer:
 
     def __init__(
         self,
-        ground_truth: list[Entity],
-        predictions: list[Entity],
-        property_schema: PropertySchema,
+        config: ValueAveragedAesopConfig,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initialize the MetricsComputer.
 
         Args:
-            ground_truth: List of ground truth entities.
-            predictions: List of predicted entities.
-            property_schema: Schema defining properties and their data types.
             logger: Optional logger instance for logging computation progress.
         """
-        self.ground_truth = ground_truth
-        self.predictions = predictions
-        self.property_schema = property_schema
+        self.config = config
         self.logger = logger or logging.getLogger(get_full_class_name(self))
 
-    def compute_bipartite_metrics(
-        self,
-        matched_pair: MatchedPairInfo,
-        keys_to_score: dict[str, Callable[[Entity, Entity, Property], ValueMatchingRecordWithScores]],
-    ) -> tuple[MetricsAccumulator, pd.DataFrame | None]:
+    def compute_bipartite_metrics(self, context: dict[str, Any]) -> tuple[MetricsAccumulator, pd.DataFrame | None]:
         """Compute provided property scores for the matched entities.
 
         Args:
@@ -503,27 +492,32 @@ class MetricsComputer:
         Returns:
             Tuple of MetricsAccumulator with computed scores and optional debug DataFrame.
         """
+        matched_pair = context["matched_pair"]
+        ground_truth = context["gt_entities"]
+        predictions = context["pred_entities"]
         metrics_accumulator = MetricsAccumulator()
         metrics_accumulator.matched_count = len(matched_pair.left_ind)
         metrics_accumulator.unmatched_pair_count = len(matched_pair.left_unmatched)
-        metrics_accumulator.total_gt_entities = len(self.ground_truth)
-        metrics_accumulator.total_pred_entities = len(self.predictions)
+        metrics_accumulator.total_gt_entities = len(ground_truth)
+        metrics_accumulator.total_pred_entities = len(predictions)
 
-        diff = len(self.ground_truth) - len(self.predictions)
+        diff = len(ground_truth) - len(predictions)
         if diff > 0:
             metrics_accumulator.unmatched_extra_gt_count = diff
         elif diff < 0:
             metrics_accumulator.unmatched_extra_pred_count = -diff
 
-        properties_union = compute_properties_union(self.ground_truth, self.predictions, matched_pair)
-        entities_scorer = MatchedEntitiesScorer(self.ground_truth, self.predictions, matched_pair, self.property_schema)
+        properties_union = compute_properties_union(ground_truth, predictions, matched_pair)
+        entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matched_pair, self.config.property_schema)
 
         for key in properties_union:
-            score_func = keys_to_score[key]
+            score_func = self.config.get_score_for_property(key, context)
+            if score_func is None:
+                raise ValueError(f"No scoring function found for property {key}")
 
             evaluated_property_metrics = entities_scorer.score(score_func, key)
 
-            if key in self.property_schema.properties:
+            if key in self.config.property_schema.properties:
                 # only accumulate metrics for properties that are in the schema
                 metrics_accumulator.total_scores_per_doc[key].extend(
                     [
@@ -540,9 +534,9 @@ class MetricsComputer:
         matched_entities_debug_info = entities_scorer.get_debug_info()
 
         unmatched_gt_records = []
-        unmatched_gt_indices = set(range(len(self.ground_truth))) - set(matched_pair.left_ind)
+        unmatched_gt_indices = set(range(len(ground_truth))) - set(matched_pair.left_ind)
         for idx in unmatched_gt_indices:
-            entity = self.ground_truth[idx]
+            entity = ground_truth[idx]
             for property_id, values in entity.properties.items():
                 first_property_record = True
                 for value in values:
@@ -568,9 +562,9 @@ class MetricsComputer:
             unmatched_gt_entities_debug_info = None
 
         unmatched_pred_records = []
-        unmatched_pred_indices = set(range(len(self.predictions))) - set(matched_pair.right_ind)
+        unmatched_pred_indices = set(range(len(predictions))) - set(matched_pair.right_ind)
         for idx in unmatched_pred_indices:
-            entity = self.predictions[idx]
+            entity = predictions[idx]
             for property_id, values in entity.properties.items():
                 first_property_record = True
                 original_property_id = ""
