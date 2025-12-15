@@ -44,7 +44,19 @@ def main():
     common_prefix = Path(os.path.commonprefix(folders))
     merged_data_frame = None
     merged_metrics = None
-    system_columns = ["log_odds", "predicted_label", "debugging_info", "debugging_info.1", "debugging_info.2"]
+    # We hope that join_columns are the same across dataframes and that a combined value of these columns uniquely identifies the row.
+    join_columns = [
+        "left",
+        "right",
+        "entity_type",
+        "overlap_props",
+        "prop_overlap_num",
+        "prop_pattern",
+        "name_overlap",
+        "label",
+        "left_entity_id",
+        "right_entity_id",
+    ]
     for folder in folders:
         folder_path = Path(folder)
         folder_suffix = folder_path.name.replace(common_prefix.name, "")
@@ -56,8 +68,9 @@ def main():
             df = pd.read_csv(tsv_file, sep="\t")
             # Remove empty columns
             df = df.dropna(axis=1, how="all")
-            # We hope that join_columns are the same across dataframes and that a combined value of these columns uniquely identifies the row.
-            join_columns = df.columns.difference(system_columns).tolist()
+            # Rename columns without names to avoid issues
+            df = df.rename(columns=lambda x: "debugging_info" if x.startswith("Unnamed:") else x)
+            system_columns = df.columns.difference(join_columns).tolist()
             # Add suffix to all system_columns
             df = df.rename(columns={c: c + suffix for c in system_columns})
             merged_data_frame = df if merged_data_frame is None else safe_merge(merged_data_frame, df, on=join_columns)

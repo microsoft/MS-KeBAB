@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -256,6 +257,14 @@ class LinkingTask(Task):
                 >= 1
             )
 
+            if debugging_info:
+                if debugging_info.strip().startswith("{"):
+                    debugging_info_dict = json.loads(debugging_info)
+                else:
+                    debugging_info_dict = {"debugging_info": debugging_info}
+            else:
+                debugging_info_dict = {}
+
             records.append(
                 {
                     "left": dict(left_entity.properties),
@@ -270,8 +279,8 @@ class LinkingTask(Task):
                     "predicted_label": prediction,
                     "left_entity_id": left_entity.entity_id,
                     "right_entity_id": right_entity.entity_id,
-                    "debugging_info": debugging_info if debugging_info else "",
                 }
+                | debugging_info_dict
             )
 
         return records

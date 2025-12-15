@@ -7,6 +7,7 @@ from typing import cast
 from kebab import mskebab
 from kebab.contracts.entity import Entity
 from kebab.tasks.linking import LinkingTask
+from kebab.utils.io_helpers import resolve_path
 
 
 def train(data: Iterable[tuple[tuple[Entity, Entity], bool]]) -> tuple[float, float]:
@@ -41,7 +42,7 @@ def main() -> None:
     """Run linking metrics example."""
     dataset_folder = Path(__file__).parents[3] / "data"
     print(f"Using dataset folder: {dataset_folder}")
-    if not (dataset_folder / "REBEL").is_dir():
+    if not resolve_path(dataset_folder / "REBEL" / "linking").is_dir():
         print("You need to download the data first")
         return
     benchmark = mskebab.Benchmark(root_for_relative_paths=dataset_folder)
