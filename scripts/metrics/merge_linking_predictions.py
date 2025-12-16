@@ -102,7 +102,7 @@ def main():
             for pred_name, predicate in predicates.items():
                 if predicate.any():
                     accuracy_pred = (predicted_label[predicate] == gold_labels[predicate]).mean()
-                    accuracy_df.loc[suffix, f"accuracy_given_{pred_name}"] = accuracy_pred
+                    accuracy_df.loc[suffix, pred_name] = accuracy_pred
         accuracy_filename = "merged_accuracies.tsv"
         accuracy_df.to_csv(accuracy_filename, sep="\t", index=True)
         print(f"Finished calculating accuracies into {accuracy_filename}")
