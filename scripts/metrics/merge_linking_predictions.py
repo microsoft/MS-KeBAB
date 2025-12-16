@@ -44,6 +44,7 @@ def main():
     common_prefix = Path(os.path.commonprefix(folders))
     merged_data_frame = None
     merged_metrics = None
+    predicted_labels = {}
     # We hope that join_columns are the same across dataframes and that a combined value of these columns uniquely identifies the row.
     join_columns = [
         "left",
@@ -66,6 +67,8 @@ def main():
             suffix = folder_suffix + tsv_file.stem.replace("linking_predictions", "")
             print(f"  Reading file {tsv_file} with suffix '{suffix}'")
             df = pd.read_csv(tsv_file, sep="\t")
+            if "predicted_label" in df.columns:
+                predicted_labels[suffix] = df["predicted_label"]
             # Remove empty columns
             df = df.dropna(axis=1, how="all")
             # Rename columns without names to avoid issues
@@ -86,6 +89,23 @@ def main():
         print(f"Finished merging metrics files into {merged_metrics_filename}")
 
     if merged_data_frame is not None:
+        gold_labels = merged_data_frame["label"]
+        predicates = {}
+        # Find boolean columns that can refine the accuracy calculation
+        for col in merged_data_frame.columns:
+            if not col.startswith("predicted_label") and merged_data_frame[col].dtype == bool:
+                predicates[col] = merged_data_frame[col]
+        accuracy_df = pd.DataFrame()
+        for suffix, predicted_label in predicted_labels.items():
+            accuracy = (predicted_label == gold_labels).mean()
+            accuracy_df.loc[suffix, "accuracy"] = accuracy
+            for pred_name, predicate in predicates.items():
+                if predicate.any():
+                    accuracy_pred = (predicted_label[predicate] == gold_labels[predicate]).mean()
+                    accuracy_df.loc[suffix, f"accuracy_given_{pred_name}"] = accuracy_pred
+        accuracy_filename = "merged_accuracies.tsv"
+        accuracy_df.to_csv(accuracy_filename, sep="\t", index=True)
+        print(f"Finished calculating accuracies into {accuracy_filename}")
         output_filename = "merged_linking_predictions.tsv"
         merged_data_frame.to_csv(output_filename, sep="\t", index=False)
         print(f"Finished merging files into {output_filename}")
