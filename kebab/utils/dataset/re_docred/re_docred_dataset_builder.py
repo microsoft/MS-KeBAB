@@ -19,10 +19,9 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from kebab.contracts.document import Document, DocumentSchema, DocumentUtilities
-from kebab.contracts.entity import Entity, PropertySchema, Property, ValueType, DataType
+from kebab.contracts.entity import DataType, Entity, Property, PropertySchema, ValueType
 from kebab.utils import io_helpers
 from kebab.utils.dataset.wikidata import wikidata_utils
-from kebab.utils.io_helpers import get_value_type
 
 
 class ReDocRedDatasetBuilder:
@@ -127,8 +126,8 @@ class ReDocRedDatasetBuilder:
                         )
             extraction_dataset.append(example)
         property_schema = self.build_property_schema(
-            property_to_data_type,
-            [entity for example in extraction_dataset for entity in example["entities"]])
+            property_to_data_type, [entity for example in extraction_dataset for entity in example["entities"]]
+        )
 
         # save the dataset
         self._write_dataset(extraction_dataset)
@@ -189,8 +188,10 @@ class ReDocRedDatasetBuilder:
                 entities[entity_index][property_label] = set()
             entities[entity_index][property_label].add(str(rel_entity_index))
         return entities
-    
-    def build_property_schema(self, property_to_data_type: dict[str, DataType], entities: list[Entity]) -> PropertySchema:
+
+    def build_property_schema(
+        self, property_to_data_type: dict[str, DataType], entities: list[Entity]
+    ) -> PropertySchema:
         """Build the property schema from the property to value types mapping."""
         property_schema = PropertySchema()
         properties = {}
@@ -211,11 +212,12 @@ class ReDocRedDatasetBuilder:
                 data_types,
             )
         property_schema = PropertySchema.from_dict(
-        {
-            "name": "schema",
-            "properties": [prop.to_dict() for prop in properties.values()],
-            "data_types": [x.to_dict() for x in data_types.values()],
-        })
+            {
+                "name": "schema",
+                "properties": [prop.to_dict() for prop in properties.values()],
+                "data_types": [x.to_dict() for x in data_types.values()],
+            }
+        )
         return property_schema
 
     def filter_entities(self, entities: list[Entity]) -> list[Entity]:
@@ -239,9 +241,7 @@ class ReDocRedDatasetBuilder:
                     if value not in dropped_entity_ids:
                         updated_values.add(value)
                 if not updated_values:
-                    self._logger.debug(
-                        f"filtering all values of the property {prop} in entity {entity.to_json()}."
-                    )
+                    self._logger.debug(f"filtering all values of the property {prop} in entity {entity.to_json()}.")
                     properties_to_drop.add(prop)
                 entity.properties[prop] = sorted(updated_values)
             for prop_name in properties_to_drop:

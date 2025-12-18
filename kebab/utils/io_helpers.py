@@ -473,6 +473,7 @@ class EntityListJsonlWriter(ItemWriter[list[Entity]]):
                 )
                 file.write(json_line + "\n")
 
+
 def get_value_type(property_id: str, values: list[Any]) -> ValueType:
     """Guess value type from values."""
     if len(values) == 0:
@@ -484,6 +485,7 @@ def get_value_type(property_id: str, values: list[Any]) -> ValueType:
     if isinstance(values[0], str) and ("date" in property_id or "time" in property_id):
         return ValueType.DATE
     return ValueType.TEXT
+
 
 def generate_draft_property_schema_from_data(paths: Iterable[Path], output_path: Path) -> None:
     """

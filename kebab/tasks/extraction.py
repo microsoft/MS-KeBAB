@@ -10,7 +10,7 @@ from typing import ClassVar, cast
 
 from kebab.contracts.entity import Entity, PropertySchema
 from kebab.contracts.task import Task, TaskType
-from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator, MetricConfig
+from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator
 from kebab.utils.io_helpers import (
     DocumentJsonlReader,
     EntityListJsonlReader,
@@ -30,7 +30,6 @@ class ExtractionTask(Task):
         Path(__file__).parents[1] / "configs" / "extraction" / "default_metrics_config.json"
     )
     __metric_calculator_cls: ClassVar[dict[str, type[MetricCalculator]]] = {}
-    __metric_config_cls: ClassVar[dict[str, type[MetricConfig]]] = {}
 
     @property
     def task_type(self) -> TaskType:
@@ -117,28 +116,23 @@ class ExtractionTask(Task):
         metrics = {}
 
         from kebab.tasks.metrics.extraction.aesop.calculator import (
-            ValueAveragedAesopConfig,
             ValueAveragedAesopMetricCalculator,
         )
 
         self.__metric_calculator_cls["aesop"] = ValueAveragedAesopMetricCalculator
-        self.__metric_config_cls["aesop"] = ValueAveragedAesopConfig
 
         for metric_name, metric_config_dict in self.metrics_config.items():
             if logger is not None:
                 logger.info(f"Evaluating metric: {metric_name}")
                 logger.info(metric_config_dict)
             metric_calculator_cls = self.__metric_calculator_cls[metric_name]
-            metric_config = self.__metric_config_cls[metric_name].from_dict(
-                metric_config_dict,
-                cast(PropertySchema, self.read_schema()),  # in extraction, schema is not optional
-            )
+            property_schema = cast(PropertySchema, self.read_schema())
             debug_output_path = (
                 result_output_path.parent / "debug_output" if result_output_path and collect_debug_info else None
             )
-            metric_results = metric_calculator_cls(metric_config, logger, debug_output_path).run(  # type: ignore
-                pred_extractions, self.read_items()
-            )
+            metric_results = metric_calculator_cls(
+                self.metrics_config[metric_name], property_schema, logger, debug_output_path
+            ).run(pred_extractions, self.read_items())
             metrics[metric_name] = metric_results
         if result_output_path:
             save_dict_to_json(metrics, result_output_path)

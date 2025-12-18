@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict, Counter
+from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -13,11 +13,12 @@ import numpy as np
 import pandas as pd
 
 from kebab.contracts.entity import Entity, Property, PropertySchema
-from kebab.tasks.metrics.extraction.aesop.distances import ValueMatchingRecordWithScores, match_items
-from kebab.tasks.metrics.extraction.aesop.config import ValueAveragedAesopConfig
+from kebab.tasks.metrics.extraction.aesop.metrics_factory import MetricsFactory
+from kebab.tasks.metrics.extraction.aesop.property_score import ValueMatchingRecordWithScores, match_items
+
 
 @dataclass
-class MatchedPairInfo:
+class MatchingInfo:
     """
     Stores information about matched pairs of entities.
 
@@ -52,49 +53,36 @@ def get_full_class_name(obj: object) -> str:
     return f"{obj.__class__.__module__}.{obj.__class__.__qualname__}"
 
 
-class EntityMatcher:
-    """Matches entities in two disjoint sets based on a distance function and a matching score threshold."""
+def match_entities(
+    metrics_factory: MetricsFactory, gt_entities: list[Entity], pred_entities: list[Entity], threshold: float = 1.0
+) -> MatchingInfo:
+    """Match entities based on a distance function and a matching score threshold.
 
-    def __init__(
-        self, entities_gt: list[Entity], entities_pred: list[Entity], logger: logging.Logger | None = None
-    ) -> None:
-        """Initialize the EntityMatcher.
+    Args:
+        metrics_factory: instance of MetricsFactory to get metrics instances
+        gt_entities: List of ground truth entities.
+        pred_entities: List of predicted entities.
+        threshold: Maximum distance threshold for considering entities as matched.
 
-        Args:
-            entities_gt: List of ground truth entities to match.
-            entities_pred: List of predicted entities to match.
-            logger: Optional logger instance for logging matching progress.
-        """
-        self.entities_gt = entities_gt
-        self.entities_pred = entities_pred
-        self.logger = logger or logging.getLogger(get_full_class_name(self))
+    Returns:
+        MatchedPairInfo containing indices of matched and unmatched entities.
+    """
+    distance_function = metrics_factory.get_matching_score_function(
+        gt_entities=gt_entities, pred_entities=pred_entities
+    )
+    distances = np.empty((len(gt_entities), len(pred_entities)))
+    for i, e1 in enumerate(gt_entities):
+        for j, e2 in enumerate(pred_entities):
+            distances[i, j] = distance_function(e1, e2)
 
-    def match(self, distance_function: Callable[[Entity, Entity], float], threshold: float = 1.0) -> MatchedPairInfo:
-        """Match entities based on a distance function and a matching score threshold.
-
-        Args:
-            distance_function: Function that computes distance between two entities.
-            threshold: Maximum distance threshold for considering entities as matched.
-
-        Returns:
-            MatchedPairInfo containing indices of matched and unmatched entities.
-        """
-        distances = self._compute_distances(distance_function)
-        matched_indices = match_items(distances, threshold)
-        return MatchedPairInfo(
-            matched_indices.left_ind,
-            matched_indices.right_ind,
-            matched_indices.left_unmatched,
-            matched_indices.right_unmatched,
-            distances,
-        )
-
-    def _compute_distances(self, distance_function: Callable[[Entity, Entity], float]) -> np.ndarray:
-        distances = np.empty((len(self.entities_gt), len(self.entities_pred)))
-        for i, e1 in enumerate(self.entities_gt):
-            for j, e2 in enumerate(self.entities_pred):
-                distances[i, j] = distance_function(e1, e2)
-        return distances
+    matched_indices = match_items(distances, threshold)
+    return MatchingInfo(
+        matched_indices.left_ind,
+        matched_indices.right_ind,
+        matched_indices.left_unmatched,
+        matched_indices.right_unmatched,
+        distances,
+    )
 
 
 class EvaluatedPropertyMetrics:
@@ -162,10 +150,10 @@ class MetricsAccumulator:
 
     def accumulate_metrics(self) -> dict:
         """Accumulate metrics across all files."""
-        metrics = {
-            "property_precision": {},
-            "property_recall": {},
-        }
+        metrics = {}
+        metrics["property_precision"] = {}
+        metrics["property_recall"] = {}
+
         for key, score_values in self.total_scores_per_doc.items():
             scores = np.hstack(score_values) if len(score_values) > 0 else np.array([])
             total_score = np.sum(scores)
@@ -184,15 +172,15 @@ class MetricsAccumulator:
             sorted(metrics["property_recall"].items(), key=lambda key: -key[1] if key[1] else 0.0)
         )
 
-        metrics["avg_property_precision"] = np.mean(  # type: ignore
+        metrics["avg_property_precision"] = np.mean(
             [value for value in metrics["property_precision"].values() if value is not None]
         )
-        metrics["avg_property_recall"] = np.mean(  # type: ignore
+        metrics["avg_property_recall"] = np.mean(
             [value for value in metrics["property_recall"].values() if value is not None]
         )
-        metrics["matched_count"] = self.matched_count  # type: ignore
+        metrics["matched_count"] = self.matched_count
         metrics["unmatched_counts"] = {
-            "extra_gt_entities": self.unmatched_extra_gt_count,  
+            "extra_gt_entities": self.unmatched_extra_gt_count,
             "extra_pred_entities": self.unmatched_extra_pred_count,
             "pairs": self.unmatched_pair_count,
         }
@@ -255,7 +243,7 @@ class MatchedEntitiesScorer:
         self,
         entities_gt: list[Entity],
         entities_pred: list[Entity],
-        matched_pair: MatchedPairInfo,
+        matching_info: MatchingInfo,
         property_schema: PropertySchema,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -264,19 +252,19 @@ class MatchedEntitiesScorer:
         Args:
             entities_gt: List of ground truth entities.
             entities_pred: List of predicted entities.
-            matched_pair: Information about matched entity pairs.
+            matching_info: Information about matched entity pairs.
             property_schema: Schema defining properties and their data types.
             logger: Optional logger instance for logging scoring progress.
         """
         self.entities_gt = entities_gt
         self.entities_pred = entities_pred
 
-        if len(matched_pair.left_ind) != len(matched_pair.right_ind):
+        if len(matching_info.left_ind) != len(matching_info.right_ind):
             raise ValueError("left_ind and right_ind must have the same length.")
 
-        self.gt_ind = matched_pair.left_ind
-        self.pred_ind = matched_pair.right_ind
-        self.distances = matched_pair.distances
+        self.gt_ind = matching_info.left_ind
+        self.pred_ind = matching_info.right_ind
+        self.distances = matching_info.distances
         self.property_schema = property_schema
         self.debug_info: defaultdict[int, defaultdict[int, dict[str, ValueMatchingRecordWithScores]]] = defaultdict(
             lambda: defaultdict(dict)
@@ -466,162 +454,154 @@ def create_property_record(
     return record, first_property_record
 
 
-class MetricsComputer:
-    """Computes metrics for a given set of ground truth and prediction entities."""
+def compute_bipartite_metrics(
+    metrics_factory: MetricsFactory,
+    matching_info: MatchingInfo,
+    ground_truth: list[Entity],
+    predictions: list[Entity],
+    property_schema: PropertySchema,
+    logger: logging.Logger,
+) -> tuple[MetricsAccumulator, pd.DataFrame | None]:
+    """Compute provided property scores for the matched entities.
 
-    def __init__(
-        self,
-        config: ValueAveragedAesopConfig,
-        logger: logging.Logger | None = None,
-    ) -> None:
-        """Initialize the MetricsComputer.
+    Args:
+        metrics_factory: instance of MetricsFactory to get metrics instances
+        matching_info: Information about matched entity pairs.
+        ground_truth: List of ground truth entities.
+        predictions: List of predicted entities.
+        property_schema: Schema defining properties and their data types.
+        logger: Logger instance for logging scoring progress.
 
-        Args:
-            logger: Optional logger instance for logging computation progress.
-        """
-        self.config = config
-        self.logger = logger or logging.getLogger(get_full_class_name(self))
+    Returns:
+        Tuple of MetricsAccumulator with computed scores and optional debug DataFrame.
+    """
+    metrics_accumulator = MetricsAccumulator()
+    metrics_accumulator.matched_count = len(matching_info.left_ind)
+    metrics_accumulator.unmatched_pair_count = len(matching_info.left_unmatched)
+    metrics_accumulator.total_gt_entities = len(ground_truth)
+    metrics_accumulator.total_pred_entities = len(predictions)
 
-    def compute_bipartite_metrics(self, context: dict[str, Any]) -> tuple[MetricsAccumulator, pd.DataFrame | None]:
-        """Compute provided property scores for the matched entities.
+    diff = len(ground_truth) - len(predictions)
+    if diff > 0:
+        metrics_accumulator.unmatched_extra_gt_count = diff
+    elif diff < 0:
+        metrics_accumulator.unmatched_extra_pred_count = -diff
 
-        Args:
-            matched_pair: Information about matched and unmatched entity pairs.
-            keys_to_score: Dictionary mapping property IDs to scoring functions.
+    properties_union = compute_properties_union(ground_truth, predictions, matching_info)
+    entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matching_info, property_schema)
 
-        Returns:
-            Tuple of MetricsAccumulator with computed scores and optional debug DataFrame.
-        """
-        matched_pair = context["matched_pair"]
-        ground_truth = context["gt_entities"]
-        predictions = context["pred_entities"]
-        metrics_accumulator = MetricsAccumulator()
-        metrics_accumulator.matched_count = len(matched_pair.left_ind)
-        metrics_accumulator.unmatched_pair_count = len(matched_pair.left_unmatched)
-        metrics_accumulator.total_gt_entities = len(ground_truth)
-        metrics_accumulator.total_pred_entities = len(predictions)
-
-        diff = len(ground_truth) - len(predictions)
-        if diff > 0:
-            metrics_accumulator.unmatched_extra_gt_count = diff
-        elif diff < 0:
-            metrics_accumulator.unmatched_extra_pred_count = -diff
-
-        properties_union = compute_properties_union(ground_truth, predictions, matched_pair)
-        entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matched_pair, self.config.property_schema)
-
-        for key in properties_union:
-            score_func = self.config.get_score_for_property(key, context)
-            if score_func is None:
-                raise ValueError(f"No scoring function found for property {key}")
-
-            evaluated_property_metrics = entities_scorer.score(score_func, key)
-
-            if key in self.config.property_schema.properties:
-                # only accumulate metrics for properties that are in the schema
-                metrics_accumulator.total_scores_per_doc[key].extend(
-                    [
-                        evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx]
-                        for gt_idx in evaluated_property_metrics.relevant_pair_scores
-                        for pred_idx in evaluated_property_metrics.relevant_pair_scores[gt_idx]
-                    ]
-                    or [[0.0]]
-                )
-                metrics_accumulator.total_unmatched_counts_per_doc[key] += evaluated_property_metrics.unmatched_count
-                metrics_accumulator.total_gt_property_value_counts_per_doc[key] += (
-                    evaluated_property_metrics.property_value_count_gt
-                )
-        matched_entities_debug_info = entities_scorer.get_debug_info()
-
-        unmatched_gt_records = []
-        unmatched_gt_indices = set(range(len(ground_truth))) - set(matched_pair.left_ind)
-        for idx in unmatched_gt_indices:
-            entity = ground_truth[idx]
-            for property_id, values in entity.properties.items():
-                first_property_record = True
-                for value in values:
-                    record, first_property_record = create_property_record(
-                        entity.entity_id,
-                        "",  # No pred_entity_id for unmatched ground truth entities
-                        "",  # No original_property_id for unmatched ground truth entities
-                        property_id,
-                        value,
-                        "",
-                        None,
-                        len(entity.properties[property_id]),
-                        0,
-                        first_property_record,
-                    )
-                    unmatched_gt_records.append(record)
-        unmatched_gt_entities_debug_info = (
-            pd.DataFrame.from_records(unmatched_gt_records) if unmatched_gt_records else None
+    for key in properties_union:
+        score_func = metrics_factory.get_score_for_property(
+            key, matching_info=matching_info, gt_entities=ground_truth, pred_entities=predictions
         )
+        if score_func is None:
+            raise ValueError(f"No scoring function found for property {key}")
 
-        if unmatched_gt_entities_debug_info is None or unmatched_gt_entities_debug_info.isna().to_numpy().all():
-            self.logger.warning("All values are null for unmatched ground truth entities.")
-            unmatched_gt_entities_debug_info = None
+        evaluated_property_metrics = entities_scorer.score(score_func, key)
 
-        unmatched_pred_records = []
-        unmatched_pred_indices = set(range(len(predictions))) - set(matched_pair.right_ind)
-        for idx in unmatched_pred_indices:
-            entity = predictions[idx]
-            for property_id, values in entity.properties.items():
-                first_property_record = True
-                original_property_id = ""
-                property_evidence = entity.evidence_map.get(property_id)
-                if property_evidence:
-                    evidence_idx = property_evidence[0][0]
-                    original_property_id = entity.source_ids[evidence_idx]
-                for value in values:
-                    record, first_property_record = create_property_record(
-                        "",
-                        entity.entity_id,  # No gt_entity_id for unmatched prediction entities
-                        original_property_id,
-                        property_id,
-                        "",
-                        value,
-                        None,
-                        0,
-                        len(entity.properties[property_id]),
-                        first_property_record,
-                    )
-                    unmatched_pred_records.append(record)
-        unmatched_pred_entities_debug_info = (
-            pd.DataFrame.from_records(unmatched_pred_records) if unmatched_pred_records else None
-        )
+        if key in property_schema.properties:
+            # only accumulate metrics for properties that are in the schema
+            metrics_accumulator.total_scores_per_doc[key].extend(
+                [
+                    evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx]
+                    for gt_idx in evaluated_property_metrics.relevant_pair_scores
+                    for pred_idx in evaluated_property_metrics.relevant_pair_scores[gt_idx]
+                ]
+                or [[0.0]]
+            )
+            metrics_accumulator.total_unmatched_counts_per_doc[key] += evaluated_property_metrics.unmatched_count
+            metrics_accumulator.total_gt_property_value_counts_per_doc[key] += (
+                evaluated_property_metrics.property_value_count_gt
+            )
+    matched_entities_debug_info = entities_scorer.get_debug_info()
 
-        if unmatched_pred_entities_debug_info is None or unmatched_pred_entities_debug_info.isna().to_numpy().all():
-            self.logger.warning("All values are null for unmatched prediction entities.")
-            unmatched_pred_entities_debug_info = None
+    unmatched_gt_records = []
+    unmatched_gt_indices = set(range(len(ground_truth))) - set(matching_info.left_ind)
+    for idx in unmatched_gt_indices:
+        entity = ground_truth[idx]
+        for property_id, values in entity.properties.items():
+            first_property_record = True
+            for value in values:
+                record, first_property_record = create_property_record(
+                    entity.entity_id,
+                    "",  # No pred_entity_id for unmatched ground truth entities
+                    "",  # No original_property_id for unmatched ground truth entities
+                    property_id,
+                    value,
+                    "",
+                    None,
+                    len(entity.properties[property_id]),
+                    0,
+                    first_property_record,
+                )
+                unmatched_gt_records.append(record)
+    unmatched_gt_entities_debug_info = pd.DataFrame.from_records(unmatched_gt_records) if unmatched_gt_records else None
 
-        debug_info_parts = [
-            matched_entities_debug_info,
-            unmatched_gt_entities_debug_info,
-            unmatched_pred_entities_debug_info,
-        ]
-        debug_info_parts = [df for df in debug_info_parts if df is not None]
-        return metrics_accumulator, pd.concat(debug_info_parts, ignore_index=True) if debug_info_parts else None
+    if unmatched_gt_entities_debug_info is None or unmatched_gt_entities_debug_info.isna().to_numpy().all():
+        logger.warning("All values are null for unmatched ground truth entities.")
+        unmatched_gt_entities_debug_info = None
+
+    unmatched_pred_records = []
+    unmatched_pred_indices = set(range(len(predictions))) - set(matching_info.right_ind)
+    for idx in unmatched_pred_indices:
+        entity = predictions[idx]
+        for property_id, values in entity.properties.items():
+            first_property_record = True
+            original_property_id = ""
+            property_evidence = entity.evidence_map.get(property_id)
+            if property_evidence:
+                evidence_idx = property_evidence[0][0]
+                original_property_id = entity.source_ids[evidence_idx]
+            for value in values:
+                record, first_property_record = create_property_record(
+                    "",
+                    entity.entity_id,  # No gt_entity_id for unmatched prediction entities
+                    original_property_id,
+                    property_id,
+                    "",
+                    value,
+                    None,
+                    0,
+                    len(entity.properties[property_id]),
+                    first_property_record,
+                )
+                unmatched_pred_records.append(record)
+    unmatched_pred_entities_debug_info = (
+        pd.DataFrame.from_records(unmatched_pred_records) if unmatched_pred_records else None
+    )
+
+    if unmatched_pred_entities_debug_info is None or unmatched_pred_entities_debug_info.isna().to_numpy().all():
+        logger.warning("All values are null for unmatched prediction entities.")
+        unmatched_pred_entities_debug_info = None
+
+    debug_info_parts = [
+        matched_entities_debug_info,
+        unmatched_gt_entities_debug_info,
+        unmatched_pred_entities_debug_info,
+    ]
+    debug_info_parts = [df for df in debug_info_parts if df is not None]
+    return metrics_accumulator, pd.concat(debug_info_parts, ignore_index=True) if debug_info_parts else None
 
 
 def compute_properties_union(
     ground_truth: list[Entity],
     predictions: list[Entity],
-    matched_pair: MatchedPairInfo,
+    matching_info: MatchingInfo,
 ) -> set[str]:
     """Compute the union of the properties occuring in matched entities from both ground truth and predictions.
 
     Args:
         ground_truth: List of ground truth entities.
         predictions: List of predicted entities.
-        matched_pair: Information about matched entity pairs.
+        matching_info: Information about matched entity pairs.
 
     Returns:
         Set of property IDs that appear in matched entities from either ground truth or predictions.
     """
     ground_truth_keys = {
-        key for idx, entity in enumerate(ground_truth) if idx in matched_pair.left_ind for key in entity.properties
+        key for idx, entity in enumerate(ground_truth) if idx in matching_info.left_ind for key in entity.properties
     }
     predictions_keys = {
-        key for idx, entity in enumerate(predictions) if idx in matched_pair.right_ind for key in entity.properties
+        key for idx, entity in enumerate(predictions) if idx in matching_info.right_ind for key in entity.properties
     }
     return ground_truth_keys.union(predictions_keys)

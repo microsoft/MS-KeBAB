@@ -9,14 +9,18 @@ from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pandas as pd
 import xlsxwriter
-from sentence_transformers import SentenceTransformer
 
-from kebab.tasks.metrics.extraction.aesop.metric_helpers import MetricsAccumulator, MetricsComputer, EntityMatcher
-from kebab.tasks.metrics.extraction.aesop.config import ValueAveragedAesopConfig
+from kebab.contracts.entity import PropertySchema
+from kebab.tasks.metrics.extraction.aesop.metric_helpers import (
+    MetricsAccumulator,
+    compute_bipartite_metrics,
+    match_entities,
+)
+from kebab.tasks.metrics.extraction.aesop.metrics_factory import MetricsFactory
 from kebab.tasks.metrics.extraction.calculator import ExtractionOutput, MetricCalculator
 
 
@@ -188,20 +192,22 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
 
     def __init__(
         self,
-        config: ValueAveragedAesopConfig,
+        config: dict[str, Any],
+        property_schema: PropertySchema,
         logger: logging.Logger | None = None,
         debug_output_path: Path | None = None,
     ):
         """Configure value-averaged-AESOP metric calculator.
 
         Args:
-            config: Configuration object containing AESOP metric parameters.
+            config: deserialized from JSON configuration for AESOP metric.
+            property_schema: Property schema for the entities.
             logger: Optional logger instance for logging metric computation progress.
             debug_output_path: Optional path to save debug information Excel files.
         """
-        self.config = config
-        self.logger = logger or logging.getLogger("Value-Averaged-AESOP")
-        self.debug_output_path = debug_output_path
+        super().__init__(config, property_schema, logger, debug_output_path)
+        self.metrics_factory = MetricsFactory(config, property_schema)
+        self.logger = self.logger or logging.getLogger("Value-Averaged-AESOP")
 
     def run(self, prediction: Iterable[ExtractionOutput], ground_truth: Iterable[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
@@ -225,18 +231,17 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             # pred_entities = [entity for entity in pred.entities if "time" not in entity.properties.get("type", [])]
             gt_entities = gt.entities.copy()
             pred_entities = pred.entities.copy()
-            for property_to_skip in self.config.properties_to_skip:
+            for property_to_skip in self.metrics_factory.properties_to_skip:
                 for entity in gt_entities:
                     if property_to_skip in entity.properties:
                         del entity.properties[property_to_skip]
                 for entity in pred_entities:
                     if property_to_skip in entity.properties:
                         del entity.properties[property_to_skip]
-            
-            context = {
-                "gt_entities": gt_entities,
-                "pred_entities": pred_entities,
-            }
+
+            context = {}
+            context["gt_entities"] = gt_entities
+            context["pred_entities"] = pred_entities
 
             gt_property_counts = Counter()
             for entity in gt_entities:
@@ -254,13 +259,11 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
                 pred_property_counts=pred_property_counts,
             )
 
-            entity_matcher = EntityMatcher(gt_entities, pred_entities, self.logger)
             self.logger.info(f"Document {idx + 1}: Matching entities")
-            matched_pairs = entity_matcher.match(self.config.get_matching_score_function(context), self.config.matching_threshold)
-            context["matched_pair"] = matched_pairs # type: ignore
+            matching_info = match_entities(self.metrics_factory, **context, threshold=self.config["matching_threshold"])
+            context["matching_info"] = matching_info
             self.logger.info(f"Document {idx + 1}: Computing metrics")
-            metrics_computer = MetricsComputer(self.config, self.logger)
-            metrics, document_debug_info = metrics_computer.compute_bipartite_metrics(context)
+            metrics, document_debug_info = compute_bipartite_metrics(**context)
             self.logger.info(f"Document {idx + 1}: Done")
 
             if document_debug_info is not None:

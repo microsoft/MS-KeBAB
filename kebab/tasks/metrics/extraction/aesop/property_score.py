@@ -3,7 +3,7 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -12,9 +12,13 @@ from scipy.sparse.csgraph import min_weight_full_bipartite_matching
 from kebab.contracts.entity import Entity, Property, PropertySchema, ValueType
 from kebab.tasks.metrics.extraction.aesop import distances
 from kebab.tasks.metrics.extraction.aesop.distances import ElementDistance
+from kebab.tasks.metrics.extraction.aesop.metric_helpers import MatchingInfo
 
 
 class ReferenceDistance(ElementDistance):
+    """Distance class for reference properties.
+    Computes distance based on matched entities.
+    """
 
     def __init__(self, matched_entities: dict[str, dict[str, float]]):
         """Initialize reference distance."""
@@ -25,7 +29,7 @@ class ReferenceDistance(ElementDistance):
         """Check constraints for reference distance."""
         if property_.data_type.value_type is not ValueType.REFERENCE:
             raise ValueError("Only ValueType.REFERENCE properties are supported.")
-    
+
     @override
     def compute(self, value1: Any, value2: Any, property_: Property) -> float:
         """Compute distance between property values of ground truth and prediction entity."""
@@ -37,26 +41,33 @@ class ReferenceDistance(ElementDistance):
 
     @classmethod
     @override
-    def build(cls, config: dict[str, Any], **kwargs) -> "ReferenceDistance":
+    def build(
+        cls,
+        config: dict[str, Any],
+        *,
+        gt_entities: Any,
+        pred_entities: Any,
+        matching_info: Any,
+        **kwargs: dict[str, Any],
+    ) -> "ReferenceDistance":
         """Build reference distance from matched entities.
 
         Args:
             config: Configuration dictionary (not used).
-            kwargs: Additional arguments containing "matched_pair", "gt_entities", and "pred_entities".
-                "matched_pair": MatchedIndices object containing matched entity indices and distances.
-                "gt_entities": List of ground truth entities.
-                "pred_entities": List of predicted entities.
+            gt_entities: List of ground truth entities.
+            pred_entities: List of predicted entities.
+            matching_info: Matched pairs of entities.
+            kwargs: Additional arguments
         Returns:
             ReferenceDistance instance.
         """
-
         matched_entities = {}
-        for gt_idx, pred_idx in zip(kwargs["matched_pair"].left_ind, kwargs["matched_pair"].right_ind):
-            gt_entity = kwargs["gt_entities"][gt_idx]
-            pred_entity = kwargs["pred_entities"][pred_idx]
-            distance = kwargs["matched_pair"].distances[gt_idx, pred_idx]
-            gt_ref = str(gt_entity.id)
-            pred_ref = str(pred_entity.id)
+        for gt_idx, pred_idx in zip(matching_info.left_ind, matching_info.right_ind, strict=False):
+            gt_entity = gt_entities[gt_idx]
+            pred_entity = pred_entities[pred_idx]
+            distance = matching_info.distances[gt_idx, pred_idx]
+            gt_ref = str(gt_entity.entity_id)
+            pred_ref = str(pred_entity.entity_id)
             if gt_ref not in matched_entities:
                 matched_entities[gt_ref] = {}
             matched_entities[gt_ref][pred_ref] = distance
@@ -65,21 +76,30 @@ class ReferenceDistance(ElementDistance):
 
 class ReferenceResolvingDistance(ElementDistance):
     """Reference resolving distance class.
-        Resolves references in property values and computes distance on resolved values.
+    Resolves references in property values and computes distance on resolved values.
     """
 
-    def __init__(self, internal_distance: ElementDistance, gt_entities: dict[str, Entity] | None = None, pred_entities: dict[str, Entity] | None = None):
-        """Initialize reference resolving distance."""
+    def __init__(
+        self, internal_distance: ElementDistance, gt_entities: dict[str, Entity], pred_entities: dict[str, Entity]
+    ):
+        """Initialize reference resolving distance.
+
+        Args:
+            internal_distance: Element distance function to compute distance after resolving references.
+            gt_entities: mapping of ground truth entity IDs to entities.
+            pred_entities: mapping of predicted entity IDs to entities.
+        """
         self.gt_entities = gt_entities
         self.pred_entities = pred_entities
         self.internal_distance = internal_distance
 
+    @override
     def check_constraints(self, property_: Property) -> None:
         """Check constraints for reference resolving distance."""
         if property_.data_type.value_type is not ValueType.REFERENCE:
             raise ValueError("Only ValueType.REFERENCE properties are supported.")
-    
-    def resolve_value(self, value: Any, is_gt: bool) -> Any:
+
+    def resolve_value(self, value: Any, is_gt: bool) -> Any:  # noqa: ANN401
         """Resolve reference to actual value."""
         entities = self.gt_entities if is_gt else self.pred_entities
         if entities is None:
@@ -89,38 +109,48 @@ class ReferenceResolvingDistance(ElementDistance):
             raise ValueError(f"Reference resolution failed: entity with id '{value}' not found.")
         return entity.properties["name"]
 
+    @override
     def compute(self, value1: Any, value2: Any, property_: Property) -> float:
         """Compute distance between property values after resolving references.
-            Assumes that value1 and value2 are entity IDs.
-            And value1 is from ground truth entity, value2 is from predicted entity."""
+        Assumes that value1 and value2 are entity IDs.
+        And value1 is from ground truth entity, value2 is from predicted entity.
+        """
         resolved_value1 = self.resolve_value(value1, is_gt=True)
         resolved_value2 = self.resolve_value(value2, is_gt=False)
         min_distance = 1.0
-        for value1 in enumerate(resolved_value1):
-            for value2 in enumerate(resolved_value2):
-                distance = self.internal_distance(value1, value2, property_)
-                if distance < min_distance: 
-                    min_distance = distance
+        for internal_value1 in enumerate(resolved_value1):
+            for internal_value2 in enumerate(resolved_value2):
+                distance = self.internal_distance(internal_value1, internal_value2, property_)
+                min_distance = min(min_distance, distance)
         return min_distance
 
     @classmethod
     @override
-    def build(cls, config: dict[str, Any], **kwargs) -> "ReferenceResolvingDistance":
+    def build(
+        cls, config: dict[str, Any], *, gt_entities: Any, pred_entities: Any, **kwargs: dict[str, Any]
+    ) -> "ReferenceResolvingDistance":
         """Create reference resolving distance from dictionary.
-        
+
         Args:
             config: Configuration dictionary containing "internal_distance".
                 "internal_distance": Configuration for the internal element distance function.
-            kwargs: Additional arguments containing "gt_entities" and "pred_entities".
-                "gt_entities": List of ground truth entities.
-                "pred_entities": List of predicted entities.
+            gt_entities: List of ground truth entities.
+            pred_entities: List of predicted entities.
+            kwargs: Additional arguments for internal distance function.
+
         Returns:
             ReferenceResolvingDistance instance.
         """
         internal_distance_config = config.get("internal_distance", {})
-        gt_entities = {entity.id: entity for entity in kwargs.get("gt_entities", [])} if kwargs.get("gt_entities") is not None else None
-        pred_entities = {entity.id: entity for entity in kwargs.get("pred_entities", [])} if kwargs.get("pred_entities") is not None else None
-        return ReferenceResolvingDistance(get_element_distance(internal_distance_config, kwargs), gt_entities, pred_entities)
+        gt_entities_map = {entity.entity_id: entity for entity in gt_entities}
+        pred_entities_map = {entity.entity_id: entity for entity in pred_entities}
+        return ReferenceResolvingDistance(
+            get_element_distance(
+                internal_distance_config, **{"gt_entities": gt_entities, "pred_entities": pred_entities, **kwargs}
+            ),
+            gt_entities_map,
+            pred_entities_map,
+        )
 
 
 PropertyDistanceValue = tuple[list[float], int]
@@ -131,6 +161,7 @@ def get_element_distance(element_distance_params: dict[str, Any], context: dict[
     """Get element distance function from parameters."""
     element_distance_cls_name = element_distance_params["name"]
     return getattr(distances, element_distance_cls_name).build(element_distance_params.get("params", {}), context)
+
 
 @dataclass
 class ValueMatchingRecordWithDistances:
@@ -158,6 +189,7 @@ class ValueMatchingRecordWithScores:
     matched_scores: list[float]
     unmatched_gt_values: list[Any]
     unmatched_pred_values: list[Any]
+
 
 class PropertyDistance(abc.ABC):
     """Property distance class."""
@@ -189,7 +221,7 @@ class PropertyDistance(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def build(cls, config: dict[str, Any], **kwargs) -> "PropertyDistance":
+    def build(cls, config: dict[str, Any], **kwargs: dict[str, Any]) -> "PropertyDistance":
         """Update internal distance functions with entity information for reference resolving distances."""
         raise NotImplementedError
 
@@ -201,11 +233,13 @@ class SingleValuePropertyDistance(PropertyDistance):
         """Initialize single value property distance."""
         self.element_distance = element_distance
 
+    @override
     def check_constraints(self, property_: Property) -> None:
         """Check constraints for single value property distance."""
         if property_.is_collection:
             raise ValueError("Collection properties are not supported.")
 
+    @override
     def compute(self, gt_entity: Entity, pred_entity: Entity, property_: Property) -> ValueMatchingRecordWithDistances:
         """Compute distance between two entities for a given property id.
 
@@ -227,8 +261,8 @@ class SingleValuePropertyDistance(PropertyDistance):
 
     @classmethod
     @override
-    def build(cls, config: dict[str, Any], **kwargs) -> "SingleValuePropertyDistance":
-        """Update internal distance functions with entity information for reference resolving distances."""
+    def build(cls, config: dict[str, Any], **kwargs: dict[str, Any]) -> "SingleValuePropertyDistance":
+        """Create single value property distance from config and additional arguments."""
         return SingleValuePropertyDistance(get_element_distance(config, **kwargs))
 
 
@@ -239,7 +273,8 @@ class SetPropertyDistance(PropertyDistance):
         """Initialize set distance."""
         self.element_distance = element_distance
 
-    def check_constraints(self, property_: Property) -> None:  # noqa: ARG002
+    @override
+    def check_constraints(self, property_: Property) -> None:
         """Check constraints for set distance."""
         return None
 
@@ -277,8 +312,8 @@ class SetPropertyDistance(PropertyDistance):
 
     @classmethod
     @override
-    def build(cls, config: dict[str, Any], **kwargs) -> "SetPropertyDistance":
-        """Update internal distance functions with entity information for reference resolving distances."""
+    def build(cls, config: dict[str, Any], **kwargs: dict[str, Any]) -> "SetPropertyDistance":
+        """Create set property distance from config and additional arguments."""
         return SetPropertyDistance(get_element_distance(config, **kwargs))
 
 
@@ -313,8 +348,8 @@ class PropertyScore:
         )
 
     @classmethod
-    def build(cls, config: dict[str, Any], **kwargs) -> "PropertyScore":
-        """Update internal distance functions with entity information for reference resolving distances."""
+    def build(cls, config: dict[str, Any], **kwargs: dict[str, Any]) -> "PropertyScore":
+        """Create property score from configuration dictionary and additional arguments."""
         property_distance_cls = config.get("property_distance_cls")
         if property_distance_cls is None:
             raise ValueError("property_distance_cls must be provided in the config.")
@@ -328,7 +363,7 @@ class EntityDistance:
     Computed as a weighted sum of distances between properties.
     """
 
-    DEFAULT_ELEMENT_DISTANCE_CONFIG = {"name": "TokenDistance", "params": {}}
+    DEFAULT_ELEMENT_DISTANCE_CONFIG: ClassVar[dict[str, Any]] = {"name": "TokenDistance", "params": {}}
     DEFAULT_PROPERTY_WEIGHT = 1.0
 
     def __init__(
@@ -383,16 +418,18 @@ class EntityDistance:
                 )
 
     @classmethod
-    def build(cls, config: dict[str, Any], **kwargs) -> "EntityDistance":
-        """Create entity distance from dictionary with provided context."""
+    def build(cls, config: dict[str, Any], **kwargs: dict[str, Any]) -> "EntityDistance":
+        """Create entity distance from dictionary  and additional arguments."""
         property_to_distance_function_and_weight = {}
         default_weight = config.get("default_property_weight", cls.DEFAULT_PROPERTY_WEIGHT)
         for property_id, params in config["property_to_distance"].items():
             if property_id not in config["property_schema"].properties:
                 raise ValueError(f"Property '{property_id}' is not in the property schema.")
-            element_distance_config = ({"internal_distance": params["distance_function"]}
+            element_distance_config = (
+                {"internal_distance": params["distance_function"]}
                 if config["property_schema"].properties[property_id].data_type.value_type == ValueType.REFERENCE
-                else params["distance_function"])
+                else params["distance_function"]
+            )
             property_distance = (
                 SetPropertyDistance.build(element_distance_config, **kwargs)
                 if config["property_schema"].properties[property_id].is_collection
@@ -403,7 +440,10 @@ class EntityDistance:
         default_element_distance_config = config.get("default_property_distance", cls.DEFAULT_ELEMENT_DISTANCE_CONFIG)
         default_property_distance = SetPropertyDistance.build(default_element_distance_config, **kwargs)
         return EntityDistance(
-            config["property_schema"], property_to_distance_function_and_weight, default_property_distance, default_weight
+            config["property_schema"],
+            property_to_distance_function_and_weight,
+            default_property_distance,
+            default_weight,
         )
 
 
@@ -438,4 +478,3 @@ def match_items(distances: np.ndarray, threshold: float = 1.0) -> MatchedIndices
     left_ind_unmatched = left_ind[unmatched_ind]
     right_ind_unmatched = right_ind[unmatched_ind]
     return MatchedIndices(left_ind_matched, right_ind_matched, left_ind_unmatched, right_ind_unmatched)
-

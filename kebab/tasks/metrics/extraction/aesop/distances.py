@@ -5,18 +5,14 @@
 from __future__ import annotations
 
 import abc
-from dataclasses import dataclass
 from typing import Any, override
 
 import nltk
-import numpy as np
 import tiktoken
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import min_weight_full_bipartite_matching
 from scipy.spatial.distance import cosine
 from sentence_transformers import SentenceTransformer
 
-from kebab.contracts.entity import Entity, Property, PropertySchema, ValueType
+from kebab.contracts.entity import Property, ValueType
 from kebab.tasks.metrics.extraction.utils import normalize_property_value, normalize_string
 
 
@@ -41,10 +37,17 @@ class ElementDistance(abc.ABC):
         return self.compute(value1, value2, property_)
 
     @classmethod
-    def build(cls, config: dict[str, Any], **kwargs) -> ElementDistance:
-        """Build element distance from configuration dictionary and additional arguments."""
-        raise NotImplementedError
+    def build(cls, config: dict[str, Any], **kwargs: dict[str, Any]) -> ElementDistance:
+        """Build element distance from configuration dictionary and additional arguments.
 
+        Args:
+            config: Configuration dictionary.
+            kwargs: Additional arguments.
+
+        Returns:
+            ElementDistance instance.
+        """
+        raise NotImplementedError
 
 
 class TokenDistance(ElementDistance):
@@ -70,13 +73,30 @@ class TokenDistance(ElementDistance):
 
     @override
     def compute(self, value1: Any, value2: Any, property_: Property) -> float:
-        """Compute token distance between property values of ground truth and prediction entity."""
+        """Compute token distance between property values of ground truth and prediction entity.
+
+        Args:
+               value1: First property value to compare.
+               value2: Second property value to compare.
+               property_: Property instance.
+
+        Returns:
+                Distance value between 0 and 1.
+        """
         return token_distance_between_strings(str(value1), str(value2), self.encoder)
 
     @classmethod
     @override
-    def build(cls, config: dict[str, str], **kwargs) -> TokenDistance:
-        """Create token distance from dictionary."""
+    def build(cls, config: dict[str, str], **kwargs: dict[str, Any]) -> TokenDistance:
+        """Create token distance from dictionary.
+
+        Args:
+            config: Configuration dictionary.
+            kwargs: Additional arguments.
+
+        Returns:
+            TokenDistance instance
+        """
         return TokenDistance(encoder=tiktoken.get_encoding(config.get("encoding", cls.__default_encoding)))
 
 
@@ -108,8 +128,16 @@ class EmbeddingDistance(ElementDistance):
 
     @classmethod
     @override
-    def build(cls, config: dict[str, str], **kwargs) -> EmbeddingDistance:
-        """Create embedding distance from dictionary."""
+    def build(cls, config: dict[str, str], **kwargs: dict[str, Any]) -> EmbeddingDistance:
+        """Create embedding distance from dictionary and additionaal arguments.
+
+        Args:
+            config: Configuration dictionary.
+            kwargs: Additional arguments.
+
+        Returns:
+            EmbeddingDistance instance.
+        """
         return EmbeddingDistance(model=SentenceTransformer(config.get("model", cls.__default_model)))  # type: ignore
 
 
@@ -130,8 +158,16 @@ class BinaryMatchDistance(ElementDistance):
 
     @classmethod
     @override
-    def build(cls, config: dict[str, Any], **kwargs) -> BinaryMatchDistance:
-        """Create binary match distance from dictionary."""
+    def build(cls, config: dict[str, Any], **kwargs: dict[str, Any]) -> BinaryMatchDistance:
+        """Create binary match distance from dictionary and additional arguments.
+
+        Args:
+            config: Configuration dictionary.
+            kwargs: Additional arguments.
+
+        Returns:
+            BinaryMatchDistance instance
+        """
         return BinaryMatchDistance()
 
 
@@ -151,8 +187,16 @@ class EditDistance(ElementDistance):
 
     @classmethod
     @override
-    def build(cls, config: dict[str, Any], **kwargs) -> EditDistance:
-        """Create edit distance from dictionary."""
+    def build(cls, config: dict[str, Any], **kwargs: dict[str, Any]) -> EditDistance:
+        """Create edit distance from dictionary and additional arguments.
+
+        Args:
+            config: Configuration dictionary.
+            kwargs: Additional arguments.
+
+        Returns:
+            EditDistance instance.
+        """
         return EditDistance()
 
 
@@ -192,9 +236,19 @@ class TypeNameDistance(ElementDistance):
 
     @classmethod
     @override
-    def build(cls, config: dict[str, Any], **kwargs) -> TypeNameDistance:
-        """Create type name distance from dictionary."""
+    def build(cls, config: dict[str, Any], **kwargs: dict[str, Any]) -> TypeNameDistance:
+        """Create type name distance from dictionary.
+
+        Args:
+            config: Configuration dictionary.
+            kwargs: Additional arguments.
+
+        Returns:
+            TypeNameDistance instance.
+        """
         return TypeNameDistance(config.get("miscellaneous_distance"))
+
+
 #######################################################################################################################
 
 
