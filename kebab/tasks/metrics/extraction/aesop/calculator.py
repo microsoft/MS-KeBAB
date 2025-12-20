@@ -263,7 +263,9 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             matching_info = match_entities(self.metrics_factory, **context, threshold=self.config["matching_threshold"])
             context["matching_info"] = matching_info
             self.logger.info(f"Document {idx + 1}: Computing metrics")
-            metrics, document_debug_info = compute_bipartite_metrics(**context)
+            metrics, document_debug_info = compute_bipartite_metrics(
+                self.metrics_factory, **context, logger=self.logger
+            )
             self.logger.info(f"Document {idx + 1}: Done")
 
             if document_debug_info is not None:

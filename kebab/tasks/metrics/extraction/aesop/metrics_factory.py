@@ -1,9 +1,8 @@
 from typing import Any
 
-from kebab.contracts.entity import Entity, PropertySchema, ValueType
+from kebab.contracts.entity import PropertySchema, ValueType
 from kebab.tasks.metrics.extraction.aesop.property_score import (
     EntityDistance,
-    MatchingInfo,
     PropertyScore,
     SetPropertyDistance,
     SingleValuePropertyDistance,
@@ -27,7 +26,12 @@ class MetricsFactory:
         self.entity_distance_config = config["entity_distance"]
 
     def get_score_for_property(
-        self, property_id: str, *, gt_entities: Any, pred_entities: Any, matching_info: Any
+        self,
+        property_id: str,
+        *,
+        gt_entities: Any,
+        pred_entities: Any,
+        matching_info: Any,  # noqa: ANN401
     ) -> PropertyScore | None:
         """Get property score function for given property.
 
@@ -57,7 +61,7 @@ class MetricsFactory:
             matching_info=matching_info,
         )
 
-    def get_matching_score_function(self, *, gt_entities: Any, pred_entities: Any) -> EntityDistance:
+    def get_matching_score_function(self, *, gt_entities: Any, pred_entities: Any) -> EntityDistance:  # noqa: ANN401
         """Get entity matching score function in the given context.
 
         Args:
@@ -66,6 +70,7 @@ class MetricsFactory:
         """
         return EntityDistance.build(
             config=self.entity_distance_config,
+            property_schema=self.property_schema,
             gt_entities=gt_entities,
             pred_entities=pred_entities,
         )

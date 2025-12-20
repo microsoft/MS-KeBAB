@@ -4,7 +4,10 @@
             "property_to_distance": {
                 "name": {
                     "distance_function": {
-                        "name": "EmbeddingDistance"
+                        "name": "TokenDistance",
+                        "params": {
+                            "encoding": "cl100k_base"
+                        }
                     },
                     "weight": 1
                 }
@@ -17,7 +20,7 @@
             },
             "default_property_weight": 0
         },
-        "matching_threshold": 0.1,
+        "matching_threshold": 1.0,
         "default_property_distance": {
             "name": "TokenDistance",
             "params": {
@@ -26,10 +29,7 @@
         },
         "property_distance_functions": {
             "name": {
-                "name": "EmbeddingDistance",
-                "params": {
-                    "model": "paraphrase-MiniLM-L6-v2"
-                }
+                "name": "EditDistance"
             },
             "descriptions": {
                 "name": "EmbeddingDistance",
@@ -43,7 +43,31 @@
                     "model": "paraphrase-MiniLM-L6-v2"
                 }
             },
+            "objectives": {
+                "name": "EmbeddingDistance",
+                "params": {
+                    "model": "paraphrase-MiniLM-L6-v2"
+                }
+            },
+            "risks": {
+                "name": "EmbeddingDistance",
+                "params": {
+                    "model": "paraphrase-MiniLM-L6-v2"
+                }
+            },
+            "purpose": {
+                "name": "EmbeddingDistance",
+                "params": {
+                    "model": "paraphrase-MiniLM-L6-v2"
+                }
+            },
+            "url": {
+                "name": "BinaryMatchDistance"
+            },
             "email": {
+                "name": "BinaryMatchDistance"
+            },
+            "password": {
                 "name": "BinaryMatchDistance"
             }
         }

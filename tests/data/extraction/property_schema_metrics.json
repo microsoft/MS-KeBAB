@@ -18,7 +18,8 @@
             "property_id": "name",
             "data_type_id": "text",
             "description": "The name of the entity.",
-            "display_name": "name"
+            "display_name": "name",
+            "is_collection": true
         },
         {
             "property_id": "alternative names",
@@ -46,6 +47,27 @@
             "description": "Entity descriptions.",
             "display_name": "descriptions",
             "is_collection": true
+        },
+        {
+            "property_id": "objectives",
+            "data_type_id": "text",
+            "description": "Objectives related to the entity.",
+            "display_name": "objectives",
+            "is_collection": true
+        },
+        {
+            "property_id": "risks",
+            "data_type_id": "text",
+            "description": "Risks associated with the entity.",
+            "display_name": "risks",
+            "is_collection": true
+        },
+        {
+            "property_id": "purpose",
+            "data_type_id": "text",
+            "description": "Purpose of the entity.",
+            "display_name": "purpose",
+            "is_collection": false
         },
         {
             "property_id": "team",
@@ -88,6 +110,27 @@
             "data_type_id": "reference",
             "description": "Key points related to the entity.",
             "display_name": "key points",
+            "is_collection": true
+        },
+        {
+            "property_id": "part of",
+            "data_type_id": "reference",
+            "description": "Entities that this entity is part of.",
+            "display_name": "part of",
+            "is_collection": true
+        },
+        {
+            "property_id": "key points",
+            "data_type_id": "text",
+            "description": "Key points related to the entity as text.",
+            "display_name": "key points",
+            "is_collection": true
+        },
+        {
+            "property_id": "friend",
+            "data_type_id": "reference",
+            "description": "Friends of the entity.",
+            "display_name": "friend",
             "is_collection": true
         }
     ]

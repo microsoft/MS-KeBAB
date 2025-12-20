@@ -14,28 +14,7 @@ import pandas as pd
 
 from kebab.contracts.entity import Entity, Property, PropertySchema
 from kebab.tasks.metrics.extraction.aesop.metrics_factory import MetricsFactory
-from kebab.tasks.metrics.extraction.aesop.property_score import ValueMatchingRecordWithScores, match_items
-
-
-@dataclass
-class MatchingInfo:
-    """
-    Stores information about matched pairs of entities.
-
-    Attributes:
-        left_ind: the indices of the matched entities in the ground truth
-        right_ind: the indices of the matched entities in the predictions
-        left_unmatched: the indices of the unmatched entities in the ground truth
-        right_unmatched: the indices of the unmatched entities in the predictions
-        distances: the distances between the matched entities
-
-    """
-
-    left_ind: list[int]
-    right_ind: list[int]
-    left_unmatched: list[int]
-    right_unmatched: list[int]
-    distances: np.ndarray
+from kebab.tasks.metrics.extraction.aesop.property_score import MatchingInfo, ValueMatchingRecordWithScores, match_items
 
 
 def get_full_class_name(obj: object) -> str:
@@ -75,14 +54,7 @@ def match_entities(
         for j, e2 in enumerate(pred_entities):
             distances[i, j] = distance_function(e1, e2)
 
-    matched_indices = match_items(distances, threshold)
-    return MatchingInfo(
-        matched_indices.left_ind,
-        matched_indices.right_ind,
-        matched_indices.left_unmatched,
-        matched_indices.right_unmatched,
-        distances,
-    )
+    return match_items(distances, threshold)
 
 
 class EvaluatedPropertyMetrics:
@@ -457,9 +429,8 @@ def create_property_record(
 def compute_bipartite_metrics(
     metrics_factory: MetricsFactory,
     matching_info: MatchingInfo,
-    ground_truth: list[Entity],
-    predictions: list[Entity],
-    property_schema: PropertySchema,
+    gt_entities: list[Entity],
+    pred_entities: list[Entity],
     logger: logging.Logger,
 ) -> tuple[MetricsAccumulator, pd.DataFrame | None]:
     """Compute provided property scores for the matched entities.
@@ -467,9 +438,8 @@ def compute_bipartite_metrics(
     Args:
         metrics_factory: instance of MetricsFactory to get metrics instances
         matching_info: Information about matched entity pairs.
-        ground_truth: List of ground truth entities.
-        predictions: List of predicted entities.
-        property_schema: Schema defining properties and their data types.
+        gt_entities: List of ground truth entities.
+        pred_entities: List of predicted entities.
         logger: Logger instance for logging scoring progress.
 
     Returns:
@@ -478,28 +448,28 @@ def compute_bipartite_metrics(
     metrics_accumulator = MetricsAccumulator()
     metrics_accumulator.matched_count = len(matching_info.left_ind)
     metrics_accumulator.unmatched_pair_count = len(matching_info.left_unmatched)
-    metrics_accumulator.total_gt_entities = len(ground_truth)
-    metrics_accumulator.total_pred_entities = len(predictions)
+    metrics_accumulator.total_gt_entities = len(gt_entities)
+    metrics_accumulator.total_pred_entities = len(pred_entities)
 
-    diff = len(ground_truth) - len(predictions)
+    diff = len(gt_entities) - len(pred_entities)
     if diff > 0:
         metrics_accumulator.unmatched_extra_gt_count = diff
     elif diff < 0:
         metrics_accumulator.unmatched_extra_pred_count = -diff
 
-    properties_union = compute_properties_union(ground_truth, predictions, matching_info)
-    entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matching_info, property_schema)
+    properties_union = compute_properties_union(gt_entities, pred_entities, matching_info)
+    entities_scorer = MatchedEntitiesScorer(gt_entities, pred_entities, matching_info, metrics_factory.property_schema)
 
     for key in properties_union:
         score_func = metrics_factory.get_score_for_property(
-            key, matching_info=matching_info, gt_entities=ground_truth, pred_entities=predictions
+            key, matching_info=matching_info, gt_entities=gt_entities, pred_entities=pred_entities
         )
         if score_func is None:
             raise ValueError(f"No scoring function found for property {key}")
 
         evaluated_property_metrics = entities_scorer.score(score_func, key)
 
-        if key in property_schema.properties:
+        if key in metrics_factory.property_schema.properties:
             # only accumulate metrics for properties that are in the schema
             metrics_accumulator.total_scores_per_doc[key].extend(
                 [
@@ -516,9 +486,9 @@ def compute_bipartite_metrics(
     matched_entities_debug_info = entities_scorer.get_debug_info()
 
     unmatched_gt_records = []
-    unmatched_gt_indices = set(range(len(ground_truth))) - set(matching_info.left_ind)
+    unmatched_gt_indices = set(range(len(gt_entities))) - set(matching_info.left_ind)
     for idx in unmatched_gt_indices:
-        entity = ground_truth[idx]
+        entity = gt_entities[idx]
         for property_id, values in entity.properties.items():
             first_property_record = True
             for value in values:
@@ -542,9 +512,9 @@ def compute_bipartite_metrics(
         unmatched_gt_entities_debug_info = None
 
     unmatched_pred_records = []
-    unmatched_pred_indices = set(range(len(predictions))) - set(matching_info.right_ind)
+    unmatched_pred_indices = set(range(len(pred_entities))) - set(matching_info.right_ind)
     for idx in unmatched_pred_indices:
-        entity = predictions[idx]
+        entity = pred_entities[idx]
         for property_id, values in entity.properties.items():
             first_property_record = True
             original_property_id = ""

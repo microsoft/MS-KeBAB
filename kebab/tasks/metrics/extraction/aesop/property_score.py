@@ -11,8 +11,7 @@ from scipy.sparse.csgraph import min_weight_full_bipartite_matching
 
 from kebab.contracts.entity import Entity, Property, PropertySchema, ValueType
 from kebab.tasks.metrics.extraction.aesop import distances
-from kebab.tasks.metrics.extraction.aesop.distances import ElementDistance
-from kebab.tasks.metrics.extraction.aesop.metric_helpers import MatchingInfo
+from kebab.tasks.metrics.extraction.aesop.element_distance import ElementDistance
 
 
 class ReferenceDistance(ElementDistance):
@@ -120,7 +119,9 @@ class ReferenceResolvingDistance(ElementDistance):
         min_distance = 1.0
         for internal_value1 in enumerate(resolved_value1):
             for internal_value2 in enumerate(resolved_value2):
-                distance = self.internal_distance(internal_value1, internal_value2, property_)
+                distance = self.internal_distance(
+                    internal_value1, internal_value2, property_, override_constraints=True
+                )
                 min_distance = min(min_distance, distance)
         return min_distance
 
@@ -157,10 +158,13 @@ PropertyDistanceValue = tuple[list[float], int]
 PropertyScoreValue = tuple[list[float], int]
 
 
-def get_element_distance(element_distance_params: dict[str, Any], context: dict[str, Any]) -> ElementDistance:
+def get_element_distance(element_distance_params: dict[str, Any], **kwargs: dict[str, Any]) -> ElementDistance:
     """Get element distance function from parameters."""
     element_distance_cls_name = element_distance_params["name"]
-    return getattr(distances, element_distance_cls_name).build(element_distance_params.get("params", {}), context)
+    cls = getattr(distances, element_distance_cls_name, globals().get(element_distance_cls_name))
+    if cls is None:
+        raise ValueError(f"Element distance class '{element_distance_cls_name}' not found.")
+    return cls.build(element_distance_params.get("params", {}), **kwargs)
 
 
 @dataclass
@@ -363,14 +367,15 @@ class EntityDistance:
     Computed as a weighted sum of distances between properties.
     """
 
-    DEFAULT_ELEMENT_DISTANCE_CONFIG: ClassVar[dict[str, Any]] = {"name": "TokenDistance", "params": {}}
+    DEFAULT_ELEMENT_DISTANCE_CONFIG: ClassVar[dict[str, Any]] = {"name": "TokenDistance"}
     DEFAULT_PROPERTY_WEIGHT = 1.0
 
     def __init__(
         self,
         property_schema: PropertySchema,
         property_to_distance_function_and_weight: dict[str, tuple[PropertyDistance, float]],
-        default_property_distance: PropertyDistance,
+        default_simple_property_distance: PropertyDistance,
+        default_reference_property_distance: PropertyDistance,
         default_property_weight: float = DEFAULT_PROPERTY_WEIGHT,
     ):
         """Initialize entity distance.
@@ -378,12 +383,14 @@ class EntityDistance:
         Args:
             property_schema: Schema defining properties and their data types.
             property_to_distance_function_and_weight: Mapping of property names to distance functions and weights.
-            default_property_distance: Default distance function for properties not explicitly configured.
+            default_simple_property_distance: Default distance function for non-reference properties not explicitly configured.
+            default_reference_property_distance: Default distance function for reference properties not explicitly configured.
             default_property_weight: Default weight for properties not explicitly configured.
         """
         self.property_to_distance_function_and_weight = property_to_distance_function_and_weight
         self.property_schema = property_schema
-        self.default_property_distance = default_property_distance
+        self.default_simple_property_distance = default_simple_property_distance
+        self.default_reference_property_distance = default_reference_property_distance
         self.default_property_weight = default_property_weight
         self.__normalize_weights()
 
@@ -408,7 +415,9 @@ class EntityDistance:
         for property_id in self.property_schema.properties:
             if property_id not in self.property_to_distance_function_and_weight:
                 self.property_to_distance_function_and_weight[property_id] = (
-                    self.default_property_distance,
+                    self.default_simple_property_distance
+                    if self.property_schema.properties[property_id].data_type.value_type != ValueType.REFERENCE
+                    else self.default_reference_property_distance,
                     self.default_property_weight / weight_sum,
                 )
             else:
@@ -418,46 +427,67 @@ class EntityDistance:
                 )
 
     @classmethod
-    def build(cls, config: dict[str, Any], **kwargs: dict[str, Any]) -> "EntityDistance":
+    def build(
+        cls, config: dict[str, Any], property_schema: PropertySchema, **kwargs: dict[str, Any]
+    ) -> "EntityDistance":
         """Create entity distance from dictionary  and additional arguments."""
         property_to_distance_function_and_weight = {}
         default_weight = config.get("default_property_weight", cls.DEFAULT_PROPERTY_WEIGHT)
         for property_id, params in config["property_to_distance"].items():
-            if property_id not in config["property_schema"].properties:
+            if property_id not in property_schema.properties:
                 raise ValueError(f"Property '{property_id}' is not in the property schema.")
             element_distance_config = (
-                {"internal_distance": params["distance_function"]}
-                if config["property_schema"].properties[property_id].data_type.value_type == ValueType.REFERENCE
+                {"name": "ReferenceResolvingDistance", "params": {"internal_distance": params["distance_function"]}}
+                if property_schema.properties[property_id].data_type.value_type == ValueType.REFERENCE
                 else params["distance_function"]
             )
             property_distance = (
                 SetPropertyDistance.build(element_distance_config, **kwargs)
-                if config["property_schema"].properties[property_id].is_collection
+                if property_schema.properties[property_id].is_collection
                 else SingleValuePropertyDistance.build(element_distance_config, **kwargs)
             )
             weight = params.get("weight", default_weight)
             property_to_distance_function_and_weight[property_id] = (property_distance, weight)
         default_element_distance_config = config.get("default_property_distance", cls.DEFAULT_ELEMENT_DISTANCE_CONFIG)
-        default_property_distance = SetPropertyDistance.build(default_element_distance_config, **kwargs)
+        default_reference_element_distance_config = {
+            "name": "ReferenceResolvingDistance",
+            "params": {"internal_distance": default_element_distance_config},
+        }
+        default_simple_property_distance = SetPropertyDistance.build(default_element_distance_config, **kwargs)
+        default_reference_property_distance = SetPropertyDistance.build(
+            default_reference_element_distance_config, **kwargs
+        )
         return EntityDistance(
-            config["property_schema"],
+            property_schema,
             property_to_distance_function_and_weight,
-            default_property_distance,
+            default_simple_property_distance,
+            default_reference_property_distance,
             default_weight,
         )
 
 
 @dataclass
-class MatchedIndices:
-    """Stores the indices of matched items and unmatched items in ground truth and prediction."""
+class MatchingInfo:
+    """
+    Stores information about matched pairs of entities.
+
+    Attributes:
+        left_ind: the indices of the matched entities in the ground truth
+        right_ind: the indices of the matched entities in the predictions
+        left_unmatched: the indices of the unmatched entities in the ground truth
+        right_unmatched: the indices of the unmatched entities in the predictions
+        distances: the distances between the matched entities
+
+    """
 
     left_ind: list[int]
     right_ind: list[int]
     left_unmatched: list[int]
     right_unmatched: list[int]
+    distances: np.ndarray
 
 
-def match_items(distances: np.ndarray, threshold: float = 1.0) -> MatchedIndices:
+def match_items(distances: np.ndarray, threshold: float = 1.0) -> MatchingInfo:
     """Match items from two sets of items based on a distance matrix if the distance is within a threshold.
 
     Args:
@@ -465,7 +495,7 @@ def match_items(distances: np.ndarray, threshold: float = 1.0) -> MatchedIndices
         threshold: Maximum distance threshold for considering items as matched.
 
     Returns:
-        MatchedIndices object containing indices of matched and unmatched items.
+        MatchingInfo object containing indices of matched and unmatched items.
     """
     epsilon = 0.01
     left_ind, right_ind = min_weight_full_bipartite_matching(csr_matrix(distances + epsilon))
@@ -477,4 +507,4 @@ def match_items(distances: np.ndarray, threshold: float = 1.0) -> MatchedIndices
     right_ind_matched = right_ind[indices_within_threshold]
     left_ind_unmatched = left_ind[unmatched_ind]
     right_ind_unmatched = right_ind[unmatched_ind]
-    return MatchedIndices(left_ind_matched, right_ind_matched, left_ind_unmatched, right_ind_unmatched)
+    return MatchingInfo(left_ind_matched, right_ind_matched, left_ind_unmatched, right_ind_unmatched, distances)
