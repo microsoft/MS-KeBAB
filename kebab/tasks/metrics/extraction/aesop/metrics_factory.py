@@ -29,8 +29,8 @@ class MetricsFactory:
         self,
         property_id: str,
         *,
-        gt_entities: Any,
-        pred_entities: Any,
+        gt_entities: Any,  # noqa: ANN401
+        pred_entities: Any,  # noqa: ANN401
         matching_info: Any,  # noqa: ANN401
     ) -> PropertyScore | None:
         """Get property score function for given property.
