@@ -14,7 +14,7 @@ from typing import Any, cast
 import pandas as pd
 import xlsxwriter
 
-from kebab.contracts.entity import PropertySchema
+from kebab.contracts.entity import Entity, PropertySchema
 from kebab.tasks.metrics.extraction.aesop.metric_helpers import (
     MetricsAccumulator,
     compute_bipartite_metrics,
@@ -209,7 +209,7 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         self.metrics_factory = MetricsFactory(config, property_schema)
         self.logger = self.logger or logging.getLogger("Value-Averaged-AESOP")
 
-    def preprocess_entities(self, entities: Iterable[Entity]) -> list[Entity]:
+    def preprocess_entities(self, entities: list[Entity]) -> list[Entity]:
         """Preprocess entities by removing specified properties.
 
         Args:
@@ -218,8 +218,8 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         Returns:
             List of preprocessed Entity objects.
         """
-        preprocessed_entities = [entity for entity in entities if "time" not in entity.properties.get("type", [])]
-        for property_to_skip in self.config.properties_to_skip:
+        preprocessed_entities = entities.copy()
+        for property_to_skip in self.metrics_factory.properties_to_skip:
             for entity in preprocessed_entities:
                 if property_to_skip in entity.properties:
                     del entity.properties[property_to_skip]
@@ -254,6 +254,12 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
 
             gt_entities = self.preprocess_entities(gt.entities)
             pred_entities = self.preprocess_entities(pred.entities)
+
+            context = {}
+
+            context["gt_entities"] = gt_entities
+            context["pred_entities"] = pred_entities
+
             gt_property_counts = Counter()
             for entity in gt_entities:
                 gt_property_counts.update(entity.properties.keys())
