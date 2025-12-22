@@ -41,6 +41,8 @@ class MetricsFactory:
             pred_entities: Predicted entities.
             matching_info: Matched pairs of entities.
         """
+        if property_id not in self.property_schema.properties:
+            raise ValueError(f"Property '{property_id}' not found in the property schema.")
         if property_id in self.properties_to_skip:
             return None
         params = self.property_distance_configs.get(property_id, self.default_property_distance_config)

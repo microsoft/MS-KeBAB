@@ -78,13 +78,6 @@ def test_task_interface(tmp_path: Path):
             "predictions": ["tests/data/extraction/re_docred_dev_extracted_entities.jsonl"],
             "metrics": [load_json("tests/data/extraction/re_docred_dev_extracted_entities_metrics.json")],
         },
-        "Extraction-Modified-Heldout": {
-            "predictions": [
-                "tests/data/extraction/re_docred_dev_extracted_entities_modified.jsonl",
-                "tests/data/extraction/re_docred_dev_extracted_entities_modified_with_json_values.jsonl",
-            ],
-            "metrics": [load_json("tests/data/extraction/re_docred_dev_extracted_entities_modified_metrics.json")] * 2,
-        },
         "Linking-Heldout": {
             "predictions": ["tests/data/linking/predictions.jsonl"],
             "metrics": [

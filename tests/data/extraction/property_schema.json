@@ -5,6 +5,11 @@
             "data_type_id": "text",
             "value_type": "Text",
             "description": "A generic text or a value stored as a string."
+        },
+        {
+            "data_type_id": "reference",
+            "value_type": "Reference",
+            "description": "A reference to another entity."
         }
     ],
 
@@ -45,37 +50,37 @@
         },
         {
             "property_id": "team",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "The team that the entity belongs to.",
             "is_collection": false
         },
         {
             "property_id": "email",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Email associated with the entity.",
             "is_collection": false
         },
         {
             "property_id": "employer",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Employer of the entity.",
             "is_collection": false
         },
         {
             "property_id": "job title",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Job title of the entity.",
             "is_collection": false
         },
         {
             "property_id": "company",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Company of the entity.",
             "is_collection": false
         },
         {
             "property_id": "location",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Location of the entity.",
             "is_collection": false
         },
@@ -84,6 +89,19 @@
             "data_type_id": "text",
             "description": "Key points related to the entity.",
             "display_name": "key points",
+            "is_collection": true
+        },
+        {
+            "property_id": "participant",
+            "data_type_id": "reference",
+            "description": "Participants related to the entity.",
+            "is_collection": true
+        },
+        {
+            "property_id": "followed by",
+            "data_type_id": "reference",
+            "description": "Entities that follow this entity.",
+            "display_name": "followed by",
             "is_collection": true
         }
     ]

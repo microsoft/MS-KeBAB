@@ -3,7 +3,7 @@
     "task": "Extraction",
     "data": {
       "extracts": "./tests/utils/data/datasets/re-docred/train_small/extracts.jsonl",
-      "schema": "./tests/data/extraction/property_schema.json",
+      "schema": "./tests/utils/data/datasets/re-docred/property_schema.json",
       "ground_truth": "./tests/utils/data/datasets/re-docred/train_small/entities.jsonl",
       "metrics_config": "./tests/data/extraction/metrics_config.json"
     }
@@ -12,7 +12,7 @@
     "task": "Extraction",
     "data": {
       "extracts": "./tests/utils/data/datasets/re-docred/test_small/extracts.jsonl",
-      "schema": "./tests/data/extraction/property_schema.json",
+      "schema": "./tests/utils/data/datasets/re-docred/property_schema.json",
       "ground_truth": "./tests/utils/data/datasets/re-docred/test_small/entities.jsonl",
       "metrics_config": "./tests/data/extraction/metrics_config.json"
     }
@@ -21,7 +21,7 @@
     "task": "Extraction",
     "data": {
       "extracts": "./tests/utils/data/datasets/re-docred/dev_small/extracts.jsonl",
-      "schema": "./tests/data/extraction/property_schema.json",
+      "schema": "./tests/utils/data/datasets/re-docred/property_schema.json",
       "ground_truth": "./tests/utils/data/datasets/re-docred/dev_small/entities.jsonl",
       "metrics_config": "./tests/data/extraction/metrics_config.json"
     }
