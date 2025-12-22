@@ -474,9 +474,23 @@ class EntityListJsonlWriter(ItemWriter[list[Entity]]):
                 file.write(json_line + "\n")
 
 
+def get_value_type(property_id: str, values: list[Any]) -> ValueType:
+    """Guess value type from values."""
+    if len(values) == 0:
+        return ValueType.TEXT
+    if isinstance(values[0], bool):
+        return ValueType.BOOLEAN
+    if isinstance(values[0], int | float):
+        return ValueType.NUMERIC
+    if isinstance(values[0], str) and ("date" in property_id or "time" in property_id):
+        return ValueType.DATE
+    return ValueType.TEXT
+
+
 def generate_draft_property_schema_from_data(paths: Iterable[Path], output_path: Path) -> None:
     """
-    Generates a property schema from data.
+    Generates a property schema from data files containing entities.
+    Assumes that entities don't have entity reference values.
 
     Args:
         paths: paths to files with entities
@@ -485,23 +499,12 @@ def generate_draft_property_schema_from_data(paths: Iterable[Path], output_path:
     properties = {}
     data_types = {}
 
-    def get_value_type(values: list[Any]) -> ValueType:
-        if len(values) == 0:
-            return ValueType.TEXT
-        if isinstance(values[0], bool):
-            return ValueType.BOOLEAN
-        if isinstance(values[0], int | float):
-            return ValueType.NUMERIC
-        if isinstance(values[0], str) and ("date" in key or "time" in key):
-            return ValueType.DATE
-        return ValueType.TEXT
-
     for path in paths:
         entities = EntityListJsonlReader(path).read_items()
         for entity_list in entities:
             for entity in entity_list:
                 for key, values in entity.properties.items():
-                    value_type = get_value_type(values)
+                    value_type = get_value_type(key, values)
                     data_type_id = value_type.name.lower()
                     is_collection = len(values) > 1
                     if data_type_id not in data_types:

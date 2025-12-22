@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import click
@@ -15,7 +16,7 @@ from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedData
 @click.option(
     "--re-docred-dir",
     type=Path,
-    default=Path.cwd() / "data" / "Re-DocRED" / "Original Dataset" / "full",
+    default=Path.cwd() / "data" / "Re-DocRED" / "Original Dataset" / "dev",
     help="Path to the Re-DocRED data directory (will be *.json-globbed against).",
 )
 @click.option(
@@ -27,18 +28,24 @@ from kebab.utils.dataset.re_docred.re_docred_dataset_builder import ReDocRedData
 @click.option(
     "--output-dir",
     type=Path,
-    default=Path.cwd() / "output" / "re_docred_extractions" / "full",
+    default=Path.cwd() / "data" / "Re-DocRED" / "Extractions" / "dev_updated",
     help="Path to the output directory ('extracts.jsonl' and 'entities.jsonl' will be created there).",
+)
+@click.option(
+    "--log-level",
+    type=str,
+    default="INFO",
+    help="Logging level to use.",
 )
 @click.command()
 def main(
     re_docred_dir: Path,
     wikidata_properties_path: Path,
     output_dir: Path,
+    log_level: str,
 ) -> None:
     """Run Re-DocRED extraction dataset creation steps."""
-    logging_helpers.configure_logging()
-
+    logging_helpers.configure_logging(level=getattr(logging, log_level.upper(), logging.INFO))
     builder = ReDocRedDatasetBuilder(
         re_docred_dir=re_docred_dir,
         wikidata_properties_path=wikidata_properties_path,

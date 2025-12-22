@@ -1,85 +1,165 @@
 {
-    "aesop": {
-        "per_document_metrics": {
-            "2f984bacd714639a11d0ed2055b9c212c4ddad6cf1c80c83d92f92a7e92af058": {
-                "property_precision": {
-                    "name": 0.9855900704860687,
-                    "type": 0.5,
-                    "location": null,
-                    "descriptions": 0.0
-                },
-                "property_recall": {
-                    "name": 0.788472056388855,
-                    "type": 0.5,
-                    "location": 0.0,
-                    "descriptions": null
-                },
-                "avg_property_precision": 0.4951966901620229,
-                "avg_property_recall": 0.42949068546295166,
-                "matched_count": 4,
-                "unmatched_counts": {
-                    "extra_gt_entities": 16,
-                    "extra_pred_entities": 0,
-                    "pairs": 0
-                },
-                "unmatched_fractions": {
-                    "pairs": 0.0,
-                    "extra_pred_entities": 0.0,
-                    "extra_gt_entities": 0.8
-                }
-            },
-            "cd831c4a59537a6936fde50c355173e088621a74bd594da1e76e00fd89db9e9f": {
-                "property_precision": {
-                    "type": 1.0,
-                    "name": 1.0,
-                    "descriptions": 0.0
-                },
-                "property_recall": {
-                    "type": 1.0,
-                    "name": 0.75,
-                    "descriptions": null
-                },
-                "avg_property_precision": 0.6666666666666666,
-                "avg_property_recall": 0.875,
-                "matched_count": 3,
-                "unmatched_counts": {
-                    "extra_gt_entities": 12,
-                    "extra_pred_entities": 0,
-                    "pairs": 1
-                },
-                "unmatched_fractions": {
-                    "pairs": 0.25,
-                    "extra_pred_entities": 0.0,
-                    "extra_gt_entities": 0.75
-                }
-            }
+  "aesop": {
+    "per_document_metrics": {
+      "f4fb743e2acf14b52cb51b0c33152e61dd1077b4f0acebc8205a851ae8c2ffc0": {
+        "property_precision": {
+          "name": 0.9107142857142857,
+          "type": 0.5,
+          "location": null,
+          "country of citizenship": null,
+          "participant in": null,
+          "date of birth": null,
+          "descriptions": 0.0,
+          "place of birth": null,
+          "end time": null,
+          "participant": null,
+          "followed by": null,
+          "start time": null
         },
-        "dataset_metrics": {
-            "property_precision": {
-                "name": 0.9917657545634678,
-                "type": 0.7142857142857143,
-                "location": null,
-                "descriptions": 0.0
-            },
-            "property_recall": {
-                "name": 0.771373364660475,
-                "type": 0.7142857142857143,
-                "location": 0.0,
-                "descriptions": null
-            },
-            "avg_property_precision": 0.5686838229497274,
-            "avg_property_recall": 0.4952196929820631,
-            "matched_count": 7,
-            "unmatched_counts": {
-                "extra_gt_entities": 28,
-                "extra_pred_entities": 0,
-                "pairs": 1
-            },
-            "unmatched_fractions": {
-                "pairs": 0.125,
-                "extra_pred_entities": 0.0,
-                "extra_gt_entities": 0.7777777777777778
-            }
+        "property_recall": {
+          "name": 0.7285714285714285,
+          "type": 0.5,
+          "location": 0.0,
+          "country of citizenship": 0.0,
+          "participant in": 0.0,
+          "date of birth": 0.0,
+          "descriptions": null,
+          "place of birth": 0.0,
+          "end time": 0.0,
+          "participant": 0.0,
+          "followed by": 0.0,
+          "start time": 0.0
+        },
+        "avg_property_precision": 0.4702380952380952,
+        "avg_property_recall": 0.1116883116883117,
+        "matched_count": 4,
+        "unmatched_counts": {
+          "extra_gt_entities": 24,
+          "extra_pred_entities": 0,
+          "pairs": 0
+        },
+        "unmatched_fractions": {
+          "pairs": 0.0,
+          "extra_pred_entities": 0.0,
+          "extra_gt_entities": 0.8571428571428571
         }
+      },
+      "cca7b385d2d086d34ee19a228dfe13aead5273cb3c12d49dcca2a9c964c7a7d8": {
+        "property_precision": {
+          "type": 1.0,
+          "name": 0.8333333333333334,
+          "date of death": null,
+          "country of citizenship": null,
+          "head of government": null,
+          "military branch": null,
+          "educated at": null,
+          "participant in": null,
+          "sibling": null,
+          "date of birth": null,
+          "located in the administrative territorial entity": null,
+          "applies to jurisdiction": null,
+          "country": null,
+          "participated in conflict": null,
+          "descriptions": 0.0,
+          "place of birth": null,
+          "legislative body": null
+        },
+        "property_recall": {
+          "type": 1.0,
+          "name": 0.6666666666666667,
+          "date of death": 0.0,
+          "country of citizenship": 0.0,
+          "head of government": 0.0,
+          "military branch": 0.0,
+          "educated at": 0.0,
+          "participant in": 0.0,
+          "sibling": 0.0,
+          "date of birth": 0.0,
+          "located in the administrative territorial entity": 0.0,
+          "applies to jurisdiction": 0.0,
+          "country": 0.0,
+          "participated in conflict": 0.0,
+          "descriptions": null,
+          "place of birth": 0.0,
+          "legislative body": 0.0
+        },
+        "avg_property_precision": 0.6111111111111112,
+        "avg_property_recall": 0.10416666666666667,
+        "matched_count": 4,
+        "unmatched_counts": {
+          "extra_gt_entities": 23,
+          "extra_pred_entities": 0,
+          "pairs": 0
+        },
+        "unmatched_fractions": {
+          "pairs": 0.0,
+          "extra_pred_entities": 0.0,
+          "extra_gt_entities": 0.8518518518518519
+        }
+      }
+    },
+    "dataset_metrics": {
+      "property_precision": {
+        "name": 0.8720238095238095,
+        "type": 0.75,
+        "location": null,
+        "country of citizenship": null,
+        "participant in": null,
+        "date of birth": null,
+        "descriptions": 0.0,
+        "place of birth": null,
+        "end time": null,
+        "participant": null,
+        "followed by": null,
+        "start time": null,
+        "date of death": null,
+        "head of government": null,
+        "military branch": null,
+        "educated at": null,
+        "sibling": null,
+        "located in the administrative territorial entity": null,
+        "applies to jurisdiction": null,
+        "country": null,
+        "participated in conflict": null,
+        "legislative body": null
+      },
+      "property_recall": {
+        "type": 0.75,
+        "name": 0.6976190476190476,
+        "location": 0.0,
+        "country of citizenship": 0.0,
+        "participant in": 0.0,
+        "date of birth": 0.0,
+        "descriptions": null,
+        "place of birth": 0.0,
+        "end time": 0.0,
+        "participant": 0.0,
+        "followed by": 0.0,
+        "start time": 0.0,
+        "date of death": 0.0,
+        "head of government": 0.0,
+        "military branch": 0.0,
+        "educated at": 0.0,
+        "sibling": 0.0,
+        "located in the administrative territorial entity": 0.0,
+        "applies to jurisdiction": 0.0,
+        "country": 0.0,
+        "participated in conflict": 0.0,
+        "legislative body": 0.0
+      },
+      "avg_property_precision": 0.5406746031746031,
+      "avg_property_recall": 0.06893424036281179,
+      "matched_count": 8,
+      "unmatched_counts": {
+        "extra_gt_entities": 47,
+        "extra_pred_entities": 0,
+        "pairs": 0
+      },
+      "unmatched_fractions": {
+        "pairs": 0.0,
+        "extra_pred_entities": 0.0,
+        "extra_gt_entities": 0.8545454545454545
+      }
     }
+  }
 }

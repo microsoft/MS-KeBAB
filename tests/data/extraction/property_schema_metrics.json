@@ -5,6 +5,11 @@
             "data_type_id": "text",
             "value_type": "Text",
             "description": "A generic text or a value stored as a string."
+        },
+        {
+            "data_type_id": "reference",
+            "value_type": "Reference",
+            "description": "A reference to another entity."
         }
     ],
 
@@ -13,7 +18,8 @@
             "property_id": "name",
             "data_type_id": "text",
             "description": "The name of the entity.",
-            "display_name": "name"
+            "display_name": "name",
+            "is_collection": true
         },
         {
             "property_id": "alternative names",
@@ -43,46 +49,88 @@
             "is_collection": true
         },
         {
-            "property_id": "team",
+            "property_id": "objectives",
             "data_type_id": "text",
+            "description": "Objectives related to the entity.",
+            "display_name": "objectives",
+            "is_collection": true
+        },
+        {
+            "property_id": "risks",
+            "data_type_id": "text",
+            "description": "Risks associated with the entity.",
+            "display_name": "risks",
+            "is_collection": true
+        },
+        {
+            "property_id": "purpose",
+            "data_type_id": "text",
+            "description": "Purpose of the entity.",
+            "display_name": "purpose",
+            "is_collection": false
+        },
+        {
+            "property_id": "team",
+            "data_type_id": "reference",
             "description": "The team that the entity belongs to.",
             "is_collection": false
         },
         {
             "property_id": "email",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Email associated with the entity.",
             "is_collection": false
         },
         {
             "property_id": "employer",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Employer of the entity.",
             "is_collection": false
         },
         {
             "property_id": "job title",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Job title of the entity.",
             "is_collection": false
         },
         {
             "property_id": "company",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Company of the entity.",
             "is_collection": false
         },
         {
             "property_id": "location",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Location of the entity.",
             "is_collection": false
         },
         {
             "property_id": "key_points",
-            "data_type_id": "text",
+            "data_type_id": "reference",
             "description": "Key points related to the entity.",
             "display_name": "key points",
+            "is_collection": true
+        },
+        {
+            "property_id": "part of",
+            "data_type_id": "reference",
+            "description": "Entities that this entity is part of.",
+            "display_name": "part of",
+            "is_collection": true
+        },
+        {
+            "property_id": "key points",
+            "data_type_id": "text",
+            "description": "Key points related to the entity as text.",
+            "display_name": "key points",
+            "is_collection": true
+        },
+        {
+            "property_id": "friend",
+            "data_type_id": "reference",
+            "description": "Friends of the entity.",
+            "display_name": "friend",
             "is_collection": true
         }
     ]

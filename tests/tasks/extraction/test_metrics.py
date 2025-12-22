@@ -7,66 +7,84 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
-import tiktoken
 from kebab.contracts.document import Document, DocumentSchema
-from kebab.contracts.entity import Entity, PropertySchema
+from kebab.contracts.entity import Entity, PropertySchema, ValueType
 from kebab.tasks.metrics.extraction.aesop.calculator import (
-    ValueAveragedAesopConfig,
     ValueAveragedAesopMetricCalculator,
-    make_default_value_averaged_aesop_config,
 )
-from kebab.tasks.metrics.extraction.aesop.distances import (
-    BinaryMatchDistance,
-    EditDistance,
-    EmbeddingDistance,
-    EntityDistance,
-    PropertyScore,
-    SetPropertyDistance,
-    SingleValuePropertyDistance,
-    TokenDistance,
-)
+from kebab.tasks.metrics.extraction.aesop.distances import BinaryMatchDistance, EditDistance, EmbeddingDistance
 from kebab.tasks.metrics.extraction.aesop.metric_helpers import (
-    EntityMatcher,
     MatchedEntitiesScorer,
     MetricsAccumulator,
-    MetricsComputer,
+    compute_bipartite_metrics,
     compute_properties_union,
+    match_entities,
+)
+from kebab.tasks.metrics.extraction.aesop.metrics_factory import MetricsFactory
+from kebab.tasks.metrics.extraction.aesop.property_score import (
+    PropertyScore,
+    SetPropertyDistance,
 )
 from kebab.tasks.metrics.extraction.calculator import ExtractionOutput
 from kebab.tasks.metrics.extraction.utils import normalize_string
-from sentence_transformers import SentenceTransformer
 
 
-embed_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
-encoder = tiktoken.get_encoding("cl100k_base")
-token_score = PropertyScore(SingleValuePropertyDistance(TokenDistance(encoder=encoder)))
-embedding_score = PropertyScore(SetPropertyDistance(EmbeddingDistance(model=embed_model)))
-str_score = PropertyScore(SingleValuePropertyDistance(BinaryMatchDistance()))
-edit_score = PropertyScore(SingleValuePropertyDistance(EditDistance()))
-set_token_score = PropertyScore(SetPropertyDistance(TokenDistance(encoder=encoder)))
+# embed_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
+# encoder = tiktoken.get_encoding("cl100k_base")
+# token_score = PropertyScore(SingleValuePropertyDistance(TokenDistance(encoder=encoder)))
+# token_score_ref = PropertyScore(SingleValuePropertyDistance(ReferenceResolvingDistance(TokenDistance(encoder=encoder))))
+# embedding_score = PropertyScore(SetPropertyDistance(EmbeddingDistance(model=embed_model)))
+# embedding_score_ref = PropertyScore(SetPropertyDistance(ReferenceResolvingDistance(EmbeddingDistance(model=embed_model))))
+# str_score = PropertyScore(SingleValuePropertyDistance(BinaryMatchDistance()))
+# str_score_ref = PropertyScore(SingleValuePropertyDistance(ReferenceResolvingDistance(BinaryMatchDistance())))
+# edit_score = PropertyScore(SingleValuePropertyDistance(EditDistance()))
+# edit_score_ref = PropertyScore(SingleValuePropertyDistance(ReferenceResolvingDistance(EditDistance())))
+# set_token_score = PropertyScore(SetPropertyDistance(TokenDistance(encoder=encoder)))
+# set_token_score_ref = PropertyScore(SetPropertyDistance(ReferenceResolvingDistance(TokenDistance(encoder=encoder))))
 
 
-def name_entity_distance(property_schema: PropertySchema) -> EntityDistance:
-    return EntityDistance(
-        property_schema,
-        {"name": (SingleValuePropertyDistance(TokenDistance()), 1)},
-        default_property_distance=SetPropertyDistance(TokenDistance(encoder=encoder)),
-        default_property_weight=0,
-    )
+# def name_entity_distance(property_schema: PropertySchema) -> EntityDistance:
+#     return EntityDistance(
+#         property_schema,
+#         {"name": (SingleValuePropertyDistance(TokenDistance()), 1),
+#          "type": (SetPropertyDistance(TokenDistance()), 0),
+#          "definitions": (SetPropertyDistance(TokenDistance()), 0),},
+#         default_property_distance=SetPropertyDistance(ReferenceResolvingDistance(TokenDistance(encoder=encoder))),
+#         default_property_weight=0,
+#     )
 
 
-def to_entities(properties: list[dict[str, Any]]) -> list[Entity]:
+def to_entities(properties: list[dict[str, Any]], property_schema: PropertySchema) -> list[Entity]:
     for property_dict in properties:
         for k, v in property_dict.items():
             if not isinstance(v, list):
                 property_dict[k] = [v]
-    return [
+    entities = [
         Entity.from_dict({"entity_id": str(idx), "properties": property_dict})
         for idx, property_dict in enumerate(properties)
     ]
+
+    name_to_entity_id = {}
+    for entity in entities:
+        if "name" in entity.properties:
+            for name in entity.properties["name"]:
+                name_to_entity_id[name] = entity.entity_id
+
+    for entity in entities:
+        for property_id, values in entity.properties.items():
+            if property_schema.properties[property_id].data_type.value_type != ValueType.REFERENCE:
+                continue
+            new_values = set()
+            for value in values:
+                if value not in name_to_entity_id:
+                    raise ValueError(f"Unknown reference value '{value}' for property '{property_id}'.")
+                new_values.add(name_to_entity_id[value])
+            entity.properties[property_id] = list(new_values)
+    return entities
 
 
 def dummy_doc() -> Document:
@@ -92,40 +110,42 @@ def test_normalize_string():
     assert normalize_string("KEBAB\nProject") == "kebab project"
 
 
-def test_match_entities_in_different_order(property_schema: PropertySchema):
-    ground_truth = to_entities([{"name": "London"}, {"name": "United Kingdom"}, {"name": "France"}])
+def test_match_entities_in_different_order(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    ground_truth = to_entities([{"name": "London"}, {"name": "United Kingdom"}, {"name": "France"}], property_schema)
 
-    predictions = to_entities([{"name": "France"}, {"name": "London"}, {"name": "United Kingdom"}])
+    predictions = to_entities([{"name": "France"}, {"name": "London"}, {"name": "United Kingdom"}], property_schema)
 
-    entity_matcher = EntityMatcher(ground_truth, predictions)
-    matched_pair = entity_matcher.match(name_entity_distance(property_schema))
+    matching_info = match_entities(metrics_factory, ground_truth, predictions)
 
-    np.testing.assert_allclose(matched_pair.left_ind, [0, 1, 2])
-    np.testing.assert_allclose(matched_pair.right_ind, [1, 2, 0])
+    np.testing.assert_allclose(matching_info.left_ind, [0, 1, 2])
+    np.testing.assert_allclose(matching_info.right_ind, [1, 2, 0])
 
 
-def test_match_entities_with_larger_ground_truth(property_schema: PropertySchema):
+def test_match_entities_with_larger_ground_truth(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
     ground_truth = to_entities(
         [
             {"name": "United Kingdom"},
             {"name": "London"},
             {"name": "France"},
             {"name": "Paris"},
-        ]
+        ],
+        property_schema,
     )
 
-    predictions = to_entities([{"name": "London"}])
+    predictions = to_entities([{"name": "London"}], property_schema)
 
-    entity_matcher = EntityMatcher(ground_truth, predictions)
-    matched_pair = entity_matcher.match(name_entity_distance(property_schema))
+    matching_info = match_entities(metrics_factory, ground_truth, predictions)
 
-    np.testing.assert_allclose(matched_pair.left_ind, [1])
-    np.testing.assert_allclose(matched_pair.right_ind, [0])
-    np.testing.assert_allclose(matched_pair.distances, [[1], [0], [1], [1]])
+    np.testing.assert_allclose(matching_info.left_ind, [1])
+    np.testing.assert_allclose(matching_info.right_ind, [0])
+    np.testing.assert_allclose(matching_info.distances, [[1], [0], [1], [1]])
 
 
-def test_match_entities_with_larger_predictions(property_schema: PropertySchema):
-    ground_truth = to_entities([{"name": "London"}])
+def test_match_entities_with_larger_predictions(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    ground_truth = to_entities([{"name": "London"}], property_schema)
 
     predictions = to_entities(
         [
@@ -133,50 +153,56 @@ def test_match_entities_with_larger_predictions(property_schema: PropertySchema)
             {"name": "London"},
             {"name": "France"},
             {"name": "Paris"},
-        ]
+        ],
+        property_schema,
     )
 
-    entity_matcher = EntityMatcher(ground_truth, predictions)
-    matched_pair = entity_matcher.match(name_entity_distance(property_schema))
+    matching_info = match_entities(metrics_factory, ground_truth, predictions)
 
-    np.testing.assert_allclose(matched_pair.left_ind, [0])
-    np.testing.assert_allclose(matched_pair.right_ind, [1])
-    np.testing.assert_allclose(matched_pair.distances, [[1, 0, 1, 1]])
-
-
-def test_match_multiple_different_entities(property_schema: PropertySchema):
-    ground_truth = to_entities([{"name": "United Kingdom"}, {"name": "London"}, {"name": "Istanbul"}, {"name": "UK"}])
-    predictions = to_entities([{"name": "Paris"}, {"name": "Istanbul"}, {"name": "France"}, {"name": "London"}])
-
-    entity_matcher = EntityMatcher(ground_truth, predictions)
-    matched_pair = entity_matcher.match(name_entity_distance(property_schema), threshold=0.5)
-
-    np.testing.assert_allclose(matched_pair.left_ind, [1, 2])
-    np.testing.assert_allclose(matched_pair.right_ind, [3, 1])
-    np.testing.assert_allclose(matched_pair.left_unmatched, [0, 3])
-    np.testing.assert_allclose(matched_pair.right_unmatched, [2, 0])
+    np.testing.assert_allclose(matching_info.left_ind, [0])
+    np.testing.assert_allclose(matching_info.right_ind, [1])
+    np.testing.assert_allclose(matching_info.distances, [[1, 0, 1, 1]])
 
 
-def test_match_entities_with_no_overlap(property_schema: PropertySchema):
-    ground_truth = to_entities([{"name": "United Kingdom"}, {"name": "London"}])
-    predictions = to_entities([{"name": "France"}, {"name": "Paris"}])
+def test_match_multiple_different_entities(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    ground_truth = to_entities(
+        [{"name": "United Kingdom"}, {"name": "London"}, {"name": "Istanbul"}, {"name": "UK"}], property_schema
+    )
+    predictions = to_entities(
+        [{"name": "Paris"}, {"name": "Istanbul"}, {"name": "France"}, {"name": "London"}], property_schema
+    )
 
-    entity_matcher = EntityMatcher(ground_truth, predictions)
-    matched_pair = entity_matcher.match(name_entity_distance(property_schema), threshold=0.5)
+    matching_info = match_entities(metrics_factory, ground_truth, predictions, threshold=0.5)
+
+    np.testing.assert_allclose(matching_info.left_ind, [1, 2])
+    np.testing.assert_allclose(matching_info.right_ind, [3, 1])
+    np.testing.assert_allclose(matching_info.left_unmatched, [0, 3])
+    np.testing.assert_allclose(matching_info.right_unmatched, [2, 0])
+
+
+def test_match_entities_with_no_overlap(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    ground_truth = to_entities([{"name": "United Kingdom"}, {"name": "London"}], property_schema)
+    predictions = to_entities([{"name": "France"}, {"name": "Paris"}], property_schema)
+
+    matching_info = match_entities(metrics_factory, ground_truth, predictions, threshold=0.5)
 
     # matching score is lower than the threshold so no entities are matched
-    np.testing.assert_allclose(matched_pair.left_ind, [])
-    np.testing.assert_allclose(matched_pair.right_ind, [])
-    np.testing.assert_allclose(matched_pair.left_unmatched, [0, 1])
-    np.testing.assert_allclose(matched_pair.right_unmatched, [1, 0])
+    np.testing.assert_allclose(matching_info.left_ind, [])
+    np.testing.assert_allclose(matching_info.right_ind, [])
+    np.testing.assert_allclose(matching_info.left_unmatched, [0, 1])
+    np.testing.assert_allclose(matching_info.right_unmatched, [1, 0])
 
-    properties_union = compute_properties_union(ground_truth, predictions, matched_pair)
+    properties_union = compute_properties_union(ground_truth, predictions, matching_info)
 
     assert not properties_union
 
-    entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matched_pair, property_schema)
-
-    evaluated_property_metrics = entities_scorer.score(token_score, "name")
+    entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matching_info, property_schema)
+    score_func = metrics_factory.get_score_for_property(
+        "name", matching_info=matching_info, gt_entities=ground_truth, pred_entities=predictions
+    )
+    evaluated_property_metrics = entities_scorer.score(score_func, "name")
 
     # no entities are matched so no scores are computed
     assert not evaluated_property_metrics.relevant_pair_scores
@@ -184,14 +210,16 @@ def test_match_entities_with_no_overlap(property_schema: PropertySchema):
     np.testing.assert_allclose(evaluated_property_metrics.property_value_count_gt, [0, 0])
 
 
-def test_entity_matches_with_low_matching_scores_should_not_be_evaluated(property_schema: PropertySchema):
+def test_entity_matches_with_low_matching_scores_should_not_be_evaluated(
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
+):
     ground_truth = to_extraction_output(
-        to_entities([{"name": "United Kingdom"}, {"name": "London"}, {"name": "Istanbul"}])
+        to_entities([{"name": "United Kingdom"}, {"name": "London"}, {"name": "Istanbul"}], property_schema)
     )
-    predictions = to_extraction_output(to_entities([{"name": "France"}, {"name": "Paris"}]))
+    predictions = to_extraction_output(to_entities([{"name": "France"}, {"name": "Paris"}], property_schema))
 
-    config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=0.5, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    metrics_config["matching_threshold"] = 0.5
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema=property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     # no entities are matched
@@ -210,9 +238,11 @@ def test_entity_matches_with_low_matching_scores_should_not_be_evaluated(propert
     assert not metrics.get("property_recall")
 
 
-def test_match_entities_with_different_thresholds(property_schema: PropertySchema):
+def test_match_entities_with_different_thresholds(property_schema: PropertySchema, metrics_config: dict[str, Any]):
     ground_truth = to_extraction_output(
-        to_entities([{"name": "South Korea", "type": "country"}, {"name": "London"}, {"name": "Istanbul"}])
+        to_entities(
+            [{"name": "South Korea", "type": "country"}, {"name": "London"}, {"name": "Istanbul"}], property_schema
+        )
     )
     predictions = to_extraction_output(
         to_entities(
@@ -220,13 +250,14 @@ def test_match_entities_with_different_thresholds(property_schema: PropertySchem
                 {"name": "North Korea", "type": "country"},
                 {"name": "London"},
                 {"name": "France"},
-            ]
+            ],
+            property_schema,
         )
     )
 
     # threshold 1.0
-    config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=1.0, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    metrics_config["matching_threshold"] = 1.0
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     # no extra entities in the ground truth or predictions
@@ -241,8 +272,8 @@ def test_match_entities_with_different_thresholds(property_schema: PropertySchem
     assert metrics["unmatched_fractions"]["pairs"] == 0
 
     # threshold 0.5
-    config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=0.5, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    metrics_config["matching_threshold"] = 0.5
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     # with a threshold of 0.5, the first two entities are matched
@@ -253,8 +284,8 @@ def test_match_entities_with_different_thresholds(property_schema: PropertySchem
     assert metrics["unmatched_fractions"]["extra_gt_entities"] == 0.0
 
     # threshold 0.0
-    config = make_default_value_averaged_aesop_config(property_schema, matching_threshold=0.0, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    metrics_config["matching_threshold"] = 0.0
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     # with a threshold of 0, one entity is matched
@@ -274,48 +305,81 @@ def assert_score_dicts_close(left: dict, right: dict):
             np.testing.assert_allclose(value[subkey], right[key][subkey])
 
 
-def test_compute_scores_of_target_entities_with_themselves(property_schema: PropertySchema):
-    ground_truth = to_entities([{"name": "London", "type": "city", "definitions": "Capital of the United Kindgom."}])
-    predictions = ground_truth.copy()
-
-    entity_matcher = EntityMatcher(ground_truth, predictions)
-    matched_pair = entity_matcher.match(name_entity_distance(property_schema))
-
-    properties_union = compute_properties_union(ground_truth, predictions, matched_pair)
-
-    assert properties_union == {"name", "type", "definitions"}
-
-    property_to_score = {
-        "name": token_score,
-        "type": set_token_score,
-        "definitions": set_token_score,
-    }
-
-    for key in properties_union:
-        entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matched_pair, property_schema)
-        evaluated_property_metrics = entities_scorer.score(property_to_score[key], key)
-
-        assert_score_dicts_close(evaluated_property_metrics.relevant_pair_scores, {0: {0: [1.0]}})
-        np.testing.assert_allclose(evaluated_property_metrics.unmatched_count, 0)
-        np.testing.assert_allclose(evaluated_property_metrics.property_value_count_gt, [1])
-
-
-def test_evaluate_target_entities_with_themselves(property_schema: PropertySchema):
-    ground_truth = to_extraction_output(
-        to_entities([{"name": "London", "type": "city", "definitions": ["Capital of the United Kindgom."]}])
+def test_compute_scores_of_target_entities_with_themselves(
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
+):
+    ground_truth = to_entities(
+        [
+            {
+                "name": "London",
+                "type": "city",
+                "definitions": "Capital of the United Kindgom.",
+                "part of": "United Kingdom",
+            },
+            {"name": "United Kingdom", "type": "country", "definitions": "A country in Europe."},
+        ],
+        property_schema,
     )
     predictions = ground_truth.copy()
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+
+    matching_info = match_entities(metrics_factory, ground_truth, predictions)
+
+    properties_union = compute_properties_union(ground_truth, predictions, matching_info)
+
+    assert properties_union == {"name", "type", "definitions", "part of"}
+
+    token_distance = {"name": "TokenDistance", "params": {"encoding": "cl100k_base"}}
+
+    metrics_config["property_distance_functions"].update(
+        {"name": token_distance, "type": token_distance, "definitions": token_distance}
+    )
+    property_value_count_gt_expected = {
+        "name": [1, 1],
+        "type": [1, 1],
+        "definitions": [1, 1],
+        "part of": [1, 0],
+    }
+    pair_scores_expected = {
+        "name": {0: {0: [1.0]}, 1: {1: [1.0]}},
+        "type": {0: {0: [1.0]}, 1: {1: [1.0]}},
+        "definitions": {0: {0: [1.0]}, 1: {1: [1.0]}},
+        "part of": {0: {0: [1.0]}},
+    }
+    for key in properties_union:
+        entities_scorer = MatchedEntitiesScorer(ground_truth, predictions, matching_info, property_schema)
+        score_func = metrics_factory.get_score_for_property(
+            key, gt_entities=ground_truth, pred_entities=predictions, matching_info=matching_info
+        )
+        evaluated_property_metrics = entities_scorer.score(score_func, key)
+
+        assert_score_dicts_close(evaluated_property_metrics.relevant_pair_scores, pair_scores_expected[key])
+        np.testing.assert_allclose(evaluated_property_metrics.unmatched_count, 0)
+        np.testing.assert_allclose(
+            evaluated_property_metrics.property_value_count_gt, property_value_count_gt_expected[key]
+        )
+
+
+def test_evaluate_target_entities_with_themselves(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    ground_truth = to_extraction_output(
+        to_entities(
+            [{"name": "London", "type": "city", "definitions": ["Capital of the United Kindgom."]}], property_schema
+        )
+    )
+    predictions = ground_truth.copy()
+
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["property_precision"]["name"] == metrics["property_precision"]["type"] == 1.0
     assert metrics["property_recall"]["name"] == metrics["property_recall"]["type"] == 1.0
 
 
-def test_evaluate_target_entities_with_more_predictions(property_schema: PropertySchema):
-    ground_truth = to_extraction_output(to_entities([{"name": "London"}, {"name": "Istanbul"}]))
+def test_evaluate_target_entities_with_more_predictions(
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
+):
+    ground_truth = to_extraction_output(to_entities([{"name": "London"}, {"name": "Istanbul"}], property_schema))
 
     predictions = to_extraction_output(
         to_entities(
@@ -324,12 +388,12 @@ def test_evaluate_target_entities_with_more_predictions(property_schema: Propert
                 {"name": "London"},
                 {"name": "Istanbul"},
                 {"name": "France"},
-            ]
-        )
+            ],
+            property_schema,
+        ),
     )
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["matched_count"] == 2
@@ -343,7 +407,9 @@ def test_evaluate_target_entities_with_more_predictions(property_schema: Propert
     assert metrics["property_recall"]["name"] == 1.0
 
 
-def test_evaluate_target_entities_with_more_ground_truth(property_schema: PropertySchema):
+def test_evaluate_target_entities_with_more_ground_truth(
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
+):
     ground_truth = to_extraction_output(
         to_entities(
             [
@@ -351,14 +417,14 @@ def test_evaluate_target_entities_with_more_ground_truth(property_schema: Proper
                 {"name": "London"},
                 {"name": "Istanbul"},
                 {"name": "France"},
-            ]
+            ],
+            property_schema,
         )
     )
 
-    predictions = to_extraction_output(to_entities([{"name": "London"}, {"name": "Istanbul"}]))
+    predictions = to_extraction_output(to_entities([{"name": "London"}, {"name": "Istanbul"}], property_schema))
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["matched_count"] == 2
@@ -372,12 +438,11 @@ def test_evaluate_target_entities_with_more_ground_truth(property_schema: Proper
     assert metrics["property_recall"]["name"] == 1.0
 
 
-def test_evaluate_set_properties_with_same_values(property_schema: PropertySchema):
-    ground_truth = to_extraction_output(to_entities([{"name": "London", "type": ["city"]}]))
-    predictions = to_extraction_output(to_entities([{"name": "London", "type": ["city"]}]))
+def test_evaluate_set_properties_with_same_values(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    ground_truth = to_extraction_output(to_entities([{"name": "London", "type": ["city"]}], property_schema))
+    predictions = to_extraction_output(to_entities([{"name": "London", "type": ["city"]}], property_schema))
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["property_precision"]["name"] == metrics["property_precision"]["type"] == 1.0
@@ -385,25 +450,33 @@ def test_evaluate_set_properties_with_same_values(property_schema: PropertySchem
 
 
 def compute_intermediate_metrics(
-    ground_truth: list[ExtractionOutput], predictions: list[ExtractionOutput], config: ValueAveragedAesopConfig
+    ground_truth: list[ExtractionOutput],
+    predictions: list[ExtractionOutput],
+    metrics_factory: MetricsFactory,
+    metrics_config: dict[str, Any],
 ) -> MetricsAccumulator:
     metrics_accumulator = MetricsAccumulator()
     for pred, gt in zip(predictions, ground_truth, strict=True):
-        entity_matcher = EntityMatcher(gt.entities, pred.entities)
-        matched_pairs = entity_matcher.match(config.matching_score_function, config.matching_threshold)
-        metrics_computer = MetricsComputer(gt.entities, pred.entities, config.property_schema)
-        metrics, _ = metrics_computer.compute_bipartite_metrics(matched_pairs, config.property_score_functions)
+        matched_pairs = match_entities(
+            metrics_factory, gt.entities, pred.entities, metrics_config["matching_threshold"]
+        )
+        metrics, _ = compute_bipartite_metrics(
+            metrics_factory=metrics_factory,
+            matching_info=matched_pairs,
+            gt_entities=gt.entities,
+            pred_entities=pred.entities,
+            logger=logging.getLogger(),
+        )
         metrics_accumulator.update(metrics)
     return metrics_accumulator
 
 
-def test_evaluate_set_properties_with_different_values(property_schema: PropertySchema):
-    ground_truth = to_extraction_output(to_entities([{"type": ["project", "team"]}]))
-    predictions = to_extraction_output(to_entities([{"type": ["project"]}]))
+def test_evaluate_set_properties_with_different_values(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    ground_truth = to_extraction_output(to_entities([{"type": ["project", "team"]}], property_schema))
+    predictions = to_extraction_output(to_entities([{"type": ["project"]}], property_schema))
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-
-    metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, config)
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, metrics_factory, metrics_config)
 
     metrics = metrics_accumulator.accumulate_metrics()
 
@@ -412,15 +485,14 @@ def test_evaluate_set_properties_with_different_values(property_schema: Property
     assert metrics["property_recall"]["type"] == 0.5
 
 
-def test_evaluate_set_properties_with_more_predictions(property_schema: PropertySchema):
-    ground_truth = to_extraction_output(to_entities([{"type": ["project", "team"]}]))
+def test_evaluate_set_properties_with_more_predictions(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    ground_truth = to_extraction_output(to_entities([{"type": ["project", "team"]}], property_schema))
     predictions = to_extraction_output(
-        to_entities([{"type": ["project", "team", "organization", "company", "location"]}])
+        to_entities([{"type": ["project", "team", "organization", "company", "location"]}], property_schema)
     )
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-
-    metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, config)
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, metrics_factory, metrics_config)
 
     metrics = metrics_accumulator.accumulate_metrics()
 
@@ -430,13 +502,14 @@ def test_evaluate_set_properties_with_more_predictions(property_schema: Property
     assert metrics_accumulator.total_unmatched_counts_per_doc["type"] == 3
 
 
-def test_evaluate_set_properties_with_more_ground_truth(property_schema: PropertySchema):
-    ground_truth = to_extraction_output(to_entities([{"type": ["project", "team", "organization"]}]))
-    predictions = to_extraction_output(to_entities([{"type": ["project", "team"]}]))
+def test_evaluate_set_properties_with_more_ground_truth(
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
+):
+    ground_truth = to_extraction_output(to_entities([{"type": ["project", "team", "organization"]}], property_schema))
+    predictions = to_extraction_output(to_entities([{"type": ["project", "team"]}], property_schema))
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-
-    metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, config)
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, metrics_factory, metrics_config)
 
     metrics = metrics_accumulator.accumulate_metrics()
 
@@ -446,17 +519,21 @@ def test_evaluate_set_properties_with_more_ground_truth(property_schema: Propert
     assert metrics_accumulator.total_unmatched_counts_per_doc["type"] == 0
 
 
-def test_evaluate_set_properties_in_different_order_and_normalized(property_schema: PropertySchema):
+def test_evaluate_set_properties_in_different_order_and_normalized(
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
+):
     ground_truth = to_extraction_output(
         to_entities(
-            [{"alternative names": ["Microsoft Research", "MSRC", "Microsoft Research Cambridge", "MSR Cambridge"]}]
+            [{"alternative names": ["Microsoft Research", "MSRC", "Microsoft Research Cambridge", "MSR Cambridge"]}],
+            property_schema,
         )
     )
-    predictions = to_extraction_output(to_entities([{"alternative names": ["microsoft research cambridge"]}]))
+    predictions = to_extraction_output(
+        to_entities([{"alternative names": ["microsoft research cambridge"]}], property_schema)
+    )
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-
-    metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, config)
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    metrics_accumulator = compute_intermediate_metrics(ground_truth, predictions, metrics_factory, metrics_config)
 
     metrics = metrics_accumulator.accumulate_metrics()
 
@@ -465,12 +542,11 @@ def test_evaluate_set_properties_in_different_order_and_normalized(property_sche
     assert metrics["property_recall"]["alternative names"] == 0.25
 
 
-def test_evaluate_missing_properties_in_prediction(property_schema: PropertySchema):
-    ground_truth = to_extraction_output(to_entities([{"name": "Steven", "type": "person"}]))
-    predictions = to_extraction_output(to_entities([{"name": "Steven"}]))
+def test_evaluate_missing_properties_in_prediction(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    ground_truth = to_extraction_output(to_entities([{"name": "Steven", "type": "person"}], property_schema))
+    predictions = to_extraction_output(to_entities([{"name": "Steven"}], property_schema))
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["property_precision"]["name"] == 1.0
@@ -479,12 +555,11 @@ def test_evaluate_missing_properties_in_prediction(property_schema: PropertySche
     assert metrics["property_recall"]["type"] == 0
 
 
-def test_evaluate_more_properties_in_prediction(property_schema: PropertySchema):
-    ground_truth = to_extraction_output(to_entities([{"name": "Steven"}]))
-    predictions = to_extraction_output(to_entities([{"name": "Steven", "type": "person"}]))
+def test_evaluate_more_properties_in_prediction(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    ground_truth = to_extraction_output(to_entities([{"name": "Steven"}], property_schema))
+    predictions = to_extraction_output(to_entities([{"name": "Steven", "type": "person"}], property_schema))
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["property_precision"]["name"] == 1.0
@@ -494,24 +569,58 @@ def test_evaluate_more_properties_in_prediction(property_schema: PropertySchema)
 
 
 def test_edit_score(property_schema: PropertySchema):
-    ground_truth = to_entities([{"team": "Marketing"}])
-    predictions = to_entities([{"team": "Strategic Marketing"}])
-    value_matching_record = edit_score(ground_truth[0], predictions[0], property_schema.properties["team"])
+    ground_truth = to_entities([{"name": "Marketing"}], property_schema)
+    predictions = to_entities([{"name": "Strategic Marketing"}], property_schema)
+    edit_score = PropertyScore(SetPropertyDistance(EditDistance()))
+    value_matching_record = edit_score(ground_truth[0], predictions[0], property_schema.properties["name"])
     assert value_matching_record.matched_scores[0] > 0
 
 
-def test_aggregate_across_documents_simple(property_schema: PropertySchema):
-    ground_truth1 = to_extraction_output(to_entities([{"name": "John", "type": "person"}]))
-    predictions1 = to_extraction_output(to_entities([{"name": "John"}]))
+def test_entity_references(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    ground_truth = to_extraction_output(
+        to_entities(
+            [
+                {"name": "Alice", "type": "person", "friend": "Robert"},
+                {"name": ["Bob", "Robert"], "type": "person", "friend": "Alice"},
+                {"name": "Charlie", "type": "person", "friend": ["Bob", "Robert", "Alice"]},
+            ],
+            property_schema,
+        )
+    )
+    predictions = to_extraction_output(
+        to_entities(
+            [
+                {"name": "Alice", "type": "person", "friend": "Charlie"},
+                {"name": "Robert", "type": "person", "friend": "Alice"},
+                {"name": "Charlie", "type": "person", "friend": ["Robert", "Alice"]},
+            ],
+            property_schema,
+        )
+    )
 
-    ground_truth2 = to_extraction_output(to_entities([{"name": "London"}]))
-    predictions2 = to_extraction_output(to_entities([{"name": "London"}]))
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
+    metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
+    assert metrics["property_precision"]["name"] == 1.0
+    assert metrics["property_recall"]["name"] == 3 / 4
+    assert metrics["property_precision"]["type"] == 1.0
+    assert metrics["property_recall"]["type"] == 1.0
+    assert metrics["property_precision"]["friend"] == 3 / 4
+    assert metrics["property_recall"]["friend"] == 3 / 4
 
-    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
 
-    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
+def test_aggregate_across_documents_simple(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    ground_truth1 = to_extraction_output(to_entities([{"name": "John", "type": "person"}], property_schema))
+    predictions1 = to_extraction_output(to_entities([{"name": "John"}], property_schema))
+
+    ground_truth2 = to_extraction_output(to_entities([{"name": "London"}], property_schema))
+    predictions2 = to_extraction_output(to_entities([{"name": "London"}], property_schema))
+
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+
+    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, metrics_factory, metrics_config)
+
+    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, metrics_factory, metrics_config)
 
     metrics_accumulator.update(metrics_accumulator2)
 
@@ -531,7 +640,7 @@ def test_aggregate_across_documents_simple(property_schema: PropertySchema):
     assert metrics["property_recall"]["name"] == 1.0
 
 
-def test_evaluate_entities_with_different_properties(property_schema: PropertySchema):
+def test_evaluate_entities_with_different_properties(property_schema: PropertySchema, metrics_config: dict[str, Any]):
     ground_truth = to_extraction_output(
         to_entities(
             [
@@ -556,7 +665,29 @@ def test_evaluate_entities_with_different_properties(property_schema: PropertySc
                     "team": "Executive Team",
                     "employer": "Digital Fountain",
                 },
-            ]
+                {
+                    "name": "CEO and President",
+                    "type": "job title",
+                },
+                {
+                    "name": "CTO and Co-Founder",
+                    "type": "job title",
+                },
+                {
+                    "name": "Chief Scientist",
+                    "type": "job title",
+                },
+                {
+                    "name": "Digital Fountain",
+                    "type": "company",
+                },
+                {
+                    "name": "Executive Team",
+                    "type": "team",
+                    "part of": "Digital Fountain",
+                },
+            ],
+            property_schema,
         )
     )
     predictions = to_extraction_output(
@@ -583,12 +714,33 @@ def test_evaluate_entities_with_different_properties(property_schema: PropertySc
                     "team": "Executive Team",
                     "company": "Digital Fountain",
                 },
-            ]
+                {
+                    "name": "CEO and President",
+                    "type": "job title",
+                },
+                {
+                    "name": "CTO and Co-Founder",
+                    "type": "job title",
+                },
+                {
+                    "name": "Chief Scientist",
+                    "type": "job title",
+                },
+                {
+                    "name": "Digital Fountain",
+                    "type": "company",
+                },
+                {
+                    "name": "Executive Team",
+                    "type": "team",
+                    "part of": "Digital Fountain",
+                },
+            ],
+            property_schema,
         )
     )
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert not metrics["property_precision"]["employer"]
@@ -607,18 +759,23 @@ def test_evaluate_entities_with_different_properties(property_schema: PropertySc
     assert metrics["property_recall"]["team"] == 1.0
 
 
-def test_aggregate_across_documents_with_multiple_property_values(property_schema: PropertySchema):
+def test_aggregate_across_documents_with_multiple_property_values(
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
+):
     ground_truth1 = to_extraction_output(
-        to_entities([{"name": "Alexandria", "type": ["project"], "definitions": ["amazing team"]}])
+        to_entities([{"name": "Alexandria", "type": ["project"], "definitions": ["amazing team"]}], property_schema)
     )
     predictions1 = to_extraction_output(
         to_entities(
-            [{"name": "Alexandria", "type": ["project", "team"], "definitions": ["great project", "amazing team"]}]
+            [{"name": "Alexandria", "type": ["project", "team"], "definitions": ["great project", "amazing team"]}],
+            property_schema,
         )
     )
 
     ground_truth2 = to_extraction_output(
-        to_entities([{"name": "Infer.Net", "type": ["software"], "definitions": ["software definition"]}])
+        to_entities(
+            [{"name": "Infer.Net", "type": ["software"], "definitions": ["software definition"]}], property_schema
+        )
     )
     predictions2 = to_extraction_output(
         to_entities(
@@ -628,13 +785,14 @@ def test_aggregate_across_documents_with_multiple_property_values(property_schem
                     "type": ["software", "team", "organization", "company", "location"],
                     "definitions": ["software definition", "software definition1"],
                 }
-            ]
+            ],
+            property_schema,
         )
     )
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
-    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, metrics_factory, metrics_config)
+    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, metrics_factory, metrics_config)
     metrics_accumulator.update(metrics_accumulator2)
 
     metrics = metrics_accumulator.accumulate_metrics()
@@ -650,20 +808,31 @@ def test_aggregate_across_documents_with_multiple_property_values(property_schem
     np.testing.assert_allclose(metrics["property_precision"]["definitions"], 0.5)
 
 
-def test_aggregate_across_documents_with_multiple_entities(property_schema: PropertySchema):
+def test_aggregate_across_documents_with_multiple_entities(
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
+):
     ground_truth1 = to_extraction_output(
-        to_entities([{"name": "Alexandria", "type": ["project"]}, {"name": "FNKE", "type": ["project"]}])
+        to_entities(
+            [{"name": "Alexandria", "type": ["project"]}, {"name": "FNKE", "type": ["project"]}], property_schema
+        )
     )
     predictions1 = to_extraction_output(
-        to_entities([{"name": "Alexandria", "type": ["project", "team"]}, {"name": "FNKE", "type": ["project"]}])
+        to_entities(
+            [{"name": "Alexandria", "type": ["project", "team"]}, {"name": "FNKE", "type": ["project"]}],
+            property_schema,
+        )
     )
 
-    ground_truth2 = to_extraction_output(to_entities([{"type": ["software"], "definitions": ["software definition"]}]))
-    predictions2 = to_extraction_output(to_entities([{"type": ["software"], "definitions": ["software definition"]}]))
+    ground_truth2 = to_extraction_output(
+        to_entities([{"type": ["software"], "definitions": ["software definition"]}], property_schema)
+    )
+    predictions2 = to_extraction_output(
+        to_entities([{"type": ["software"], "definitions": ["software definition"]}], property_schema)
+    )
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
-    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, metrics_factory, metrics_config)
+    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, metrics_factory, metrics_config)
     metrics_accumulator.update(metrics_accumulator2)
     metrics = metrics_accumulator.accumulate_metrics()
 
@@ -689,19 +858,23 @@ def test_aggregate_across_documents_with_multiple_entities(property_schema: Prop
 
 
 def test_aggregate_across_documents_with_multiple_entities_and_missing_properties_in_predictions(
-    property_schema: PropertySchema,
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
 ):
     ground_truth1 = to_extraction_output(
-        to_entities([{"name": "Alexandria", "type": ["project"]}, {"name": "FNKE", "type": ["project"]}])
+        to_entities(
+            [{"name": "Alexandria", "type": ["project"]}, {"name": "FNKE", "type": ["project"]}], property_schema
+        )
     )
-    predictions1 = to_extraction_output(to_entities([{"name": "Alexandria"}, {"name": "FNKE"}]))
+    predictions1 = to_extraction_output(to_entities([{"name": "Alexandria"}, {"name": "FNKE"}], property_schema))
 
-    ground_truth2 = to_extraction_output(to_entities([{"name": "Phi2", "definitions": ["small language model"]}]))
-    predictions2 = to_extraction_output(to_entities([{"name": "Phi2"}]))
+    ground_truth2 = to_extraction_output(
+        to_entities([{"name": "Phi2", "definitions": ["small language model"]}], property_schema)
+    )
+    predictions2 = to_extraction_output(to_entities([{"name": "Phi2"}], property_schema))
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
-    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, metrics_factory, metrics_config)
+    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, metrics_factory, metrics_config)
     metrics_accumulator.update(metrics_accumulator2)
     metrics = metrics_accumulator.accumulate_metrics()
 
@@ -729,19 +902,23 @@ def test_aggregate_across_documents_with_multiple_entities_and_missing_propertie
 
 
 def test_aggregate_across_documents_with_multiple_entities_and_missing_properties_in_ground_truth(
-    property_schema: PropertySchema,
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
 ):
-    ground_truth1 = to_extraction_output(to_entities([{"name": "Alexandria"}, {"name": "FNKE"}]))
+    ground_truth1 = to_extraction_output(to_entities([{"name": "Alexandria"}, {"name": "FNKE"}], property_schema))
     predictions1 = to_extraction_output(
-        to_entities([{"name": "Alexandria", "type": ["project"]}, {"name": "FNKE", "type": ["project"]}])
+        to_entities(
+            [{"name": "Alexandria", "type": ["project"]}, {"name": "FNKE", "type": ["project"]}], property_schema
+        )
     )
 
-    ground_truth2 = to_extraction_output(to_entities([{"name": "Phi2"}]))
-    predictions2 = to_extraction_output(to_entities([{"name": "Phi2", "definitions": ["small language model"]}]))
+    ground_truth2 = to_extraction_output(to_entities([{"name": "Phi2"}], property_schema))
+    predictions2 = to_extraction_output(
+        to_entities([{"name": "Phi2", "definitions": ["small language model"]}], property_schema)
+    )
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
-    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, metrics_factory, metrics_config)
+    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, metrics_factory, metrics_config)
     metrics_accumulator.update(metrics_accumulator2)
     metrics = metrics_accumulator.accumulate_metrics()
 
@@ -768,16 +945,16 @@ def test_aggregate_across_documents_with_multiple_entities_and_missing_propertie
     assert not metrics["property_recall"]["definitions"]
 
 
-def test_evaluate_same_property_across_documents(property_schema: PropertySchema):
-    ground_truth1 = to_extraction_output(to_entities([{"type": ["person", "lead"]}]))
-    predictions1 = to_extraction_output(to_entities([{"type": ["person", "lead"]}]))
+def test_evaluate_same_property_across_documents(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    ground_truth1 = to_extraction_output(to_entities([{"type": ["person", "lead"]}], property_schema))
+    predictions1 = to_extraction_output(to_entities([{"type": ["person", "lead"]}], property_schema))
 
-    ground_truth2 = to_extraction_output(to_entities([{"type": ["organization"]}]))
-    predictions2 = to_extraction_output(to_entities([{"type": ["company"]}]))
+    ground_truth2 = to_extraction_output(to_entities([{"type": ["organization"]}], property_schema))
+    predictions2 = to_extraction_output(to_entities([{"type": ["company"]}], property_schema))
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
-    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, metrics_factory, metrics_config)
+    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, metrics_factory, metrics_config)
     metrics_accumulator.update(metrics_accumulator2)
     metrics = metrics_accumulator.accumulate_metrics()
 
@@ -785,14 +962,20 @@ def test_evaluate_same_property_across_documents(property_schema: PropertySchema
     np.testing.assert_allclose(metrics["property_recall"]["type"], 0.66666666)
 
 
-def test_unmatched_entities_in_predictions_should_not_be_evaluated(property_schema: PropertySchema):
-    ground_truth = to_extraction_output(to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}]))
+def test_unmatched_entities_in_predictions_should_not_be_evaluated(
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
+):
+    ground_truth = to_extraction_output(
+        to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}], property_schema)
+    )
     predictions = to_extraction_output(
-        to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}, {"name": "FNKE", "type": "project"}])
+        to_entities(
+            [{"name": "Microsoft Research"}, {"name": "Alexandria"}, {"name": "FNKE", "type": "project"}],
+            property_schema,
+        )
     )
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["matched_count"] == 2
@@ -806,14 +989,20 @@ def test_unmatched_entities_in_predictions_should_not_be_evaluated(property_sche
     assert "type" not in metrics["property_recall"]
 
 
-def test_unmatched_entities_in_gt_should_not_be_evaluated(property_schema: PropertySchema):
+def test_unmatched_entities_in_gt_should_not_be_evaluated(
+    property_schema: PropertySchema, metrics_config: dict[str, Any]
+):
     ground_truth = to_extraction_output(
-        to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}, {"name": "FNKE", "type": "project"}])
+        to_entities(
+            [{"name": "Microsoft Research"}, {"name": "Alexandria"}, {"name": "FNKE", "type": "project"}],
+            property_schema,
+        )
     )
-    predictions = to_extraction_output(to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}]))
+    predictions = to_extraction_output(
+        to_entities([{"name": "Microsoft Research"}, {"name": "Alexandria"}], property_schema)
+    )
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["matched_count"] == 2
@@ -827,7 +1016,7 @@ def test_unmatched_entities_in_gt_should_not_be_evaluated(property_schema: Prope
     assert "type" not in metrics["property_recall"]
 
 
-def test_json_values_are_not_evaluated(property_schema: PropertySchema):
+def test_json_values_are_not_evaluated(property_schema: PropertySchema, metrics_config: dict[str, Any]):
     ground_truth = to_extraction_output(
         to_entities(
             [
@@ -849,13 +1038,13 @@ def test_json_values_are_not_evaluated(property_schema: PropertySchema):
                         },
                     ],
                 }
-            ]
+            ],
+            property_schema,
         )
     )
     predictions = ground_truth.copy()
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model)
-    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(config)
+    aesop_metric_calculator = ValueAveragedAesopMetricCalculator(metrics_config, property_schema)
     metrics = aesop_metric_calculator.run(predictions, ground_truth)["dataset_metrics"]
 
     assert metrics["matched_count"] == 1
@@ -869,27 +1058,36 @@ def test_json_values_are_not_evaluated(property_schema: PropertySchema):
     assert metrics["property_recall"]["type"] == 1.0
 
 
-def test_final_statistics(property_schema: PropertySchema):
-    ground_truth1 = to_extraction_output(to_entities([{"name": "John"}, {"name": "Alexandria"}, {"name": "FNKE"}]))
-    predictions1 = to_extraction_output(to_entities([{"name": "James"}]))
+def test_final_statistics(property_schema: PropertySchema, metrics_config: dict[str, Any]):
+    ground_truth1 = to_extraction_output(
+        to_entities([{"name": "John"}, {"name": "Alexandria"}, {"name": "FNKE"}], property_schema)
+    )
+    predictions1 = to_extraction_output(to_entities([{"name": "James"}], property_schema))
     ground_truth2 = to_extraction_output(
-        to_entities([{"name": "Alexandria"}, {"name": "FNKE"}, {"name": "Infer.Net"}, {"name": "Phi3"}])
+        to_entities(
+            [{"name": "Alexandria"}, {"name": "FNKE"}, {"name": "Infer.Net"}, {"name": "Phi3"}], property_schema
+        )
     )
-    predictions2 = to_extraction_output(to_entities([{"name": "Alexandria"}]))
+    predictions2 = to_extraction_output(to_entities([{"name": "Alexandria"}], property_schema))
     ground_truth3 = to_extraction_output(
-        to_entities([{"name": "Alexandria"}, {"name": "FNKE"}, {"name": "Infer.Net"}, {"name": "Phi3"}])
+        to_entities(
+            [{"name": "Alexandria"}, {"name": "FNKE"}, {"name": "Infer.Net"}, {"name": "Phi3"}], property_schema
+        )
     )
-    predictions3 = to_extraction_output(to_entities([{"name": "Team"}, {"name": "Model"}]))
-    ground_truth4 = to_extraction_output(to_entities([{"name": "Alexandria"}]))
-    predictions4 = to_extraction_output(to_entities([{"name": "Alexandria"}, {"name": "New Alexandria"}]))
+    predictions3 = to_extraction_output(to_entities([{"name": "Team"}, {"name": "Model"}], property_schema))
+    ground_truth4 = to_extraction_output(to_entities([{"name": "Alexandria"}], property_schema))
+    predictions4 = to_extraction_output(
+        to_entities([{"name": "Alexandria"}, {"name": "New Alexandria"}], property_schema)
+    )
 
-    config = make_default_value_averaged_aesop_config(property_schema, embed_model=embed_model, matching_threshold=0.5)
-    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, config)
-    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, config)
+    metrics_config["matching_threshold"] = 0.5
+    metrics_factory = MetricsFactory(metrics_config, property_schema)
+    metrics_accumulator = compute_intermediate_metrics(ground_truth1, predictions1, metrics_factory, metrics_config)
+    metrics_accumulator2 = compute_intermediate_metrics(ground_truth2, predictions2, metrics_factory, metrics_config)
     metrics_accumulator.update(metrics_accumulator2)
-    metrics_accumulator3 = compute_intermediate_metrics(ground_truth3, predictions3, config)
+    metrics_accumulator3 = compute_intermediate_metrics(ground_truth3, predictions3, metrics_factory, metrics_config)
     metrics_accumulator.update(metrics_accumulator3)
-    metrics_accumulator4 = compute_intermediate_metrics(ground_truth4, predictions4, config)
+    metrics_accumulator4 = compute_intermediate_metrics(ground_truth4, predictions4, metrics_factory, metrics_config)
     metrics_accumulator.update(metrics_accumulator4)
 
     metrics = metrics_accumulator.accumulate_metrics()
@@ -904,9 +1102,10 @@ def test_final_statistics(property_schema: PropertySchema):
 
 
 def test_str_match_score(property_schema: PropertySchema):
-    ground_truth = to_entities([{"email": "test@microsoft.com"}])
+    ground_truth = to_entities([{"name": "test@microsoft.com"}], property_schema)
     predictions = ground_truth.copy()
-    value_matching_record = str_score(ground_truth[0], predictions[0], property_schema.properties["email"])
+    str_score = PropertyScore(SetPropertyDistance(BinaryMatchDistance()))
+    value_matching_record = str_score(ground_truth[0], predictions[0], property_schema.properties["name"])
     assert value_matching_record.matched_scores[0] == 1.0
 
 
@@ -918,7 +1117,8 @@ def test_embedding_based_score(property_schema: PropertySchema):
                     "A tool used for extracting topics. It is used in a branch and has been tested for extracting personal topics and for the LLM stuff."
                 ]
             }
-        ]
+        ],
+        property_schema,
     )
     predictions = to_entities(
         [
@@ -927,7 +1127,9 @@ def test_embedding_based_score(property_schema: PropertySchema):
                     "A software used for extracting entities from documents in the incremental KB construction procedure. It also has a type hierarchy and can model a lot of types"
                 ]
             }
-        ]
+        ],
+        property_schema,
     )
+    embedding_score = PropertyScore(SetPropertyDistance(EmbeddingDistance()))
     value_matching_record = embedding_score(ground_truth[0], predictions[0], property_schema.properties["definitions"])
     assert value_matching_record.matched_scores[0] > 0.5

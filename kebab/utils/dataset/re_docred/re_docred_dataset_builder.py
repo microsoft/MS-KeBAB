@@ -14,11 +14,12 @@ import hashlib
 import json
 import logging
 import typing
+from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
 
 from kebab.contracts.document import Document, DocumentSchema, DocumentUtilities
-from kebab.contracts.entity import Entity
+from kebab.contracts.entity import DataType, Entity, Property, PropertySchema, ValueType
 from kebab.utils import io_helpers
 from kebab.utils.dataset.wikidata import wikidata_utils
 
@@ -28,6 +29,7 @@ class ReDocRedDatasetBuilder:
 
     EXTRACTS_FILENAME: str = "extracts.jsonl"
     ENTITIES_FILENAME: str = "entities.jsonl"
+    PROPERY_SCHEMA_FILENAME: str = "property_schema.json"
     PUNCTUATION: typing.ClassVar[set[str]] = set(".:!,;?-_)}]'#%@")
     PUNCTUATION_WO_SPACE: typing.ClassVar[set[str]] = set("-_({['/@$")
     PROPERTIES_TO_DROP: typing.ClassVar[set[str]] = {"pos", "global_pos", "index", "sent_id", "properties"}
@@ -93,6 +95,7 @@ class ReDocRedDatasetBuilder:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.extracts_output_path = self.output_dir / self.EXTRACTS_FILENAME
         self.entities_output_path = self.output_dir / self.ENTITIES_FILENAME
+        self.property_schema_path = self.output_dir / self.PROPERY_SCHEMA_FILENAME
         assert not self.extracts_output_path.exists(), "Extracts output file already exists."
         assert not self.entities_output_path.exists(), "Entities output file already exists."
 
@@ -101,12 +104,34 @@ class ReDocRedDatasetBuilder:
         entries = self._load_dataset()
         wikidata_properties = wikidata_utils.load_properties(self.wikidata_properties_path)
         extraction_dataset = []
+        property_to_data_type = {
+            "name": DataType.from_dict(
+                {"data_type_id": "text", "value_type": ValueType.TEXT.value, "description": "text"}
+            ),
+            "type": DataType.from_dict(
+                {"data_type_id": "text", "value_type": ValueType.TEXT.value, "description": "text"}
+            ),
+        }
         for entry in entries:
             example = self.extract_example(entry, wikidata_properties)
+            for entity in example["entities"]:
+                for prop in entity.properties:
+                    if prop not in property_to_data_type:
+                        property_to_data_type[prop] = DataType.from_dict(
+                            {
+                                "data_type_id": "reference",
+                                "value_type": ValueType.REFERENCE.value,
+                                "description": "reference to another entity",
+                            }
+                        )
             extraction_dataset.append(example)
+        property_schema = self.build_property_schema(
+            property_to_data_type, [entity for example in extraction_dataset for entity in example["entities"]]
+        )
 
         # save the dataset
         self._write_dataset(extraction_dataset)
+        property_schema.to_file(self.property_schema_path)
 
     @classmethod
     def get_document(cls, entry: dict) -> Document:
@@ -161,20 +186,78 @@ class ReDocRedDatasetBuilder:
             property_label = wikidata_properties[property_id]["label"]
             if property_label not in entities[entity_index]:
                 entities[entity_index][property_label] = set()
-            entities[entity_index][property_label].update(entities[rel_entity_index]["name"])
+            entities[entity_index][property_label].add(str(rel_entity_index))
         return entities
 
-    def filter_small_entities(self, entities: list[Entity]) -> list[Entity]:
-        """Filter out entities that contain only name and type properties."""
-        filtered_entities = []
+    def build_property_schema(
+        self, property_to_data_type: dict[str, DataType], entities: list[Entity]
+    ) -> PropertySchema:
+        """Build the property schema from the property to value types mapping."""
+        property_schema = PropertySchema()
+        properties = {}
+        data_types = {dt.data_type_id: dt for dt in property_to_data_type.values()}
+        is_collection = defaultdict(bool)
         for entity in entities:
-            if len(entity.properties) < self.MIN_PROPERTY_COUNT:
-                self._logger.debug(f"filtering {entity.to_json()}: num_properties < {self.MIN_PROPERTY_COUNT}")
-                continue
+            for prop, values in entity.properties.items():
+                if len(values) > 1:
+                    is_collection[prop] = True
+        for prop, data_type in property_to_data_type.items():
+            properties[prop] = Property.from_dict(
+                {
+                    "property_id": prop,
+                    "data_type_id": data_type.data_type_id,
+                    "description": prop,
+                    "is_collection": is_collection[prop],
+                },
+                data_types,
+            )
+        property_schema = PropertySchema.from_dict(
+            {
+                "name": "schema",
+                "properties": [prop.to_dict() for prop in properties.values()],
+                "data_types": [x.to_dict() for x in data_types.values()],
+            }
+        )
+        return property_schema
+
+    def filter_entities(self, entities: list[Entity]) -> list[Entity]:
+        """Filter out entities based on certain criteria."""
+        filtered_entities = []
+        dropped_entity_ids = set()
+        for entity in entities:
             if any((entity_type in self.TYPES_TO_DROP) for entity_type in entity.properties["type"]):
                 self._logger.debug(f"filtering {entity.to_json()}: has type in types_to_drop.")
+                dropped_entity_ids.add(entity.entity_id)
                 continue
             filtered_entities.append(entity)
+        # update properties to remove references to dropped entities
+        for entity in filtered_entities:
+            properties_to_drop = set()
+            for prop, values in entity.properties.items():
+                if prop in ("name", "type"):
+                    continue
+                updated_values = set()
+                for value in values:
+                    if value not in dropped_entity_ids:
+                        updated_values.add(value)
+                if not updated_values:
+                    self._logger.debug(f"filtering all values of the property {prop} in entity {entity.to_json()}.")
+                    properties_to_drop.add(prop)
+                entity.properties[prop] = sorted(updated_values)
+            for prop_name in properties_to_drop:
+                del entity.properties[prop_name]
+
+        # # update entity IDs to be consecutive
+        # id_map = {entity.entity_id: str(idx) for idx, entity in enumerate(filtered_entities)}
+        # for entity in filtered_entities:
+        #     entity.entity_id = id_map[entity.entity_id]
+        # # update references in properties
+        # for entity in filtered_entities:
+        #     for prop, values in entity.properties.items():
+        #         if property_to_data_type[prop].value_type != ValueType.REFERENCE.value:
+        #             continue
+        #         updated_values = {id_map[v] for v in values if v in id_map}
+        #         entity.properties[prop] = sorted(updated_values)
         return filtered_entities
 
     def extract_example(self, entry: dict, wikidata_properties: dict) -> dict:
@@ -182,7 +265,7 @@ class ReDocRedDatasetBuilder:
         entities = self.extract_entities(entry)
         entities = self.extract_properties(entry, entities, wikidata_properties)
         entities = [Entity(str(i), {k: sorted(v) for k, v in entity.items()}) for i, entity in enumerate(entities)]
-        entities = self.filter_small_entities(entities)
+        entities = self.filter_entities(entities)
         document = self.get_document(entry)
         return {"document": document, "entities": entities}
 
