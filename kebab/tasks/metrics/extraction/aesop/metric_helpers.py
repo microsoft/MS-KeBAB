@@ -208,7 +208,6 @@ def get_original_property_id(entity: Entity, property_id: str) -> str:
     return ""
 
 
-
 class MatchedEntitiesScorer:
     """Computes scores for a given property for matched entities."""
 

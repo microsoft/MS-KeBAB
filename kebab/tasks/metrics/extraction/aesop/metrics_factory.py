@@ -41,19 +41,19 @@ class MetricsFactory:
             pred_entities: Predicted entities.
             matching_info: Matched pairs of entities.
         """
-        if property_id not in self.property_schema.properties:
-            raise ValueError(f"Property '{property_id}' not found in the property schema.")
         if property_id in self.properties_to_skip:
             return None
         params = self.property_distance_configs.get(property_id, self.default_property_distance_config)
         element_distance_config = (
             {"name": "ReferenceDistance", "params": params}
-            if self.property_schema.properties[property_id].data_type.value_type == ValueType.REFERENCE
+            if property_id not in self.property_schema.properties
+            or self.property_schema.properties[property_id].data_type.value_type == ValueType.REFERENCE
             else params
         )
         property_distance_cls = (
             SetPropertyDistance
-            if self.property_schema.properties[property_id].is_collection
+            if property_id not in self.property_schema.properties
+            or self.property_schema.properties[property_id].is_collection
             else SingleValuePropertyDistance
         )
         return PropertyScore.build(
