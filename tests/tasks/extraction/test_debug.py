@@ -68,17 +68,24 @@ def is_cell_or_range_reference(token: str) -> bool:
 
 
 def split_arguments(arg_string: str) -> list[str]:
-    """Split a string of arguments by commas, ignoring commas within quoted strings."""
+    """Split a string of arguments by commas, ignoring commas within quoted strings and parentheses."""
     args = []
     current_arg = ""
     in_quotes = False
+    in_parentheses = False
     for char in arg_string:
         if char == '"':
             in_quotes = not in_quotes
             current_arg += char
-        elif char == "," and not in_quotes:
+        elif char == "," and not in_quotes and not in_parentheses:
             args.append(current_arg.strip())
             current_arg = ""
+        elif char == "{" and not in_quotes:
+            in_parentheses = True
+            current_arg += char
+        elif char == "}" and not in_quotes:
+            in_parentheses = False
+            current_arg += char
         else:
             current_arg += char
     if current_arg:
@@ -108,16 +115,29 @@ class MetricsSpreadsheet:
         cells = cast(tuple[tuple[Cell]], self[range_start:range_end])
         return [self.convert_cell_value(cell) for row in cells for cell in row]
 
+    def parse_criteria(self, criteria: str) -> list[str]:
+        """Parse criteria if needed."""
+        if "{" in criteria and "}" in criteria:
+            # Handle array criteria if needed
+            criteria = criteria.strip()[1:-1]
+            return [c.strip().strip('"') for c in split_arguments(criteria)]
+        return [criteria.strip().strip('"')]
+
     def evaluate_criterion(self, value: float | str, criterion: str) -> bool:
         property_id_pattern = r"[a-zA-Z0-9_ ,]+"
-        return (
-            (criterion == "?*" and len(str(value)) > 0)
-            or (re.match(property_id_pattern, criterion) and str(value) == criterion)
-            or (
-                criterion.startswith((">", "<", ">=", "<="))
-                and eval(f"{value}{criterion}" if not np.isnan(value) else f"np.{value}{criterion}")
-            )
-        )
+        if criterion == "?*":
+            return len(str(value)) > 0
+        if criterion.startswith("<>"):
+            return str(value) != criterion[2:]
+        if re.match(property_id_pattern, criterion):
+            return str(value) == criterion
+        if criterion.startswith((">", "<", ">=", "<=")) and is_float(str(value)):
+            return eval(f"{value}{criterion}" if not np.isnan(value) else f"np.{value}{criterion}")
+        return False
+
+    def evaluate_criteria(self, value: float | str, criteria: str) -> bool:
+        parsed_criteria = self.parse_criteria(criteria)
+        return all(self.evaluate_criterion(value, crit) for crit in parsed_criteria)
 
     def evaluate_sumifs(self, sumif_content: str) -> float:
         """Evaluate a SUMIFS function given its content and a spreadsheet context."""
@@ -132,11 +152,9 @@ class MetricsSpreadsheet:
         for range_part, criterion in zip(criteria_ranges, criteria, strict=True):
             range_ = self.get_range_values(range_part.strip())
             criterion_ = criterion.strip().strip('"')
-            if criterion_ == "educated at":
-                print("Debug: evaluating criterion 'educated at'")
             criterion_indices = set()
             for idx, value in enumerate(range_):
-                if value is not None and self.evaluate_criterion(value, criterion_):
+                if value is not None and self.evaluate_criteria(value, criterion_):
                     criterion_indices.add(idx)
             criteria_indices &= criterion_indices
 
@@ -156,7 +174,7 @@ class MetricsSpreadsheet:
         for idx, value in enumerate(range_):
             if value is not None and self.evaluate_criterion(value, criterion):
                 matching_values.append(average_range[idx])
-        return sum(matching_values) / len(matching_values) if matching_values else None
+        return sum(matching_values) / len(matching_values) if matching_values else np.nan
 
     def replace_functions(self, formula: str, function_to_evaluator: dict[str, Callable[[str], float]]) -> str:
         """Replace functions in the formula with their computed values.
@@ -195,11 +213,8 @@ class MetricsSpreadsheet:
             "SUMIFS": self.evaluate_sumifs,
             "AVERAGEIF": self.evaluate_averageif,
         }
-        # print(formula)
         formula = self.replace_functions(formula, functions)
-        # print(formula)
         tokens = tokenize(formula[1:] if formula.startswith("=") else formula)
-
         precedence = defaultdict(lambda: 3)
         for key, value in {"+": 1, "-": 1, "*": 2, "/": 2}.items():
             precedence[key] = value
@@ -295,7 +310,6 @@ def test_debug_output_consistency(debug_data_path: Path):
     debug_output_file = debug_data_path / "output" / "debug_output" / "debug_info.xlsx"
     # Extract metrics from debug output
     excel_metrics = MetricsSpreadsheet(str(debug_output_file)).get_metrics()
-    print(json.dumps(excel_metrics, indent=2))
     # Compare metrics
     assert_dicts_almost_equal(
         metrics["aesop"]["dataset_metrics"]["property_precision"], excel_metrics["property_precision"]

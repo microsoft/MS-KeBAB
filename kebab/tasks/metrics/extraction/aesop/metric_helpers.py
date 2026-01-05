@@ -205,9 +205,11 @@ def get_original_property_id(entity: Entity, property_id: str) -> str:
         return entity.source_ids[evidence_idx]
     return ""
 
+
 UNDEFINED_ID = "UNDEFINED_ID"
 UNDEFINED_VALUE = "UNDEFINED_VALUE"
 UNDEFINED_SCORE = -1.0
+
 
 class MatchedEntitiesScorer:
     """Computes scores for a given property for matched entities."""
