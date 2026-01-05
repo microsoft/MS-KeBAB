@@ -353,7 +353,7 @@ class MatchedEntitiesScorer:
                         original_property_id = get_original_property_id(self.entities_pred[pred_idx], property_id)
                         property_id_ = property_id
                         if property_id in self.unmapped_property_ids:
-                            property_id_ = UNDEFINED_ID  # use empty string for unmapped properties
+                            property_id_ = UNDEFINED_ID  # use UNDEFINED_ID for unmapped properties
                             original_property_id = property_id
                         record, first_property_record = create_property_record(
                             gt_entity_id,
