@@ -14,8 +14,10 @@ from typing import Any, cast
 import pandas as pd
 import xlsxwriter
 
-from kebab.contracts.entity import PropertySchema
+from kebab.contracts.entity import Entity, PropertySchema
 from kebab.tasks.metrics.extraction.aesop.metric_helpers import (
+    UNDEFINED_ID,
+    UNDEFINED_SCORE,
     MetricsAccumulator,
     compute_bipartite_metrics,
     match_entities,
@@ -70,15 +72,15 @@ def document_debug_output_to_excel(
         return f"${letter}${start}:${letter}${end}"
 
     def conditions(property_id: str) -> str:
-        return f"""{col("gt_entity_id")}, "?*", {col("pred_entity_id")}, "?*", {col("property_id")}, "{property_id}" """
+        return f"""{col("gt_entity_id")}, {{"<>{UNDEFINED_ID}", "?*"}}, {col("pred_entity_id")}, {{"<>{UNDEFINED_ID}", "?*"}}, {col("property_id")}, "{property_id}" """
 
     def property_precision_formula(property_id: str) -> str:
         """Return excel formula for property precision."""
-        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}) / SUMIFS({col("num_pred_values")}, {conditions(property_id)})"""
+        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}, {col("matched_scores")}, "<>{UNDEFINED_SCORE}") / SUMIFS({col("num_pred_values")}, {conditions(property_id)}, {col("num_pred_values")}, ">0")"""
 
     def property_recall_formula(property_id: str) -> str:
         """Return excel formula for property recall."""
-        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}) / SUMIFS({col("num_gt_values")}, {conditions(property_id)})"""
+        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}, {col("matched_scores")}, "<>{UNDEFINED_SCORE}") / SUMIFS({col("num_gt_values")}, {conditions(property_id)})"""
 
     debug_info.to_excel(writer, sheet_name=sheet_name, columns=ordered_columns, index=False)
 
@@ -209,6 +211,31 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
         self.metrics_factory = MetricsFactory(config, property_schema)
         self.logger = self.logger or logging.getLogger("Value-Averaged-AESOP")
 
+    def preprocess_entities(self, entities: list[Entity]) -> list[Entity]:
+        """Preprocess entities by removing specified properties.
+
+        Args:
+            entities: Iterable of Entity objects to preprocess.
+
+        Returns:
+            List of preprocessed Entity objects.
+        """
+        preprocessed_entities = entities.copy()
+        for property_to_skip in self.metrics_factory.properties_to_skip:
+            for entity in preprocessed_entities:
+                if property_to_skip in entity.properties:
+                    del entity.properties[property_to_skip]
+
+        def has_complex_type(value: Any) -> bool:  # noqa: ANN401
+            """Check if a value is of complex type (list or dict)."""
+            return isinstance(value, list | dict)
+
+        for entity in preprocessed_entities:
+            for property_name, property_values in entity.properties.items():
+                if any(has_complex_type(value) for value in property_values):
+                    entity.properties[property_name] = [str(value) for value in property_values]
+        return preprocessed_entities
+
     def run(self, prediction: Iterable[ExtractionOutput], ground_truth: Iterable[ExtractionOutput]) -> dict:
         """Calculate AESOP-based metrics."""
         metrics = {"per_document_metrics": {}, "dataset_metrics": {}}
@@ -227,19 +254,11 @@ class ValueAveragedAesopMetricCalculator(MetricCalculator):
             idx, (pred, gt) = input_
             self.logger.info(f"Processing document {idx + 1} with ID {gt.document.document_id}")
 
-            # gt_entities = [entity for entity in gt.entities if "time" not in entity.properties.get("type", [])]
-            # pred_entities = [entity for entity in pred.entities if "time" not in entity.properties.get("type", [])]
-            gt_entities = gt.entities.copy()
-            pred_entities = pred.entities.copy()
-            for property_to_skip in self.metrics_factory.properties_to_skip:
-                for entity in gt_entities:
-                    if property_to_skip in entity.properties:
-                        del entity.properties[property_to_skip]
-                for entity in pred_entities:
-                    if property_to_skip in entity.properties:
-                        del entity.properties[property_to_skip]
+            gt_entities = self.preprocess_entities(gt.entities)
+            pred_entities = self.preprocess_entities(pred.entities)
 
             context = {}
+
             context["gt_entities"] = gt_entities
             context["pred_entities"] = pred_entities
 

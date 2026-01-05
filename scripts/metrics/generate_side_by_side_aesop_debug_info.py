@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
+from kebab.tasks.metrics.extraction.aesop.metric_helpers import UNDEFINED_ID
 
 
 def empty_row(columns: list[str]) -> pd.DataFrame:
@@ -60,13 +61,13 @@ def merge_entity_dfs(df_left: pd.DataFrame, df_right: pd.DataFrame, suffixes: tu
     excluded_columns = {"document_id", "original_text", "property_id", "gt_entity_id", "gt_values"}
     df_left = add_suffix_excluding_columns(df_left, suffixes[0], excluded_columns)
     df_right = add_suffix_excluding_columns(df_right, suffixes[1], excluded_columns)
-    matched = df_left[df_left["property_id"].notna()].merge(
-        df_right[df_right["property_id"].notna()],
+    matched = df_left[df_left["property_id"] != UNDEFINED_ID].merge(
+        df_right[df_right["property_id"] != UNDEFINED_ID],
         on=list(excluded_columns),
         suffixes=suffixes,
     )
-    unmatched_right = df_right[df_right["property_id"].isna()].drop(columns=list(excluded_columns))
-    unmatched_left = df_left[df_left["property_id"].isna()]
+    unmatched_right = df_right[df_right["property_id"] == UNDEFINED_ID].drop(columns=list(excluded_columns))
+    unmatched_left = df_left[df_left["property_id"] == UNDEFINED_ID]
     unmatched = unmatched_left.merge(
         unmatched_right,
         left_on=[f"original_pred_property_id{suffixes[0]}", f"pred_values{suffixes[0]}"],
@@ -79,7 +80,7 @@ def merge_entity_dfs(df_left: pd.DataFrame, df_right: pd.DataFrame, suffixes: tu
 
 def split_into_gt_and_unmatched_pred(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Split a DataFrame into two rowwise: for ground truth entities and unmatched predicted entities."""
-    return pd.DataFrame(df[df["gt_entity_id"].notna()]), pd.DataFrame(df[df["gt_entity_id"].isna()])
+    return pd.DataFrame(df[df["gt_entity_id"] != UNDEFINED_ID]), pd.DataFrame(df[df["gt_entity_id"] == UNDEFINED_ID])
 
 
 def merge_document_dfs(document_dfs: list[pd.DataFrame], suffixes: tuple[str, str] | None = None) -> pd.DataFrame:
@@ -186,3 +187,7 @@ def main():
         output_filename = args.output_dir / file1.name.replace(".xlsx", "_comparison.xlsx")
         generate_side_by_side_comparison(file1, file2, output_filename, suffixes=("_1", "_2"))
         print(f"Comparison file for {file1.name} saved to {args.output_dir}")
+
+
+if __name__ == "__main__":
+    main()

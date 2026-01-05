@@ -1,0 +1,11 @@
+{
+    "Extraction-Debug-Info-Test": {
+        "task": "Extraction",
+        "data": {
+            "extracts": "./extracts.jsonl",
+            "schema": "./property_schema.json",
+            "ground_truth": "./entities.jsonl",
+            "metrics_config": "./metrics_config.json"
+        }
+    }
+}

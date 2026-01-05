@@ -144,12 +144,10 @@ class MetricsAccumulator:
             sorted(metrics["property_recall"].items(), key=lambda key: -key[1] if key[1] else 0.0)
         )
 
-        metrics["avg_property_precision"] = np.mean(
-            [value for value in metrics["property_precision"].values() if value is not None]
-        )
-        metrics["avg_property_recall"] = np.mean(
-            [value for value in metrics["property_recall"].values() if value is not None]
-        )
+        not_none_precisions = [value for value in metrics["property_precision"].values() if value is not None]
+        metrics["avg_property_precision"] = np.mean(not_none_precisions) if len(not_none_precisions) > 0 else None
+        not_none_recalls = [value for value in metrics["property_recall"].values() if value is not None]
+        metrics["avg_property_recall"] = np.mean(not_none_recalls) if len(not_none_recalls) > 0 else None
         metrics["matched_count"] = self.matched_count
         metrics["unmatched_counts"] = {
             "extra_gt_entities": self.unmatched_extra_gt_count,
@@ -206,6 +204,11 @@ def get_original_property_id(entity: Entity, property_id: str) -> str:
         evidence_idx = entity.evidence_map[property_id][0][0]
         return entity.source_ids[evidence_idx]
     return ""
+
+
+UNDEFINED_ID = "UNDEFINED_ID"
+UNDEFINED_VALUE = "UNDEFINED_VALUE"
+UNDEFINED_SCORE = -1.0
 
 
 class MatchedEntitiesScorer:
@@ -293,6 +296,8 @@ class MatchedEntitiesScorer:
                 evaluated_property_metrics.property_value_count_gt[gt_idx] += len(self.entities_gt[gt_idx][property_])
             elif property_ in self.entities_pred[pred_idx]:
                 pred_values = self.entities_pred[pred_idx][property_]
+                evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
+                evaluated_property_metrics.unmatched_count += len(pred_values)
                 self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWithScores(
                     [], [], [], [], pred_values
                 )
@@ -334,11 +339,11 @@ class MatchedEntitiesScorer:
                         record, first_property_record = create_property_record(
                             gt_entity_id,
                             pred_entity_id,
-                            "",
+                            UNDEFINED_ID,
                             property_id,
                             unmatched_gt_value,
-                            "",
-                            None,
+                            UNDEFINED_VALUE,
+                            UNDEFINED_SCORE,
                             num_gt_values,
                             num_pred_values,
                             first_property_record,
@@ -348,16 +353,16 @@ class MatchedEntitiesScorer:
                         original_property_id = get_original_property_id(self.entities_pred[pred_idx], property_id)
                         property_id_ = property_id
                         if property_id in self.unmapped_property_ids:
-                            property_id_ = ""  # use empty string for unmapped properties
+                            property_id_ = UNDEFINED_ID  # use UNDEFINED_ID for unmapped properties
                             original_property_id = property_id
                         record, first_property_record = create_property_record(
                             gt_entity_id,
                             pred_entity_id,
                             original_property_id,
                             property_id_,
-                            "",
+                            UNDEFINED_ID,
                             unmatched_pred_value,
-                            None,
+                            UNDEFINED_SCORE,
                             num_gt_values,
                             num_pred_values,
                             first_property_record,
@@ -494,12 +499,12 @@ def compute_bipartite_metrics(
             for value in values:
                 record, first_property_record = create_property_record(
                     entity.entity_id,
-                    "",  # No pred_entity_id for unmatched ground truth entities
-                    "",  # No original_property_id for unmatched ground truth entities
+                    UNDEFINED_ID,  # No pred_entity_id for unmatched ground truth entities
+                    UNDEFINED_ID,  # No original_property_id for unmatched ground truth entities
                     property_id,
                     value,
-                    "",
-                    None,
+                    UNDEFINED_VALUE,
+                    UNDEFINED_SCORE,
                     len(entity.properties[property_id]),
                     0,
                     first_property_record,
@@ -524,13 +529,13 @@ def compute_bipartite_metrics(
                 original_property_id = entity.source_ids[evidence_idx]
             for value in values:
                 record, first_property_record = create_property_record(
-                    "",
-                    entity.entity_id,  # No gt_entity_id for unmatched prediction entities
+                    UNDEFINED_ID,  # No gt_entity_id for unmatched prediction entities
+                    entity.entity_id,
                     original_property_id,
                     property_id,
-                    "",
+                    UNDEFINED_VALUE,
                     value,
-                    None,
+                    UNDEFINED_SCORE,
                     0,
                     len(entity.properties[property_id]),
                     first_property_record,
