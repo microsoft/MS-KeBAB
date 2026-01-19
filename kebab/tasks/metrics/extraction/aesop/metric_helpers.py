@@ -210,12 +210,15 @@ UNDEFINED_ID = "UNDEFINED_ID"
 UNDEFINED_VALUE = "UNDEFINED_VALUE"
 UNDEFINED_SCORE = -1.0
 
+
 def annotate_values_with_names(values: list[str], property_: Property | None, entities: list[Entity]) -> list[str]:
     """Annotate property values with entity names for better debug information.
 
     Args:
         values: List of property values (entity references).
+        property_: property of the values.
         entities: List of entities to find names from.
+
     Returns:
         List of annotated property values.
     """
@@ -229,7 +232,7 @@ def annotate_values_with_names(values: list[str], property_: Property | None, en
             annotated_values.append(None)
             continue
         names = entity_id_to_names.get(value)
-        annotated_value = f"{value} [{", ".join(names)}]" if names else value
+        annotated_value = f"{value} [{', '.join(names)}]" if names else value
         annotated_values.append(annotated_value)
     return annotated_values
 
@@ -305,8 +308,12 @@ class MatchedEntitiesScorer:
                     value_matching_record = score_function(
                         self.entities_gt[gt_idx], self.entities_pred[pred_idx], property_
                     )
-                    value_matching_record.gt_values = annotate_values_with_names(value_matching_record.gt_values, property_, self.entities_gt)
-                    value_matching_record.pred_values = annotate_values_with_names(value_matching_record.pred_values, property_, self.entities_pred)
+                    value_matching_record.gt_values = annotate_values_with_names(
+                        value_matching_record.gt_values, property_, self.entities_gt
+                    )
+                    value_matching_record.pred_values = annotate_values_with_names(
+                        value_matching_record.pred_values, property_, self.entities_pred
+                    )
                     value_matching_record.unmatched_pred_values = annotate_values_with_names(
                         value_matching_record.unmatched_pred_values, property_, self.entities_pred
                     )
@@ -321,7 +328,11 @@ class MatchedEntitiesScorer:
                 else:
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
                     self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWithScores(
-                        [], [], [], annotate_values_with_names(self.entities_gt[gt_idx][property_], property_, self.entities_gt), []
+                        [],
+                        [],
+                        [],
+                        annotate_values_with_names(self.entities_gt[gt_idx][property_], property_, self.entities_gt),
+                        [],
                     )
 
                 evaluated_property_metrics.property_value_count_gt[gt_idx] += len(self.entities_gt[gt_idx][property_])
@@ -527,7 +538,9 @@ def compute_bipartite_metrics(
         entity = gt_entities[idx]
         for property_id, values in entity.properties.items():
             first_property_record = True
-            annotated_values = annotate_values_with_names(values, metrics_factory.property_schema.properties.get(property_id), gt_entities)
+            annotated_values = annotate_values_with_names(
+                values, metrics_factory.property_schema.properties.get(property_id), gt_entities
+            )
             for value in annotated_values:
                 record, first_property_record = create_property_record(
                     entity.entity_id,
@@ -559,7 +572,9 @@ def compute_bipartite_metrics(
             if property_evidence:
                 evidence_idx = property_evidence[0][0]
                 original_property_id = entity.source_ids[evidence_idx]
-            annotated_values = annotate_values_with_names(values, metrics_factory.property_schema.properties.get(property_id), pred_entities)
+            annotated_values = annotate_values_with_names(
+                values, metrics_factory.property_schema.properties.get(property_id), pred_entities
+            )
             for value in annotated_values:
                 record, first_property_record = create_property_record(
                     UNDEFINED_ID,  # No gt_entity_id for unmatched prediction entities
