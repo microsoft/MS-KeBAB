@@ -223,7 +223,6 @@ def annotate_values_with_names(values: list[str], property_: Property | None, en
         List of annotated property values.
     """
     if property_ is not None and property_.data_type.value_type != ValueType.REFERENCE:
-        print(property_.property_id, property_.data_type.value_type)
         return values
     entity_id_to_names: dict[str, list[str]] = {entity.entity_id: entity.properties["name"] for entity in entities}
     annotated_values = []
