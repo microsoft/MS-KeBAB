@@ -232,7 +232,7 @@ def annotate_values_with_names(values: list[str], property_: Property | None, en
             annotated_values.append(None)
             continue
         names = entity_id_to_names.get(value)
-        annotated_value = f"{value} [{', '.join(names)}]" if names else value
+        annotated_value = f"{value} [{', '.join(map(str, names))}]" if names else value
         annotated_values.append(annotated_value)
     return annotated_values
 
