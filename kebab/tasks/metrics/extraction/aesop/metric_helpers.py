@@ -211,29 +211,40 @@ UNDEFINED_VALUE = "UNDEFINED_VALUE"
 UNDEFINED_SCORE = -1.0
 
 
-def annotate_values_with_names(values: list[str], property_: Property | None, entities: list[Entity]) -> list[str]:
+def annotate_value(value: str | None, entity_id_to_names: dict[str, list[Any]]) -> str | None:
+    """Annotate a single property value with entity names for better debug information.
+
+    Args:
+        value: Property value (entity reference).
+        entity_id_to_names: a mapping from entity IDs to their names.
+
+    Returns:
+        Annotated property value.
+    """
+    if value is None:
+        return None
+    if value in (UNDEFINED_ID, UNDEFINED_VALUE):
+        return value
+    names = entity_id_to_names.get(value)
+    return f"{value} [{', '.join(map(str, names))}]" if names else value
+
+
+def annotate_values_with_names(
+    values: list[Any], property_: Property | None, entity_id_to_names: dict[str, list[Any]]
+) -> list[str | None]:
     """Annotate property values with entity names for better debug information.
 
     Args:
         values: List of property values (entity references).
         property_: property of the values.
-        entities: List of entities to find names from.
+        entity_id_to_names: a mapping from entity IDs to their names.
 
     Returns:
         List of annotated property values.
     """
     if property_ is not None and property_.data_type.value_type != ValueType.REFERENCE:
         return values
-    entity_id_to_names: dict[str, list[str]] = {entity.entity_id: entity.properties["name"] for entity in entities}
-    annotated_values = []
-    for value in values:
-        if value is None:
-            annotated_values.append(None)
-            continue
-        names = entity_id_to_names.get(value)
-        annotated_value = f"{value} [{', '.join(map(str, names))}]" if names else value
-        annotated_values.append(annotated_value)
-    return annotated_values
+    return [annotate_value(value, entity_id_to_names) for value in values]
 
 
 class MatchedEntitiesScorer:
@@ -258,6 +269,11 @@ class MatchedEntitiesScorer:
         """
         self.entities_gt = entities_gt
         self.entities_pred = entities_pred
+
+        self.entity_id_to_names_gt = {e.entity_id: e.properties["name"] for e in entities_gt if "name" in e.properties}
+        self.entity_id_to_names_pred = {
+            e.entity_id: e.properties["name"] for e in entities_pred if "name" in e.properties
+        }
 
         if len(matching_info.left_ind) != len(matching_info.right_ind):
             raise ValueError("left_ind and right_ind must have the same length.")
@@ -296,7 +312,7 @@ class MatchedEntitiesScorer:
                 if property_id in self.entities_pred[pred_idx].properties:
                     pred_values = self.entities_pred[pred_idx].properties[property_id]
                     self.debug_info[gt_idx][pred_idx][property_id] = ValueMatchingRecordWithScores(
-                        [], [], [], [], annotate_values_with_names(pred_values, property_, self.entities_pred)
+                        [], [], [], [], annotate_values_with_names(pred_values, property_, self.entity_id_to_names_pred)
                     )
                     self.unmapped_property_ids.add(property_id)
             return evaluated_property_metrics
@@ -308,16 +324,16 @@ class MatchedEntitiesScorer:
                         self.entities_gt[gt_idx], self.entities_pred[pred_idx], property_
                     )
                     value_matching_record.gt_values = annotate_values_with_names(
-                        value_matching_record.gt_values, property_, self.entities_gt
+                        value_matching_record.gt_values, property_, self.entity_id_to_names_gt
                     )
                     value_matching_record.pred_values = annotate_values_with_names(
-                        value_matching_record.pred_values, property_, self.entities_pred
+                        value_matching_record.pred_values, property_, self.entity_id_to_names_pred
                     )
                     value_matching_record.unmatched_pred_values = annotate_values_with_names(
-                        value_matching_record.unmatched_pred_values, property_, self.entities_pred
+                        value_matching_record.unmatched_pred_values, property_, self.entity_id_to_names_pred
                     )
                     value_matching_record.unmatched_gt_values = annotate_values_with_names(
-                        value_matching_record.unmatched_gt_values, property_, self.entities_gt
+                        value_matching_record.unmatched_gt_values, property_, self.entity_id_to_names_gt
                     )
                     self.debug_info[gt_idx][pred_idx][property_.property_id] = value_matching_record
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = (
@@ -330,7 +346,9 @@ class MatchedEntitiesScorer:
                         [],
                         [],
                         [],
-                        annotate_values_with_names(self.entities_gt[gt_idx][property_], property_, self.entities_gt),
+                        annotate_values_with_names(
+                            self.entities_gt[gt_idx][property_], property_, self.entity_id_to_names_gt
+                        ),
                         [],
                     )
 
@@ -340,7 +358,7 @@ class MatchedEntitiesScorer:
                 evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
                 evaluated_property_metrics.unmatched_count += len(pred_values)
                 self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWithScores(
-                    [], [], [], [], annotate_values_with_names(pred_values, property_, self.entities_pred)
+                    [], [], [], [], annotate_values_with_names(pred_values, property_, self.entity_id_to_names_pred)
                 )
         return evaluated_property_metrics
 
@@ -370,6 +388,8 @@ class MatchedEntitiesScorer:
                             property_id,
                             value_gt,
                             value_pred,
+                            self.entity_id_to_names_gt,
+                            self.entity_id_to_names_pred,
                             score,
                             num_gt_values,
                             num_pred_values,
@@ -384,6 +404,8 @@ class MatchedEntitiesScorer:
                             property_id,
                             unmatched_gt_value,
                             UNDEFINED_VALUE,
+                            self.entity_id_to_names_gt,
+                            self.entity_id_to_names_pred,
                             UNDEFINED_SCORE,
                             num_gt_values,
                             num_pred_values,
@@ -403,6 +425,8 @@ class MatchedEntitiesScorer:
                             property_id_,
                             UNDEFINED_ID,
                             unmatched_pred_value,
+                            self.entity_id_to_names_gt,
+                            self.entity_id_to_names_pred,
                             UNDEFINED_SCORE,
                             num_gt_values,
                             num_pred_values,
@@ -433,12 +457,14 @@ def create_property_record(
     property_id: str,
     gt_value: Any,  # noqa: ANN401
     pred_value: Any,  # noqa: ANN401
+    entity_id_to_names_gt: dict[str, list[Any]],
+    entity_id_to_names_pred: dict[str, list[Any]],
     score: float | None,
     total_gt_values: int,
     total_pred_values: int,
     first_property_record: bool = False,
 ) -> tuple[dict, bool]:
-    """Create a property evaluation record.
+    """Create a property evaluation record with annotated values.
 
     Args:
         gt_entity_id: ID of the ground truth entity.
@@ -447,6 +473,8 @@ def create_property_record(
         property_id: Standardized property ID.
         gt_value: Ground truth property value.
         pred_value: Predicted property value.
+        entity_id_to_names_gt: Mapping from ground truth entity IDs to their names.
+        entity_id_to_names_pred: Mapping from predicted entity IDs to their names.
         score: Similarity score between the values.
         total_gt_values: Total number of ground truth values for this property.
         total_pred_values: Total number of predicted values for this property.
@@ -460,8 +488,8 @@ def create_property_record(
         "pred_entity_id": pred_entity_id,
         "original_pred_property_id": original_property_id,
         "property_id": property_id,
-        "gt_values": gt_value,
-        "pred_values": pred_value,
+        "gt_values": annotate_value(gt_value, entity_id_to_names_gt),
+        "pred_values": annotate_value(pred_value, entity_id_to_names_pred),
         "matched_scores": score,
     }
     if first_property_record:
@@ -503,6 +531,9 @@ def compute_bipartite_metrics(
     elif diff < 0:
         metrics_accumulator.unmatched_extra_pred_count = -diff
 
+    entity_id_to_names_gt = {e.entity_id: e.properties["name"] for e in gt_entities if "name" in e.properties}
+    entity_id_to_names_pred = {e.entity_id: e.properties["name"] for e in pred_entities if "name" in e.properties}
+
     properties_union = compute_properties_union(gt_entities, pred_entities, matching_info)
     entities_scorer = MatchedEntitiesScorer(gt_entities, pred_entities, matching_info, metrics_factory.property_schema)
 
@@ -537,10 +568,7 @@ def compute_bipartite_metrics(
         entity = gt_entities[idx]
         for property_id, values in entity.properties.items():
             first_property_record = True
-            annotated_values = annotate_values_with_names(
-                values, metrics_factory.property_schema.properties.get(property_id), gt_entities
-            )
-            for value in annotated_values:
+            for value in values:
                 record, first_property_record = create_property_record(
                     entity.entity_id,
                     UNDEFINED_ID,  # No pred_entity_id for unmatched ground truth entities
@@ -548,6 +576,8 @@ def compute_bipartite_metrics(
                     property_id,
                     value,
                     UNDEFINED_VALUE,
+                    entity_id_to_names_gt,
+                    entity_id_to_names_pred,
                     UNDEFINED_SCORE,
                     len(entity.properties[property_id]),
                     0,
@@ -571,10 +601,7 @@ def compute_bipartite_metrics(
             if property_evidence:
                 evidence_idx = property_evidence[0][0]
                 original_property_id = entity.source_ids[evidence_idx]
-            annotated_values = annotate_values_with_names(
-                values, metrics_factory.property_schema.properties.get(property_id), pred_entities
-            )
-            for value in annotated_values:
+            for value in values:
                 record, first_property_record = create_property_record(
                     UNDEFINED_ID,  # No gt_entity_id for unmatched prediction entities
                     entity.entity_id,
@@ -582,6 +609,8 @@ def compute_bipartite_metrics(
                     property_id,
                     UNDEFINED_VALUE,
                     value,
+                    entity_id_to_names_gt,
+                    entity_id_to_names_pred,
                     UNDEFINED_SCORE,
                     0,
                     len(entity.properties[property_id]),
