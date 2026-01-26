@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from kebab.contracts.entity import Entity, Property, PropertySchema, ValueType
+from kebab.contracts.entity import Entity, Property, PropertySchema
 from kebab.tasks.metrics.extraction.aesop.metrics_factory import MetricsFactory
 from kebab.tasks.metrics.extraction.aesop.property_score import MatchingInfo, ValueMatchingRecordWithScores, match_items
 
@@ -229,24 +229,6 @@ def annotate_value(value: str | None, entity_id_to_names: dict[str, list[Any]]) 
     return f"{value} [{', '.join(map(str, names))}]" if names else value
 
 
-def annotate_values_with_names(
-    values: list[Any], property_: Property | None, entity_id_to_names: dict[str, list[Any]]
-) -> list[str | None]:
-    """Annotate property values with entity names for better debug information.
-
-    Args:
-        values: List of property values (entity references).
-        property_: property of the values.
-        entity_id_to_names: a mapping from entity IDs to their names.
-
-    Returns:
-        List of annotated property values.
-    """
-    if property_ is not None and property_.data_type.value_type != ValueType.REFERENCE:
-        return values
-    return [annotate_value(value, entity_id_to_names) for value in values]
-
-
 class MatchedEntitiesScorer:
     """Computes scores for a given property for matched entities."""
 
@@ -312,7 +294,11 @@ class MatchedEntitiesScorer:
                 if property_id in self.entities_pred[pred_idx].properties:
                     pred_values = self.entities_pred[pred_idx].properties[property_id]
                     self.debug_info[gt_idx][pred_idx][property_id] = ValueMatchingRecordWithScores(
-                        [], [], [], [], annotate_values_with_names(pred_values, property_, self.entity_id_to_names_pred)
+                        [],
+                        [],
+                        [],
+                        [],
+                        pred_values,
                     )
                     self.unmapped_property_ids.add(property_id)
             return evaluated_property_metrics
@@ -322,18 +308,6 @@ class MatchedEntitiesScorer:
                 if property_ in self.entities_pred[pred_idx]:
                     value_matching_record = score_function(
                         self.entities_gt[gt_idx], self.entities_pred[pred_idx], property_
-                    )
-                    value_matching_record.gt_values = annotate_values_with_names(
-                        value_matching_record.gt_values, property_, self.entity_id_to_names_gt
-                    )
-                    value_matching_record.pred_values = annotate_values_with_names(
-                        value_matching_record.pred_values, property_, self.entity_id_to_names_pred
-                    )
-                    value_matching_record.unmatched_pred_values = annotate_values_with_names(
-                        value_matching_record.unmatched_pred_values, property_, self.entity_id_to_names_pred
-                    )
-                    value_matching_record.unmatched_gt_values = annotate_values_with_names(
-                        value_matching_record.unmatched_gt_values, property_, self.entity_id_to_names_gt
                     )
                     self.debug_info[gt_idx][pred_idx][property_.property_id] = value_matching_record
                     evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = (
@@ -346,9 +320,7 @@ class MatchedEntitiesScorer:
                         [],
                         [],
                         [],
-                        annotate_values_with_names(
-                            self.entities_gt[gt_idx][property_], property_, self.entity_id_to_names_gt
-                        ),
+                        self.entities_gt[gt_idx][property_],
                         [],
                     )
 
@@ -358,7 +330,11 @@ class MatchedEntitiesScorer:
                 evaluated_property_metrics.relevant_pair_scores[gt_idx][pred_idx] = []
                 evaluated_property_metrics.unmatched_count += len(pred_values)
                 self.debug_info[gt_idx][pred_idx][property_.property_id] = ValueMatchingRecordWithScores(
-                    [], [], [], [], annotate_values_with_names(pred_values, property_, self.entity_id_to_names_pred)
+                    [],
+                    [],
+                    [],
+                    [],
+                    pred_values,
                 )
         return evaluated_property_metrics
 
