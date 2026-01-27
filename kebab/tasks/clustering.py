@@ -146,7 +146,9 @@ class ClusteringTask(Task):
             ground_truth_clusters_intersecting = {ground_truth[element_idx] for element_idx in cluster}
             cluster_precision_numerator += len(cluster) - len(ground_truth_clusters_intersecting)
             cluster_precision_denominator += len(cluster) - 1
-        muc_precision = cluster_precision_numerator / cluster_precision_denominator if cluster_precision_denominator > 0 else 1.0
+        muc_precision = (
+            cluster_precision_numerator / cluster_precision_denominator if cluster_precision_denominator > 0 else 1.0
+        )
         metrics["muc_precision"] = muc_precision
         cluster_recall_numerator = 0
         cluster_recall_denominator = 0
