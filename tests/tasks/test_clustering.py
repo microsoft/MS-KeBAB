@@ -25,7 +25,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
 def test_clustering_read_write_items_roundtrip() -> None:
     # Arrange
     entity_pairs_file_path = Path(__file__).parents[1] / "data" / "clustering" / "entity_fragments.jsonl"
-    labels_file_path = Path(__file__).parents[1] / "data" / "clustering" / "labels.jsonl"
+    labels_file_path = Path(__file__).parents[1] / "data" / "clustering" / "labels.txt"
     schema_file_path = Path(__file__).parents[1] / "data" / "clustering" / "property_schema.json"
     task_instance = ClusteringTask(
         "Clustering-Roundtrip-Train",
@@ -37,7 +37,7 @@ def test_clustering_read_write_items_roundtrip() -> None:
     # Act
     items = list(task_instance.read_items())
     labels = [pred_label for _, pred_label in items if pred_label is not None]
-    pred_labels_output_file_path = Path(__file__).parents[1] / "output" / "clustering" / "labels.jsonl"
+    pred_labels_output_file_path = Path(__file__).parents[1] / "output" / "clustering" / "labels.txt"
     task_instance.write_items(
         pred_labels_output_file_path,
         labels,

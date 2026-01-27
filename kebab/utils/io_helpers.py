@@ -367,7 +367,7 @@ class StringLineWriter(ItemWriter[str]):
         """
         with open(self.path, "w", encoding="utf-8", newline="\n") as file:
             for line in items:
-                file.write(line + "\n")
+                file.write(line.replace("\n", " ").rstrip() + "\n")
 
 
 class ItemJsonlWriter[DataItemType](ItemWriter[DataItemType]):
