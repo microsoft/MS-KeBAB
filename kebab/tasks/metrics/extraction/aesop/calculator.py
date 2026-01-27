@@ -18,6 +18,7 @@ from kebab.contracts.entity import Entity, PropertySchema
 from kebab.tasks.metrics.extraction.aesop.metric_helpers import (
     UNDEFINED_ID,
     UNDEFINED_SCORE,
+    UNDEFINED_VALUE,
     MetricsAccumulator,
     compute_bipartite_metrics,
     match_entities,
@@ -64,6 +65,18 @@ def document_debug_output_to_excel(
         debug_info["entity_match_distance"] = ""
 
     debug_info = pd.DataFrame(debug_info[ordered_columns])
+
+    # replace UNDEFINED_ID, UNDEFINED_VALUE, UNDEFINED_SCORE with empty strings for better readability
+    debug_info["gt_entity_id"] = debug_info["gt_entity_id"].replace(UNDEFINED_ID, "")
+    debug_info["pred_entity_id"] = debug_info["pred_entity_id"].replace(UNDEFINED_ID, "")
+    debug_info["original_pred_property_id"] = debug_info["original_pred_property_id"].replace(UNDEFINED_ID, "")
+    debug_info["property_id"] = debug_info["property_id"].replace(UNDEFINED_ID, "")
+    debug_info["gt_values"] = debug_info["gt_values"].replace(UNDEFINED_VALUE, "")
+    debug_info["gt_values"] = debug_info["gt_values"].replace(UNDEFINED_ID, "")
+    debug_info["pred_values"] = debug_info["pred_values"].replace(UNDEFINED_VALUE, "")
+    debug_info["pred_values"] = debug_info["pred_values"].replace(UNDEFINED_ID, "")
+    debug_info["matched_scores"] = debug_info["matched_scores"].replace(UNDEFINED_SCORE, "")
+
     column_to_letter = {col: chr(65 + idx) for idx, col in enumerate(ordered_columns)}
 
     def col(column_name: str, start: int = 2, end: int = num_rows + 1) -> str:
@@ -72,15 +85,15 @@ def document_debug_output_to_excel(
         return f"${letter}${start}:${letter}${end}"
 
     def conditions(property_id: str) -> str:
-        return f"""{col("gt_entity_id")}, {{"<>{UNDEFINED_ID}", "?*"}}, {col("pred_entity_id")}, {{"<>{UNDEFINED_ID}", "?*"}}, {col("property_id")}, "{property_id}" """
+        return f"""{col("gt_entity_id")}, "?*", {col("pred_entity_id")}, "?*", {col("property_id")}, "{property_id}" """
 
     def property_precision_formula(property_id: str) -> str:
         """Return excel formula for property precision."""
-        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}, {col("matched_scores")}, "<>{UNDEFINED_SCORE}") / SUMIFS({col("num_pred_values")}, {conditions(property_id)}, {col("num_pred_values")}, ">0")"""
+        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}) / SUMIFS({col("num_pred_values")}, {conditions(property_id)}, {col("num_pred_values")}, ">0")"""
 
     def property_recall_formula(property_id: str) -> str:
         """Return excel formula for property recall."""
-        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}, {col("matched_scores")}, "<>{UNDEFINED_SCORE}") / SUMIFS({col("num_gt_values")}, {conditions(property_id)})"""
+        return f"""=SUMIFS({col("matched_scores")}, {conditions(property_id)}) / SUMIFS({col("num_gt_values")}, {conditions(property_id)})"""
 
     debug_info.to_excel(writer, sheet_name=sheet_name, columns=ordered_columns, index=False)
 
@@ -122,13 +135,17 @@ def document_debug_output_to_excel(
         f"""AVERAGEIF({recall_col}2:{recall_col}{len(evaluated_properties) + 1}, ">=0")""",
     )
     worksheet.freeze_panes(1, 2)  # Freeze the first row and first two columns
-    green_row = workbook.add_format({"bg_color": "#dbf2d2"})
+    green_row = workbook.add_format({"bg_color": "#dbf2d2", "num_format": "@"})
+    white_row = workbook.add_format({"bg_color": "#ffffff", "num_format": "@"})
     header_format = workbook.add_format({"bold": True})
     worksheet.set_row(0, None, header_format)  # Set header format
     last_col = column_to_letter[ordered_columns[-1]]
     first_col = "D" if merge_rows else "A"
     worksheet.conditional_format(
         f"{first_col}2:{last_col}{num_rows + 1}", {"type": "formula", "criteria": "=ISEVEN(ROW())", "format": green_row}
+    )
+    worksheet.conditional_format(
+        f"{first_col}2:{last_col}{num_rows + 1}", {"type": "formula", "criteria": "=ISODD(ROW())", "format": white_row}
     )
     worksheet.autofit(300)  # Adjust column widths to fit content
     writer.close()  # Save the Excel file
