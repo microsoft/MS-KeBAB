@@ -12,6 +12,7 @@ import numpy as np
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
+from kebab.tasks.metrics.extraction.aesop.metric_helpers import safe_division
 from kebab.utils.io_helpers import EntityJsonlReader, ItemJsonlReader, ItemJsonlWriter, resolve_path, save_dict_to_json
 
 
@@ -92,7 +93,7 @@ class ClusteringTask(Task):
         ground_truth = list(ItemJsonlReader[str](self.ground_truth).read_items())
 
         fragment_count = len(predicted_vals)
-        metrics = defaultdict(float)
+        metrics = {}
         metrics["fragments"] = fragment_count
 
         # construct the predicted {element_idx -> set of element_idx} map
@@ -115,7 +116,8 @@ class ClusteringTask(Task):
 
         metrics["ground_truth_clusters"] = len(gt_clusters)
 
-        # compute BCubed P,R and F1
+        # Compute BCubed P,R and F1
+        # See "Entity-Based Cross-Document Coreferencing Using the Vector Space Model" https://aclanthology.org/P98-1012.pdf
         precisions = []
         recalls = []
         f1s = []
@@ -135,6 +137,26 @@ class ClusteringTask(Task):
         metrics["precision"] = float(np.mean(precisions, dtype=np.float64))
         metrics["recall"] = float(np.mean(recalls, dtype=np.float64))
         metrics["f1"] = float(np.mean(f1s, dtype=np.float64))
+
+        # Compute MUC precision, recall, F1
+        # See "A Model-Theoretic Coreference Scoring Scheme" https://aclanthology.org/M95-1005.pdf
+        cluster_precision_numerator = 0
+        cluster_precision_denominator = 0
+        for cluster in pred_clusters.values():
+            ground_truth_clusters_intersecting = {ground_truth[element_idx] for element_idx in cluster}
+            cluster_precision_numerator += len(cluster) - len(ground_truth_clusters_intersecting)
+            cluster_precision_denominator += len(cluster) - 1
+        muc_precision = cluster_precision_numerator / cluster_precision_denominator if cluster_precision_denominator > 0 else 1.0
+        metrics["muc_precision"] = muc_precision
+        cluster_recall_numerator = 0
+        cluster_recall_denominator = 0
+        for cluster in gt_clusters.values():
+            predicted_clusters_intersecting = {predicted_vals[element_idx] for element_idx in cluster}
+            cluster_recall_numerator += len(cluster) - len(predicted_clusters_intersecting)
+            cluster_recall_denominator += len(cluster) - 1
+        muc_recall = cluster_recall_numerator / cluster_recall_denominator if cluster_recall_denominator > 0 else 1.0
+        metrics["muc_recall"] = muc_recall
+        metrics["muc_f1"] = safe_division(2 * muc_recall * muc_precision, muc_recall + muc_precision)
 
         metrics = dict(metrics)
 
