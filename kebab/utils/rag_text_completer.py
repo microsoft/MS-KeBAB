@@ -207,7 +207,7 @@ class BaseRAGTextCompleter(ABC):
         target_content: str,
         top_logprobs: list[list[dict[str, Any]]] | None,
         additional_info: dict[str, Any] | None = None,
-        allow_target_content_as_prefix: bool = True,
+        allow_target_content_as_prefix: bool = False,
     ) -> dict[str, Any]:
         """
         Processes the top log probabilities and prepares the results.
