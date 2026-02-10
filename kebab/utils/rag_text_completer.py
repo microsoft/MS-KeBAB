@@ -13,9 +13,7 @@ from collections.abc import Iterable
 from enum import Enum
 from typing import Any, ClassVar, cast, override
 
-import numpy as np
 import torch
-from scipy.special import logsumexp
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from transformers.generation.utils import GenerateOutput
 
@@ -96,7 +94,7 @@ class BaseRAGTextCompleter(ABC):
             if verbose:
                 result = copy.deepcopy(query)
 
-            if query["text_with_mask"] == "":
+            if query["text_with_mask"] == "" or not query.get("to_eval", True):
                 # Skip processing if the text with mask is empty; yield the original query dict only
                 # if `verbose` is enabled.
                 if verbose:
@@ -125,73 +123,6 @@ class BaseRAGTextCompleter(ABC):
             print(f"Processed {count} partial queries.")
 
             yield result
-
-    @staticmethod
-    def prepare_results_from_top_logprobs(
-        target_content: str,
-        top_logprobs: list[list[dict[str, Any]]] | None,
-        additional_info: dict[str, Any] | None = None,
-        allow_target_content_as_prefix: bool = False,
-    ) -> dict[str, Any]:
-        """
-        Processes the top log probabilities and prepares the results.
-
-        Args:
-            target_content: The expected content to fill in the mask.
-            top_logprobs: A list of lists containing the top log probabilities for each token position.
-            additional_info: Additional information to include in the results.
-            allow_target_content_as_prefix: Whether to allow the target content to be a prefix of the predicted token.
-
-        Returns:
-            dict[str, Any]: A dictionary including the following:
-                - "predicted_content" (str): The predicted content for the masked position.
-                - "target_content_logprob" (float): The log probability of the target content.
-                - "predicted_content_top_logprobs" (list[list[dict[str, Any]]]): Each outer list
-                  contains the top log probabilities for the corresponding token position.
-        """
-        if top_logprobs is None or len(top_logprobs) == 0 or len(top_logprobs[0]) == 0:
-            results = {
-                "predicted_content": "<Not Finished Correctly>",
-                "target_content_logprob": float("-inf"),
-                "predicted_content_top_logprobs": [[{"token": target_content, "logprob": float("-inf")}]],
-            }
-            if additional_info:
-                results |= additional_info
-            return results
-
-        target_content_logprob = float("-inf")
-        target_content_lower = target_content.strip().lower()
-        # When the target content contains multiple tokens, LLM can return the target content
-        # through multiple tokenization paths. For example, LLM can return "Beijing" as two tokens
-        # ["Be", "ijing"] or just a single token ["Beijing"]; `self.tokenizer.encode` only returns
-        # the former. We will approximately calculate the combined log prob by summing the
-        # probabilities of all prefixes of the target content in `top_tokens`.
-        # TODO (allenwang-ms): account for all possible tokenization paths; calculate the accurate
-        # log prob of a sequence of tokens by multiple forward passes.
-        prefix_logprobs = []
-        for logprob in top_logprobs[0]:
-            token = logprob["token"].strip().lower()
-            if (
-                # Check if the predicted token matches the target content or a prefix of it.
-                target_content_lower.startswith(token)
-                # When `allow_target_content_as_prefix` is True, also allow the target content to be a prefix of the predicted token.
-                or (allow_target_content_as_prefix and token.startswith(target_content_lower))
-            ) and token:  # Ensure non-empty token.
-                prefix_logprobs.append(logprob["logprob"])
-        if prefix_logprobs:
-            # Convert to numpy array for logsumexp operations.
-            prefix_array = np.array(prefix_logprobs, dtype=float)
-            target_content_logprob = logsumexp(prefix_array)
-
-        results = {
-            "predicted_content": top_logprobs[0][0]["token"],
-            "target_content_logprob": target_content_logprob,
-            "predicted_content_top_logprobs": top_logprobs,
-        }
-        if additional_info:
-            results |= additional_info
-
-        return results
 
     @staticmethod
     def get_target_content_logprob_with_fallback(result: dict[str, Any], top_k: int = 20) -> float:
@@ -529,7 +460,7 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
             ]
         ]
 
-        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
+        return TextCompletionTaskBase.prepare_results_from_top_logprobs(
             target_content=target_content,
             top_logprobs=top_logprobs,
             additional_info=additional_info,
@@ -890,7 +821,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         additional_info = {"raw_model_output": raw_response}
         additional_info |= {"error": error} if error else {}
 
-        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
+        return TextCompletionTaskBase.prepare_results_from_top_logprobs(
             target_content=target_content,
             top_logprobs=top_logprobs,
             additional_info=additional_info,
@@ -963,7 +894,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         additional_info = {"raw_model_output": raw_response}
         additional_info |= {"error": error} if error else {}
 
-        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
+        return TextCompletionTaskBase.prepare_results_from_top_logprobs(
             target_content=target_content,
             top_logprobs=top_logprobs,
             additional_info=additional_info,
@@ -1120,7 +1051,7 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         additional_info = {"raw_model_output": decoded_text}
         additional_info |= {"error": error} if error else {}
 
-        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
+        return TextCompletionTaskBase.prepare_results_from_top_logprobs(
             target_content=target_content,
             top_logprobs=top_logprobs,
             additional_info=additional_info,
