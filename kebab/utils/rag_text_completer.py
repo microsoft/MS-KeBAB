@@ -139,6 +139,7 @@ class BaseRAGTextCompleter(ABC):
             )
             result["predicted_content"] = result_single_query["predicted_content"]
             result["target_content_logprob"] = result_single_query["target_content_logprob"]
+            result["predicted_content_top_logprobs"] = result_single_query["predicted_content_top_logprobs"]
             if verbose:
                 result |= result_single_query
             result["completion_attempted"] = True

@@ -37,7 +37,7 @@ def test_text_completion_read_items_and_generate_queries(text_completion_task, t
     partial_queries = list(text_completion_task.generate_partial_queries())
     text_completion_task.write_items(
         predictions_output_file_path,
-        [(query["target_content"], -0.1) for query in partial_queries],
+        [(query["target_content"], -0.1, [[query["target_content"], -0.1]]) for query in partial_queries],
     )
     metrics = text_completion_task.evaluate(predictions_output_file_path)
 
@@ -131,3 +131,18 @@ def test_email_text_completion_read_items_and_generate_queries(email_text_comple
         "target_content": "population",
         "document_id": "email_1",
     }
+
+
+def test_calculate_thresholds(email_text_completion_task) -> None:
+    # Act
+    predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "document_predictions.jsonl"
+    queries_with_thresholds = list(
+        email_text_completion_task.generate_partial_queries_with_thresholds(predictions_file_path)
+    )
+    queries_with_to_eval_flags = list(
+        email_text_completion_task.generate_partial_queries_with_to_eval_flags(predictions_file_path)
+    )
+
+    # Assert
+    assert all(query["t"] == 0 for query in queries_with_thresholds)
+    assert all(not query["to_eval"] for query in queries_with_to_eval_flags)
