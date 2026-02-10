@@ -14,6 +14,8 @@ from logging import Logger
 from pathlib import Path
 from typing import Any, ClassVar
 
+import numpy as np
+
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
@@ -118,7 +120,45 @@ class TextCompletionTaskBase(Task):
                     "document_id": doc.document_id,
                 }
 
-    def write_items(self, path: Path, items: Iterable[tuple[str, float]]) -> None:
+    def generate_partial_queries_with_thresholds(
+        self,
+        base_predictions: Path,
+        verbose: bool = False,
+        words_after_mask: int = 0,
+        with_to_eval_flags_only: bool = False,
+    ) -> Iterable[dict[str, Any]]:
+        """TODO (allenwang-ms)."""
+        predicted_vals = ItemJsonlReader[dict[str, str | float]](base_predictions).read_items()
+        queries = self.generate_partial_queries(verbose=verbose, words_after_mask=words_after_mask)
+        predicted_vals_iter = iter(predicted_vals)
+
+        for query in queries:
+            query: dict[str, Any]
+            if query["text_with_mask"] == "":
+                query["to_eval"] = False
+            else:
+                prediction = next(predicted_vals_iter)
+                t = TextCompletionTaskBase.__calculate_t(prediction, query)
+                query["to_eval"] = t < 0
+                if not with_to_eval_flags_only:
+                    query["t"] = t
+            yield query
+
+    def generate_partial_queries_with_to_eval_flags(
+        self,
+        base_predictions: Path,
+        verbose: bool = False,
+        words_after_mask: int = 0,
+    ) -> Iterable[dict[str, Any]]:
+        """TODO (allenwang-ms)."""
+        yield from self.generate_partial_queries_with_thresholds(
+            base_predictions=base_predictions,
+            verbose=verbose,
+            words_after_mask=words_after_mask,
+            with_to_eval_flags_only=True,
+        )
+
+    def write_items(self, path: Path, items: Iterable[tuple[str, float, list[dict[str, float]]]]) -> None:
         """
         Write prediction items to the specified path.
 
@@ -127,13 +167,15 @@ class TextCompletionTaskBase(Task):
             items: An iterable of tuples, where each tuple contains:
                 - predicted_content: The predicted content.
                 - target_content_logprob: The log probability of the target content.
+                - predicted_content_top_logprobs: The top log probabilities for the predicted content.
         """
         with open(path, "w", encoding="utf-8", newline="\n") as file:
-            for predicted_content, target_content_logprob in items:
+            for predicted_content, target_content_logprob, predicted_content_top_logprobs in items:
                 json_line = json.dumps(
                     {
                         "predicted_content": predicted_content,
                         "target_content_logprob": target_content_logprob,
+                        "predicted_content_top_logprobs": predicted_content_top_logprobs,
                     },
                     ensure_ascii=False,
                     separators=(",", ":"),
@@ -202,6 +244,69 @@ class TextCompletionTaskBase(Task):
         metrics["variance_log_prob"] = statistics.variance(log_probs, metrics["mean_log_prob"])
         metrics["perplexity"] = math.exp(-metrics["mean_log_prob"])
         metrics["num_predictions"] = len(log_probs)
+
+    @staticmethod
+    def __calculate_t(prediction: dict[str, Any], query: dict[str, Any], a: float = -4.0, b: float = 1.0) -> float:
+        """
+        Calculate threshold ensuring baseline has zero score.
+        t = min(0, max(a, base_logprob + b, c))
+        where c is calculated from the position of target content in the distribution.
+        """
+        base_logprob = prediction["target_content_logprob"]
+
+        # Get the target content and distribution.
+        target_content = query["target_content"].strip().lower()
+        top_logprobs = prediction["predicted_content_top_logprobs"]
+
+        # Sort by logprob descending.
+        top_logprobs.sort(key=lambda x: x[1], reverse=True)
+
+        # Find position of target content (match first token that equals or is prefix).
+        target_position = -1
+        for i, (token, _) in enumerate(top_logprobs):
+            token_lower = token.strip().lower()
+            # Check if token is a prefix of target content.
+            if target_content.startswith(token_lower):
+                target_position = i
+                break
+
+        # Calculate cumulative probabilities.
+        cumulative_probs = []
+        for i, (_, logprob) in enumerate(top_logprobs):
+            prob = np.exp(logprob)
+            if i == 0:
+                cumulative_probs.append(prob)
+            else:
+                cumulative_probs.append(cumulative_probs[-1] + prob)
+
+        # Calculate c based on whether target was found.
+        if target_position != -1:
+            # Target found at position n.
+            n = target_position
+            p_n = np.exp(top_logprobs[n][1])
+            c_n = cumulative_probs[n]
+            c_prev = cumulative_probs[n - 1] if n > 0 else 0
+
+            # c = log(p_n/c_n) - c_{n-1}/p_n * log(1 + p_n/c_{n-1})
+            term1 = np.log(p_n / c_n)
+            term2 = (c_prev / p_n) * np.log(1 + p_n / c_prev) if c_prev > 0 else 0
+
+            c = term1 - term2
+        else:
+            # Target not found, use k = length of distribution.
+            k = len(top_logprobs) - 1  # Last position (0-indexed)
+            p_k = np.exp(top_logprobs[k][1])
+            c_k = cumulative_probs[k]
+
+            # c = log(p_k/(c_k+p_k)) - c_k/p_k * log(1 + p_k/c_k)
+            term1 = np.log(p_k / (c_k + p_k))
+            term2 = (c_k / p_k) * np.log(1 + p_k / c_k)
+
+            c = term1 - term2
+
+        # Final threshold: t = min(0, max(a, baseline_logprob + b, c))
+        t = min(0, max(a, base_logprob + b, c))
+        return t
 
 
 class TextCompletionUsingDocumentsTask(TextCompletionTaskBase):
