@@ -22,8 +22,30 @@ from kebab.utils.rag_text_completer import (
     BasePhiRAGTextCompleter,
     BaseQwenRAGTextCompleter,
     BaseRAGTextCompleter,
-    PredictionMethod,
 )
+
+
+def process_results(results: list[tuple[str, dict[str, Any]]]) -> list[tuple[str, float, list[list[str | float]]]]:
+    """Process completion results and extract prediction data.
+
+    Args:
+        results: List of completion result dictionaries.
+
+    Returns:
+        List of tuples containing (predicted_content, target_content_logprob, predicted_content_top_logprobs).
+    """
+    results_to_eval = []
+    for _, result in results:
+        if result["text_with_mask"] != "" and result.get("to_eval", True):
+            predicted_content = result["predicted_content"]
+            target_content_logprob = BaseRAGTextCompleter.get_target_content_logprob_with_fallback(result)
+            predicted_content_top_logprobs = [
+                [item["token"], item["logprob"]] for item in result["predicted_content_top_logprobs"][0]
+            ]
+            results_to_eval.append((predicted_content, target_content_logprob, predicted_content_top_logprobs))
+        if "to_eval" in result:
+            result["to_eval"] = "True" if result["to_eval"] else "False"  # Convert to str.
+    return results_to_eval
 
 
 if __name__ == "__main__":
@@ -34,7 +56,7 @@ if __name__ == "__main__":
         documents_file_path,
     )
 
-    # Prepare partial queries.
+    # Prepare partial queries for each word.
     queries = task_instance.generate_partial_queries(verbose=True)
 
     class DummyPhiRAGTextCompleter(BasePhiRAGTextCompleter):
@@ -60,50 +82,78 @@ if __name__ == "__main__":
 
     # Run the text completer.
     # Qwen/Qwen3-0.6B, Qwen/Qwen3-1.7B, Qwen/Qwen3-4B, Qwen/Qwen3-8B, Qwen/Qwen3-14B, Qwen/Qwen3-32B
-    annotator = DummyQwenRAGTextCompleter(
-        model_id="Qwen/Qwen3-14B", prediction_method=PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE
-    )
+    # base_model = DummyQwenRAGTextCompleter(
+    #     model_id="Qwen/Qwen3-14B", prediction_method=PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE
+    # )
     # Examples of using other models:
-    # annotator = DummyPhiRAGTextCompleter()
-    # annotator = DummyGptOssRAGTextCompleter(
+    base_model = DummyPhiRAGTextCompleter()
+    # base_model = DummyGptOssRAGTextCompleter(
     #     model_id="openai/gpt-oss-20b", gpu_id=3, prediction_method=PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE
     # )
 
-    results = list(
-        annotator.complete_partial_queries(
+    # Run the completion task with the base model on each word.
+    base_results = list(
+        base_model.complete_partial_queries(
             partial_queries=queries,
             verbose=True,
         )
     )
 
-    results_to_evaluate = []
-    for _, result in results:
-        if result["text_with_mask"] != "":
-            predicted_content = result["predicted_content"]
-            target_content_logprob = BaseRAGTextCompleter.get_target_content_logprob_with_fallback(result)
-            results_to_evaluate.append((predicted_content, target_content_logprob))
+    # Process the full base results for threshold calculation.
+    base_results_for_threshold_calculation = process_results(base_results)
 
-    # Write the results to a file.
-    output_to_evaulate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_to_eval.jsonl")
-    task_instance.write_items(output_to_evaulate_path, results_to_evaluate)
+    # Write the processed base results to a file.
+    base_results_for_threshold_calculation_path = Path(
+        os.path.splitext(documents_file_path)[0] + "_tc_base_results_for_t_calc.jsonl"
+    )
+    task_instance.write_items(base_results_for_threshold_calculation_path, base_results_for_threshold_calculation)
 
-    # Evluate the results.
-    task_instance.evaluate(
-        predictions=output_to_evaulate_path,
-        result_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics.json"),
+    # Prepare partial queries with to_eval flags based on threshold calculation from base results.
+    queries_with_to_eval_flags = task_instance.generate_partial_queries_for_eval(
+        base_predictions=base_results_for_threshold_calculation_path,
+        verbose=True,
+    )
+
+    # For demonstration, we use the same base model for evaluation. In practice, you can use a different model for evaluation if desired.
+    model_to_eval = base_model
+
+    # Run the completion task with the model to evaluate.
+    results = list(
+        model_to_eval.complete_partial_queries(
+            partial_queries=queries_with_to_eval_flags,
+            verbose=True,
+        )
+    )
+
+    # Process the full results for evaluation.
+    results_to_evaluate = process_results(results)
+
+    # Write the results to a file for evaluation.
+    results_to_evaulate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_to_eval.jsonl")
+    task_instance.write_items(results_to_evaulate_path, results_to_evaluate)
+
+    # Evaluate the results.
+    task_instance.fair_keyword_evaluate(
+        to_eval_predictions=results_to_evaulate_path,
+        base_predictions=base_results_for_threshold_calculation_path,
+        metrics_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics.json"),
     )
 
     # Write the full output for debugging.
-    output_path = os.path.splitext(documents_file_path)[0] + "_tc_results.json"
-    with open(output_path, "w", encoding="utf-8") as f:
+    base_results_output_path = os.path.splitext(documents_file_path)[0] + "_tc_base_results.json"
+    with open(base_results_output_path, "w", encoding="utf-8") as f:
+        json.dump(base_results, f, indent=2, ensure_ascii=False)
+    results_output_path = os.path.splitext(documents_file_path)[0] + "_tc_results.json"
+    with open(results_output_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
 
     # Annotate each document with log probabilities.
     results_grouped_by_doc = defaultdict(list)
+
     for _, result in results:
         results_grouped_by_doc[result["document_id"]].append(result)
     for doc_id, results_per_doc in results_grouped_by_doc.items():
         BaseRAGTextCompleter.generate_annotated_doc_html(
             text_completion_results=results_per_doc,
-            output_path=os.path.splitext(documents_file_path)[0] + f"_annotated_{doc_id}.html",
+            output_path=os.path.splitext(documents_file_path)[0] + f"_base_annotated_{doc_id}.html",
         )

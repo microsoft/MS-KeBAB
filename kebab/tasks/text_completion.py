@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import numpy as np
+from scipy.special import logsumexp
 
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
@@ -120,14 +121,14 @@ class TextCompletionTaskBase(Task):
                     "document_id": doc.document_id,
                 }
 
-    def generate_partial_queries_with_thresholds(
+    def __generate_partial_queries_with_thresholds(
         self,
         base_predictions: Path,
         verbose: bool = False,
         words_after_mask: int = 0,
         with_to_eval_flags_only: bool = False,
     ) -> Iterable[dict[str, Any]]:
-        """TODO (allenwang-ms)."""
+        """TODO (allenwang-ms): if not verbose, do not return queries not to be evaluated."""
         predicted_vals = ItemJsonlReader[dict[str, str | float]](base_predictions).read_items()
         queries = self.generate_partial_queries(verbose=verbose, words_after_mask=words_after_mask)
         predicted_vals_iter = iter(predicted_vals)
@@ -144,21 +145,21 @@ class TextCompletionTaskBase(Task):
                     query["t"] = t
             yield query
 
-    def generate_partial_queries_with_to_eval_flags(
+    def generate_partial_queries_for_eval(
         self,
         base_predictions: Path,
         verbose: bool = False,
         words_after_mask: int = 0,
     ) -> Iterable[dict[str, Any]]:
         """TODO (allenwang-ms)."""
-        yield from self.generate_partial_queries_with_thresholds(
+        yield from self.__generate_partial_queries_with_thresholds(
             base_predictions=base_predictions,
             verbose=verbose,
             words_after_mask=words_after_mask,
             with_to_eval_flags_only=True,
         )
 
-    def write_items(self, path: Path, items: Iterable[tuple[str, float, list[dict[str, float]]]]) -> None:
+    def write_items(self, path: Path, items: Iterable[tuple[str, float, list[list[str | float]]]]) -> None:
         """
         Write prediction items to the specified path.
 
@@ -230,6 +231,168 @@ class TextCompletionTaskBase(Task):
             save_dict_to_json(metrics, result_output_path)
 
         return metrics
+
+    def fair_keyword_evaluate(
+        self,
+        to_eval_predictions: Path,
+        base_predictions: Path,
+        metrics_output_path: Path | None = None,
+        logger: Logger | None = None,
+    ) -> dict[str, float]:
+        """Evaluate an output for the text completion task."""
+        if logger:
+            logger.info("Starting evaluation for the text completion task.")
+
+        predicted_vals = ItemJsonlReader[dict[str, Any]](to_eval_predictions).read_items()
+        predicted_vals_iter = iter(predicted_vals)
+        queries = self.__generate_partial_queries_with_thresholds(base_predictions=base_predictions)
+
+        scores = []
+        for query in queries:
+            query: dict[str, Any]
+            if query["text_with_mask"] != "" and query["to_eval"]:
+                prediction = next(predicted_vals_iter)
+                t = query["t"]
+                top_logprobs = prediction["predicted_content_top_logprobs"]
+                top_logprobs.sort(key=lambda x: x[1], reverse=True)
+
+                # Calculate cumulative probabilities and find largest n such that:
+                # log(p_n/c_n) - c_{n-1}/p_n * log(1 + p_n/c_{n-1}) - t > 0
+                k = 0
+                cumulative_probs = []
+
+                for i, (_, logprob) in enumerate(top_logprobs):
+                    prob = np.exp(logprob)
+                    if i == 0:
+                        cumulative_probs.append(prob)
+                        c_prev = 0
+                    else:
+                        cumulative_probs.append(cumulative_probs[-1] + prob)
+                        c_prev = cumulative_probs[i - 1]
+
+                    c_current = cumulative_probs[i]
+
+                    # Calculate the condition: log(p_n/c_n) - c_{n-1}/p_n * log(1 + p_n/c_{n-1}) - t > 0
+                    term1 = np.log(prob / c_current)
+
+                    # For i=0, c_prev = 0, and the limit of term2 is 0.
+                    term2 = (c_prev / prob) * np.log(1 + prob / c_prev) if c_prev > 0 else 0
+
+                    condition = term1 - term2 - t
+
+                    if condition > 0:
+                        k = i + 1
+
+                # If no k found, keep at least one element.
+                if k == 0:
+                    k = 1
+
+                # Truncate and normalize: (p_1/c_k, ..., p_k/c_k)
+                c_k = cumulative_probs[k - 1]
+                truncated_logprobs = []
+                for i in range(k):
+                    token, logprob = top_logprobs[i]
+                    normalized_prob = np.exp(logprob) / c_k
+                    normalized_logprob = np.log(normalized_prob)
+                    truncated_logprobs.append(
+                        {
+                            "token": token,
+                            "logprob": normalized_logprob,
+                        }
+                    )
+
+                # Calculate score using the truncated distribution.
+                target_content = query["target_content"]
+                truncated_result = TextCompletionTaskBase.prepare_results_from_top_logprobs(
+                    target_content=target_content,
+                    top_logprobs=[truncated_logprobs],
+                )
+
+                target_logprob_truncated = truncated_result["target_content_logprob"]
+                score = max(0, target_logprob_truncated - t)
+                scores.append(score)
+
+        metrics = {}
+        metrics["total_score"] = sum(scores)
+        metrics["mean_score"] = statistics.mean(scores)
+        metrics["variance_score"] = statistics.variance(scores, metrics["mean_score"]) if len(scores) > 1 else 0.0
+        metrics["num_eval_words"] = len(scores)
+        metrics["num_positive_scores"] = sum(1 for score in scores if score > 0)
+
+        if logger:
+            logger.info("Evaluation metrics calculated successfully.")
+            logger.info(f"Metrics: {metrics}")
+        if metrics_output_path:
+            save_dict_to_json(metrics, metrics_output_path)
+
+        return metrics
+
+    @staticmethod
+    def prepare_results_from_top_logprobs(
+        target_content: str,
+        top_logprobs: list[list[dict[str, Any]]] | None,
+        additional_info: dict[str, Any] | None = None,
+        allow_target_content_as_prefix: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Processes the top log probabilities and prepares the results.
+
+        Args:
+            target_content: The expected content to fill in the mask.
+            top_logprobs: A list of lists containing the top log probabilities for each token position.
+            additional_info: Additional information to include in the results.
+            allow_target_content_as_prefix: Whether to allow the target content to be a prefix of the predicted token.
+
+        Returns:
+            dict[str, Any]: A dictionary including the following:
+                - "predicted_content" (str): The predicted content for the masked position.
+                - "target_content_logprob" (float): The log probability of the target content.
+                - "predicted_content_top_logprobs" (list[list[dict[str, Any]]]): Each outer list
+                  contains the top log probabilities for the corresponding token position.
+        """
+        if top_logprobs is None or len(top_logprobs) == 0 or len(top_logprobs[0]) == 0:
+            results = {
+                "predicted_content": "<Not Finished Correctly>",
+                "target_content_logprob": float("-inf"),
+                "predicted_content_top_logprobs": [[{"token": target_content, "logprob": float("-inf")}]],
+            }
+            if additional_info:
+                results |= additional_info
+            return results
+
+        target_content_logprob = float("-inf")
+        target_content_lower = target_content.strip().lower()
+        # When the target content contains multiple tokens, LLM can return the target content
+        # through multiple tokenization paths. For example, LLM can return "Beijing" as two tokens
+        # ["Be", "ijing"] or just a single token ["Beijing"]; `self.tokenizer.encode` only returns
+        # the former. We will approximately calculate the combined log prob by summing the
+        # probabilities of all prefixes of the target content in `top_tokens`.
+        # TODO (allenwang-ms): account for all possible tokenization paths; calculate the accurate
+        # log prob of a sequence of tokens by multiple forward passes.
+        prefix_logprobs = []
+        for logprob in top_logprobs[0]:
+            token = logprob["token"].strip().lower()
+            if (
+                # Check if the predicted token matches the target content or a prefix of it.
+                target_content_lower.startswith(token)
+                # When `allow_target_content_as_prefix` is True, also allow the target content to be a prefix of the predicted token.
+                or (allow_target_content_as_prefix and token.startswith(target_content_lower))
+            ) and token:  # Ensure non-empty token.
+                prefix_logprobs.append(logprob["logprob"])
+        if prefix_logprobs:
+            # Convert to numpy array for logsumexp operations.
+            prefix_array = np.array(prefix_logprobs, dtype=float)
+            target_content_logprob = logsumexp(prefix_array)
+
+        results = {
+            "predicted_content": top_logprobs[0][0]["token"],
+            "target_content_logprob": target_content_logprob,
+            "predicted_content_top_logprobs": top_logprobs,
+        }
+        if additional_info:
+            results |= additional_info
+
+        return results
 
     _MIN_SAMPLES_FOR_VARIANCE = 2
     """Minimum number of samples required to compute variance."""
