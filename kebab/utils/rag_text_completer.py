@@ -317,14 +317,14 @@ class BaseRAGTextCompleter(ABC):
             if target_word_logprob == float("-inf"):
                 tooltip = "Incorrect prediction, "
                 if "predicted_content_top_logprobs" in result:
-                    target_word_logprob = result["predicted_content_top_logprobs"][0][-1]["logprob"]
+                    target_word_logprob = result["predicted_content_top_logprobs"][-1][1]
             color = BaseRAGTextCompleter.get_font_color(target_word_logprob)
             font_weight = "bold" if target_word_logprob <= BaseRAGTextCompleter.LOGPROB_THRESHOLDS[2] else "normal"
             tooltip += f"LogProb: {target_word_logprob:.3f}"
             if "predicted_content_top_logprobs" in result:
                 top_logprobs_html = str(result["predicted_content_top_logprobs"]).replace('"', "&quot;")
                 tooltip += (
-                    f", top {len(result['predicted_content_top_logprobs'][0])} token predictions: {top_logprobs_html}"
+                    f", top {len(result['predicted_content_top_logprobs'])} token predictions: {top_logprobs_html}"
                 )
             html_content += f'<span class="word" style="color: {color}; font-weight: {font_weight};" title="{tooltip}">{result["target_content"]}</span>'
         html_content += """
