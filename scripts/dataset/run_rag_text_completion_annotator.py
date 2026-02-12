@@ -10,7 +10,6 @@ words that are challenging to predict based on their log probabilities.
 
 from __future__ import annotations
 
-import json
 import os
 from collections import defaultdict
 from pathlib import Path
@@ -23,29 +22,6 @@ from kebab.utils.rag_text_completer import (
     BaseQwenRAGTextCompleter,
     BaseRAGTextCompleter,
 )
-
-
-def process_results(results: list[dict[str, Any]]) -> list[tuple[str, float, list[list[str | float]]]]:
-    """Process completion results and extract prediction data.
-
-    Args:
-        results: List of completion result dictionaries.
-
-    Returns:
-        List of tuples containing (predicted_content, target_content_logprob, predicted_content_top_logprobs).
-    """
-    results_to_eval = []
-    for result in results:
-        if result["text_with_mask"] != "" and result.get("to_eval", True):
-            predicted_content = result["predicted_content"]
-            target_content_logprob = BaseRAGTextCompleter.get_target_content_logprob_with_fallback(result)
-            predicted_content_top_logprobs = [
-                [item["token"], item["logprob"]] for item in result["predicted_content_top_logprobs"][0]
-            ]
-            results_to_eval.append((predicted_content, target_content_logprob, predicted_content_top_logprobs))
-        if "to_eval" in result:
-            result["to_eval"] = "True" if result["to_eval"] else "False"  # Convert to str.
-    return results_to_eval
 
 
 if __name__ == "__main__":
@@ -99,17 +75,14 @@ if __name__ == "__main__":
         )
     )
 
-    # Process the full base results for threshold calculation.
-    base_results_for_threshold_calculation = process_results(base_results)
-
-    # Write the processed base results to a file.
+    # Write the base results to a file.
     base_results_for_threshold_calculation_path = Path(
         os.path.splitext(documents_file_path)[0] + "_tc_base_results_for_t_calc.jsonl"
     )
-    task_instance.write_items(base_results_for_threshold_calculation_path, base_results_for_threshold_calculation)
+    task_instance.write_items(base_results_for_threshold_calculation_path, base_results, strict=False)
 
     # Prepare partial queries with to_eval flags based on threshold calculation from base results.
-    queries_with_to_eval_flags = task_instance.generate_partial_queries_for_eval(
+    queries_with_to_eval_flags = task_instance.generate_partial_queries_to_eval(
         base_predictions=base_results_for_threshold_calculation_path,
         verbose=True,
     )
@@ -125,12 +98,9 @@ if __name__ == "__main__":
         )
     )
 
-    # Process the full results for evaluation.
-    results_to_evaluate = process_results(results)
-
     # Write the results to a file for evaluation.
     results_to_evaulate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_to_eval.jsonl")
-    task_instance.write_items(results_to_evaulate_path, results_to_evaluate)
+    task_instance.write_items(results_to_evaulate_path, results, strict=False)
 
     # Evaluate the results.
     task_instance.fair_keyword_evaluate(
@@ -139,13 +109,19 @@ if __name__ == "__main__":
         metrics_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics.json"),
     )
 
-    # Write the full output for debugging.
-    base_results_output_path = os.path.splitext(documents_file_path)[0] + "_tc_base_results.json"
-    with open(base_results_output_path, "w", encoding="utf-8") as f:
-        json.dump(base_results, f, indent=2, ensure_ascii=False)
-    results_output_path = os.path.splitext(documents_file_path)[0] + "_tc_results.json"
-    with open(results_output_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
+    # Write the full results for debugging.
+    verbose_base_results_output_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_verbose_base_results.json")
+    task_instance.write_items(
+        path=verbose_base_results_output_path,
+        items=base_results,
+        verbose=True,
+    )
+    verbose_results_output_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_verbose_results.json")
+    task_instance.write_items(
+        path=verbose_results_output_path,
+        items=results,
+        verbose=True,
+    )
 
     # Annotate each document with log probabilities.
     results_grouped_by_doc = defaultdict(list)

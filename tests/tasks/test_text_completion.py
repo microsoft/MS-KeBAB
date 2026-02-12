@@ -37,8 +37,16 @@ def test_text_completion_read_items_and_generate_queries(text_completion_task, t
     partial_queries = list(text_completion_task.generate_partial_queries())
     text_completion_task.write_items(
         predictions_output_file_path,
-        [(query["target_content"], -0.1, [[query["target_content"], -0.1]]) for query in partial_queries],
+        [
+            {
+                "predicted_content": query["target_content"],
+                "target_content_logprob": -0.1,
+                "predicted_content_top_logprobs": [[query["target_content"], -0.1]],
+            }
+            for query in partial_queries
+        ],
     )
+
     metrics = text_completion_task.evaluate(predictions_output_file_path)
 
     # Assert
@@ -69,9 +77,28 @@ def test_text_completion_read_items_and_generate_queries(text_completion_task, t
     assert math.isclose(metrics["perplexity"], 1.105, abs_tol=1e-3)
 
 
-def test_text_completion_generate_verbose_partial_queries(text_completion_task) -> None:
+def test_text_completion_generate_verbose_partial_queries(text_completion_task, tmp_path: Path) -> None:
+    # Arrange
+    predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "document_predictions_verbose.json"
+    predictions_output_file_path = tmp_path / "document_predictions_verbose_test.json"
+
     # Act
     verbose_partial_queries = list(text_completion_task.generate_partial_queries(verbose=True))
+    text_completion_task.write_items(
+        predictions_output_file_path,
+        [
+            query
+            if query["text_with_mask"] == ""
+            else query
+            | {
+                "predicted_content": query["target_content"],
+                "target_content_logprob": -0.1,
+                "predicted_content_top_logprobs": [[query["target_content"], -0.1]],
+            }
+            for query in verbose_partial_queries
+        ],
+        verbose=True,
+    )
 
     # Assert
     # The verbose partial queries should include skipped words/spaces/punctuations with empty
@@ -90,6 +117,10 @@ def test_text_completion_generate_verbose_partial_queries(text_completion_task) 
         {"text_with_mask": "The capital of France is <mask>", "target_content": "Paris", "document_id": "doc_0"},
         {"text_with_mask": "", "target_content": ".", "document_id": "doc_0"},
     ]
+    assert compare_files_ignore_linebreaks(
+        predictions_file_path,
+        predictions_output_file_path,
+    )
 
 
 def test_text_completion_generate_partial_queries_with_words_after_mask(text_completion_task) -> None:
@@ -137,7 +168,7 @@ def test_calculate_thresholds(email_text_completion_task) -> None:
     # Act
     predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "document_predictions.jsonl"
     queries_with_to_eval_flags = list(
-        email_text_completion_task.generate_partial_queries_for_eval(predictions_file_path)
+        email_text_completion_task.generate_partial_queries_to_eval(predictions_file_path)
     )
 
     # Assert

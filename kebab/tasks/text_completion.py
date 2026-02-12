@@ -126,62 +126,126 @@ class TextCompletionTaskBase(Task):
         base_predictions: Path,
         verbose: bool = False,
         words_after_mask: int = 0,
-        with_to_eval_flags_only: bool = False,
+        include_to_eval_flags_only: bool = False,
     ) -> Iterable[dict[str, Any]]:
-        """TODO (allenwang-ms): if not verbose, do not return queries not to be evaluated."""
-        predicted_vals = ItemJsonlReader[dict[str, str | float]](base_predictions).read_items()
+        """
+        Generate partial queries with thresholds based on the model's predictions.
+
+        Args:
+            base_predictions: The path to the base model's predictions, which will be used to
+            calculate thresholds for evaluation.
+            verbose: Defaults to False, only includes queries marked for evaluation. If True,
+            includes all queries, including skipped words with empty "text_with_mask" for debugging.
+            words_after_mask: Defaults to 0. Number of non-whitespace words/tokens to include
+            after the mask position.
+            include_to_eval_flags_only: Defaults to False, includes both `to_eval` flags and
+            threshold values; if True, only includes `to_eval` flags without the threshold values.
+
+        Returns:
+            Iterable[dict[str, Any]]: An iterable of queries, where each query is a dict containing:
+                - Fields from `generate_partial_queries` output.
+                - "to_eval": A boolean flag indicating whether this query should be evaluated based
+                on the calculated threshold.
+                - "t": The calculated threshold for evaluation (included only if
+                `include_to_eval_flags_only` is False).
+        """
+        base_predictions_iter = iter(ItemJsonlReader[dict[str, str | float]](base_predictions).read_items())
         queries = self.generate_partial_queries(verbose=verbose, words_after_mask=words_after_mask)
-        predicted_vals_iter = iter(predicted_vals)
 
         for query in queries:
             query: dict[str, Any]
             if query["text_with_mask"] == "":
                 query["to_eval"] = False
             else:
-                prediction = next(predicted_vals_iter)
+                try:
+                    prediction = next(base_predictions_iter)
+                except StopIteration as e:
+                    raise ValueError(
+                        "Number of base predictions is less than the number of queries being evaluated."
+                    ) from e
                 t = TextCompletionTaskBase.__calculate_t(prediction, query)
-                query["to_eval"] = t < 0
-                if not with_to_eval_flags_only:
+                query["to_eval"] = t < 0  # Evaluate only when the threshold is less than 0.
+                if not include_to_eval_flags_only:
                     query["t"] = t
-            yield query
+            # If `verbose` is True, include all queries, otherwise include only those with `to_eval` True.
+            if verbose or query["to_eval"]:
+                yield query
 
-    def generate_partial_queries_for_eval(
+    def generate_partial_queries_to_eval(
         self,
         base_predictions: Path,
         verbose: bool = False,
         words_after_mask: int = 0,
     ) -> Iterable[dict[str, Any]]:
-        """TODO (allenwang-ms)."""
+        """
+        Generate partial queries to complete for evaluation, including only `to_eval` flags.
+
+        Args:
+            base_predictions: The path to the base model's predictions, which will be used to
+            calculate thresholds for evaluation.
+            verbose: Defaults to False, only includes queries marked for evaluation; if True,
+            includes all queries, including skipped words with empty "text_with_mask" for debugging.
+            words_after_mask: Defaults to 0. Number of non-whitespace words/tokens to include
+            after the mask position.
+
+        Returns:
+            Iterable[dict[str, Any]]: An iterable of queries, where each query is a dict containing:
+                - "text_with_mask": The text with a chunk replaced by "<mask>".
+                - "target_content": The content of the chunk that was replaced by "<mask>".
+                - "document_id": The ID of the document being processed.
+                - "to_eval": A boolean flag indicating whether this query should be evaluated based
+                on the calculated threshold.
+        """
         yield from self.__generate_partial_queries_with_thresholds(
             base_predictions=base_predictions,
             verbose=verbose,
             words_after_mask=words_after_mask,
-            with_to_eval_flags_only=True,
+            include_to_eval_flags_only=True,
         )
 
-    def write_items(self, path: Path, items: Iterable[tuple[str, float, list[list[str | float]]]]) -> None:
+    def write_items(
+        self, path: Path, items: Iterable[dict[str, Any]], verbose: bool = False, strict: bool = True
+    ) -> None:
         """
         Write prediction items to the specified path.
 
         Args:
             path: The file path where the prediction items should be written.
-            items: An iterable of tuples, where each tuple contains:
-                - predicted_content: The predicted content.
-                - target_content_logprob: The log probability of the target content.
-                - predicted_content_top_logprobs: The top log probabilities for the predicted content.
+            items: An iterable of dictionaries, where if verbose is False, each dictionary must
+            contain:
+                - "predicted_content": The predicted content.
+                - "target_content_logprob": The log probability of the target content.
+                - "predicted_content_top_logprobs": The top log probabilities for the predicted content.
+            verbose: Defaults to False, writes one JSONL line per item with only the required
+            fields. If True, writes all items as a JSON array with all fields.
+            strict: Only applies when `verbose` is False. Defaults to True, raises an error when
+            required fields are missing; if False, skips items with missing required fields.
         """
-        with open(path, "w", encoding="utf-8", newline="\n") as file:
-            for predicted_content, target_content_logprob, predicted_content_top_logprobs in items:
-                json_line = json.dumps(
-                    {
-                        "predicted_content": predicted_content,
-                        "target_content_logprob": target_content_logprob,
-                        "predicted_content_top_logprobs": predicted_content_top_logprobs,
-                    },
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                )
-                file.write(json_line + "\n")
+        required_fields = ("predicted_content", "target_content_logprob", "predicted_content_top_logprobs")
+
+        if verbose:
+            output_items = list(items)
+            with open(path, "w", encoding="utf-8", newline="\n") as file:
+                json.dump(output_items, file, ensure_ascii=False, indent=2, default=str)
+                file.write("\n")
+        else:
+            with open(path, "w", encoding="utf-8", newline="\n") as file:
+                for item in items:
+                    output_item = {key: item[key] for key in required_fields if key in item}
+                    # Ensure all required fields are present when not in verbose mode.
+                    if len(output_item) < len(required_fields):
+                        if strict:
+                            missing_fields = set(required_fields) - output_item.keys()
+                            raise ValueError(f"Missing required fields: {missing_fields}, in item: {item}")
+                        else:
+                            continue
+
+                    json_line = json.dumps(
+                        output_item,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                    file.write(json_line + "\n")
 
     def evaluate(
         self,
@@ -387,7 +451,7 @@ class TextCompletionTaskBase(Task):
         results = {
             "predicted_content": top_logprobs[0][0]["token"],
             "target_content_logprob": target_content_logprob,
-            "predicted_content_top_logprobs": top_logprobs,
+            "predicted_content_top_logprobs": [[logprob["token"], logprob["logprob"]] for logprob in top_logprobs[0]],
         }
         if additional_info:
             results |= additional_info
