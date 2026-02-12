@@ -10,7 +10,6 @@ words that are challenging to predict based on their log probabilities.
 
 from __future__ import annotations
 
-import json
 import os
 from collections import defaultdict
 from pathlib import Path
@@ -92,24 +91,21 @@ if __name__ == "__main__":
     # )
 
     # Run the completion task with the base model on each word.
-    base_results = list(
+    base_results = process_results(list(
         base_model.complete_partial_queries(
             partial_queries=queries,
             verbose=True,
         )
-    )
+    ))
 
-    # Process the full base results for threshold calculation.
-    base_results_for_threshold_calculation = process_results(base_results)
-
-    # Write the processed base results to a file.
+    # Write the base results to a file.
     base_results_for_threshold_calculation_path = Path(
         os.path.splitext(documents_file_path)[0] + "_tc_base_results_for_t_calc.jsonl"
     )
-    task_instance.write_items(base_results_for_threshold_calculation_path, base_results_for_threshold_calculation)
+    task_instance.write_items(base_results_for_threshold_calculation_path, base_results, strict=False)
 
     # Prepare partial queries with to_eval flags based on threshold calculation from base results.
-    queries_with_to_eval_flags = task_instance.generate_partial_queries_for_eval(
+    queries_with_to_eval_flags = task_instance.generate_partial_queries_to_eval(
         base_predictions=base_results_for_threshold_calculation_path,
         verbose=True,
     )
@@ -118,19 +114,16 @@ if __name__ == "__main__":
     model_to_eval = base_model
 
     # Run the completion task with the model to evaluate.
-    results = list(
+    results = process_results(list(
         model_to_eval.complete_partial_queries(
             partial_queries=queries_with_to_eval_flags,
             verbose=True,
         )
-    )
-
-    # Process the full results for evaluation.
-    results_to_evaluate = process_results(results)
+    ))
 
     # Write the results to a file for evaluation.
     results_to_evaulate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_to_eval.jsonl")
-    task_instance.write_items(results_to_evaulate_path, results_to_evaluate)
+    task_instance.write_items(results_to_evaulate_path, results, strict=False)
 
     # Evaluate the results.
     task_instance.fair_keyword_evaluate(
@@ -139,13 +132,19 @@ if __name__ == "__main__":
         metrics_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics.json"),
     )
 
-    # Write the full output for debugging.
-    base_results_output_path = os.path.splitext(documents_file_path)[0] + "_tc_base_results.json"
-    with open(base_results_output_path, "w", encoding="utf-8") as f:
-        json.dump(base_results, f, indent=2, ensure_ascii=False)
-    results_output_path = os.path.splitext(documents_file_path)[0] + "_tc_results.json"
-    with open(results_output_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
+    # Write the full results for debugging.
+    verbose_base_results_output_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_verbose_base_results.json")
+    task_instance.write_items(
+        path=verbose_base_results_output_path,
+        items=base_results,
+        verbose=True,
+    )
+    verbose_results_output_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_verbose_results.json")
+    task_instance.write_items(
+        path=verbose_results_output_path,
+        items=results,
+        verbose=True,
+    )
 
     # Annotate each document with log probabilities.
     results_grouped_by_doc = defaultdict(list)
