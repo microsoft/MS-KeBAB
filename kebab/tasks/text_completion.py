@@ -14,12 +14,10 @@ from logging import Logger
 from pathlib import Path
 from typing import Any, ClassVar
 
-import numpy as np
-from scipy.special import logsumexp
-
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
+from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
 from kebab.utils.io_helpers import (
     DocumentJsonlReader,
     EntityJsonlReader,
@@ -42,6 +40,7 @@ class TextCompletionTaskBase(Task):
     """Mapping from schemas to the corresponding text field names."""
 
     __documents: Path
+    __scorer: FairKeywordScorer
 
     @property
     @abstractmethod
@@ -59,10 +58,12 @@ class TextCompletionTaskBase(Task):
         documents: Path,
         schema: Path | None = None,
         root_for_relative_paths: Path | None = None,
+        scorer: FairKeywordScorer | None = None,
     ):
         """Initialize a text completion task."""
         super().__init__(name, schema=schema, root_for_relative_paths=root_for_relative_paths)
         self.__documents = resolve_path(documents, root_for_relative_paths)
+        self.__scorer = scorer or FairKeywordScorer()
 
     def read_items(self) -> Iterable[Document]:
         """
@@ -149,7 +150,7 @@ class TextCompletionTaskBase(Task):
                 - "t": The calculated threshold for evaluation (included only if
                 `include_to_eval_flags_only` is False).
         """
-        base_predictions_iter = iter(ItemJsonlReader[dict[str, str | float]](base_predictions).read_items())
+        base_predictions_iter = iter(ItemJsonlReader[dict[str, Any]](base_predictions).read_items())
         queries = self.generate_partial_queries(verbose=verbose, words_after_mask=words_after_mask)
 
         for query in queries:
@@ -163,7 +164,10 @@ class TextCompletionTaskBase(Task):
                     raise ValueError(
                         "Number of base predictions is less than the number of queries being evaluated."
                     ) from e
-                t = TextCompletionTaskBase.__calculate_t(prediction, query)
+                t = self.__scorer.calculate_t(
+                    predicted_content_top_logprobs=prediction["predicted_content_top_logprobs"],
+                    target_content=query["target_content"],
+                )
                 query["to_eval"] = t < 0  # Evaluate only when the threshold is less than 0.
                 if not include_to_eval_flags_only:
                     query["t"] = t
@@ -316,64 +320,11 @@ class TextCompletionTaskBase(Task):
             query: dict[str, Any]
             if query["text_with_mask"] != "" and query["to_eval"]:
                 prediction = next(predicted_vals_iter)
-                t = query["t"]
-                top_logprobs = prediction["predicted_content_top_logprobs"]
-                top_logprobs.sort(key=lambda x: x[1], reverse=True)
-
-                # Calculate cumulative probabilities and find largest n such that:
-                # log(p_n/c_n) - c_{n-1}/p_n * log(1 + p_n/c_{n-1}) - t > 0
-                k = 0
-                cumulative_probs = []
-
-                for i, (_, logprob) in enumerate(top_logprobs):
-                    prob = np.exp(logprob)
-                    if i == 0:
-                        cumulative_probs.append(prob)
-                        c_prev = 0
-                    else:
-                        cumulative_probs.append(cumulative_probs[-1] + prob)
-                        c_prev = cumulative_probs[i - 1]
-
-                    c_current = cumulative_probs[i]
-
-                    # Calculate the condition: log(p_n/c_n) - c_{n-1}/p_n * log(1 + p_n/c_{n-1}) - t > 0
-                    term1 = np.log(prob / c_current)
-
-                    # For i=0, c_prev = 0, and the limit of term2 is 0.
-                    term2 = (c_prev / prob) * np.log(1 + prob / c_prev) if c_prev > 0 else 0
-
-                    condition = term1 - term2 - t
-
-                    if condition > 0:
-                        k = i + 1
-
-                # If no k found, keep at least one element.
-                if k == 0:
-                    k = 1
-
-                # Truncate and normalize: (p_1/c_k, ..., p_k/c_k)
-                c_k = cumulative_probs[k - 1]
-                truncated_logprobs = []
-                for i in range(k):
-                    token, logprob = top_logprobs[i]
-                    normalized_prob = np.exp(logprob) / c_k
-                    normalized_logprob = np.log(normalized_prob)
-                    truncated_logprobs.append(
-                        {
-                            "token": token,
-                            "logprob": normalized_logprob,
-                        }
-                    )
-
-                # Calculate score using the truncated distribution.
-                target_content = query["target_content"]
-                truncated_result = TextCompletionTaskBase.prepare_results_from_top_logprobs(
-                    target_content=target_content,
-                    top_logprobs=[truncated_logprobs],
+                score = self.__scorer.calculate_score(
+                    predicted_content_top_logprobs=prediction["predicted_content_top_logprobs"],
+                    target_content=query["target_content"],
+                    t=query["t"],
                 )
-
-                target_logprob_truncated = truncated_result["target_content_logprob"]
-                score = max(0, target_logprob_truncated - t)
                 scores.append(score)
 
         metrics = {}
@@ -478,69 +429,6 @@ class TextCompletionTaskBase(Task):
         )
         metrics["perplexity"] = math.exp(-metrics["mean_log_prob"])
         metrics["num_predictions"] = len(log_probs)
-
-    @staticmethod
-    def __calculate_t(prediction: dict[str, Any], query: dict[str, Any], a: float = -4.0, b: float = 1.0) -> float:
-        """
-        Calculate threshold ensuring baseline has zero score.
-        t = min(0, max(a, base_logprob + b, c))
-        where c is calculated from the position of target content in the distribution.
-        """
-        base_logprob = prediction["target_content_logprob"]
-
-        # Get the target content and distribution.
-        target_content = query["target_content"].strip().lower()
-        top_logprobs = prediction["predicted_content_top_logprobs"]
-
-        # Sort by logprob descending.
-        top_logprobs.sort(key=lambda x: x[1], reverse=True)
-
-        # Find position of target content (match first token that equals or is prefix).
-        target_position = -1
-        for i, (token, _) in enumerate(top_logprobs):
-            token_lower = token.strip().lower()
-            # Check if token is a prefix of target content.
-            if target_content.startswith(token_lower):
-                target_position = i
-                break
-
-        # Calculate cumulative probabilities.
-        cumulative_probs = []
-        for i, (_, logprob) in enumerate(top_logprobs):
-            prob = np.exp(logprob)
-            if i == 0:
-                cumulative_probs.append(prob)
-            else:
-                cumulative_probs.append(cumulative_probs[-1] + prob)
-
-        # Calculate c based on whether target was found.
-        if target_position != -1:
-            # Target found at position n.
-            n = target_position
-            p_n = np.exp(top_logprobs[n][1])
-            c_n = cumulative_probs[n]
-            c_prev = cumulative_probs[n - 1] if n > 0 else 0
-
-            # c = log(p_n/c_n) - c_{n-1}/p_n * log(1 + p_n/c_{n-1})
-            term1 = np.log(p_n / c_n)
-            term2 = (c_prev / p_n) * np.log(1 + p_n / c_prev) if c_prev > 0 else 0
-
-            c = term1 - term2
-        else:
-            # Target not found, use k = length of distribution.
-            k = len(top_logprobs) - 1  # Last position (0-indexed)
-            p_k = np.exp(top_logprobs[k][1])
-            c_k = cumulative_probs[k]
-
-            # c = log(p_k/(c_k+p_k)) - c_k/p_k * log(1 + p_k/c_k)
-            term1 = np.log(p_k / (c_k + p_k))
-            term2 = (c_k / p_k) * np.log(1 + p_k / c_k)
-
-            c = term1 - term2
-
-        # Final threshold: t = min(0, max(a, baseline_logprob + b, c))
-        t = min(0, max(a, base_logprob + b, c))
-        return t
 
 
 class TextCompletionUsingDocumentsTask(TextCompletionTaskBase):
