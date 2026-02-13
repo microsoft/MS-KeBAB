@@ -57,12 +57,13 @@ if __name__ == "__main__":
             return ""
 
     # Run the text completer.
+    base_model = DummyPhiRAGTextCompleter()
+    # Examples of using other models:
     # Qwen/Qwen3-0.6B, Qwen/Qwen3-1.7B, Qwen/Qwen3-4B, Qwen/Qwen3-8B, Qwen/Qwen3-14B, Qwen/Qwen3-32B
     # base_model = DummyQwenRAGTextCompleter(
     #     model_id="Qwen/Qwen3-14B", prediction_method=PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE
     # )
-    # Examples of using other models:
-    base_model = DummyPhiRAGTextCompleter()
+    # openai/gpt-oss-20b, openai/gpt-oss-120b
     # base_model = DummyGptOssRAGTextCompleter(
     #     model_id="openai/gpt-oss-20b", gpu_id=3, prediction_method=PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE
     # )
