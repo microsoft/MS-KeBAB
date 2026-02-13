@@ -18,6 +18,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from transformers.generation.utils import GenerateOutput
 
+from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
 from kebab.tasks.text_completion import TextCompletionTaskBase
 from kebab.utils.parallel_executor import parallel_execute
 
@@ -202,6 +203,57 @@ class BaseRAGTextCompleter(ABC):
             yield (request_id, result)
 
     @staticmethod
+    def prepare_results_from_top_logprobs(
+        target_content: str,
+        top_logprobs: list[list[dict[str, Any]]] | None,
+        additional_info: dict[str, Any] | None = None,
+        allow_target_content_as_prefix: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Processes the top log probabilities and prepares the results.
+
+        Args:
+            target_content: The expected content to fill in the mask.
+            top_logprobs: A list of lists containing the top log probabilities for each token position.
+            additional_info: Additional information to include in the results.
+            allow_target_content_as_prefix: Whether to allow the target content to be a prefix of the predicted token.
+
+        Returns:
+            dict[str, Any]: A dictionary including the following:
+                - "predicted_content" (str): The predicted content for the masked position.
+                - "target_content_logprob" (float): The log probability of the target content.
+                - "predicted_content_top_logprobs" (list[list[str, float]]): A list of lists
+                containing the top predicted tokens and their log probabilities.
+        """
+        if top_logprobs is None or len(top_logprobs) == 0 or len(top_logprobs[0]) == 0:
+            results = {
+                "predicted_content": "<Not Finished Correctly>",
+                "target_content_logprob": float("-inf"),
+                "predicted_content_top_logprobs": [[target_content, float("-inf")]],
+            }
+            if additional_info:
+                results |= additional_info
+            return results
+
+        predicted_content_top_logprobs = [[logprob["token"], logprob["logprob"]] for logprob in top_logprobs[0]]
+
+        target_content_logprob = FairKeywordScorer.get_target_content_logprob_from_top_logprobs(
+            predicted_content_top_logprobs=predicted_content_top_logprobs,
+            target_content=target_content,
+            allow_target_content_as_prefix=allow_target_content_as_prefix,
+        )
+
+        results = {
+            "predicted_content": top_logprobs[0][0]["token"],
+            "target_content_logprob": target_content_logprob,
+            "predicted_content_top_logprobs": [[logprob["token"], logprob["logprob"]] for logprob in top_logprobs[0]],
+        }
+        if additional_info:
+            results |= additional_info
+
+        return results
+
+    @staticmethod
     def get_target_content_logprob_with_fallback(result: dict[str, Any], top_k: int = 20) -> float:
         """
         Gets the target content log probability with fallback.
@@ -214,7 +266,7 @@ class BaseRAGTextCompleter(ABC):
             return result["target_content_logprob"]
         # Fallback to the smallest log probability among the top k predicted tokens when the
         # target content log probability is -inf.
-        target_content_logprob = result["predicted_content_top_logprobs"][0][-1]["logprob"]
+        target_content_logprob = result["predicted_content_top_logprobs"][-1][1]
         # Fallback to a small value to avoid -inf log probability or when the prob is larger than 1 / top_k
         # which usually means a shorter list of predictions being returned.
         if target_content_logprob > math.log(1 / top_k) or target_content_logprob == float("-inf"):
@@ -541,7 +593,7 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
             ]
         ]
 
-        return TextCompletionTaskBase.prepare_results_from_top_logprobs(
+        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
             target_content=target_content,
             top_logprobs=top_logprobs,
             additional_info=additional_info,
@@ -612,10 +664,8 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             dict[str, Any]: A dictionary containing the following:
                 - "predicted_content" (str): The predicted content for the masked position.
                 - "target_content_logprob" (float): The log probability of the target content.
-                - "predicted_content_top_logprobs" (list[list[dict[str, Any]]]): Each outer list
-                contains predicitons at the same token position, and each inner list contains the
-                top k predictions for that token position, including the token and its log
-                probability.
+                - "predicted_content_top_logprobs" (list[list[str, float]]): A list of lists
+                containing the top predicted tokens and their log probabilities.
         """
         text_completion_prompt = self.prediction_method.build_text_completion_prompt(
             text_with_mask=text_with_mask,
@@ -704,10 +754,8 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             dict[str, Any]: A dictionary containing the following:
                 - "predicted_content" (str): The predicted content for the masked position.
                 - "target_content_logprob" (float): The log probability of the target content.
-                - "predicted_content_top_logprobs" (list[list[dict[str, Any]]]): Each outer list
-                contains predicitons at the same token position, and each inner list contains the
-                top k predictions for that token position, including the token and its log
-                probability.
+                - "predicted_content_top_logprobs" (list[list[str, float]]): A list of lists
+                containing the top predicted tokens and their log probabilities.
         """
         if self.prediction_method == PredictionMethod.LOGPROBS_FROM_LOGITS:
             return self.__get_logprobs_from_logits(
@@ -753,10 +801,8 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             dict[str, Any]: A dictionary containing the following:
                 - "predicted_content" (str): The predicted content for the masked position.
                 - "target_content_logprob" (float): The log probability of the target content.
-                - "predicted_content_top_logprobs" (list[list[dict[str, Any]]]): Each outer list
-                contains predicitons at the same token position, and each inner list contains the
-                top k predictions for that token position, including the token and its log
-                probability.
+                - "predicted_content_top_logprobs" (list[list[str, float]]): A list of lists
+                containing the top predicted tokens and their log probabilities.
         """
         text_completion_prompt = "/no_think" + self.prediction_method.build_text_completion_prompt(
             text_with_mask=text_with_mask,
@@ -907,7 +953,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         additional_info = {"raw_model_output": raw_response}
         additional_info |= {"error": error} if error else {}
 
-        return TextCompletionTaskBase.prepare_results_from_top_logprobs(
+        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
             target_content=target_content,
             top_logprobs=top_logprobs,
             additional_info=additional_info,
@@ -980,7 +1026,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         additional_info = {"raw_model_output": raw_response}
         additional_info |= {"error": error} if error else {}
 
-        return TextCompletionTaskBase.prepare_results_from_top_logprobs(
+        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
             target_content=target_content,
             top_logprobs=top_logprobs,
             additional_info=additional_info,
@@ -1046,10 +1092,8 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             dict[str, Any]: A dictionary containing the following:
                 - "predicted_content" (str): The predicted content for the masked position.
                 - "target_content_logprob" (float): The log probability of the target content.
-                - "predicted_content_top_logprobs" (list[list[dict[str, Any]]]): Each outer list
-                contains predicitons at the same token position, and each inner list contains the
-                top k predictions for that token position, including the token and its log
-                probability.
+                - "predicted_content_top_logprobs" (list[list[str, float]]): A list of lists
+                containing the top predicted tokens and their log probabilities.
         """
         if self.prediction_method == PredictionMethod.LOGPROBS_FROM_TEXT_RESPONSE:
             return self.__get_logprobs_from_text_response(
@@ -1139,7 +1183,7 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         additional_info = {"raw_model_output": decoded_text}
         additional_info |= {"error": error} if error else {}
 
-        return TextCompletionTaskBase.prepare_results_from_top_logprobs(
+        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
             target_content=target_content,
             top_logprobs=top_logprobs,
             additional_info=additional_info,
@@ -1213,7 +1257,7 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             return {
                 "predicted_content": "<Not Finished Correctly>",
                 "target_content_logprob": float("-inf"),
-                "predicted_content_top_logprobs": [[{"token": target_content, "logprob": float("-inf")}]],
+                "predicted_content_top_logprobs": [[target_content, float("-inf")]],
                 "raw_model_output": decoded_text,
             }
 
