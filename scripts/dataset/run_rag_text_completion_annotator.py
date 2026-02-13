@@ -15,6 +15,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, override
 
+from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
 from kebab.utils.rag_text_completer import (
     BaseGptOssRAGTextCompleter,
@@ -82,9 +83,11 @@ if __name__ == "__main__":
     )
     task_instance.write_items(base_results_for_threshold_calculation_path, base_results, strict=False)
 
+    # Initialize the scorer with the base predictions to evaluate candidate models.
+    task_instance.scorer = FairKeywordScorer(base_predictions=base_results_for_threshold_calculation_path)
+
     # Prepare partial queries with to_eval flags based on threshold calculation from base results.
     queries_with_to_eval_flags = task_instance.generate_partial_queries_to_eval(
-        base_predictions=base_results_for_threshold_calculation_path,
         verbose=True,
     )
 
@@ -106,7 +109,6 @@ if __name__ == "__main__":
     # Evaluate the results.
     task_instance.fair_keyword_evaluate(
         to_eval_predictions=results_to_evaulate_path,
-        base_predictions=base_results_for_threshold_calculation_path,
         metrics_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics.json"),
     )
 
