@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from pathlib import Path
 from typing import cast
 
 import numpy as np
@@ -10,8 +11,9 @@ from scipy.special import logsumexp
 class FairKeywordScorer:
     """Fair keyword evaluator for text completion tasks."""
 
-    def __init__(self, a: float = -4.0, b: float = 1.0) -> None:
-        """Initialize the evaluator with threshold parameters a and b."""
+    def __init__(self, base_predictions: Path, a: float = -4.0, b: float = 1.0) -> None:
+        """Initialize the evaluator."""
+        self.base_predictions = base_predictions
         self.a = a
         self.b = b
 
@@ -20,7 +22,13 @@ class FairKeywordScorer:
         predicted_content_top_logprobs: list[list[str | float]],
         target_content: str,
     ) -> float:
-        """TODO (allenwang-ms)."""
+        """
+        Calculate threshold t for a word based on the base predicted content distribution.
+
+        Args:
+            predicted_content_top_logprobs: The top log probabilities for the predicted content.
+            target_content: The groundtruth content.
+        """
         return FairKeywordScorer.__calculate_t(
             predicted_content_top_logprobs=predicted_content_top_logprobs,
             target_content=target_content,
@@ -28,13 +36,20 @@ class FairKeywordScorer:
             b=self.b,
         )
 
+    @staticmethod
     def calculate_score(
-        self,
         predicted_content_top_logprobs: list[list[str | float]],
         target_content: str,
         t: float,
     ) -> float:
-        """TODO (allenwang-ms)."""
+        """
+        Calculate the score for a prediction based on the truncated predicted content distribution.
+
+        Args:
+            predicted_content_top_logprobs: The top log probabilities for the predicted content.
+            target_content: The groundtruth content.
+            t: The threshold for evaluation.
+        """
         predicted_content_top_logprobs.sort(key=lambda x: x[1], reverse=True)
 
         # Calculate cumulative probabilities and find largest n such that:

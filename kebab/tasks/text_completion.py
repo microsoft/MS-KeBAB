@@ -40,7 +40,6 @@ class TextCompletionTaskBase(Task):
     """Mapping from schemas to the corresponding text field names."""
 
     __documents: Path
-    __scorer: FairKeywordScorer
 
     @property
     @abstractmethod
@@ -58,12 +57,11 @@ class TextCompletionTaskBase(Task):
         documents: Path,
         schema: Path | None = None,
         root_for_relative_paths: Path | None = None,
-        scorer: FairKeywordScorer | None = None,
     ):
         """Initialize a text completion task."""
         super().__init__(name, schema=schema, root_for_relative_paths=root_for_relative_paths)
         self.__documents = resolve_path(documents, root_for_relative_paths)
-        self.__scorer = scorer or FairKeywordScorer()
+        self.scorer: FairKeywordScorer | None = None
 
     def read_items(self) -> Iterable[Document]:
         """
@@ -124,7 +122,6 @@ class TextCompletionTaskBase(Task):
 
     def __generate_partial_queries_with_thresholds(
         self,
-        base_predictions: Path,
         verbose: bool = False,
         words_after_mask: int = 0,
         include_to_eval_flags_only: bool = False,
@@ -133,8 +130,6 @@ class TextCompletionTaskBase(Task):
         Generate partial queries with thresholds based on the model's predictions.
 
         Args:
-            base_predictions: The path to the base model's predictions, which will be used to
-            calculate thresholds for evaluation.
             verbose: Defaults to False, only includes queries marked for evaluation. If True,
             includes all queries, including skipped words with empty "text_with_mask" for debugging.
             words_after_mask: Defaults to 0. Number of non-whitespace words/tokens to include
@@ -150,7 +145,11 @@ class TextCompletionTaskBase(Task):
                 - "t": The calculated threshold for evaluation (included only if
                 `include_to_eval_flags_only` is False).
         """
-        base_predictions_iter = iter(ItemJsonlReader[dict[str, Any]](base_predictions).read_items())
+        if self.scorer is None:
+            raise ValueError(
+                "Scorer is not initialized. Please initialize the scorer with base predictions before generating partial queries for evaluation."
+            )
+        base_predictions_iter = iter(ItemJsonlReader[dict[str, Any]](self.scorer.base_predictions).read_items())
         queries = self.generate_partial_queries(verbose=verbose, words_after_mask=words_after_mask)
 
         for query in queries:
@@ -164,7 +163,7 @@ class TextCompletionTaskBase(Task):
                     raise ValueError(
                         "Number of base predictions is less than the number of queries being evaluated."
                     ) from e
-                t = self.__scorer.calculate_t(
+                t = self.scorer.calculate_t(
                     predicted_content_top_logprobs=prediction["predicted_content_top_logprobs"],
                     target_content=query["target_content"],
                 )
@@ -177,7 +176,6 @@ class TextCompletionTaskBase(Task):
 
     def generate_partial_queries_to_eval(
         self,
-        base_predictions: Path,
         verbose: bool = False,
         words_after_mask: int = 0,
     ) -> Iterable[dict[str, Any]]:
@@ -201,7 +199,6 @@ class TextCompletionTaskBase(Task):
                 on the calculated threshold.
         """
         yield from self.__generate_partial_queries_with_thresholds(
-            base_predictions=base_predictions,
             verbose=verbose,
             words_after_mask=words_after_mask,
             include_to_eval_flags_only=True,
@@ -221,7 +218,8 @@ class TextCompletionTaskBase(Task):
                 - "target_content_logprob": The log probability of the target content.
                 - "predicted_content_top_logprobs": The top log probabilities for the predicted content.
             verbose: Defaults to False, writes one JSONL line per item with only the required
-            fields. If True, writes all items as a JSON array with all fields.
+            fields, which is the format expected by `evaluate`; if True, writes all items as a JSON
+            array with all fields.
             strict: Only applies when `verbose` is False. Defaults to True, raises an error when
             required fields are missing; if False, skips items with missing required fields.
         """
@@ -303,7 +301,6 @@ class TextCompletionTaskBase(Task):
     def fair_keyword_evaluate(
         self,
         to_eval_predictions: Path,
-        base_predictions: Path,
         metrics_output_path: Path | None = None,
         logger: Logger | None = None,
     ) -> dict[str, float]:
@@ -313,14 +310,14 @@ class TextCompletionTaskBase(Task):
 
         predicted_vals = ItemJsonlReader[dict[str, Any]](to_eval_predictions).read_items()
         predicted_vals_iter = iter(predicted_vals)
-        queries = self.__generate_partial_queries_with_thresholds(base_predictions=base_predictions)
+        queries = self.__generate_partial_queries_with_thresholds()
 
         scores = []
         for query in queries:
             query: dict[str, Any]
             if query["text_with_mask"] != "" and query["to_eval"]:
                 prediction = next(predicted_vals_iter)
-                score = self.__scorer.calculate_score(
+                score = FairKeywordScorer.calculate_score(
                     predicted_content_top_logprobs=prediction["predicted_content_top_logprobs"],
                     target_content=query["target_content"],
                     t=query["t"],
