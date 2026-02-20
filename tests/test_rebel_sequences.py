@@ -10,6 +10,7 @@ from kebab.utils.dataset.rebel.rebel_split_sampler import (
     RebelSplitSampler,
     SplitBuildConfig,
 )
+from kebab.utils.io_helpers import StringLineWriter
 
 
 def _write_jsonl(path: Path, lines: Sequence[Any]) -> None:
@@ -17,6 +18,11 @@ def _write_jsonl(path: Path, lines: Sequence[Any]) -> None:
     with open(path, "w", encoding="utf-8") as f:
         for obj in lines:
             f.write(json.dumps(obj) + "\n")
+
+
+def _write_lines(path: Path, lines: Sequence[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    StringLineWriter(path).write_items(lines)
 
 
 def _fragment(entity_id: str, frag_id: str) -> dict:
@@ -59,7 +65,7 @@ def test_sequences_per_entity_sampling(tmp_path):
     _write_jsonl(base_dir / "linking/base/rebel_linking_dataset.jsonl", linking_pairs)
     _write_jsonl(base_dir / "linking/base/rebel_linking_ground_truth.jsonl", linking_gt)
     _write_jsonl(base_dir / "clustering/base/rebel_clustering_dataset.jsonl", clustering_dataset)
-    _write_jsonl(base_dir / "clustering/base/rebel_clustering_ground_truth.jsonl", clustering_gt)
+    _write_lines(base_dir / "clustering/base/rebel_clustering_ground_truth.txt", clustering_gt)
     _write_jsonl(base_dir / "entity_generation/base/rebel_entity_generation_dataset.jsonl", entity_gen_dataset)
     _write_jsonl(base_dir / "fragment_generation/base/rebel_fragment_generation_dataset.jsonl", fragment_gen_dataset)
 

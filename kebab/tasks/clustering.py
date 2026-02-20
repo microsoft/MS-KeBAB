@@ -12,7 +12,13 @@ import numpy as np
 
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
-from kebab.utils.io_helpers import EntityJsonlReader, ItemJsonlReader, ItemJsonlWriter, resolve_path, save_dict_to_json
+from kebab.utils.io_helpers import (
+    EntityJsonlReader,
+    StringLineReader,
+    StringLineWriter,
+    resolve_path,
+    save_dict_to_json,
+)
 
 
 class ClusteringTask(Task):
@@ -61,11 +67,7 @@ class ClusteringTask(Task):
                 - A string value providing the ground-truth label (cluster ID).
         """
         entities = EntityJsonlReader(self.entity_fragments).read_items()
-        labels = (
-            ItemJsonlReader[str](self.ground_truth, converter=str).read_items()
-            if self.ground_truth is not None
-            else iter([])
-        )
+        labels = StringLineReader(self.ground_truth).read_items() if self.ground_truth is not None else iter([])
         return zip(entities, labels, strict=True)
 
     def write_items(self, path: Path, items: Iterable[str]) -> None:
@@ -76,7 +78,7 @@ class ClusteringTask(Task):
             path: The file path where the str labels should be written.
             items: An iterable of str labels to be written to the file.
         """
-        ItemJsonlWriter[str](path).write_items(items)
+        StringLineWriter(path).write_items(items)
 
     def evaluate(
         self,
@@ -88,8 +90,8 @@ class ClusteringTask(Task):
         if self.ground_truth is None:
             raise ValueError("Ground truth data is required for evaluation.")
 
-        predicted_vals = list(ItemJsonlReader[str](predictions, converter=str).read_items())
-        ground_truth = list(ItemJsonlReader[str](self.ground_truth).read_items())
+        predicted_vals = list(StringLineReader(predictions).read_items())
+        ground_truth = list(StringLineReader(self.ground_truth).read_items())
 
         fragment_count = len(predicted_vals)
         metrics = defaultdict(float)

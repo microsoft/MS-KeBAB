@@ -367,6 +367,10 @@ class StringLineWriter(ItemWriter[str]):
         """
         with open(self.path, "w", encoding="utf-8", newline="\n") as file:
             for line in items:
+                if line.rstrip() != line:
+                    raise ValueError("Item contains trailing whitespace")
+                if "\n" in line:
+                    raise ValueError("Item contains newline character")
                 file.write(line + "\n")
 
 
