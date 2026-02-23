@@ -51,7 +51,12 @@ def main() -> None:
 
     class Stats:
         def __init__(
-            self, true_count, false_count, single_overlap_count, multiple_overlap_count, multiple_overlap_false_count
+            self,
+            true_count: int,
+            false_count: int,
+            single_overlap_count: int,
+            multiple_overlap_count: int,
+            multiple_overlap_false_count: int,
         ):
             self.true_count = true_count
             self.false_count = false_count
@@ -199,6 +204,8 @@ def test_train_test_split():
 
 
 class Predicate:
+    """Represents a predicate that we want to maintain a certain number of true and false instances for in the test set."""
+
     name: str
     true_nodes: set[str]
     min_true_count: int
@@ -211,7 +218,8 @@ class Predicate:
         self.min_true_count = min_true_count
         self.min_false_count = min_false_count
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return a string representation of the predicate."""
         return self.name
 
     def get_counts(self, nodes: set[str]) -> tuple[int, int]:
