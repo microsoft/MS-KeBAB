@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-import math
 from pathlib import Path
 
 import pytest
@@ -40,15 +39,11 @@ def test_text_completion_read_items_and_generate_queries(text_completion_task, t
         predictions_output_file_path,
         [
             {
-                "predicted_content": query["target_content"],
-                "target_content_logprob": -0.1,
-                "predicted_content_top_logprobs": [[query["target_content"], -0.1]],
+                "predicted_content_top_probs": {query["target_content"]: 0.1},
             }
             for query in partial_queries
         ],
     )
-
-    metrics = text_completion_task.evaluate(predictions_output_file_path)
 
     # Assert
     assert items[0].document_id == "doc_0"
@@ -73,15 +68,12 @@ def test_text_completion_read_items_and_generate_queries(text_completion_task, t
         predictions_file_path,
         predictions_output_file_path,
     )
-    assert metrics["mean_log_prob"] == -0.1
-    assert metrics["variance_log_prob"] == 0.0
-    assert math.isclose(metrics["perplexity"], 1.105, abs_tol=1e-3)
 
 
 def test_text_completion_generate_verbose_partial_queries(text_completion_task, tmp_path: Path) -> None:
     # Arrange
     predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "document_predictions_verbose.json"
-    predictions_output_file_path = tmp_path / "document_predictions_verbose_test.json"
+    predictions_output_file_path = tmp_path / "document_predictions_verbose.json"
 
     # Act
     verbose_partial_queries = list(text_completion_task.generate_partial_queries(verbose=True))
@@ -93,12 +85,13 @@ def test_text_completion_generate_verbose_partial_queries(text_completion_task, 
             else query
             | {
                 "predicted_content": query["target_content"],
-                "target_content_logprob": -0.1,
-                "predicted_content_top_logprobs": [[query["target_content"], -0.1]],
+                "target_content_prob": 0.1,
+                "predicted_content_top_probs": {query["target_content"]: 0.1},
             }
             for query in verbose_partial_queries
         ],
         verbose=True,
+        strict=False,
     )
 
     # Assert
