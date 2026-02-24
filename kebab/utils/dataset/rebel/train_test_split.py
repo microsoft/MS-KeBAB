@@ -137,7 +137,6 @@ def main() -> None:
 
     training_nodes, test_nodes = split(graph, test_stats)
 
-    training_indices = {int(node) for node in training_nodes}
     test_indices = {int(node) for node in test_nodes}
     # Write out the new test set
     new_test = [instances[i] for i in sorted(test_indices)]
@@ -146,9 +145,9 @@ def main() -> None:
     print(f"Wrote test set with {len(test_indices)} instances.")
 
     # Further split the new training set to make a new validation set
-    training_graph = graph.subgraph(training_nodes)
+    training_graph = graph.subgraph(training_nodes).copy()
     training_nodes, validation_nodes = split(training_graph, val_stats)
-    training_indices = {int(node) for node in training_nodes}
+    training_indices = {int(node) for node in training_nodes if node in instance_nodes}
     validation_indices = {int(node) for node in validation_nodes}
     new_train = [instances[i] for i in sorted(training_indices)]
     write_instances(new_train, output_dir / "train")
@@ -269,14 +268,16 @@ def train_test_split(
         )
         largest_cc_graph = component_graphs_with_sizes[0][0]
         # removed_from_largest = minimum_node_cut(largest_cc_graph, flow_func=shortest_augmenting_path)
-        min_group_size = sum(
-            max(0, predicate.min_true_count - remaining_true_count[predicate])
-            + max(0, predicate.min_false_count - remaining_false_count[predicate])
+        reduced_predicates = [
+            Predicate(
+                predicate.name,
+                predicate.true_nodes,
+                max(0, predicate.min_true_count - remaining_true_count[predicate]),
+                max(0, predicate.min_false_count - remaining_false_count[predicate]),
+            )
             for predicate in predicates
-        )
-        removed_from_largest = approximate_minimum_node_cut(
-            largest_cc_graph, instance_nodes, min_group_size=min_group_size
-        )
+        ]
+        removed_from_largest = approximate_minimum_node_cut(largest_cc_graph, instance_nodes, reduced_predicates)
         if len(removed_from_largest) == 0:
             raise ValueError("Cannot further split the largest connected component.")
         print(f"Removing {len(removed_from_largest)} nodes from largest connected component")
@@ -341,7 +342,7 @@ def train_test_split(
         node
         for i in training_components
         for node in component_graphs_with_sizes[i][0].nodes()
-        if node in instance_nodes
+        # if node in instance_nodes
     }
     test_set = {
         node for i in testing_components for node in component_graphs_with_sizes[i][0].nodes() if node in instance_nodes
@@ -509,7 +510,7 @@ def minimum_node_cut(G, s=None, t=None, flow_func=None, approximate=False) -> se
 def approximate_minimum_node_cut(
     graph: nx.Graph,
     instance_nodes: set[str],
-    min_group_size: int = 1,
+    predicates: list[Predicate],
 ) -> set:
     """Returns an approximate minimum node cut that splits G into two groups of at least min_group_size. instance_nodes can be a superset of the graph nodes."""
     # The algorithm is inspired by Tarjan's DFS algorithm for finding articulation points.
@@ -547,9 +548,15 @@ def approximate_minimum_node_cut(
     subtree_back_edge_from_instance_count = {
         root: 0
     }  # number of back edges out of subtree rooted at node from instance nodes (excluding node itself)
+    subtree_back_edge_from_predicate_count = {
+        root: dict.fromkeys(predicates, 0)
+    }  # number of back edges out of subtree rooted at node from instance nodes that are true for predicate (excluding node itself)
     subtree_size = {
         root: 1 if root in instance_nodes else 0
     }  # number of instances in subtree rooted at node (including node itself)
+    subtree_size_by_predicate = {
+        root: {predicate: 1 if root in predicate.true_nodes else 0 for predicate in predicates}
+    }  # number of instances in subtree rooted at node that are true for predicate (including node itself)
     stack = [(root, root, iter(graph[root]))]
     time_counter = 1
     start_time = time.perf_counter()
@@ -594,15 +601,22 @@ def approximate_minimum_node_cut(
             else:
                 discovery[child] = time_counter
                 time_counter += 1
-                if time_counter % 100000 == 0:
-                    elapsed_per_counter = (time.perf_counter() - start_time) / time_counter
+                time_block = 100000
+                if time_counter % time_block == 0:
+                    current_time = time.perf_counter()
+                    elapsed_per_counter = (current_time - start_time) / time_block
+                    start_time = current_time
                     estimated_seconds_remaining = int(elapsed_per_counter * (graph.number_of_nodes() - time_counter))
                     timedelta_seconds = timedelta(seconds=estimated_seconds_remaining)
                     print(f"DFS visited {time_counter} nodes. {timedelta_seconds} remaining")
                 back_edge_target[child] = child
                 subtree_back_edge_count[child] = 0
                 subtree_back_edge_from_instance_count[child] = 0
+                subtree_back_edge_from_predicate_count[child] = dict.fromkeys(predicates, 0)
                 subtree_size[child] = 1 if child in instance_nodes else 0
+                subtree_size_by_predicate[child] = {
+                    predicate: 1 if child in predicate.true_nodes else 0 for predicate in predicates
+                }
                 stack.append((parent, child, iter(graph[child])))
                 discovered_nodes.append(child)
         except StopIteration:
@@ -616,20 +630,40 @@ def approximate_minimum_node_cut(
                     subtree_back_edge_count[child] -= 1
                     subtree_back_edge_from_instance_count[grandparent] += 1
                     subtree_back_edge_from_instance_count[child] -= 1
+                    for predicate in predicates:
+                        if parent in predicate.true_nodes:
+                            subtree_back_edge_from_predicate_count[grandparent][predicate] += 1
+                            subtree_back_edge_from_predicate_count[child][predicate] -= 1
                 subtree_size[grandparent] += subtree_size[parent]
                 subtree_back_edge_count[grandparent] += subtree_back_edge_count[parent]
                 subtree_back_edge_from_instance_count[grandparent] += subtree_back_edge_from_instance_count[parent]
+                for predicate in predicates:
+                    subtree_size_by_predicate[grandparent][predicate] += subtree_size_by_predicate[parent][predicate]
+                    subtree_back_edge_from_predicate_count[grandparent][predicate] += (
+                        subtree_back_edge_from_predicate_count[parent][predicate]
+                    )
 
     cut_size = {node: 1 + subtree_back_edge_count[node] for node in subtree_back_edge_count if node in instance_nodes}
     instance_node_count = sum(1 for node in graph if node in instance_nodes)
+
+    min_group_size = sum(predicate.min_true_count + predicate.min_false_count for predicate in predicates)
 
     def node_cost(node: str) -> int:
         """Compute the cost of cutting at this node."""
         subtree_cut_size = 1 + subtree_back_edge_from_instance_count[node]
         subtree_size_after_cut = subtree_size[node] - subtree_cut_size
+        subtree_size_after_cut_by_predicate = {
+            predicate: subtree_size_by_predicate[node][predicate]
+            - subtree_back_edge_from_predicate_count[node][predicate]
+            for predicate in predicates
+        }
         remaining_cut_size = subtree_back_edge_count[node] - subtree_back_edge_from_instance_count[node]
         remaining_size_after_cut = instance_node_count - subtree_size[node] - remaining_cut_size
         smaller_group_size = min(subtree_size_after_cut, remaining_size_after_cut)
+        if subtree_size_after_cut < remaining_size_after_cut and all(
+            subtree_size_after_cut_by_predicate[predicate] >= predicate.min_true_count for predicate in predicates
+        ):
+            return cut_size[node] - 2 * instance_node_count  # prefer smaller cuts that satisfy all predicates
         if smaller_group_size >= min_group_size:
             return cut_size[node] - instance_node_count  # prefer smaller cuts that satisfy min_group_size
         return -smaller_group_size  # maximize smaller group size if min_group_size not satisfied
