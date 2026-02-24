@@ -247,6 +247,10 @@ class BaseRAGTextCompleter(ABC):
         predicted_content_top_probs = dict(
             sorted(predicted_content_top_probs.items(), key=lambda item: item[1], reverse=True)
         )
+        # Normalize if the sum of probabilities exceeds 1.
+        total_prob = sum(predicted_content_top_probs.values())
+        if total_prob > 1:
+            predicted_content_top_probs = {k: v / total_prob for k, v in predicted_content_top_probs.items()}
 
         target_content_prob = FairKeywordScorer.get_target_content_prob_from_top_probs(
             predicted_content_top_probs=predicted_content_top_probs,
@@ -449,9 +453,9 @@ class PredictionMethod(Enum):
             augmented_context: Additional context to help with the prediction.
         """
         base_text_completion_prompt = f"""
-You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context.
+You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context. You MUST always output a prediction. Never apologize, never refuse, never explain. Even if context is empty or insufficient, you MUST still output your best guess.
 
-Below is the context retrieved to help you make a better prediction. It is marked between <Begin Context> and <End Context>:
+Below is the optional context retrieved to help you make a better prediction. It may be empty - that is fine, still make your best prediction. It is marked between <Begin Context> and <End Context>:
 <Begin Context>
 {augmented_context}
 <End Context>
@@ -479,7 +483,7 @@ Now, complete the following text by predicting the missing word, represented by 
         }
 What is the **single alphanumeric word** that best completes the masked position "{
             TextCompletionTaskBase.MASK
-        }"? Please respond strictly with **only** the word.
+        }"? Please respond strictly with **only** the word. No explanation, no apology, no punctuation - just the word.
 
 Answer: """
         return text_completion_prompt
@@ -663,6 +667,7 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         augmented_context: str = "",
         seed: int = 42,
         top_k: int = 20,
+        beam_search: bool = True,
     ) -> dict[str, Any]:
         """
         Processes a single partial query and returns the predicted content and probabilities.
@@ -673,6 +678,7 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             augmented_context: Additional context to help with the prediction.
             seed: seed for the random number generator.
             top_k: The number of top predictions to consider.
+            beam_search: Whether to use beam search for generation.
 
         Returns:
             dict[str, Any]: A dictionary containing the following:
@@ -681,6 +687,14 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
                 - "predicted_content_top_probs" (dict[str, float]): A dictionary containing the top
                 predicted tokens and their probabilities.
         """
+        if beam_search:
+            return self.__complete_single_partial_query_beam_search(
+                text_with_mask=text_with_mask,
+                target_content=target_content,
+                augmented_context=augmented_context,
+                top_k=top_k,
+            )
+
         text_completion_prompt = self.prediction_method.build_text_completion_prompt(
             text_with_mask=text_with_mask,
             augmented_context=augmented_context,
@@ -705,6 +719,63 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             target_content=target_content,
             predicted_token_logits=next_token_logits,
             top_k=top_k,
+        )
+
+    def __complete_single_partial_query_beam_search(
+        self,
+        text_with_mask: str,
+        target_content: str,
+        augmented_context: str,
+        top_k: int,
+    ) -> dict[str, Any]:
+        """Processes a single partial query and returns the predicted content and probabilities using beam search."""
+        text_completion_prompt = self.prediction_method.build_text_completion_prompt(
+            text_with_mask=text_with_mask,
+            augmented_context=augmented_context,
+            top_k=top_k,
+        )
+
+        # Encode the prompt using the chat template so the model knows it's in an assistant turn.
+        messages = [{"role": "user", "content": text_completion_prompt}]
+        input_ids = self.tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            return_tensors="pt",
+        ).to(self.device)
+
+        # Run beam search to generate top_k sequences.
+        # TODO (allenwang-ms): The problem of this beam search implementation is that it does not
+        # handle duplicated sequences well, which frequently lead to less than top_k unique
+        # predictions being returned.
+        with torch.no_grad():
+            outputs = cast(
+                GenerateOutput,
+                self.model.generate(
+                    input_ids,
+                    max_new_tokens=30,
+                    num_beams=top_k,
+                    num_return_sequences=top_k,
+                    do_sample=False,
+                    return_dict_in_generate=True,
+                    output_scores=True,
+                ),
+            )
+
+        # Build top_logprobs from beam search results.
+        top_logprobs: list[dict[str, Any]] = []
+        sequences_scores = getattr(outputs, "sequences_scores", None)
+        for i in range(top_k):
+            generated_ids = outputs.sequences[i][input_ids.shape[1] :]
+            decoded_text = self.tokenizer.decode(generated_ids, skip_special_tokens=False).strip()
+            # Extract only the first alphanumeric word.
+            match = re.search(r"[a-zA-Z0-9]+", decoded_text)
+            decoded_text = match.group(0) if match else decoded_text
+            seq_score = sequences_scores[i].item() if sequences_scores is not None else float("-inf")
+            top_logprobs.append({"token": decoded_text, "logprob": seq_score})
+
+        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
+            target_content=target_content,
+            top_logprobs=top_logprobs,
         )
 
 
