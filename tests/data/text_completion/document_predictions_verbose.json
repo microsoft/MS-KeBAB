@@ -14,13 +14,10 @@
     "target_content": "capital",
     "document_id": "doc_0",
     "predicted_content": "capital",
-    "target_content_logprob": -0.1,
-    "predicted_content_top_logprobs": [
-      [
-        "capital",
-        -0.1
-      ]
-    ]
+    "target_content_prob": 0.1,
+    "predicted_content_top_probs": {
+      "capital": 0.1
+    }
   },
   {
     "text_with_mask": "",
@@ -32,13 +29,10 @@
     "target_content": "of",
     "document_id": "doc_0",
     "predicted_content": "of",
-    "target_content_logprob": -0.1,
-    "predicted_content_top_logprobs": [
-      [
-        "of",
-        -0.1
-      ]
-    ]
+    "target_content_prob": 0.1,
+    "predicted_content_top_probs": {
+      "of": 0.1
+    }
   },
   {
     "text_with_mask": "",
@@ -50,13 +44,10 @@
     "target_content": "France",
     "document_id": "doc_0",
     "predicted_content": "France",
-    "target_content_logprob": -0.1,
-    "predicted_content_top_logprobs": [
-      [
-        "France",
-        -0.1
-      ]
-    ]
+    "target_content_prob": 0.1,
+    "predicted_content_top_probs": {
+      "France": 0.1
+    }
   },
   {
     "text_with_mask": "",
@@ -68,13 +59,10 @@
     "target_content": "is",
     "document_id": "doc_0",
     "predicted_content": "is",
-    "target_content_logprob": -0.1,
-    "predicted_content_top_logprobs": [
-      [
-        "is",
-        -0.1
-      ]
-    ]
+    "target_content_prob": 0.1,
+    "predicted_content_top_probs": {
+      "is": 0.1
+    }
   },
   {
     "text_with_mask": "",
@@ -86,13 +74,10 @@
     "target_content": "Paris",
     "document_id": "doc_0",
     "predicted_content": "Paris",
-    "target_content_logprob": -0.1,
-    "predicted_content_top_logprobs": [
-      [
-        "Paris",
-        -0.1
-      ]
-    ]
+    "target_content_prob": 0.1,
+    "predicted_content_top_probs": {
+      "Paris": 0.1
+    }
   },
   {
     "text_with_mask": "",
@@ -114,13 +99,10 @@
     "target_content": "capital",
     "document_id": "doc_1",
     "predicted_content": "capital",
-    "target_content_logprob": -0.1,
-    "predicted_content_top_logprobs": [
-      [
-        "capital",
-        -0.1
-      ]
-    ]
+    "target_content_prob": 0.1,
+    "predicted_content_top_probs": {
+      "capital": 0.1
+    }
   },
   {
     "text_with_mask": "",
@@ -132,13 +114,10 @@
     "target_content": "of",
     "document_id": "doc_1",
     "predicted_content": "of",
-    "target_content_logprob": -0.1,
-    "predicted_content_top_logprobs": [
-      [
-        "of",
-        -0.1
-      ]
-    ]
+    "target_content_prob": 0.1,
+    "predicted_content_top_probs": {
+      "of": 0.1
+    }
   },
   {
     "text_with_mask": "",
@@ -150,13 +129,10 @@
     "target_content": "China",
     "document_id": "doc_1",
     "predicted_content": "China",
-    "target_content_logprob": -0.1,
-    "predicted_content_top_logprobs": [
-      [
-        "China",
-        -0.1
-      ]
-    ]
+    "target_content_prob": 0.1,
+    "predicted_content_top_probs": {
+      "China": 0.1
+    }
   },
   {
     "text_with_mask": "",
@@ -168,13 +144,10 @@
     "target_content": "is",
     "document_id": "doc_1",
     "predicted_content": "is",
-    "target_content_logprob": -0.1,
-    "predicted_content_top_logprobs": [
-      [
-        "is",
-        -0.1
-      ]
-    ]
+    "target_content_prob": 0.1,
+    "predicted_content_top_probs": {
+      "is": 0.1
+    }
   },
   {
     "text_with_mask": "",
@@ -186,13 +159,10 @@
     "target_content": "Beijing",
     "document_id": "doc_1",
     "predicted_content": "Beijing",
-    "target_content_logprob": -0.1,
-    "predicted_content_top_logprobs": [
-      [
-        "Beijing",
-        -0.1
-      ]
-    ]
+    "target_content_prob": 0.1,
+    "predicted_content_top_probs": {
+      "Beijing": 0.1
+    }
   },
   {
     "text_with_mask": "",

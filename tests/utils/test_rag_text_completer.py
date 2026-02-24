@@ -26,8 +26,8 @@ class MockRAGTextCompleter(BaseRAGTextCompleter):
         # Dummy logic for testing.
         return {
             "predicted_content": target_content,
-            "target_content_logprob": -0.1,
-            "predicted_content_top_logprobs": [[target_content, -0.1]],
+            "target_content_prob": 0.1,
+            "predicted_content_top_probs": {target_content: 0.1},
         }
 
 

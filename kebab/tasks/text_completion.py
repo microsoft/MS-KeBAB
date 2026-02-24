@@ -164,7 +164,7 @@ class TextCompletionTaskBase(Task):
                         "Number of base predictions is less than the number of queries being evaluated."
                     ) from e
                 t = self.scorer.calculate_t(
-                    predicted_content_top_logprobs=prediction["predicted_content_top_logprobs"],
+                    predicted_content_top_probs=prediction["predicted_content_top_probs"],
                     target_content=query["target_content"],
                 )
                 query["to_eval"] = t < 0  # Evaluate only when the threshold is less than 0.
@@ -214,16 +214,14 @@ class TextCompletionTaskBase(Task):
             path: The file path where the prediction items should be written.
             items: An iterable of dictionaries, where if verbose is False, each dictionary must
             contain:
-                - "predicted_content": The predicted content.
-                - "target_content_logprob": The log probability of the target content.
-                - "predicted_content_top_logprobs": The top log probabilities for the predicted content.
+                - "predicted_content_top_probs": The top probabilities for the predicted content.
             verbose: Defaults to False, writes one JSONL line per item with only the required
             fields, which is the format expected by `evaluate`; if True, writes all items as a JSON
             array with all fields.
             strict: Only applies when `verbose` is False. Defaults to True, raises an error when
             required fields are missing; if False, skips items with missing required fields.
         """
-        required_fields = ("predicted_content", "target_content_logprob", "predicted_content_top_logprobs")
+        required_fields = ["predicted_content_top_probs"]
 
         if verbose:
             output_items = list(items)
@@ -318,7 +316,7 @@ class TextCompletionTaskBase(Task):
             if query["text_with_mask"] != "" and query["to_eval"]:
                 prediction = next(predicted_vals_iter)
                 score = FairKeywordScorer.calculate_score(
-                    predicted_content_top_logprobs=prediction["predicted_content_top_logprobs"],
+                    predicted_content_top_probs=prediction["predicted_content_top_probs"],
                     target_content=query["target_content"],
                     t=query["t"],
                 )

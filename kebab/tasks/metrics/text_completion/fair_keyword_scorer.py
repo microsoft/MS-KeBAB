@@ -2,10 +2,8 @@
 # Licensed under the MIT license.
 
 from pathlib import Path
-from typing import cast
 
 import numpy as np
-from scipy.special import logsumexp
 
 
 class FairKeywordScorer:
@@ -19,18 +17,18 @@ class FairKeywordScorer:
 
     def calculate_t(
         self,
-        predicted_content_top_logprobs: list[list[str | float]],
+        predicted_content_top_probs: dict[str, float],
         target_content: str,
     ) -> float:
         """
         Calculate threshold t for a word based on the base predicted content distribution.
 
         Args:
-            predicted_content_top_logprobs: The top log probabilities for the predicted content.
+            predicted_content_top_probs: The top probabilities for the predicted content.
             target_content: The groundtruth content.
         """
         return FairKeywordScorer.__calculate_t(
-            predicted_content_top_logprobs=predicted_content_top_logprobs,
+            predicted_content_top_probs=predicted_content_top_probs,
             target_content=target_content,
             a=self.a,
             b=self.b,
@@ -38,7 +36,7 @@ class FairKeywordScorer:
 
     @staticmethod
     def calculate_score(
-        predicted_content_top_logprobs: list[list[str | float]],
+        predicted_content_top_probs: dict[str, float],
         target_content: str,
         t: float,
     ) -> float:
@@ -46,19 +44,19 @@ class FairKeywordScorer:
         Calculate the score for a prediction based on the truncated predicted content distribution.
 
         Args:
-            predicted_content_top_logprobs: The top log probabilities for the predicted content.
+            predicted_content_top_probs: The top probabilities for the predicted content.
             target_content: The groundtruth content.
             t: The threshold for evaluation.
         """
-        predicted_content_top_logprobs.sort(key=lambda x: x[1], reverse=True)
+        top_probs = list(predicted_content_top_probs.items())
+        top_probs.sort(key=lambda x: x[1], reverse=True)
 
         # Calculate cumulative probabilities and find largest n such that:
         # log(p_n/c_n) - c_{n-1}/p_n * log(1 + p_n/c_{n-1}) - t > 0
         k = 0
         cumulative_probs = []
 
-        for i, (_, logprob) in enumerate(predicted_content_top_logprobs):
-            prob = np.exp(logprob)
+        for i, (_, prob) in enumerate(top_probs):
             if i == 0:
                 cumulative_probs.append(prob)
                 c_prev = 0
@@ -85,40 +83,39 @@ class FairKeywordScorer:
 
         # Truncate and normalize: (p_1/c_k, ..., p_k/c_k)
         c_k = cumulative_probs[k - 1]
-        truncated_top_logprobs = []
+        truncated_top_probs = {}
         for i in range(k):
-            token, logprob = predicted_content_top_logprobs[i]
-            normalized_prob = np.exp(logprob) / c_k
-            normalized_logprob = np.log(normalized_prob)
-            truncated_top_logprobs.append((token, normalized_logprob))
+            token, prob = top_probs[i]
+            normalized_prob = prob / c_k
+            truncated_top_probs[token] = normalized_prob
 
         # Calculate score using the truncated distribution.
-        truncated_target_content_logprob = FairKeywordScorer.get_target_content_logprob_from_top_logprobs(
-            predicted_content_top_logprobs=truncated_top_logprobs,
+        truncated_target_content_prob = FairKeywordScorer.get_target_content_prob_from_top_probs(
+            predicted_content_top_probs=truncated_top_probs,
             target_content=target_content,
         )
-        score = max(0, truncated_target_content_logprob - t)
+        score = max(0, np.log(truncated_target_content_prob) - t) if truncated_target_content_prob > 0 else 0
 
         return score
 
     @staticmethod
-    def get_target_content_logprob_from_top_logprobs(
-        predicted_content_top_logprobs: list[list[str | float]],
+    def get_target_content_prob_from_top_probs(
+        predicted_content_top_probs: dict[str, float],
         target_content: str,
         allow_target_content_as_prefix: bool = False,
     ) -> float:
-        """Get the log probability of the target content from the top log probabilities."""
-        target_content_logprob = float("-inf")
+        """Get the probability of the target content from the top probabilities."""
+        target_content_prob = 0
         target_content_lower = target_content.strip().lower()
         # When the target content contains multiple tokens, LLM can return the target content
         # through multiple tokenization paths. For example, LLM can return "Beijing" as two tokens
         # ["Be", "ijing"] or just a single token ["Beijing"]; `self.tokenizer.encode` only returns
-        # the former. We will approximately calculate the combined log prob by summing the
-        # probabilities of all prefixes of the target content in `top_tokens`.
+        # the former. We will approximately calculate the combined prob by summing the probabilities
+        # of all prefixes of the target content in `top_tokens`.
         # TODO (allenwang-ms): account for all possible tokenization paths; calculate the accurate
-        # log prob of a sequence of tokens by multiple forward passes.
-        prefix_logprobs = []
-        for token, logprob in predicted_content_top_logprobs:
+        # prob of a sequence of tokens by multiple forward passes.
+        prefix_probs = []
+        for token, prob in predicted_content_top_probs.items():
             token_lower = str(token).strip().lower()
             if (
                 # Check if the predicted token matches the target content or a prefix of it.
@@ -126,36 +123,34 @@ class FairKeywordScorer:
                 # When `allow_target_content_as_prefix` is True, also allow the target content to be a prefix of the predicted token.
                 or (allow_target_content_as_prefix and token_lower.startswith(target_content_lower))
             ) and token_lower:  # Ensure non-empty token.
-                prefix_logprobs.append(float(logprob))
-        if prefix_logprobs:
-            # Convert to numpy array for logsumexp operations.
-            prefix_array = np.array(prefix_logprobs, dtype=float)
-            target_content_logprob = cast(float, logsumexp(prefix_array))
+                prefix_probs.append(prob)
+        if prefix_probs:
+            target_content_prob = sum(prefix_probs)
 
-        return target_content_logprob
+        return target_content_prob
 
     @staticmethod
-    def __calculate_t(
-        predicted_content_top_logprobs: list[list[str | float]], target_content: str, a: float, b: float
-    ) -> float:
+    def __calculate_t(predicted_content_top_probs: dict[str, float], target_content: str, a: float, b: float) -> float:
         """
         Calculate threshold ensuring baseline has zero score.
         t = min(0, max(a, base_logprob + b, c))
         where c is calculated from the position of target content in the distribution.
         """
-        base_logprob = FairKeywordScorer.get_target_content_logprob_from_top_logprobs(
-            predicted_content_top_logprobs, target_content
-        )
+        with np.errstate(divide="ignore"):
+            base_logprob = np.log(
+                FairKeywordScorer.get_target_content_prob_from_top_probs(predicted_content_top_probs, target_content)
+            )
 
         # Get the target content and distribution.
         target_content = target_content.strip().lower()
 
         # Sort by logprob descending.
-        predicted_content_top_logprobs.sort(key=lambda x: x[1], reverse=True)
+        top_probs = list(predicted_content_top_probs.items())
+        top_probs.sort(key=lambda x: x[1], reverse=True)
 
         # Find position of target content (match first token that equals or is prefix).
         target_position = -1
-        for i, (token, _) in enumerate(predicted_content_top_logprobs):
+        for i, (token, _) in enumerate(top_probs):
             token_lower = str(token).strip().lower()
             # Check if token is a prefix of target content.
             if target_content.startswith(token_lower):
@@ -164,8 +159,7 @@ class FairKeywordScorer:
 
         # Calculate cumulative probabilities.
         cumulative_probs = []
-        for i, (_, logprob) in enumerate(predicted_content_top_logprobs):
-            prob = np.exp(logprob)
+        for i, (_, prob) in enumerate(top_probs):
             if i == 0:
                 cumulative_probs.append(prob)
             else:
@@ -175,7 +169,7 @@ class FairKeywordScorer:
         if target_position != -1:
             # Target found at position n.
             n = target_position
-            p_n = np.exp(predicted_content_top_logprobs[n][1])
+            p_n = top_probs[n][1]
             c_n = cumulative_probs[n]
             c_prev = cumulative_probs[n - 1] if n > 0 else 0
 
@@ -186,8 +180,8 @@ class FairKeywordScorer:
             c = term1 - term2
         else:
             # Target not found, use k = length of distribution.
-            k = len(predicted_content_top_logprobs) - 1  # Last position (0-indexed)
-            p_k = np.exp(predicted_content_top_logprobs[k][1])
+            k = len(top_probs) - 1  # Last position (0-indexed)
+            p_k = top_probs[k][1]
             c_k = cumulative_probs[k]
 
             # c = log(p_k/(c_k+p_k)) - c_k/p_k * log(1 + p_k/c_k)
