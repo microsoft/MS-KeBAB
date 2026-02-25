@@ -378,9 +378,9 @@ Below is the optional context retrieved to help you make a better prediction. It
 {augmented_context}
 <End Context>
 
-Now, complete the following text by predicting the missing word, represented by "{TextCompletionTaskBase.MASK}". The text is marked between <Begin Text> and <End Text>:
+Now, complete the following text by predicting the missing alphanumeric word, represented by "{TextCompletionTaskBase.MASK}". The "{TextCompletionTaskBase.MASK}" is immediately followed by a non-alphanumeric character (e.g., space, -, ., ,, etc.) or the end of the text. Therefore, predicting a partial word that ends right before that delimiter is valid (e.g., "United" for "United Kingdom" or "Anglo" for "Anglo-Saxon"). The text is marked between <Begin Text> and <End Text>:
 <Begin Text>
-{text_with_mask} <the rest of the text is not visible to you>
+{text_with_mask}...<the rest of the text is not visible to you>
 <End Text>
 """
         return base_text_completion_prompt
