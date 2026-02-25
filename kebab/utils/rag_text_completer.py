@@ -8,8 +8,11 @@ import json
 import math
 import os
 import re
+import threading
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum
 from typing import Any, ClassVar, cast, override
 
@@ -20,6 +23,64 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from transformers.generation.utils import GenerateOutput
 
 from kebab.tasks.text_completion import TextCompletionTaskBase
+
+
+class RateLimiter:
+    """
+    A token bucket rate limiter for controlling API request rates.
+
+    Uses a ``threading.Condition`` so waiting threads sleep until a token is
+    expected to be available, eliminating spinlock CPU overhead and lock
+    contention.
+
+    The burst capacity is capped at 1 second's worth of tokens so the limiter
+    enforces a smooth rate from the very first request rather than allowing a
+    large initial burst that exhausts the minute's allowance instantly.
+
+    Attributes:
+        rate: Maximum number of requests allowed per minute.
+        tokens: Current number of available tokens.
+        max_tokens: Maximum burst capacity (1 second's worth of tokens, minimum 1).
+        last_update: Monotonic timestamp of the last token refill.
+    """
+
+    def __init__(self, requests_per_minute: int):
+        """
+        Initialize the rate limiter.
+
+        Args:
+            requests_per_minute: Maximum number of requests allowed per minute.
+        """
+        self._rate_per_sec: float = requests_per_minute / 60.0
+        # Burst cap: at most 1 second's worth of tokens (minimum 1).
+        self._max_tokens: float = max(1.0, self._rate_per_sec)
+        self._tokens: float = self._max_tokens
+        self._last_update: float = time.monotonic()
+        self._condition = threading.Condition(threading.Lock())
+
+    def _refill(self) -> None:
+        """Refill tokens proportional to elapsed time. Must be called under the lock."""
+        now = time.monotonic()
+        elapsed = now - self._last_update
+        self._tokens = min(self._max_tokens, self._tokens + elapsed * self._rate_per_sec)
+        self._last_update = now
+
+    def acquire(self) -> None:
+        """
+        Block until a token is available, then consume it.
+
+        Uses ``Condition.wait(timeout=...)`` so the calling thread sleeps
+        efficiently rather than spinning.
+        """
+        with self._condition:
+            while True:
+                self._refill()
+                if self._tokens >= 1.0:
+                    self._tokens -= 1.0
+                    return
+                # Sleep exactly as long as it takes for one token to appear.
+                wait_secs = (1.0 - self._tokens) / self._rate_per_sec
+                self._condition.wait(timeout=wait_secs)
 
 
 class BaseRAGTextCompleter(ABC):
@@ -74,10 +135,22 @@ class BaseRAGTextCompleter(ABC):
         partial_queries: Iterable[dict[str, Any]],
         seed: int = 42,
         verbose: bool = False,
+        max_workers: int | None = None,
+        requests_per_minute: int = 750,
     ) -> Iterable[dict[str, Any]]:
         """
         Processes a collection of partial queries and completes them using the
-        `complete_single_partial_query` method.
+        ``complete_single_partial_query`` method in parallel.
+
+        The number of worker threads is the primary throughput lever. To fully
+        saturate ``requests_per_minute`` the pool must be large enough to keep
+        that many requests in-flight simultaneously:
+
+            min_workers = ceil(requests_per_minute / 60 * expected_latency_sec)
+
+        When ``max_workers`` is ``None`` (the default) the pool size is set to
+        ``requests_per_minute // 30``, which corresponds to workers sustaining
+        up to 2-second API latency at full rate—adjust if your latency differs.
 
         Args:
             partial_queries: An iterable of dictionaries, where each dictionary represents a partial
@@ -85,23 +158,49 @@ class BaseRAGTextCompleter(ABC):
             seed: seed for the random number generator.
             verbose: Defaults to False. If True, includes additional information such as the
             original partial query and augmented context in the results for debugging.
+            max_workers: Maximum number of parallel workers. Defaults to ``requests_per_minute // 30``
+            (sized for ~2 s API latency). Increase if calls are slower; decrease to reduce
+            concurrency.
+            requests_per_minute: Rate limit for API requests per minute. Default is 750.
 
         Returns:
             Iterable[dict[str, Any]]: An iterable of dictionaries, where each dictionary contains
             the results for each partial query, including log probabilities and predicted content.
+            Results are returned in the same order as the input queries.
         """
-        count = 0
-        for query in partial_queries:
+        # Convert to list to maintain order and get total count
+        queries_list = list(partial_queries)
+        total_queries = len(queries_list)
+
+        if total_queries == 0:
+            return []
+
+        # Default workers: enough to sustain ~5-second API latency at full RPM.
+        effective_workers = max_workers if max_workers is not None else max(1, requests_per_minute // 12)
+
+        # Initialize rate limiter
+        rate_limiter = RateLimiter(requests_per_minute)
+
+        # Store results with their original indices to maintain order
+        results_dict: dict[int, dict[str, Any]] = {}
+        results_lock = threading.Lock()
+
+        def process_single_query(index: int, query: dict[str, Any]) -> None:
+            """Process a single query with rate limiting."""
             result = {}
             if verbose:
                 result = copy.deepcopy(query)
 
             if query["text_with_mask"] == "":
-                # Skip processing if the text with mask is empty; yield the original query dict only
+                # Skip processing if the text with mask is empty; store the original query dict only
                 # if `verbose` is enabled.
                 if verbose:
-                    yield result
-                continue
+                    with results_lock:
+                        results_dict[index] = result
+                return
+
+            # Acquire rate limit token before making API call (blocks until a token is available).
+            rate_limiter.acquire()
 
             # Run RAG to augment a partial query with context.
             augmented_context = self.get_augmented_context(query)
@@ -120,10 +219,27 @@ class BaseRAGTextCompleter(ABC):
             if verbose:
                 result |= result_single_query
 
-            count += 1
-            print(f"Processed {count} partial queries.")
+            # Store result with its index
+            with results_lock:
+                results_dict[index] = result
+                processed = len(results_dict)
+                if processed % 10 == 0 or processed == total_queries:
+                    print(f"Processed {processed}/{total_queries} partial queries.")
 
-            yield result
+        # Process queries in parallel using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=effective_workers) as executor:
+            # Submit all tasks
+            futures = [executor.submit(process_single_query, i, query) for i, query in enumerate(queries_list)]
+
+            # Wait for all tasks to complete
+            for future in as_completed(futures):
+                # This will raise any exceptions that occurred during processing
+                future.result()
+
+        # Yield results in original order
+        for i in range(total_queries):
+            if i in results_dict:
+                yield results_dict[i]
 
     @staticmethod
     def prepare_results_from_top_logprobs(
@@ -372,16 +488,16 @@ class PredictionMethod(Enum):
             augmented_context: Additional context to help with the prediction.
         """
         base_text_completion_prompt = f"""
-You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context.
+You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context. You MUST always output a prediction. Never apologize, never refuse, never explain. Even if context is empty or insufficient, you MUST still output your best guess.
 
-Below is the context retrieved to help you make a better prediction. It is marked between <Begin Context> and <End Context>:
+Below is the optional context retrieved to help you make a better prediction. It may be empty - that is fine, still make your best prediction. It is marked between <Begin Context> and <End Context>:
 <Begin Context>
 {augmented_context}
 <End Context>
 
-Now, complete the following text by predicting the missing word, represented by "{TextCompletionTaskBase.MASK}". The text is marked between <Begin Text> and <End Text>:
+Now, complete the following text by predicting the missing alphanumeric word, represented by "{TextCompletionTaskBase.MASK}". The "{TextCompletionTaskBase.MASK}" is immediately followed by a non-alphanumeric character (e.g., space, -, ., ,, etc.) or the end of the text. Therefore, predicting a partial word that ends right before that delimiter is valid (e.g., "United" for "United Kingdom" or "Anglo" for "Anglo-Saxon"). The text is marked between <Begin Text> and <End Text>:
 <Begin Text>
-{text_with_mask} <the rest of the text is not visible to you>
+{text_with_mask}...<the rest of the text is not visible to you>
 <End Text>
 """
         return base_text_completion_prompt
@@ -402,7 +518,7 @@ Now, complete the following text by predicting the missing word, represented by 
         }
 What is the **single alphanumeric word** that best completes the masked position "{
             TextCompletionTaskBase.MASK
-        }"? Please respond strictly with **only** the word.
+        }"? Please respond strictly with **only** the word. No explanation, no apology, no punctuation - just the word.
 
 Answer: """
         return text_completion_prompt
