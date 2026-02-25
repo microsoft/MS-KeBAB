@@ -3,15 +3,22 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import copy
+import heapq
 import json
+import logging
 import math
 import os
+import queue
 import re
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, ClassVar, cast, override
+from threading import BoundedSemaphore, Condition, Event, Lock, Thread
+from typing import Any, ClassVar, cast, override, NamedTuple
 
 import numpy as np
 import torch
@@ -20,6 +27,54 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from transformers.generation.utils import GenerateOutput
 
 from kebab.tasks.text_completion import TextCompletionTaskBase
+
+
+class LeakyBucketRateLimiter:
+    """A leaky bucket rate limiter that allows for a certain number of requests per minute, with a burst capacity."""
+    _SECONDS_PER_MINUTE = 60
+
+    def __init__(self, max_requests_per_minute: int, time_to_stop: Event, logger: logging.Logger) -> None:
+        """Initializes the rate limiter."""
+        self.max_burst = max(1, math.floor(max_requests_per_minute / self._SECONDS_PER_MINUTE))
+        self.semaphore = BoundedSemaphore(value=self.max_burst)
+        self.time_to_stop = time_to_stop
+        self.logger = logger
+        self.max_requests_per_minute = max_requests_per_minute
+        self.rate_limiter_thread = Thread(target=self.__rate_limiter, daemon=True)
+
+    def __rate_limiter(self) -> None:
+        """The rate limiter thread that releases permits at a fixed rate until signaled to stop."""
+        time.sleep(5)
+        try:
+            while not self.time_to_stop.is_set():
+                time.sleep(self._SECONDS_PER_MINUTE / self.max_requests_per_minute)
+                if self._get_semaphore_value() < self.max_burst:
+                    self.semaphore.release()
+                    self.logger.debug(f"Released semaphore. {self._get_semaphore_value()} requests remaining.")
+                else:
+                    self.logger.debug(f"Semaphore is full. {self._get_semaphore_value()} requests remaining.")
+        except Exception as e:
+            # Must explicitly log the exception for it to appear in logs in Heron.
+            self.logger.exception(f"Rate limiter thread failed: {e}")  # noqa: TRY401
+
+    def _get_semaphore_value(self) -> int:
+        # There's no public API exposing the value.
+        return self.semaphore._value  # noqa: SLF001
+
+    def __enter__(self) -> LeakyBucketRateLimiter:
+        """Enters the context manager, starting the rate limiter thread."""
+        self.rate_limiter_thread.start()
+        return self
+
+    def acquire(self) -> None:
+        """Acquires a permit from the rate limiter, blocking if necessary until one is available."""
+        self.semaphore.acquire()
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exits the context manager, signaling the rate limiter thread to stop and waiting for it to finish."""
+        self.time_to_stop.set()
+        if self.rate_limiter_thread.is_alive():
+            self.rate_limiter_thread.join()
 
 
 class BaseRAGTextCompleter(ABC):
@@ -66,6 +121,10 @@ class BaseRAGTextCompleter(ABC):
             dict[str, Any]: A dictionary requiring the following:
                 - "predicted_content" (str): The predicted content for the masked position.
                 - "target_content_logprob" (float): The log probability of the target content.
+                If the implementation involves making a request to a model, it must also include the following fields to provide information about the response and any potential errors:
+                - "request_status_code" (int): The status code of the request made to the model, if applicable.
+                - "request_error_message" (str): The error message if the request to the model failed, if applicable.
+                - "response_headers": (dict) The response headers from the model, if applicable.
         """
         raise NotImplementedError
 
@@ -74,7 +133,11 @@ class BaseRAGTextCompleter(ABC):
         partial_queries: Iterable[dict[str, Any]],
         seed: int = 42,
         verbose: bool = False,
-    ) -> Iterable[dict[str, Any]]:
+        max_requests_per_minute: int | None = None,
+        num_workers: int = 1,
+        max_retries: int = 3,
+        logger: logging.Logger | None = None,
+    ) -> Iterable[tuple[int, dict[str, Any]]]:
         """
         Processes a collection of partial queries and completes them using the
         `complete_single_partial_query` method.
@@ -87,11 +150,11 @@ class BaseRAGTextCompleter(ABC):
             original partial query and augmented context in the results for debugging.
 
         Returns:
-            Iterable[dict[str, Any]]: An iterable of dictionaries, where each dictionary contains
+            Iterable[tuple[int, dict[str, Any]]]: An iterable of dictionaries, where each dictionary contains
             the results for each partial query, including log probabilities and predicted content.
         """
-        count = 0
-        for query in partial_queries:
+        logger = logger or logging.getLogger(__name__)
+        def process_query(query: dict[str, Any]) -> dict[str, Any]:
             result = {}
             if verbose:
                 result = copy.deepcopy(query)
@@ -100,8 +163,7 @@ class BaseRAGTextCompleter(ABC):
                 # Skip processing if the text with mask is empty; yield the original query dict only
                 # if `verbose` is enabled.
                 if verbose:
-                    yield result
-                continue
+                    return result
 
             # Run RAG to augment a partial query with context.
             augmented_context = self.get_augmented_context(query)
@@ -120,10 +182,116 @@ class BaseRAGTextCompleter(ABC):
             if verbose:
                 result |= result_single_query
 
-            count += 1
-            print(f"Processed {count} partial queries.")
+            return result
 
-            yield result
+
+
+        def populate_ready_requests(queries):
+            for idx, query in enumerate(queries):
+                if shutdown.is_set():
+                    break
+                ready_requests.put((idx, query, max_retries))  # (idx, query, retry_count)
+
+        def delayed_requests_handler():
+            while not shutdown.is_set():
+                with delayed_cv:
+                    while not delayed_requests and not shutdown.is_set():
+                        delayed_cv.wait(timeout=0.5)
+
+                    if shutdown.is_set():
+                        return
+
+                    now = time.monotonic()
+                    item = delayed_requests[0]
+                    if item.due > now:
+                        # sleep until due (or until a new earlier item arrives)
+                        delayed_cv.wait(timeout=item.due - now)
+                        continue
+
+                    item = heapq.heappop(delayed_requests)
+
+                # move due item to ready queue (may block if backpressure)
+                ready_requests.put(item.request)
+
+
+        def schedule_delayed_request(query: dict[str, Any], retry_count: int, retry_delay: float):
+            with delayed_cv:
+                heapq.heappush(delayed_requests, (time.monotonic() + retry_delay, (query, retry_count)))
+                delayed_cv.notify()
+
+        def consumer(ready_requests: queue.Queue, results: queue.Queue, limiter: LeakyBucketRateLimiter, shutdown: Event):
+            RATE_LIMIT_STATUS_CODE = 429
+            SUCCESS_STATUS_CODE = 200
+            DEFAULT_RETRY_DELAY = 10  # seconds
+            while True:
+                try:
+                    id, query, retry_count = ready_requests.get(timeout=0.5)
+                except queue.Empty:
+                    if shutdown.is_set():
+                        return
+                    continue
+                try:
+                    limiter.acquire()
+                    result = process_query(query)
+                    if "request_status_code" in result and result["request_status_code"] == RATE_LIMIT_STATUS_CODE and retry_count > 0:
+                        # If rate limited, schedule the request to be retried after a delay.
+                        # default retry delay is 10 seconds with exponential backoff, but if the model provides a "Retry-After" header, use that instead.
+                        retry_delay = 10 * (2 ** (max_retries - retry_count))
+                        if "Retry-After" in result.get("response_headers", {}):
+                            retry_delay = int(result["response_headers"]["Retry-After"])
+                        schedule_delayed_request(query, retry_count - 1, retry_delay)
+                        logger.warning(f"Rate limit hit. Scheduling retry {max_retries - retry_count + 1} for query: {query}")
+                        continue
+                    if "request_status_code" in result and result["request_status_code"] != SUCCESS_STATUS_CODE and retry_count > 0:
+                        # If there was a request error, schedule the request to be retried after a delay.
+                        retry_delay = DEFAULT_RETRY_DELAY * (2 ** (max_retries - retry_count))
+                        schedule_delayed_request(query, retry_count - 1, retry_delay)
+                        logger.warning(f"Request error: {result.get('request_error_message')}. Scheduling retry {max_retries - retry_count + 1} for query: {query}")
+                        continue
+                    results.put((id, result))
+                except Exception as e:
+                    if retry_count > 0:
+                        retry_delay = DEFAULT_RETRY_DELAY * (2 ** (max_retries - retry_count))
+                        schedule_delayed_request(query, retry_count - 1, retry_delay)
+                        logger.info(f"Error processing query: {e}. Scheduling retry {max_retries - retry_count + 1} for query: {query}")
+                    else:
+                        logger.warning(f"Query failed after {max_retries} retries: {query}")
+                finally:
+                    ready_requests.task_done()
+
+        shutdown = Event()
+        ready_requests = queue.Queue(maxsize=num_workers * 2)  # Buffer for ready requests to be processed by workers.
+        delayed_requests = [] # List to hold requests that are waiting to be retried after hitting rate limits.
+        delayed_cv = Condition() # Condition variable to signal the arrival of new delayed requests.
+        results = queue.Queue() # Queue to hold results from worker threads.
+
+
+        with LeakyBucketRateLimiter(max_requests_per_minute=max_requests_per_minute, time_to_stop=shutdown, logger=logger) as limiter:
+
+            # start threads
+            producer_thread = Thread(target=populate_ready_requests, args=(partial_queries, shutdown), daemon=True)
+            delayed_handler_thread = Thread(target=delayed_requests_handler, daemon=True)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as ex:  # high-level thread pool [4](https://docs.python.org/3/library/concurrent.futures.html)
+                # start N long-lived consumer loops
+                futures = [ex.submit(consumer, ready_requests, results, limiter, shutdown) for _ in range(num_workers)]
+                try:
+                    producer_thread.start()
+                    delayed_handler_thread.start()
+                    ready_requests.join()  # wait for producer to enqueue all requests and for workers to process them all
+                    shutdown.set()  # signal consumers to stop after all requests have been processed
+                    while True:
+                        try:
+                            yield results.get(timeout=0.5)  # yield results as they come in
+                            results.task_done()
+                        except queue.Empty:
+                            if shutdown.is_set() and results.empty():
+                                break  # exit loop when all results have been yielded after shutdown
+                finally:
+                    producer_thread.join()
+                    shutdown.set()  # signal consumers to stop after all queries have been produced
+                    for f in futures:
+                        f.result()
+                    delayed_handler_thread.join()
 
     @staticmethod
     def prepare_results_from_top_logprobs(
