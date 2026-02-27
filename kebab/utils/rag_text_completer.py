@@ -186,7 +186,7 @@ class BaseRAGTextCompleter(ABC):
 
 
 
-        def populate_ready_requests(queries):
+        def populate_ready_requests(queries: Iterable[dict[str, Any]], shutdown: Event):
             for idx, query in enumerate(queries):
                 if shutdown.is_set():
                     break

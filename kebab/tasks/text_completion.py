@@ -129,15 +129,19 @@ class TextCompletionTaskBase(Task):
                 - target_content_logprob: The log probability of the target content.
         """
         with open(path, "w", encoding="utf-8", newline="\n") as file:
-            for predicted_content, target_content_logprob in items:
-                json_line = json.dumps(
-                    {
-                        "predicted_content": predicted_content,
-                        "target_content_logprob": target_content_logprob,
-                    },
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                )
+            for item in items:
+                if item is None:
+                    json_line = json.dumps(None)
+                else:
+                    predicted_content, target_content_logprob = item
+                    json_line = json.dumps(
+                        {
+                            "predicted_content": predicted_content,
+                            "target_content_logprob": target_content_logprob,
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
                 file.write(json_line + "\n")
 
     def evaluate(
@@ -150,14 +154,15 @@ class TextCompletionTaskBase(Task):
         if logger:
             logger.info("Starting evaluation for the text completion task.")
 
-        predicted_vals = ItemJsonlReader[dict[str, str | float]](predictions).read_items()
-        queries = self.generate_partial_queries()
+        predicted_vals = list(ItemJsonlReader[dict[str, str | float]](predictions).read_items())
+        queries = list(self.generate_partial_queries())
+        print(len(predicted_vals), len(queries))
         predictions_and_queries = zip(predicted_vals, queries, strict=True)
 
         log_probs = []
         log_probs_by_doc = defaultdict(list)
         for prediction, query in predictions_and_queries:
-            log_prob = float(prediction["target_content_logprob"])
+            log_prob = None if prediction is None else float(prediction["target_content_logprob"])
             log_probs.append(log_prob)
             log_probs_by_doc[query["document_id"]].append(log_prob)
 
