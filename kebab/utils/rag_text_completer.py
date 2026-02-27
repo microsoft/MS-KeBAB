@@ -137,109 +137,160 @@ class BaseRAGTextCompleter(ABC):
         verbose: bool = False,
         max_workers: int | None = None,
         requests_per_minute: int = 750,
+        batch_size: int = 1000,
+        query_timeout_secs: float = 600.0,
+        max_retries: int = 3,
     ) -> Iterable[dict[str, Any]]:
         """
-        Processes a collection of partial queries and completes them using the
-        ``complete_single_partial_query`` method in parallel.
+        Processes a collection of partial queries in sequential batches, with
+        per-query timeouts and automatic retries for stuck requests.
 
-        The number of worker threads is the primary throughput lever. To fully
-        saturate ``requests_per_minute`` the pool must be large enough to keep
-        that many requests in-flight simultaneously:
-
-            min_workers = ceil(requests_per_minute / 60 * expected_latency_sec)
-
-        When ``max_workers`` is ``None`` (the default) the pool size is set to
-        ``requests_per_minute // 30``, which corresponds to workers sustaining
-        up to 2-second API latency at full rate—adjust if your latency differs.
+        Each batch of ``batch_size`` queries is submitted to a thread pool.
+        If any query does not complete within ``query_timeout_secs``, it is
+        cancelled and retried in a subsequent pass (up to ``max_retries``
+        total attempts).  The next batch is not started until the current
+        batch is fully resolved, preventing thousands of in-flight requests
+        from piling up.
 
         Args:
             partial_queries: An iterable of dictionaries, where each dictionary represents a partial
-            query to complete.
+                query to complete.
             seed: seed for the random number generator.
             verbose: Defaults to False. If True, includes additional information such as the
-            original partial query and augmented context in the results for debugging.
-            max_workers: Maximum number of parallel workers. Defaults to ``requests_per_minute // 30``
-            (sized for ~2 s API latency). Increase if calls are slower; decrease to reduce
-            concurrency.
+                original partial query and augmented context in the results for debugging.
+            max_workers: Maximum number of parallel workers. Defaults to
+                ``requests_per_minute // 12``.
             requests_per_minute: Rate limit for API requests per minute. Default is 750.
+            batch_size: Number of queries to process per batch before moving on. Default is 1000.
+            query_timeout_secs: Maximum seconds to wait for a single query before considering it
+                stuck and retrying. Default is 120.
+            max_retries: Maximum number of attempts per query (including the first). Default is 3.
 
         Returns:
-            Iterable[dict[str, Any]]: An iterable of dictionaries, where each dictionary contains
-            the results for each partial query, including log probabilities and predicted content.
-            Results are returned in the same order as the input queries.
+            Iterable[dict[str, Any]]: An iterable of dictionaries in the same order as the input.
         """
-        # Convert to list to maintain order and get total count
+        from concurrent.futures import Future
+
         queries_list = list(partial_queries)
         total_queries = len(queries_list)
 
         if total_queries == 0:
             return []
 
-        # Default workers: enough to sustain ~5-second API latency at full RPM.
         effective_workers = max_workers if max_workers is not None else max(1, requests_per_minute // 12)
-
-        # Initialize rate limiter
         rate_limiter = RateLimiter(requests_per_minute)
 
-        # Store results with their original indices to maintain order
-        results_dict: dict[int, dict[str, Any]] = {}
-        results_lock = threading.Lock()
+        # Pre-allocate results; None means "not yet completed".
+        all_results: list[dict[str, Any] | None] = [None] * total_queries
 
-        def process_single_query(index: int, query: dict[str, Any]) -> None:
-            """Process a single query with rate limiting."""
-            result = {}
+        def run_single_query(index: int, query: dict[str, Any]) -> tuple[int, dict[str, Any] | None]:
+            """Execute one query, returning (index, result) or (index, None) on skip."""
+            result: dict[str, Any] = {}
             if verbose:
                 result = copy.deepcopy(query)
 
             if query["text_with_mask"] == "":
-                # Skip processing if the text with mask is empty; store the original query dict only
-                # if `verbose` is enabled.
                 if verbose:
-                    with results_lock:
-                        results_dict[index] = result
-                return
+                    return (index, result)
+                return (index, None)
 
-            # Acquire rate limit token before making API call (blocks until a token is available).
             rate_limiter.acquire()
 
-            # Run RAG to augment a partial query with context.
             augmented_context = self.get_augmented_context(query)
             if verbose:
                 result["augmented_context"] = augmented_context
 
-            # Run `complete_single_partial_query` to complete the partial query.
             result_single_query = self.complete_single_partial_query(
                 text_with_mask=query["text_with_mask"],
                 target_content=query["target_content"],
                 augmented_context=augmented_context,
                 seed=seed,
             )
+
             result["predicted_content"] = result_single_query["predicted_content"]
             result["target_content_logprob"] = result_single_query["target_content_logprob"]
             if verbose:
                 result |= result_single_query
 
-            # Store result with its index
-            with results_lock:
-                results_dict[index] = result
-                processed = len(results_dict)
-                if processed % 10 == 0 or processed == total_queries:
-                    print(f"Processed {processed}/{total_queries} partial queries.")
+            return (index, result)
 
-        # Process queries in parallel using ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=effective_workers) as executor:
-            # Submit all tasks
-            futures = [executor.submit(process_single_query, i, query) for i, query in enumerate(queries_list)]
+        def process_batch(indices: list[int]) -> list[int]:
+            """
+            Submit queries for the given indices, wait with timeout, and return
+            the list of indices that did NOT complete in time.
+            """
+            pending_futures: dict[Future[tuple[int, dict[str, Any] | None]], int] = {}
+            timed_out_indices: list[int] = []
 
-            # Wait for all tasks to complete
-            for future in as_completed(futures):
-                # This will raise any exceptions that occurred during processing
-                future.result()
+            with ThreadPoolExecutor(max_workers=effective_workers) as executor:
+                for idx in indices:
+                    future = executor.submit(run_single_query, idx, queries_list[idx])
+                    pending_futures[future] = idx
+
+                completed_count = 0
+                for future in as_completed(pending_futures, timeout=query_timeout_secs):
+                    idx = pending_futures.pop(future)
+                    try:
+                        result_idx, result_data = future.result(timeout=0)
+                        if result_data is not None:
+                            all_results[result_idx] = result_data
+                        completed_count += 1
+                        if completed_count % 100 == 0 or completed_count == len(indices):
+                            print(f"  Batch progress: {completed_count}/{len(indices)} queries completed.")
+                    except Exception as e:  # noqa: BLE001 - intentionally catching all worker exceptions for retry
+                        print(f"  Query {idx} failed with error: {e}")
+                        timed_out_indices.append(idx)
+
+            # Any futures still in pending_futures after as_completed's timeout are stuck.
+            for future, idx in pending_futures.items():
+                future.cancel()
+                timed_out_indices.append(idx)
+                print(f"  Query {idx} timed out after {query_timeout_secs}s, will retry.")
+
+            return timed_out_indices
+
+        # --- Main loop: process in batches ---
+        global_completed = 0
+        for batch_start in range(0, total_queries, batch_size):
+            batch_end = min(batch_start + batch_size, total_queries)
+            batch_indices = list(range(batch_start, batch_end))
+            print(
+                f"\n=== Processing batch [{batch_start}\u2013{batch_end - 1}] "
+                f"({len(batch_indices)} queries, total {total_queries}) ==="
+            )
+
+            pending = batch_indices
+            for attempt in range(1, max_retries + 1):
+                if not pending:
+                    break
+                if attempt > 1:
+                    print(
+                        f"  Retry attempt {attempt}/{max_retries} for {len(pending)} stuck queries "
+                        f"in batch [{batch_start}\u2013{batch_end - 1}]."
+                    )
+                failed = process_batch(pending)
+                pending = failed
+
+            batch_completed = sum(1 for i in batch_indices if all_results[i] is not None)
+            global_completed += batch_completed
+            print(
+                f"=== Batch [{batch_start}\u2013{batch_end - 1}] done: "
+                f"{batch_completed}/{len(batch_indices)} succeeded "
+                f"({global_completed}/{total_queries} overall) ==="
+            )
+
+            if pending:
+                max_display = 20
+                print(
+                    f"  WARNING: {len(pending)} queries failed after {max_retries} attempts: "
+                    f"{pending[:max_display]}{'...' if len(pending) > max_display else ''}"
+                )
 
         # Yield results in original order
         for i in range(total_queries):
-            if i in results_dict:
-                yield results_dict[i]
+            result = all_results[i]
+            if result is not None:
+                yield result
 
     @staticmethod
     def prepare_results_from_top_logprobs(
@@ -276,6 +327,32 @@ class BaseRAGTextCompleter(ABC):
                 results |= additional_info
             return results
 
+        # Combine probabilities for duplicate tokens and sort by probability descending.
+        for position_logprobs in top_logprobs:
+            token_logprob_map: dict[str, float] = {}
+            for entry in position_logprobs:
+                token = entry["token"]
+                lp = entry["logprob"]
+                if token in token_logprob_map:
+                    # Sum probabilities in log-space: log(exp(a) + exp(b))
+                    token_logprob_map[token] = cast(float, logsumexp(np.array([token_logprob_map[token], lp])))
+                else:
+                    token_logprob_map[token] = lp
+            # Normalize if the sum of probabilities exceeds 1.
+            total_logprob = cast(float, logsumexp(np.array(list(token_logprob_map.values()))))
+            if total_logprob > 0.0:  # sum of probs > 1
+                for token in token_logprob_map:
+                    token_logprob_map[token] -= total_logprob
+            # Rebuild the list sorted by logprob descending.
+            position_logprobs.clear()
+            position_logprobs.extend(
+                sorted(
+                    [{"token": t, "logprob": lp} for t, lp in token_logprob_map.items()],
+                    key=lambda x: x["logprob"],
+                    reverse=True,
+                )
+            )
+
         target_content_logprob = float("-inf")
         target_content_lower = target_content.strip().lower()
         # When the target content contains multiple tokens, LLM can return the target content
@@ -288,14 +365,13 @@ class BaseRAGTextCompleter(ABC):
         prefix_logprobs = []
         for logprob in top_logprobs[0]:
             token = logprob["token"].strip().lower()
-            if token == target_content_lower:
-                prefix_logprobs.append(logprob["logprob"])
-            elif (
+            if token == target_content_lower or ((
                 # Check if the predicted token matches the target content or a prefix of it.
-                allow_be_prefix_of_target_content and target_content_lower.startswith(token)
+                (allow_be_prefix_of_target_content
+                and target_content_lower.startswith(token))
                 # When `allow_target_content_as_prefix` is True, also allow the target content to be a prefix of the predicted token.
                 or (allow_target_content_as_prefix and token.startswith(target_content_lower))
-            ) and token:  # Ensure non-empty token.
+            ) and token):
                 prefix_logprobs.append(logprob["logprob"])
         if prefix_logprobs:
             # Convert to numpy array for logsumexp operations.
