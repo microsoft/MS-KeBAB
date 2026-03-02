@@ -65,6 +65,7 @@ def main() -> None:
         return {name for ent in make_list(e) for name in ent.properties["name"]}
 
     # Run the simple linker (link by name overlap) on the test data
+    # Note: the linker must not use any metadata, only properties.
     shared_names_count = [
         len(get_names(pair[0]).intersection(get_names(pair[1]))) for pair, label in task_instance.read_items()
     ]
