@@ -137,8 +137,8 @@ class BaseRAGTextCompleter(ABC):
         verbose: bool = False,
         max_workers: int | None = None,
         requests_per_minute: int = 750,
-        batch_size: int = 1000,
-        query_timeout_secs: float = 600.0,
+        batch_size: int = 1_000,
+        query_timeout_secs: float = 1_800.0,
         max_retries: int = 3,
     ) -> Iterable[dict[str, Any]]:
         """
