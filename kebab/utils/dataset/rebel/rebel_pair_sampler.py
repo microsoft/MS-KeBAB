@@ -75,7 +75,7 @@ class RebelPairSampler:
     LINKING_DATASET_FILENAME: str = "rebel_linking_dataset.jsonl"
     LINKING_GROUND_TRUTH_FILENAME: str = "rebel_linking_ground_truth.jsonl"
     CLUSTERING_DATASET_FILENAME: str = "rebel_clustering_dataset.jsonl"
-    CLUSTERING_GROUND_TRUTH_FILENAME: str = "rebel_clustering_ground_truth.jsonl"
+    CLUSTERING_GROUND_TRUTH_FILENAME: str = "rebel_clustering_ground_truth.txt"
     ENTITY_GENERATION_DATASET_FILENAME: str = "rebel_entity_generation_dataset.jsonl"
     FRAGMENT_GENERATION_DATASET_FILENAME: str = "rebel_fragment_generation_dataset.jsonl"
     CONFUSING_ENTITIES_MAP_FILENAME: str = "rebel_confusing_entities_map.jsonl"
@@ -498,7 +498,11 @@ class RebelPairSampler:
                 f_ds.write(fragment.with_sorted_properties().to_json(minimal_repr=True) + "\n")
 
                 label = fragment.entity_id
-                f_gt.write(json.dumps(label) + "\n")
+                if label.rstrip() != label:
+                    raise ValueError("Entity ID contains trailing whitespace")
+                if "\n" in label:
+                    raise ValueError("Entity ID contains newline character")
+                f_gt.write(label + "\n")
                 count += 1
 
         logging.info(

@@ -98,7 +98,7 @@ def test_task_interface(tmp_path: Path):
             ],
         },
         "Clustering-Heldout": {
-            "predictions": ["tests/data/clustering/predictions.jsonl"],
+            "predictions": ["tests/data/clustering/predictions.txt"],
             "metrics": [
                 {
                     "f1": 1.0,
