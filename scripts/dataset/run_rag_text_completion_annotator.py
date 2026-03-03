@@ -77,7 +77,7 @@ if __name__ == "__main__":
     )
 
     results_to_evaluate = []
-    for result in results:
+    for _, result in results:
         if result["text_with_mask"] != "":
             predicted_content = result["predicted_content"]
             target_content_logprob = BaseRAGTextCompleter.get_target_content_logprob_with_fallback(result)
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     # Annotate each document with log probabilities.
     results_grouped_by_doc = defaultdict(list)
-    for result in results:
+    for _, result in results:
         results_grouped_by_doc[result["document_id"]].append(result)
     for doc_id, results_per_doc in results_grouped_by_doc.items():
         BaseRAGTextCompleter.generate_annotated_doc_html(

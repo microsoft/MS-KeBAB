@@ -9,6 +9,7 @@ from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
 from kebab.utils.io_helpers import ItemJsonlReader
 from kebab.utils.rag_text_completer import BaseRAGTextCompleter
 
+
 class MockRAGTextCompleter(BaseRAGTextCompleter):
     @override
     def get_augmented_context(self, query: dict[str, Any]) -> str:
@@ -28,6 +29,7 @@ class MockRAGTextCompleter(BaseRAGTextCompleter):
             "target_content_logprob": -0.1,
         }
 
+
 @pytest.fixture
 def text_completion_task() -> TextCompletionUsingDocumentsTask:
     documents_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "documents.jsonl"
@@ -35,6 +37,7 @@ def text_completion_task() -> TextCompletionUsingDocumentsTask:
         "TextCompletion",
         documents_file_path,
     )
+
 
 def _extract_predictions(indexed_results: list[tuple[int, dict[str, Any]]]) -> list[dict[str, str | float]]:
     """Sort results by index, filter to attempted completions, and extract prediction fields."""
@@ -44,6 +47,7 @@ def _extract_predictions(indexed_results: list[tuple[int, dict[str, Any]]]) -> l
         for _, result in indexed_results
         if result.get("completion_attempted", False)
     ]
+
 
 def test_rag_text_completer(text_completion_task) -> None:
     # Arrange

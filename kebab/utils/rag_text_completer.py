@@ -13,11 +13,12 @@ import os
 import queue
 import re
 import time
+import types
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from enum import Enum
 from threading import BoundedSemaphore, Condition, Event, Lock, Thread
-from typing import Any, ClassVar, NamedTuple, cast, override
+from typing import Any, ClassVar, Self, cast, override
 
 import numpy as np
 import torch
@@ -30,6 +31,7 @@ from kebab.tasks.text_completion import TextCompletionTaskBase
 
 class LeakyBucketRateLimiter:
     """A leaky bucket rate limiter that allows for a certain number of requests per minute, with a burst capacity."""
+
     _SECONDS_PER_MINUTE = 60
 
     def __init__(self, max_requests_per_minute: int, time_to_stop: Event, logger: logging.Logger) -> None:
@@ -60,7 +62,7 @@ class LeakyBucketRateLimiter:
         # There's no public API exposing the value.
         return self.semaphore._value  # noqa: SLF001
 
-    def __enter__(self) -> LeakyBucketRateLimiter:
+    def __enter__(self) -> Self:
         """Enters the context manager, starting the rate limiter thread."""
         self.rate_limiter_thread.start()
         return self
@@ -81,7 +83,9 @@ class LeakyBucketRateLimiter:
             if self.semaphore.acquire(timeout=timeout):
                 return True
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
+    ) -> None:
         """Exits the context manager, signaling the rate limiter thread to stop and waiting for it to finish."""
         self.time_to_stop.set()
         if self.rate_limiter_thread.is_alive():
@@ -159,6 +163,10 @@ class BaseRAGTextCompleter(ABC):
             seed: seed for the random number generator.
             verbose: Defaults to False. If True, includes additional information such as the
             original partial query and augmented context in the results for debugging.
+            max_requests_per_minute: The maximum number of requests per minute for rate limiting.
+            num_workers: The number of worker threads to use for parallel processing.
+            max_retries: The maximum number of retries for failed requests.
+            logger: An optional logger instance for logging.
 
         Returns:
             Iterable[tuple[int, dict[str, Any]]]: An iterable of dictionaries, where each dictionary contains
@@ -211,8 +219,6 @@ class BaseRAGTextCompleter(ABC):
             )
 
             return result
-
-
 
         def populate_ready_requests(queries: Iterable[dict[str, Any]], shutdown: Event):
             nonlocal pending_count
@@ -298,10 +304,9 @@ class BaseRAGTextCompleter(ABC):
                         results.put((req_id, err_result))
                         resolve_request()
 
-
-        def schedule_delayed_request(id: int, query: dict[str, Any], retry_count: int, retry_delay: float):
+        def schedule_delayed_request(request_id: int, query: dict[str, Any], retry_count: int, retry_delay: float):
             with delayed_cv:
-                heapq.heappush(delayed_requests, (time.monotonic() + retry_delay, (id, query, retry_count)))
+                heapq.heappush(delayed_requests, (time.monotonic() + retry_delay, (request_id, query, retry_count)))
                 delayed_cv.notify()
 
         def resolve_request():
@@ -312,50 +317,66 @@ class BaseRAGTextCompleter(ABC):
                 if producer_done.is_set() and pending_count == 0:
                     all_done.set()
 
-        def consumer(ready_requests: queue.Queue, results: queue.Queue, limiter: LeakyBucketRateLimiter, shutdown: Event):
-            RATE_LIMIT_STATUS_CODE = 429
-            SUCCESS_STATUS_CODE = 200
-            DEFAULT_RETRY_DELAY = 10  # seconds
+        def consumer(
+            ready_requests: queue.Queue, results: queue.Queue, limiter: LeakyBucketRateLimiter, shutdown: Event
+        ):
+            rate_limit_status_code = 429
+            success_status_code = 200
+            default_retry_delay = 10  # seconds
             while True:
                 try:
-                    id, query, retry_count = ready_requests.get(timeout=0.5)
+                    request_id, query, retry_count = ready_requests.get(timeout=0.5)
                 except queue.Empty:
                     if shutdown.is_set():
                         return
                     continue
                 try:
-                    logger.debug(f"Consumer: processing query id={id}")
+                    logger.debug(f"Consumer: processing query request_id={request_id}")
                     if not limiter.acquire(shutdown=shutdown):
                         # Shutdown signaled while waiting for rate limiter — put item back and exit.
-                        ready_requests.put((id, query, retry_count))
+                        ready_requests.put((request_id, query, retry_count))
                         return
                     result = process_query(query)
-                    if "request_status_code" in result and result["request_status_code"] == RATE_LIMIT_STATUS_CODE and retry_count > 0:
+                    if (
+                        "request_status_code" in result
+                        and result["request_status_code"] == rate_limit_status_code
+                        and retry_count > 0
+                    ):
                         # If rate limited, schedule the request to be retried after a delay.
                         # default retry delay is 10 seconds with exponential backoff, but if the model provides a "Retry-After" header, use that instead.
                         retry_delay = 10 * (2 ** (max_retries - retry_count))
                         if "Retry-After" in result.get("response_headers", {}):
                             retry_delay = int(result["response_headers"]["Retry-After"])
-                        schedule_delayed_request(id, query, retry_count - 1, retry_delay)
-                        logger.warning(f"Rate limit hit. Scheduling retry {max_retries - retry_count + 1} for query: {query}")
+                        schedule_delayed_request(request_id, query, retry_count - 1, retry_delay)
+                        logger.warning(
+                            f"Rate limit hit. Scheduling retry {max_retries - retry_count + 1} for query: {query}"
+                        )
                         continue
-                    if "request_status_code" in result and result["request_status_code"] != SUCCESS_STATUS_CODE and retry_count > 0:
+                    if (
+                        "request_status_code" in result
+                        and result["request_status_code"] != success_status_code
+                        and retry_count > 0
+                    ):
                         # If there was a request error, schedule the request to be retried after a delay.
-                        retry_delay = DEFAULT_RETRY_DELAY * (2 ** (max_retries - retry_count))
-                        schedule_delayed_request(id, query, retry_count - 1, retry_delay)
-                        logger.warning(f"Request error: {result.get('request_error_message')}. Scheduling retry {max_retries - retry_count + 1} for query: {query}")
+                        retry_delay = default_retry_delay * (2 ** (max_retries - retry_count))
+                        schedule_delayed_request(request_id, query, retry_count - 1, retry_delay)
+                        logger.warning(
+                            f"Request error: {result.get('request_error_message')}. Scheduling retry {max_retries - retry_count + 1} for query: {query}"
+                        )
                         continue
-                    if "request_status_code" in result and result["request_status_code"] != SUCCESS_STATUS_CODE:
+                    if "request_status_code" in result and result["request_status_code"] != success_status_code:
                         # Retries exhausted with a non-success status code.
                         result["completion_failed"] = True
-                    results.put((id, result))
+                    results.put((request_id, result))
                     resolve_request()
-                    logger.debug(f"Consumer: result for query id={id} submitted")
-                except Exception as e:
+                    logger.debug(f"Consumer: result for query request_id={request_id} submitted")
+                except Exception as e:  # noqa: BLE001
                     if retry_count > 0:
-                        retry_delay = DEFAULT_RETRY_DELAY * (2 ** (max_retries - retry_count))
-                        schedule_delayed_request(id, query, retry_count - 1, retry_delay)
-                        logger.info(f"Error processing query: {e}. Scheduling retry {max_retries - retry_count + 1} for query: {query}")
+                        retry_delay = default_retry_delay * (2 ** (max_retries - retry_count))
+                        schedule_delayed_request(request_id, query, retry_count - 1, retry_delay)
+                        logger.info(
+                            f"Error processing query: {e}. Scheduling retry {max_retries - retry_count + 1} for query: {query}"
+                        )
                     else:
                         logger.warning(f"Query failed after {max_retries} retries: {query}")
                         error_result: dict[str, Any] = {
@@ -363,28 +384,30 @@ class BaseRAGTextCompleter(ABC):
                             "completion_failed": True,
                             "error": str(e),
                         }
-                        results.put((id, error_result))
+                        results.put((request_id, error_result))
                         resolve_request()
                 finally:
                     ready_requests.task_done()
 
         shutdown = Event()
         ready_requests = queue.Queue(maxsize=num_workers * 2)  # Buffer for ready requests to be processed by workers.
-        delayed_requests = [] # List to hold requests that are waiting to be retried after hitting rate limits.
-        delayed_cv = Condition() # Condition variable to signal the arrival of new delayed requests.
-        results = queue.Queue() # Queue to hold results from worker threads.
+        delayed_requests = []  # List to hold requests that are waiting to be retried after hitting rate limits.
+        delayed_cv = Condition()  # Condition variable to signal the arrival of new delayed requests.
+        results = queue.Queue()  # Queue to hold results from worker threads.
         pending_count = 0  # Number of requests that have not yet produced a final result.
         pending_lock = Lock()  # Lock to protect pending_count.
         all_done = Event()  # Signaled when producer is done and pending_count reaches 0.
         producer_done = Event()  # Signaled when the producer has finished enqueuing all queries.
 
-
-        with LeakyBucketRateLimiter(max_requests_per_minute=max_requests_per_minute, time_to_stop=shutdown, logger=logger) as limiter:
-
+        with LeakyBucketRateLimiter(
+            max_requests_per_minute=max_requests_per_minute, time_to_stop=shutdown, logger=logger
+        ) as limiter:
             # start threads
             producer_thread = Thread(target=populate_ready_requests, args=(partial_queries, shutdown), daemon=True)
             delayed_handler_thread = Thread(target=delayed_requests_handler, daemon=True)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as ex:  # high-level thread pool [4](https://docs.python.org/3/library/concurrent.futures.html)
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=num_workers
+            ) as ex:  # high-level thread pool [4](https://docs.python.org/3/library/concurrent.futures.html)
                 # start N long-lived consumer loops
                 futures = [ex.submit(consumer, ready_requests, results, limiter, shutdown) for _ in range(num_workers)]
                 try:
@@ -400,7 +423,9 @@ class BaseRAGTextCompleter(ABC):
                             yielded_count += 1
                             if yielded_count % 100 == 0:
                                 elapsed = time.monotonic() - start_time
-                                logger.info(f"Progress: {yielded_count} results yielded so far ({elapsed:.1f}s elapsed)")
+                                logger.info(
+                                    f"Progress: {yielded_count} results yielded so far ({elapsed:.1f}s elapsed)"
+                                )
                         except queue.Empty:
                             continue
                     shutdown.set()  # signal consumers and delayed handler to stop
