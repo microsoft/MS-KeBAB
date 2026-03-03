@@ -129,19 +129,15 @@ class TextCompletionTaskBase(Task):
                 - target_content_logprob: The log probability of the target content.
         """
         with open(path, "w", encoding="utf-8", newline="\n") as file:
-            for item in items:
-                if item is None:
-                    json_line = json.dumps(None)
-                else:
-                    predicted_content, target_content_logprob = item
-                    json_line = json.dumps(
-                        {
-                            "predicted_content": predicted_content,
-                            "target_content_logprob": target_content_logprob,
-                        },
-                        ensure_ascii=False,
-                        separators=(",", ":"),
-                    )
+            for predicted_content, target_content_logprob in items:
+                json_line = json.dumps(
+                    {
+                        "predicted_content": predicted_content,
+                        "target_content_logprob": target_content_logprob,
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
                 file.write(json_line + "\n")
 
     def evaluate(
