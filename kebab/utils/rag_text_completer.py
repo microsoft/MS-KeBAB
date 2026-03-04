@@ -365,13 +365,15 @@ class BaseRAGTextCompleter(ABC):
         prefix_logprobs = []
         for logprob in top_logprobs[0]:
             token = logprob["token"].strip().lower()
-            if token == target_content_lower or ((
-                # Check if the predicted token matches the target content or a prefix of it.
-                (allow_be_prefix_of_target_content
-                and target_content_lower.startswith(token))
-                # When `allow_target_content_as_prefix` is True, also allow the target content to be a prefix of the predicted token.
-                or (allow_target_content_as_prefix and token.startswith(target_content_lower))
-            ) and token):
+            if token == target_content_lower or (
+                (
+                    # Check if the predicted token matches the target content or a prefix of it.
+                    (allow_be_prefix_of_target_content and target_content_lower.startswith(token))
+                    # When `allow_target_content_as_prefix` is True, also allow the target content to be a prefix of the predicted token.
+                    or (allow_target_content_as_prefix and token.startswith(target_content_lower))
+                )
+                and token
+            ):
                 prefix_logprobs.append(logprob["logprob"])
         if prefix_logprobs:
             # Convert to numpy array for logsumexp operations.
