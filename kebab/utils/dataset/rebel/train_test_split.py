@@ -645,40 +645,108 @@ def approximate_minimum_node_cut(
 
     cut_size = {node: 1 + subtree_back_edge_count[node] for node in subtree_back_edge_count if node in instance_nodes}
     instance_node_count = sum(1 for node in graph if node in instance_nodes)
+    node_count_by_predicate = {
+        predicate: sum(1 for node in graph if node in predicate.true_nodes) for predicate in predicates
+    }
 
     min_group_size = sum(predicate.min_true_count + predicate.min_false_count for predicate in predicates)
 
-    def node_cost(node: str) -> int:
+    def safe_divide(numerator: int, denominator: int) -> float:
+        """Divide numerator by denominator, returning 0 if denominator is 0."""
+        if numerator == 0:
+            return 0.0
+        if denominator == 0:
+            return float("inf")
+        return numerator / denominator
+
+    # A valid node_cost function must have the property that if A is an ancestor of B in the DFS tree and
+    # node_cost(A) > node_cost(B), then cutting at B should not decrease node_cost(A).
+    # Also any cuts at nodes that are not ancestors or descendants of A should not decrease node_cost(A).
+    def node_cost(node: str, verbose: bool = False) -> float:
         """Compute the cost of cutting at this node."""
         subtree_cut_size = 1 + subtree_back_edge_from_instance_count[node]
         subtree_size_after_cut = subtree_size[node] - subtree_cut_size
         subtree_size_after_cut_by_predicate = {
             predicate: subtree_size_by_predicate[node][predicate]
             - subtree_back_edge_from_predicate_count[node][predicate]
+            - (1 if node in predicate.true_nodes else 0)
             for predicate in predicates
         }
         remaining_cut_size = subtree_back_edge_count[node] - subtree_back_edge_from_instance_count[node]
         remaining_size_after_cut = instance_node_count - subtree_size[node] - remaining_cut_size
         smaller_group_size = min(subtree_size_after_cut, remaining_size_after_cut)
-        if subtree_size_after_cut < remaining_size_after_cut and all(
-            subtree_size_after_cut_by_predicate[predicate] >= predicate.min_true_count for predicate in predicates
+        if subtree_size_after_cut < remaining_size_after_cut and any(
+            subtree_size_after_cut_by_predicate[predicate] > 0 and predicate.min_true_count > 0
+            for predicate in predicates
         ):
-            return cut_size[node] - 2 * instance_node_count  # prefer smaller cuts that satisfy all predicates
+            # An estimate of how many cuts we will need to compute, based on how many predicate nodes are added by this cut and how many predicate nodes we need.
+            future_cut_count = max(
+                safe_divide(
+                    predicate.min_true_count,
+                    min(predicate.min_true_count, subtree_size_after_cut_by_predicate[predicate]),
+                )
+                for predicate in predicates
+            )
+            # An estimate of the number of predicate nodes that will need to be cut to satisfy the predicate requirements, based on how many are in this cut and how many future cuts are required.
+            future_cut_by_predicate = {
+                predicate: safe_divide(
+                    predicate.min_true_count * subtree_back_edge_from_predicate_count[node][predicate],
+                    min(predicate.min_true_count, subtree_size_after_cut_by_predicate[predicate]),
+                )
+                for predicate in predicates
+            }
+            gain_by_predicate = {
+                predicate: min(subtree_size_after_cut_by_predicate[predicate], predicate.min_true_count)
+                for predicate in predicates
+            }
+            if any(
+                future_cut_by_predicate[predicate] > node_count_by_predicate[predicate] - predicate.min_true_count
+                for predicate in predicates
+            ):
+                return float(
+                    "inf"
+                )  # this cut would make it impossible to satisfy the predicate requirements in the future
+            total_future_cut = sum(future_cut_by_predicate.values())
+            total_gain = sum(gain_by_predicate.values())
+            if verbose:
+                print(
+                    f"Node {node}: subtree size after cut {subtree_size_after_cut}, by predicate {subtree_size_after_cut_by_predicate}, future cut by predicate {future_cut_by_predicate}, total future cut {total_future_cut}, future cut count {future_cut_count}, total gain {total_gain}"
+                )
+            # This is valid because if B has larger gain per cut than A, then cutting at B (so that B is no longer part of A) cannot increase A's gain per cut.
+            return -total_gain / cut_size[node]
+            # If we don't penalize by future_cut_count, we can get a very good solution but only after computing thousands of cuts.
+            return (
+                future_cut_count * cut_size[node] + total_future_cut
+            )  # prefer cuts that are likely to satisfy the predicate requirements with fewer future cuts and fewer nodes cut.
+        return float("inf")
         if smaller_group_size >= min_group_size:
             return cut_size[node] - instance_node_count  # prefer smaller cuts that satisfy min_group_size
         return -smaller_group_size  # maximize smaller group size if min_group_size not satisfied
 
-    best_node = min(cut_size, key=node_cost)
-    print(f"Chose cut at node {best_node} with cut size {cut_size[best_node]} and cost {node_cost(best_node)}")
-    # Collect subtree back edges for best node
-    best_subtree_back_edges = [
-        (node, child)
-        for node in discovered_nodes[discovery[best_node] + 1 : finish[best_node] - 1]
-        for child in graph[node]
-        if discovery[child] < discovery[best_node]
-    ]
-    cut = {source if source in instance_nodes else target for source, target in best_subtree_back_edges}
-    cut.add(best_node)
+    # best_node = min(cut_size, key=node_cost)
+    max_node_cost = -0.0001
+    cut = set()
+    # We use discovery_threshold to ensure that if we cut at a node, we won't consider cutting at any of its descendants.
+    discovery_threshold = 0
+    for best_node in discovered_nodes:
+        if discovery[best_node] < discovery_threshold:
+            continue
+        if best_node not in instance_nodes:
+            continue
+        if node_cost(best_node) > max_node_cost:
+            continue
+        # print(f"Chose cut at node {best_node} with cut size {node_cut_size} and cost {node_cost(best_node, verbose=True)}"
+        # Exclude descendants of best_node from consideration by updating discovery_threshold.
+        discovery_threshold = finish[best_node]
+        # Collect subtree back edges for best node
+        best_subtree_back_edges = [
+            (node, child)
+            for node in discovered_nodes[discovery[best_node] + 1 : finish[best_node] - 1]
+            for child in graph[node]
+            if discovery[child] < discovery[best_node]
+        ]
+        cut.update(source if source in instance_nodes else target for source, target in best_subtree_back_edges)
+        cut.add(best_node)
     return cut
 
 
