@@ -6,7 +6,6 @@ import time
 from threading import Event
 from typing import Any
 
-import pytest
 from kebab.utils.parallel_executor import LeakyBucketRateLimiter, parallel_execute
 
 
@@ -56,7 +55,7 @@ def _identity(payload: dict[str, Any]) -> dict[str, Any]:
     return {"value": payload["value"]}
 
 
-def _failing(payload: dict[str, Any]) -> dict[str, Any]:
+def _failing(_payload: dict[str, Any]) -> dict[str, Any]:
     """Always raises an exception."""
     raise RuntimeError("boom")
 
@@ -76,7 +75,7 @@ class TestParallelExecute:
         items = [(str(i), {"value": i}) for i in range(10)]
         results = list(parallel_execute(items=items, process_fn=_identity, num_workers=4))
         assert len(results) == 10
-        result_map = {rid: r for rid, r in results}
+        result_map = dict(results)
         for i in range(10):
             assert result_map[str(i)]["value"] == i
 
@@ -94,7 +93,7 @@ class TestParallelExecute:
     def test_retries_on_exception(self) -> None:
         call_count = 0
 
-        def _fail_then_succeed(payload: dict[str, Any]) -> dict[str, Any]:
+        def _fail_then_succeed(_payload: dict[str, Any]) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
@@ -110,7 +109,7 @@ class TestParallelExecute:
     def test_should_retry_callback(self) -> None:
         call_count = 0
 
-        def _retry_once(payload: dict[str, Any]) -> dict[str, Any]:
+        def _retry_once(_payload: dict[str, Any]) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -148,6 +147,6 @@ class TestParallelExecute:
             )
         )
         assert len(results) == 8
-        result_map = {rid: r for rid, r in results}
+        result_map = dict(results)
         for i in range(8):
             assert result_map[str(i)]["value"] == i

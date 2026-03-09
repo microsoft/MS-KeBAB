@@ -9,7 +9,6 @@ import logging
 import math
 import os
 import re
-import time
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from enum import Enum
@@ -23,6 +22,7 @@ from transformers.generation.utils import GenerateOutput
 
 from kebab.tasks.text_completion import TextCompletionTaskBase
 from kebab.utils.parallel_executor import parallel_execute
+
 
 class BaseRAGTextCompleter(ABC):
     """
@@ -108,7 +108,6 @@ class BaseRAGTextCompleter(ABC):
         """
         logger = logger or logging.getLogger(__name__)
 
-        start_time = time.monotonic()
         logger.info(
             f"Starting complete_partial_queries: num_workers={num_workers}, "
             f"max_requests_per_minute={max_requests_per_minute}, max_retries={max_retries}"
@@ -195,9 +194,10 @@ class BaseRAGTextCompleter(ABC):
                 result.pop("processing_attempted", None)
                 result.pop("processing_failed", None)
             # If retries were exhausted with a non-success status code, mark as failed.
+            _success_status_code = 200
             if (
                 "request_status_code" in result
-                and result["request_status_code"] != 200
+                and result["request_status_code"] != _success_status_code
                 and not result.get("completion_failed", False)
             ):
                 result["completion_failed"] = True

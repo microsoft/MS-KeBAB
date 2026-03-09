@@ -26,6 +26,7 @@ from collections.abc import Callable, Iterable
 from threading import BoundedSemaphore, Condition, Event, Lock, Thread
 from typing import Any, Self, TypeVar
 
+
 T = TypeVar("T")
 R = TypeVar("R")
 
@@ -152,7 +153,7 @@ def parallel_execute(
                 all_done.set()
 
     # -- Helper: schedule a delayed retry -------------------------------------
-    def schedule_delayed_request(request_id: str, payload: Any, retry_count: int, retry_delay: float) -> None:
+    def schedule_delayed_request(request_id: str, payload: dict[str, Any], retry_count: int, retry_delay: float) -> None:
         with delayed_cv:
             heapq.heappush(delayed_requests, (time.monotonic() + retry_delay, (request_id, payload, retry_count)))
             delayed_cv.notify()
