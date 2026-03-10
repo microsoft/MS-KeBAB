@@ -13,10 +13,13 @@ from kebab.utils.parallel_executor import LeakyBucketRateLimiter, parallel_execu
 # LeakyBucketRateLimiter tests
 # ---------------------------------------------------------------------------
 
+
 class TestLeakyBucketRateLimiter:
     def test_basic_acquire(self) -> None:
         stop = Event()
-        limiter = LeakyBucketRateLimiter(max_requests_per_minute=600, time_to_stop=stop, logger=logging.getLogger(__name__))
+        limiter = LeakyBucketRateLimiter(
+            max_requests_per_minute=600, time_to_stop=stop, logger=logging.getLogger(__name__)
+        )
         with limiter:
             # Should acquire immediately (bucket starts full).
             t0 = time.monotonic()
@@ -29,7 +32,9 @@ class TestLeakyBucketRateLimiter:
         # 60 RPM => 1 per second.  After exhausting the initial token the
         # second acquire must wait ~1 s.
         stop = Event()
-        limiter = LeakyBucketRateLimiter(max_requests_per_minute=60, time_to_stop=stop, logger=logging.getLogger(__name__))
+        limiter = LeakyBucketRateLimiter(
+            max_requests_per_minute=60, time_to_stop=stop, logger=logging.getLogger(__name__)
+        )
         with limiter:
             limiter.acquire()  # first token — immediate
             t0 = time.monotonic()
@@ -40,7 +45,9 @@ class TestLeakyBucketRateLimiter:
 
     def test_context_manager(self) -> None:
         stop = Event()
-        limiter = LeakyBucketRateLimiter(max_requests_per_minute=6000, time_to_stop=stop, logger=logging.getLogger(__name__))
+        limiter = LeakyBucketRateLimiter(
+            max_requests_per_minute=6000, time_to_stop=stop, logger=logging.getLogger(__name__)
+        )
         with limiter:
             limiter.acquire()
             stop.set()
@@ -49,6 +56,7 @@ class TestLeakyBucketRateLimiter:
 # ---------------------------------------------------------------------------
 # parallel_execute tests
 # ---------------------------------------------------------------------------
+
 
 def _identity(payload: dict[str, Any]) -> dict[str, Any]:
     """Trivial process function that echoes the payload."""

@@ -153,7 +153,9 @@ def parallel_execute(
                 all_done.set()
 
     # -- Helper: schedule a delayed retry -------------------------------------
-    def schedule_delayed_request(request_id: str, payload: dict[str, Any], retry_count: int, retry_delay: float) -> None:
+    def schedule_delayed_request(
+        request_id: str, payload: dict[str, Any], retry_count: int, retry_delay: float
+    ) -> None:
         with delayed_cv:
             heapq.heappush(delayed_requests, (time.monotonic() + retry_delay, (request_id, payload, retry_count)))
             delayed_cv.notify()
@@ -266,8 +268,7 @@ def parallel_execute(
                     if do_retry:
                         schedule_delayed_request(request_id, payload, retry_count - 1, retry_delay)
                         logger.warning(
-                            f"Retryable result. Scheduling retry {max_retries - retry_count + 1} "
-                            f"for item {request_id}"
+                            f"Retryable result. Scheduling retry {max_retries - retry_count + 1} for item {request_id}"
                         )
                         continue
 
@@ -279,8 +280,7 @@ def parallel_execute(
                     retry_delay = default_retry_delay * (2 ** (max_retries - retry_count))
                     schedule_delayed_request(request_id, payload, retry_count - 1, retry_delay)
                     logger.info(
-                        f"Error processing item {request_id}: {e}. "
-                        f"Scheduling retry {max_retries - retry_count + 1}"
+                        f"Error processing item {request_id}: {e}. Scheduling retry {max_retries - retry_count + 1}"
                     )
                 else:
                     logger.warning(f"Item {request_id} failed after {max_retries} retries with error: {e}")
@@ -313,9 +313,7 @@ def parallel_execute(
                         yielded_count += 1
                         if yielded_count % 100 == 0:
                             elapsed = time.monotonic() - start_time
-                            logger.info(
-                                f"Progress: {yielded_count} results yielded so far ({elapsed:.1f}s elapsed)"
-                            )
+                            logger.info(f"Progress: {yielded_count} results yielded so far ({elapsed:.1f}s elapsed)")
                     except queue.Empty:
                         continue
                 shutdown.set()

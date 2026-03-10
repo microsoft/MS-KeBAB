@@ -151,7 +151,6 @@ class BaseRAGTextCompleter(ABC):
 
             return result
 
-
         def should_retry_completion(result: dict[str, Any]) -> tuple[bool, float]:
             """Determine whether a completion result should be retried based on HTTP status codes."""
             rate_limit_status_code = 429
@@ -629,7 +628,9 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
     token_ids_to_exclude: list[Any]
     model: Any
 
-    def __init__(self, model_id: str = "microsoft/phi-4", gpu_id: int | None = None, logger: logging.Logger | None = None) -> None:
+    def __init__(
+        self, model_id: str = "microsoft/phi-4", gpu_id: int | None = None, logger: logging.Logger | None = None
+    ) -> None:
         """
         Initializes the text completer.
 

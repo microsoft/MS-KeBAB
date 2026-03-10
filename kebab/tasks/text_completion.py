@@ -202,7 +202,11 @@ class TextCompletionTaskBase(Task):
             log_probs: A list of log probability values.
         """
         metrics["mean_log_prob"] = statistics.mean(log_probs)
-        metrics["variance_log_prob"] = statistics.variance(log_probs, metrics["mean_log_prob"]) if len(log_probs) >= TextCompletionTaskBase._MIN_SAMPLES_FOR_VARIANCE else 0.0
+        metrics["variance_log_prob"] = (
+            statistics.variance(log_probs, metrics["mean_log_prob"])
+            if len(log_probs) >= TextCompletionTaskBase._MIN_SAMPLES_FOR_VARIANCE
+            else 0.0
+        )
         metrics["perplexity"] = math.exp(-metrics["mean_log_prob"])
         metrics["num_predictions"] = len(log_probs)
 
