@@ -189,6 +189,9 @@ class TextCompletionTaskBase(Task):
 
         return metrics
 
+    _MIN_SAMPLES_FOR_VARIANCE = 2
+    """Minimum number of samples required to compute variance."""
+
     @staticmethod
     def __calculate_metrics(metrics: dict[str, Any], log_probs: list[float]) -> None:
         """
@@ -199,7 +202,11 @@ class TextCompletionTaskBase(Task):
             log_probs: A list of log probability values.
         """
         metrics["mean_log_prob"] = statistics.mean(log_probs)
-        metrics["variance_log_prob"] = statistics.variance(log_probs, metrics["mean_log_prob"])
+        metrics["variance_log_prob"] = (
+            statistics.variance(log_probs, metrics["mean_log_prob"])
+            if len(log_probs) >= TextCompletionTaskBase._MIN_SAMPLES_FOR_VARIANCE
+            else 0.0
+        )
         metrics["perplexity"] = math.exp(-metrics["mean_log_prob"])
         metrics["num_predictions"] = len(log_probs)
 

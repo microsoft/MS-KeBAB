@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import math
 import os
 import re
@@ -20,6 +21,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from transformers.generation.utils import GenerateOutput
 
 from kebab.tasks.text_completion import TextCompletionTaskBase
+from kebab.utils.parallel_executor import parallel_execute
 
 
 class BaseRAGTextCompleter(ABC):
@@ -66,6 +68,10 @@ class BaseRAGTextCompleter(ABC):
             dict[str, Any]: A dictionary requiring the following:
                 - "predicted_content" (str): The predicted content for the masked position.
                 - "target_content_logprob" (float): The log probability of the target content.
+                If the implementation involves making a request to a model, it must also include the following fields to provide information about the response and any potential errors:
+                - "request_status_code" (int): The status code of the request made to the model, if applicable.
+                - "request_error_message" (str): The error message if the request to the model failed, if applicable.
+                - "response_headers": (dict) The response headers from the model, if applicable.
         """
         raise NotImplementedError
 
@@ -74,34 +80,50 @@ class BaseRAGTextCompleter(ABC):
         partial_queries: Iterable[dict[str, Any]],
         seed: int = 42,
         verbose: bool = False,
-    ) -> Iterable[dict[str, Any]]:
+        max_requests_per_minute: int = 60,
+        num_workers: int = 1,
+        max_retries: int = 3,
+        logger: logging.Logger | None = None,
+    ) -> Iterable[tuple[str, dict[str, Any]]]:
         """
         Processes a collection of partial queries and completes them using the
         `complete_single_partial_query` method.
 
         Args:
             partial_queries: An iterable of dictionaries, where each dictionary represents a partial
-            query to complete.
+            query to complete.  Each query may contain an ``"id"`` key (str) used as a stable
+            identifier for the result.  When ``"id"`` is absent the positional index is used.
             seed: seed for the random number generator.
             verbose: Defaults to False. If True, includes additional information such as the
             original partial query and augmented context in the results for debugging.
+            max_requests_per_minute: The maximum number of requests per minute for rate limiting.
+            num_workers: The number of worker threads to use for parallel processing.
+            max_retries: The maximum number of retries for failed requests.
+            logger: An optional logger instance for logging.
 
         Returns:
-            Iterable[dict[str, Any]]: An iterable of dictionaries, where each dictionary contains
-            the results for each partial query, including log probabilities and predicted content.
+            Iterable[tuple[str, dict[str, Any]]]: An iterable of tuples where the first element is
+            the query id (str) and the second is the result dictionary containing log probabilities
+            and predicted content.
         """
-        count = 0
-        for query in partial_queries:
+        logger = logger or logging.getLogger(__name__)
+
+        logger.info(
+            f"Starting complete_partial_queries: num_workers={num_workers}, "
+            f"max_requests_per_minute={max_requests_per_minute}, max_retries={max_retries}"
+        )
+
+        def process_query(query: dict[str, Any]) -> dict[str, Any]:
             result = {}
             if verbose:
                 result = copy.deepcopy(query)
 
             if query["text_with_mask"] == "":
-                # Skip processing if the text with mask is empty; yield the original query dict only
-                # if `verbose` is enabled.
-                if verbose:
-                    yield result
-                continue
+                # Skip processing if the text with mask is empty.
+                logger.debug("Skipping query with empty text_with_mask")
+                result["completion_attempted"] = False
+                result["completion_failed"] = False
+                return result
 
             # Run RAG to augment a partial query with context.
             augmented_context = self.get_augmented_context(query)
@@ -119,11 +141,66 @@ class BaseRAGTextCompleter(ABC):
             result["target_content_logprob"] = result_single_query["target_content_logprob"]
             if verbose:
                 result |= result_single_query
+            result["completion_attempted"] = True
+            result["completion_failed"] = False
 
-            count += 1
-            print(f"Processed {count} partial queries.")
+            logger.debug(
+                f"Query completed: predicted='{result['predicted_content']}', "
+                f"logprob={result['target_content_logprob']:.4f}"
+            )
 
-            yield result
+            return result
+
+        def should_retry_completion(result: dict[str, Any]) -> tuple[bool, float]:
+            """Determine whether a completion result should be retried based on HTTP status codes."""
+            rate_limit_status_code = 429
+            success_status_code = 200
+            default_retry_delay = 10  # seconds
+
+            if "request_status_code" not in result:
+                return (False, 0.0)
+
+            status_code = result["request_status_code"]
+            if status_code == success_status_code:
+                return (False, 0.0)
+
+            if status_code == rate_limit_status_code:
+                retry_delay = default_retry_delay
+                if "Retry-After" in result.get("response_headers", {}):
+                    retry_delay = int(result["response_headers"]["Retry-After"])
+                return (True, retry_delay)
+
+            # Any other non-success status code.
+            return (True, default_retry_delay)
+
+        # Build (id, query) pairs for parallel_execute.
+        items = ((str(query.get("id", idx)), query) for idx, query in enumerate(partial_queries))
+
+        for request_id, result in parallel_execute(
+            items=items,
+            process_fn=process_query,
+            num_workers=num_workers,
+            max_retries=max_retries,
+            max_requests_per_minute=max_requests_per_minute,
+            should_retry=should_retry_completion,
+            logger=logger,
+        ):
+            # Map generic executor failure fields to completion-specific fields.
+            if result.get("processing_failed"):
+                result["completion_attempted"] = result.pop("processing_attempted", True)
+                result["completion_failed"] = result.pop("processing_failed", True)
+            elif "processing_attempted" in result:
+                result.pop("processing_attempted", None)
+                result.pop("processing_failed", None)
+            # If retries were exhausted with a non-success status code, mark as failed.
+            _success_status_code = 200
+            if (
+                "request_status_code" in result
+                and result["request_status_code"] != _success_status_code
+                and not result.get("completion_failed", False)
+            ):
+                result["completion_failed"] = True
+            yield (request_id, result)
 
     @staticmethod
     def prepare_results_from_top_logprobs(
@@ -326,7 +403,7 @@ class BaseRAGTextCompleter(ABC):
 
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-        print(f"HTML file generated: {os.path.abspath(output_path)}")
+        logging.getLogger(__name__).info(f"HTML file generated: {os.path.abspath(output_path)}")
 
 
 class PredictionMethod(Enum):
@@ -481,6 +558,7 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
         model_id: str,
         gpu_id: int | None = None,
         prediction_method: PredictionMethod = PredictionMethod.LOGPROBS_FROM_LOGITS,
+        logger: logging.Logger | None = None,
     ) -> None:
         """
         Initializes the text completer.
@@ -489,8 +567,10 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
             model_id: The model Id to use for text completion.
             gpu_id: The GPU Id to use for the model, if any.
             prediction_method: The method to use for predicting log probabilities.
+            logger: An optional logger instance for logging.
         """
         super().__init__()
+        self.logger = logger or logging.getLogger(__name__)
         self.model_id = model_id
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         self.device = torch.device(
@@ -548,20 +628,23 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
     token_ids_to_exclude: list[Any]
     model: Any
 
-    def __init__(self, model_id: str = "microsoft/phi-4", gpu_id: int | None = None) -> None:
+    def __init__(
+        self, model_id: str = "microsoft/phi-4", gpu_id: int | None = None, logger: logging.Logger | None = None
+    ) -> None:
         """
         Initializes the text completer.
 
         Args:
             model_id: The Phi model Id to use for text completion.
             gpu_id: The GPU Id to use for the model, if any.
+            logger: An optional logger instance for logging.
         """
-        super().__init__(model_id=model_id, gpu_id=gpu_id)
+        super().__init__(model_id=model_id, gpu_id=gpu_id, logger=logger)
         self.token_ids_to_exclude = [
             self.tokenizer.convert_tokens_to_ids(token) for token in BasePhiRAGTextCompleter.TOKENS_TO_EXCLUDE
         ]
 
-        print(f"Loading {self.model_id} model on device: {self.device}.")
+        self.logger.info(f"Loading {self.model_id} model on device: {self.device}.")
 
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
@@ -569,7 +652,7 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             device_map={"": self.device} if gpu_id is not None else "auto",
         )
 
-        print(f"Loaded {self.model_id} model on device: {self.device}.")
+        self.logger.info(f"Loaded {self.model_id} model on device: {self.device}.")
 
         self.model.eval()
 
@@ -651,7 +734,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         """
         super().__init__(model_id=model_id, gpu_id=gpu_id, prediction_method=prediction_method)
 
-        print(f"Loading {self.model_id} model on device: {self.device}.")
+        self.logger.info(f"Loading {self.model_id} model on device: {self.device}.")
 
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
@@ -659,7 +742,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             device_map={"": self.device} if gpu_id is not None else "auto",
         )
 
-        print(f"Loaded {self.model_id} model on device: {self.device}.")
+        self.logger.info(f"Loaded {self.model_id} model on device: {self.device}.")
 
         self.model.eval()
 
@@ -880,7 +963,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
                 json_response=response,
             )
             if error is not None:
-                print(f"Attempt {attempt + 1}: {error}")
+                self.logger.debug(f"Attempt {attempt + 1}: {error}")
                 continue
             if top_logprobs is not None:
                 break
@@ -953,7 +1036,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
 
             if not predicted_word:
                 error = "Could not find a valid word in the response."
-                print(f"Attempt {attempt + 1}: {error}")
+                self.logger.debug(f"Attempt {attempt + 1}: {error}")
                 continue
             error = None
             break
@@ -992,14 +1075,14 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         """
         super().__init__(model_id=model_id, gpu_id=gpu_id, prediction_method=prediction_method)
 
-        print(f"Loading {self.model_id} model on device: {self.device}.")
+        self.logger.info(f"Loading {self.model_id} model on device: {self.device}.")
 
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
             device_map={"": self.device} if gpu_id is not None else "auto",
         )
 
-        print(f"Loaded {self.model_id} model on device: {self.device}.")
+        self.logger.info(f"Loaded {self.model_id} model on device: {self.device}.")
 
         self.model.eval()
 
@@ -1110,7 +1193,7 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
                 json_response=relevant_content,
             )
             if error is not None:
-                print(f"Attempt {attempt + 1}: {error}")
+                self.logger.debug(f"Attempt {attempt + 1}: {error}")
                 continue
             if top_logprobs is not None:
                 break
@@ -1183,12 +1266,12 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
                     break
 
             if offset is not None:
-                print(f"Found start marker at offset {offset} on attempt {retry_count + 1}")
+                self.logger.debug(f"Found start marker at offset {offset} on attempt {retry_count + 1}")
                 break
-            print(f"Start marker not found on attempt {retry_count + 1}, retrying...")
+            self.logger.debug(f"Start marker not found on attempt {retry_count + 1}, retrying...")
 
         if offset is None or outputs is None or outputs.scores is None:
-            print(f"Could not find start marker '{start_marker}' after {max_retries} attempts")
+            self.logger.warning(f"Could not find start marker '{start_marker}' after {max_retries} attempts")
             # Output results.
             return {
                 "predicted_content": "<Not Finished Correctly>",
