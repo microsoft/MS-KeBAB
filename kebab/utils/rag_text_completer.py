@@ -207,7 +207,8 @@ class BaseRAGTextCompleter(ABC):
         target_content: str,
         top_logprobs: list[list[dict[str, Any]]] | None,
         additional_info: dict[str, Any] | None = None,
-        allow_target_content_as_prefix: bool = True,
+        allow_be_prefix_of_target_content: bool = False,
+        allow_target_content_as_prefix: bool = False,
     ) -> dict[str, Any]:
         """
         Processes the top log probabilities and prepares the results.
@@ -216,6 +217,7 @@ class BaseRAGTextCompleter(ABC):
             target_content: The expected content to fill in the mask.
             top_logprobs: A list of lists containing the top log probabilities for each token position.
             additional_info: Additional information to include in the results.
+            allow_be_prefix_of_target_content: Whether to allow the predicted token to be a prefix of the target content.
             allow_target_content_as_prefix: Whether to allow the target content to be a prefix of the predicted token.
 
         Returns:
@@ -235,6 +237,32 @@ class BaseRAGTextCompleter(ABC):
                 results |= additional_info
             return results
 
+        # Combine probabilities for duplicate tokens and sort by probability descending.
+        for position_logprobs in top_logprobs:
+            token_logprob_map: dict[str, float] = {}
+            for entry in position_logprobs:
+                token = entry["token"]
+                lp = entry["logprob"]
+                if token in token_logprob_map:
+                    # Sum probabilities in log-space: log(exp(a) + exp(b))
+                    token_logprob_map[token] = cast(float, logsumexp(np.array([token_logprob_map[token], lp])))
+                else:
+                    token_logprob_map[token] = lp
+            # Normalize if the sum of probabilities exceeds 1.
+            total_logprob = cast(float, logsumexp(np.array(list(token_logprob_map.values()))))
+            if total_logprob > 0.0:  # sum of probs > 1
+                for token in token_logprob_map:
+                    token_logprob_map[token] -= total_logprob
+            # Rebuild the list sorted by logprob descending.
+            position_logprobs.clear()
+            position_logprobs.extend(
+                sorted(
+                    [{"token": t, "logprob": lp} for t, lp in token_logprob_map.items()],
+                    key=lambda x: x["logprob"],
+                    reverse=True,
+                )
+            )
+
         target_content_logprob = float("-inf")
         target_content_lower = target_content.strip().lower()
         # When the target content contains multiple tokens, LLM can return the target content
@@ -247,12 +275,15 @@ class BaseRAGTextCompleter(ABC):
         prefix_logprobs = []
         for logprob in top_logprobs[0]:
             token = logprob["token"].strip().lower()
-            if (
-                # Check if the predicted token matches the target content or a prefix of it.
-                target_content_lower.startswith(token)
-                # When `allow_target_content_as_prefix` is True, also allow the target content to be a prefix of the predicted token.
-                or (allow_target_content_as_prefix and token.startswith(target_content_lower))
-            ) and token:  # Ensure non-empty token.
+            if token == target_content_lower or (
+                (
+                    # Check if the predicted token matches the target content or a prefix of it.
+                    (allow_be_prefix_of_target_content and target_content_lower.startswith(token))
+                    # When `allow_target_content_as_prefix` is True, also allow the target content to be a prefix of the predicted token.
+                    or (allow_target_content_as_prefix and token.startswith(target_content_lower))
+                )
+                and token
+            ):
                 prefix_logprobs.append(logprob["logprob"])
         if prefix_logprobs:
             # Convert to numpy array for logsumexp operations.
@@ -449,16 +480,16 @@ class PredictionMethod(Enum):
             augmented_context: Additional context to help with the prediction.
         """
         base_text_completion_prompt = f"""
-You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context.
+You are a professional language model trained to assist with text completion tasks. Your goal is to accurately fill in missing parts of text using your understanding of language and context. You MUST always output a prediction. Never apologize, never refuse, never explain. Even if context is empty or insufficient, you MUST still output your best guess.
 
-Below is the context retrieved to help you make a better prediction. It is marked between <Begin Context> and <End Context>:
+Below is the optional context retrieved to help you make a better prediction. It may be empty - that is fine, still make your best prediction. It is marked between <Begin Context> and <End Context>:
 <Begin Context>
 {augmented_context}
 <End Context>
 
-Now, complete the following text by predicting the missing word, represented by "{TextCompletionTaskBase.MASK}". The text is marked between <Begin Text> and <End Text>:
+Now, complete the following text by predicting the missing alphanumeric word, represented by "{TextCompletionTaskBase.MASK}". The "{TextCompletionTaskBase.MASK}" is immediately followed by a non-alphanumeric character (e.g., space, -, ., ,, etc.) or the end of the text. Therefore, predicting a partial word that ends right before that delimiter is valid (e.g., "United" for "United Kingdom" or "Anglo" for "Anglo-Saxon" or "200" for "200,000"). The text is marked between <Begin Text> and <End Text>:
 <Begin Text>
-{text_with_mask} <the rest of the text is not visible to you>
+{text_with_mask}...<the rest of the text is not visible to you>
 <End Text>
 """
         return base_text_completion_prompt
@@ -479,7 +510,7 @@ Now, complete the following text by predicting the missing word, represented by 
         }
 What is the **single alphanumeric word** that best completes the masked position "{
             TextCompletionTaskBase.MASK
-        }"? Please respond strictly with **only** the word.
+        }"? Please respond strictly with **only** the word. No explanation, no apology, no punctuation - just the word.
 
 Answer: """
         return text_completion_prompt
