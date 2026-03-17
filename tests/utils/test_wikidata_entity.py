@@ -36,7 +36,7 @@ def test_wikidata_entity_fields(sample_wikidata_entity_belgium: WikidataEntity) 
     ]
     assert sample_wikidata_entity_belgium.name == "Fictional Republic"
     assert sample_wikidata_entity_belgium.aliases == ["FR", "fr", "FRE", "Republic of Fiction"]
-    assert sample_wikidata_entity_belgium.type == ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"]
+    assert sample_wikidata_entity_belgium.instance_of == ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"]
     assert sample_wikidata_entity_belgium.description == "Fictional Republic is a made-up country for testing purposes."
     assert sample_wikidata_entity_belgium.wikipedia_title == "Fictional_Republic"
 
@@ -46,7 +46,7 @@ def test_wikidata_entity_fields(sample_wikidata_entity_belgium: WikidataEntity) 
     assert entity.properties["name"] == ["Fictional Republic", "FR", "fr", "FRE", "Republic of Fiction"]
     assert entity.name == "Fictional Republic"
     assert entity.aliases == ["FR", "fr", "FRE", "Republic of Fiction"]
-    assert entity.type == ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"]
+    assert entity.instance_of == ["Q7777", "Q8888", "Q9999", "Q1111", "Q2222", "Q3333"]
     assert entity.description == "Fictional Republic is a made-up country for testing purposes."
     assert entity.wikipedia_title == "Fictional_Republic"
 
@@ -79,14 +79,14 @@ def test_wikidata_entity_fields(sample_wikidata_entity_belgium: WikidataEntity) 
 
     # modify fields
     entity.aliases = ["Fiction Land"]
-    entity.type = []
+    entity.instance_of = []
     entity.wikipedia_title = "Fiction_Land"
 
     assert entity.properties["name"] == ["Fictional Republic", "Fiction Land"]
     assert entity.properties[TypeProperties.INSTANCE_OF.value] == []
     assert entity.name == "Fictional Republic"
     assert entity.aliases == ["Fiction Land"]
-    assert entity.type == []
+    assert entity.instance_of == []
     assert entity.wikipedia_title == "Fiction_Land"
 
 

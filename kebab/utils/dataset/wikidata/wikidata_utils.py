@@ -88,12 +88,12 @@ class WikidataEntity(Entity):
         self.metadata["wikipedia_title"] = value
 
     @property
-    def type(self) -> list[str]:
+    def instance_of(self) -> list[str]:
         """Return the types of the entity."""
         return self.properties[TypeProperties.INSTANCE_OF.value]
 
-    @type.setter
-    def type(self, value: list[str]) -> None:
+    @instance_of.setter
+    def instance_of(self, value: list[str]) -> None:
         """Set the types of the entity."""
         self.properties[TypeProperties.INSTANCE_OF.value] = value
 
@@ -195,12 +195,12 @@ class ResolvedWikidataEntity(WikidataEntity):
     """A Wikidata entity with resolved properties."""
 
     @property
-    def type(self) -> list[str]:
+    def instance_of(self) -> list[str]:
         """Return the types of the entity."""
         return self.properties["instance of"]
 
-    @type.setter
-    def type(self, value: list[str]) -> None:
+    @instance_of.setter
+    def instance_of(self, value: list[str]) -> None:
         """Set the types of the entity."""
         self.properties["instance of"] = value
 
