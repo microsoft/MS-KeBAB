@@ -703,8 +703,10 @@ class RebelSplitSampler:
             if cfg.include_all_linking_fragments_first:
                 sorted_fragments = sorted(
                     fragments,
-                    key=lambda f: f.metadata.get("fragment_id")
-                    or f.metadata.get("fragment_ids", [])[0] not in included_fragment_ids,
+                    key=lambda f: (
+                        f.metadata.get("fragment_id")
+                        or f.metadata.get("fragment_ids", [])[0] not in included_fragment_ids
+                    ),
                 )
             else:
                 sorted_fragments = fragments
