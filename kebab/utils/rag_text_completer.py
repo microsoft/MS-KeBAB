@@ -89,8 +89,8 @@ class BaseRAGTextCompleter(ABC):
 
         Args:
             partial_queries: An iterable of dictionaries, where each dictionary represents a partial
-            query to complete.  Each query may contain an ``"id"`` key (str) used as a stable
-            identifier for the result.  When ``"id"`` is absent the positional index is used.
+            query to complete. Each query may contain an ``"id"`` key (str) used as a stable
+            identifier for the result. When ``"id"`` is absent the positional index is used.
             seed: seed for the random number generator.
             verbose: Defaults to False. If True, includes additional information such as the
             original partial query and augmented context in the results for debugging.
@@ -101,7 +101,7 @@ class BaseRAGTextCompleter(ABC):
 
         Returns:
             Iterable[tuple[str, dict[str, Any]]]: An iterable of tuples where the first element is
-            the query id (str) and the second is the result dictionary containing log probabilities
+            the query id (str) and the second is the result dictionary containing probabilities
             and predicted content.
         """
         logger = logger or logging.getLogger(__name__)
@@ -117,8 +117,8 @@ class BaseRAGTextCompleter(ABC):
                 result = copy.deepcopy(query)
 
             if query["text_with_mask"] == "" or not query.get("to_eval", True):
-                # Skip processing if the text with mask is empty.
-                logger.debug("Skipping query with empty text_with_mask")
+                # Skip processing if the text with mask is empty or the query is not marked for evaluation.
+                logger.debug("Skipping query with empty text_with_mask or not marked for evaluation")
                 result["completion_attempted"] = False
                 result["completion_failed"] = False
                 return result
@@ -142,8 +142,8 @@ class BaseRAGTextCompleter(ABC):
             result["completion_failed"] = False
 
             logger.debug(
-                f"Query completed: predicted='{result['predicted_content']}', "
-                f"logprob={result['target_content_logprob']:.4f}"
+                f"Query completed: predicted='{result.get('predicted_content', '')}', "
+                f"logprob={result['predicted_content_top_probs']}"
             )
 
             return result
@@ -211,7 +211,7 @@ class BaseRAGTextCompleter(ABC):
 
         Args:
             target_content: The expected content to fill in the mask.
-            top_logprobs: A list of dicts containing the top log probabilities for the first token position.
+            top_logprobs: A list of dicts containing the top probabilities.
             additional_info: Additional information to include in the results.
             allow_target_content_as_prefix: Whether to allow the target content to be a prefix of the predicted token.
 
@@ -220,7 +220,7 @@ class BaseRAGTextCompleter(ABC):
                 - "predicted_content" (str): The predicted content for the masked position.
                 - "target_content_prob" (float): The probability of the target content.
                 - "predicted_content_top_probs" (dict[str, float]): A dictionary containing the top
-                predicted tokens and their probabilities.
+                predicted words and their probabilities.
         """
         if top_logprobs is None or len(top_logprobs) == 0:
             results = {
@@ -454,7 +454,7 @@ Below is the optional context retrieved to help you make a better prediction. It
 {augmented_context}
 <End Context>
 
-Now, complete the following text by predicting the missing alphanumeric word, represented by "{TextCompletionTaskBase.MASK}". The "{TextCompletionTaskBase.MASK}" is immediately followed by a non-alphanumeric character (e.g., space, -, ., ,, etc.) or the end of the text. Therefore, predicting a partial word that ends right before that delimiter is valid (e.g., "United" for "United Kingdom" or "Anglo" for "Anglo-Saxon"). The text is marked between <Begin Text> and <End Text>:
+Now, complete the following text by predicting the missing alphanumeric word, represented by "{TextCompletionTaskBase.MASK}". The "{TextCompletionTaskBase.MASK}" is immediately followed by a non-alphanumeric character (e.g., space, -, ., ,, etc.) or the end of the text. Therefore, predicting a partial word that ends right before that delimiter is valid (e.g., "United" for "United Kingdom" or "Anglo" for "Anglo-Saxon" or "200" for "200,000"). The text is marked between <Begin Text> and <End Text>:
 <Begin Text>
 {text_with_mask}...<the rest of the text is not visible to you>
 <End Text>
@@ -660,7 +660,6 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
         augmented_context: str = "",
         seed: int = 42,
         top_k: int = 20,
-        beam_search: bool = True,
     ) -> dict[str, Any]:
         """
         Processes a single partial query and returns the predicted content and probabilities.
@@ -671,7 +670,6 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             augmented_context: Additional context to help with the prediction.
             seed: seed for the random number generator.
             top_k: The number of top predictions to consider.
-            beam_search: Whether to use beam search for generation.
 
         Returns:
             dict[str, Any]: A dictionary containing the following:
@@ -680,14 +678,6 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
                 - "predicted_content_top_probs" (dict[str, float]): A dictionary containing the top
                 predicted tokens and their probabilities.
         """
-        if beam_search:
-            return self.__complete_single_partial_query_beam_search(
-                text_with_mask=text_with_mask,
-                target_content=target_content,
-                augmented_context=augmented_context,
-                top_k=top_k,
-            )
-
         text_completion_prompt = self.prediction_method.build_text_completion_prompt(
             text_with_mask=text_with_mask,
             augmented_context=augmented_context,
@@ -712,63 +702,6 @@ class BasePhiRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             target_content=target_content,
             predicted_token_logits=next_token_logits,
             top_k=top_k,
-        )
-
-    def __complete_single_partial_query_beam_search(
-        self,
-        text_with_mask: str,
-        target_content: str,
-        augmented_context: str,
-        top_k: int,
-    ) -> dict[str, Any]:
-        """Processes a single partial query and returns the predicted content and probabilities using beam search."""
-        text_completion_prompt = self.prediction_method.build_text_completion_prompt(
-            text_with_mask=text_with_mask,
-            augmented_context=augmented_context,
-            top_k=top_k,
-        )
-
-        # Encode the prompt using the chat template so the model knows it's in an assistant turn.
-        messages = [{"role": "user", "content": text_completion_prompt}]
-        input_ids = self.tokenizer.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            return_tensors="pt",
-        ).to(self.device)
-
-        # Run beam search to generate top_k sequences.
-        # TODO (allenwang-ms): The problem of this beam search implementation is that it does not
-        # handle duplicated sequences well, which frequently lead to less than top_k unique
-        # predictions being returned.
-        with torch.no_grad():
-            outputs = cast(
-                GenerateOutput,
-                self.model.generate(
-                    input_ids,
-                    max_new_tokens=30,
-                    num_beams=top_k,
-                    num_return_sequences=top_k,
-                    do_sample=False,
-                    return_dict_in_generate=True,
-                    output_scores=True,
-                ),
-            )
-
-        # Build top_logprobs from beam search results.
-        top_logprobs: list[dict[str, Any]] = []
-        sequences_scores = getattr(outputs, "sequences_scores", None)
-        for i in range(top_k):
-            generated_ids = outputs.sequences[i][input_ids.shape[1] :]
-            decoded_text = self.tokenizer.decode(generated_ids, skip_special_tokens=False).strip()
-            # Extract only the first alphanumeric word.
-            match = re.search(r"[a-zA-Z0-9]+", decoded_text)
-            decoded_text = match.group(0) if match else decoded_text
-            seq_score = sequences_scores[i].item() if sequences_scores is not None else float("-inf")
-            top_logprobs.append({"token": decoded_text, "logprob": seq_score})
-
-        return BaseRAGTextCompleter.prepare_results_from_top_logprobs(
-            target_content=target_content,
-            top_logprobs=top_logprobs,
         )
 
 

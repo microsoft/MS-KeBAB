@@ -44,7 +44,7 @@ def _extract_predictions(indexed_results: list[tuple[str, dict[str, Any]]]) -> l
     """Sort results by id, filter to attempted completions, and extract prediction fields."""
     indexed_results.sort(key=lambda x: int(x[0]))
     return [
-        {k: v for k, v in result.items() if k in ("predicted_content", "target_content_logprob")}
+        {k: v for k, v in result.items() if k in ("predicted_content_top_probs")}
         for _, result in indexed_results
         if result.get("completion_attempted", False)
     ]
