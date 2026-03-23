@@ -321,13 +321,13 @@ class TextCompletionTaskBase(Task):
                 scores.append(score)
 
         metrics = {}
-        metrics["total_fair_keyword_score"] = sum(scores)
-        metrics["mean_fair_keyword_score"] = statistics.mean(scores)
-        metrics["variance_fair_keyword_score"] = (
-            statistics.variance(scores, metrics["mean_fair_keyword_score"]) if len(scores) > 1 else 0.0
+        metrics["fair_keyword_total_score"] = sum(scores)
+        metrics["fair_keyword_mean_score"] = statistics.mean(scores)
+        metrics["fair_keyword_variance_score"] = (
+            statistics.variance(scores, metrics["fair_keyword_mean_score"]) if len(scores) > 1 else 0.0
         )
-        metrics["num_fair_keyword_eval_words"] = len(scores)
-        metrics["num_positive_fair_keyword_scores"] = sum(1 for score in scores if score > 0)
+        metrics["fair_keyword_num_eval_words"] = len(scores)
+        metrics["fair_keyword_num_positive_scores"] = sum(1 for score in scores if score > 0)
 
         if logger:
             logger.info("Evaluation metrics calculated successfully.")

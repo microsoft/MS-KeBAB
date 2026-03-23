@@ -369,9 +369,8 @@ class BaseRAGTextCompleter(ABC):
             if result["text_with_mask"] == "":
                 html_content += f'<span class="word">{result["target_content"]}</span>'
                 continue
-            target_word_logprob = (
-                math.log(result["target_content_prob"]) if result["target_content_prob"] > 0 else float("-inf")
-            )
+            target_word_prob = result.get("target_content_prob", 0)
+            target_word_logprob = math.log(target_word_prob) if target_word_prob > 0 else float("-inf")
             tooltip = ""
             if target_word_logprob == float("-inf"):
                 tooltip = "Incorrect prediction, "
