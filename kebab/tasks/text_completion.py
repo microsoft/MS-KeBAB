@@ -183,8 +183,6 @@ class TextCompletionTaskBase(Task):
         Generate partial queries to complete for evaluation, including only `to_eval` flags.
 
         Args:
-            base_predictions: The path to the base model's predictions, which will be used to
-            calculate thresholds for evaluation.
             verbose: Defaults to False, only includes queries marked for evaluation; if True,
             includes all queries, including skipped words with empty "text_with_mask" for debugging.
             words_after_mask: Defaults to 0. Number of non-whitespace words/tokens to include

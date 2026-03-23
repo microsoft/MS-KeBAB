@@ -93,12 +93,16 @@ if __name__ == "__main__":
     # )
 
     # Run the completion task with the base model on each word.
-    base_results = process_results(list(
-        base_model.complete_partial_queries(
-            partial_queries=queries,
-            verbose=True,
+    base_results = [
+        result
+        for _, result in sorted(
+            base_model.complete_partial_queries(
+                partial_queries=queries,
+                verbose=True,
+            ),
+            key=lambda x: x[0],
         )
-    ))
+    ]
 
     # Write the base results to a file.
     base_results_for_threshold_calculation_path = Path(
@@ -118,12 +122,16 @@ if __name__ == "__main__":
     model_to_eval = base_model
 
     # Run the completion task with the model to evaluate.
-    results = process_results(list(
-        model_to_eval.complete_partial_queries(
-            partial_queries=queries_with_to_eval_flags,
-            verbose=True,
+    results = [
+        result
+        for _, result in sorted(
+            model_to_eval.complete_partial_queries(
+                partial_queries=queries_with_to_eval_flags,
+                verbose=True,
+            ),
+            key=lambda x: x[0],
         )
-    ))
+    ]
 
     # Write the results to a file for evaluation.
     results_to_evaulate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_to_eval.jsonl")
@@ -151,8 +159,7 @@ if __name__ == "__main__":
 
     # Annotate each document with log probabilities.
     results_grouped_by_doc = defaultdict(list)
-
-    for _, result in results:
+    for result in results:
         results_grouped_by_doc[result["document_id"]].append(result)
     for doc_id, results_per_doc in results_grouped_by_doc.items():
         BaseRAGTextCompleter.generate_annotated_doc_html(
