@@ -18,7 +18,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from transformers.generation.utils import GenerateOutput
 
-from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
+from kebab.tasks.metrics.text_completion.utils import get_target_content_prob_from_top_probs, process_logprobs_to_probs
 from kebab.tasks.text_completion import TextCompletionTaskBase
 from kebab.utils.parallel_executor import parallel_execute
 
@@ -204,6 +204,7 @@ class BaseRAGTextCompleter(ABC):
         target_content: str,
         top_logprobs: list[dict[str, Any]] | None,
         additional_info: dict[str, Any] | None = None,
+        allow_be_prefix_of_target_content: bool = False,
         allow_target_content_as_prefix: bool = False,
     ) -> dict[str, Any]:
         """
@@ -213,6 +214,7 @@ class BaseRAGTextCompleter(ABC):
             target_content: The expected content to fill in the mask.
             top_logprobs: A list of dicts containing the top probabilities.
             additional_info: Additional information to include in the results.
+            allow_be_prefix_of_target_content: Whether to allow a predicted word/token to be a prefix of the target content.
             allow_target_content_as_prefix: Whether to allow the target content to be a prefix of the predicted token.
 
         Returns:
@@ -232,23 +234,12 @@ class BaseRAGTextCompleter(ABC):
                 results |= additional_info
             return results
 
-        # Combine probabilities for duplicate keys and sort by probability descending.
-        predicted_content_top_probs: dict[str, float] = {}
-        for logprob in top_logprobs:
-            token = logprob["token"]
-            prob = math.exp(logprob["logprob"])
-            predicted_content_top_probs[token] = predicted_content_top_probs.get(token, 0.0) + prob
-        predicted_content_top_probs = dict(
-            sorted(predicted_content_top_probs.items(), key=lambda item: item[1], reverse=True)
-        )
-        # Normalize if the sum of probabilities exceeds 1.
-        total_prob = sum(predicted_content_top_probs.values())
-        if total_prob > 1:
-            predicted_content_top_probs = {k: v / total_prob for k, v in predicted_content_top_probs.items()}
+        predicted_content_top_probs = process_logprobs_to_probs(top_logprobs)
 
-        target_content_prob = FairKeywordScorer.get_target_content_prob_from_top_probs(
+        target_content_prob = get_target_content_prob_from_top_probs(
             predicted_content_top_probs=predicted_content_top_probs,
             target_content=target_content,
+            allow_be_prefix_of_target_content=allow_be_prefix_of_target_content,
             allow_target_content_as_prefix=allow_target_content_as_prefix,
         )
 
@@ -323,13 +314,12 @@ class BaseRAGTextCompleter(ABC):
             if total_prob > 0:
                 for word in word_prob_map:
                     word_prob_map[word] /= total_prob
-            # Convert back to list format: use "token" as the key so that the format is consistent with the result from logits.
-            top_probs = [{"token": token, "prob": prob} for token, prob in word_prob_map.items() if prob > 0.0]
+            top_probs = [{"word": word, "prob": prob} for word, prob in word_prob_map.items() if prob > 0.0]
 
             # Sort top_probs by "prob" descending.
             top_probs_sorted = sorted(top_probs, key=lambda x: x.get("prob", 1 / 100_000), reverse=True)
             # Convert to top_logprobs format (replace 'prob' with 'logprob').
-            top_logprobs = [{"token": item["token"], "logprob": math.log(item["prob"])} for item in top_probs_sorted]
+            top_logprobs = [{"word": item["word"], "logprob": math.log(item["prob"])} for item in top_probs_sorted]
         except Exception as e:  # noqa: BLE001 - intentionally catching all exceptions to log JSON parsing failures
             error = f"Error processing top_probs: {e}"
             return None, error
@@ -600,7 +590,7 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
         top_tokens = [self.tokenizer.decode([idx]) for idx in top_indices]
 
         top_logprobs = [
-            {"token": token, "logprob": logprob}
+            {"word": token, "logprob": logprob}
             for token, logprob in zip(top_tokens, top_logprobs.tolist(), strict=True)
         ]
 
@@ -1030,7 +1020,7 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
             error = None
             break
 
-        top_logprobs = [{"token": predicted_word, "logprob": 0.0}] if predicted_word else None
+        top_logprobs = [{"word": predicted_word, "logprob": 0.0}] if predicted_word else None
         additional_info = {"raw_model_output": raw_response}
         additional_info |= {"error": error} if error else {}
 
