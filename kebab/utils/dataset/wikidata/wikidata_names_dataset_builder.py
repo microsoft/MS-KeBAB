@@ -108,7 +108,7 @@ class WikidataNamesDatasetBuilder:
         count = 0
 
         for entity in entities:
-            types = entity.type
+            types = entity.instance_of
             aliases = entity.aliases
             if len(aliases) < min_aliases:
                 skipped += 1

@@ -182,7 +182,7 @@ class WikidataTypeHierarchyExtractor:
                 wikidata_json_dump_path=input_path,
                 properties=[TypeProperties.INSTANCE_OF.value],
                 input_entity_predicate=lambda x: x.get("type") == "item",
-                output_entity_predicate=lambda x: len(x.type) > 0,
+                output_entity_predicate=lambda x: len(x.instance_of) > 0,
             )
 
             for entity in entities:
@@ -219,7 +219,7 @@ class WikidataTypeHierarchyExtractor:
         with open(concrete_entities_path, encoding="utf-8") as f:
             for line in f:
                 entity = WikidataEntity.from_json(line.strip())
-                for value in entity.type:
+                for value in entity.instance_of:
                     counter[value] += 1
 
         with open(output_path, mode="w", encoding="utf-8", newline="\n") as f:

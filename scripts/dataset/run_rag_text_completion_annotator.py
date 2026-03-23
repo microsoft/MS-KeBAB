@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
     # Annotate each document with log probabilities.
     results_grouped_by_doc = defaultdict(list)
-    for result in base_results:
+    for _, result in results:
         results_grouped_by_doc[result["document_id"]].append(result)
     for doc_id, results_per_doc in results_grouped_by_doc.items():
         BaseRAGTextCompleter.generate_annotated_doc_html(

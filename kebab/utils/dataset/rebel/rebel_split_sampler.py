@@ -686,7 +686,7 @@ class RebelSplitSampler:
         ):
             for line_ds, line_gt in zip(f_ds, f_gt, strict=False):
                 fragment = ResolvedWikidataEntity.from_dict(json.loads(line_ds))
-                entity_id = json.loads(line_gt)
+                entity_id = line_gt.rstrip()
                 if entity_id in entities_to_include:
                     clustering_entities[entity_id].append(fragment)
 
@@ -703,8 +703,10 @@ class RebelSplitSampler:
             if cfg.include_all_linking_fragments_first:
                 sorted_fragments = sorted(
                     fragments,
-                    key=lambda f: f.metadata.get("fragment_id")
-                    or f.metadata.get("fragment_ids", [])[0] not in included_fragment_ids,
+                    key=lambda f: (
+                        f.metadata.get("fragment_id")
+                        or f.metadata.get("fragment_ids", [])[0] not in included_fragment_ids
+                    ),
                 )
             else:
                 sorted_fragments = fragments
@@ -799,7 +801,7 @@ class RebelSplitSampler:
         ):
             for line_ds, line_gt in zip(f_ds, f_gt, strict=False):
                 fragment = ResolvedWikidataEntity.from_dict(json.loads(line_ds))
-                entity_id = json.loads(line_gt)
+                entity_id = line_gt.rstrip()
                 if entity_id in entities_to_include:
                     ent_to_fragments[entity_id].append(fragment)
 
