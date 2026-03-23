@@ -34,7 +34,7 @@ if __name__ == "__main__":
     )
 
     # Prepare partial queries for each word.
-    queries = task_instance.generate_partial_queries(verbose=True)
+    queries = list(task_instance.generate_partial_queries(verbose=True))
 
     class DummyPhiRAGTextCompleter(BasePhiRAGTextCompleter):
         """A local class with a dummy RAG function."""
@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 partial_queries=queries,
                 verbose=True,
             ),
-            key=lambda x: x[0],
+            key=lambda x: int(x[0]),
         )
     ]
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
                 partial_queries=queries_with_to_eval_flags,
                 verbose=True,
             ),
-            key=lambda x: x[0],
+            key=lambda x: int(x[0]),
         )
     ]
 
