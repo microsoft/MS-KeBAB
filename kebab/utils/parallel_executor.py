@@ -287,7 +287,7 @@ def parallel_execute(
                     error_result: dict[str, Any] = {
                         "processing_attempted": True,
                         "processing_failed": True,
-                        "error": str(e),
+                        "error": f"{type(e).__name__}: {e}",
                     }
                     res.put((request_id, error_result))
                     resolve_request()
