@@ -10,6 +10,7 @@ import statistics
 from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Iterable
+from enum import Enum
 from logging import Logger
 from pathlib import Path
 from typing import Any, ClassVar
@@ -18,6 +19,7 @@ from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
 from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
+from kebab.tasks.metrics.text_completion.utils import get_target_content_prob_with_fallback
 from kebab.utils.io_helpers import (
     DocumentJsonlReader,
     EntityJsonlReader,
@@ -26,6 +28,13 @@ from kebab.utils.io_helpers import (
     resolve_path,
     save_dict_to_json,
 )
+
+
+class EvaluationMethod(Enum):
+    """Evaluation method for text completion tasks."""
+
+    PERPLEXITY = "perplexity"
+    FAIR_KEYWORD = "fair_keyword"
 
 
 class TextCompletionTaskBase(Task):
@@ -262,11 +271,30 @@ class TextCompletionTaskBase(Task):
         predictions: Path,
         result_output_path: Path | None = None,
         logger: Logger | None = None,
+        method: EvaluationMethod = EvaluationMethod.PERPLEXITY,
     ) -> dict[str, float]:
-        """Evaluate an output for the text completion task."""
-        if logger:
-            logger.info("Starting evaluation for the text completion task.")
+        """
+        Evaluate an output for the text completion task.
 
+        Args:
+            predictions: Path to the predictions file.
+            result_output_path: Optional path to write the evaluation metrics.
+            logger: Optional logger.
+            method: The evaluation method to use.
+        """
+        if logger:
+            logger.info(f"Starting {method.value} evaluation for the text completion task.")
+
+        if method == EvaluationMethod.FAIR_KEYWORD:
+            return self.__fair_keyword_evaluate(predictions, result_output_path, logger)
+        return self.__perplexity_evaluate(predictions, result_output_path, logger)
+
+    def __perplexity_evaluate(
+        self,
+        predictions: Path,
+        result_output_path: Path | None = None,
+        logger: Logger | None = None,
+    ) -> dict[str, float]:
         predicted_vals = ItemJsonlReader[dict[str, str | float]](predictions).read_items()
         queries = self.generate_partial_queries()
         predictions_and_queries = zip(predicted_vals, queries, strict=True)
@@ -274,7 +302,7 @@ class TextCompletionTaskBase(Task):
         log_probs = []
         log_probs_by_doc = defaultdict(list)
         for prediction, query in predictions_and_queries:
-            log_prob = float(prediction["target_content_logprob"])
+            log_prob = math.log(get_target_content_prob_with_fallback(prediction))
             log_probs.append(log_prob)
             log_probs_by_doc[query["document_id"]].append(log_prob)
 
@@ -306,16 +334,12 @@ class TextCompletionTaskBase(Task):
 
         return metrics
 
-    def fair_keyword_evaluate(
+    def __fair_keyword_evaluate(
         self,
         to_eval_predictions: Path,
         metrics_output_path: Path | None = None,
         logger: Logger | None = None,
     ) -> dict[str, float]:
-        """Evaluate an output for the text completion task."""
-        if logger:
-            logger.info("Starting evaluation for the text completion task.")
-
         predicted_vals = ItemJsonOrJsonlReader[dict[str, Any]](to_eval_predictions).read_items()
         predicted_vals_iter = (
             val for val in predicted_vals if val.get("text_with_mask", "not empty") != "" and val.get("to_eval", True)

@@ -83,3 +83,23 @@ def get_target_content_prob_from_top_probs(
         target_content_prob = sum(prefix_probs)
 
     return target_content_prob
+
+
+def get_target_content_prob_with_fallback(result: dict[str, Any], top_k: int = 20) -> float:
+    """
+    Gets the target content probability with fallback.
+
+    Args:
+        result: A dictionary containing the result of text completion.
+        top_k: The number of top predictions to consider.
+    """
+    if result.get("target_content_prob", 0) != 0:
+        return result["target_content_prob"]
+    # Fallback to the smallest probability among the top k predicted tokens when the target
+    # content probability is 0.
+    target_content_prob = min(result["predicted_content_top_probs"].values())
+    # Fallback to a small value to avoid -inf log probability or when the prob is larger than 1 / top_k
+    # which usually means a shorter list of predictions being returned.
+    if target_content_prob > 1 / top_k or target_content_prob == 0:
+        target_content_prob = 1 / 100_000
+    return target_content_prob
