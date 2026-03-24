@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, override
 
 from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
-from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
+from kebab.tasks.text_completion import EvaluationMethod, TextCompletionUsingDocumentsTask
 from kebab.utils.rag_text_completer import (
     BaseGptOssRAGTextCompleter,
     BasePhiRAGTextCompleter,
@@ -25,27 +26,105 @@ from kebab.utils.rag_text_completer import (
 )
 
 
-def process_results(results: list[tuple[str, dict[str, Any]]]) -> list[tuple[str, float, list[list[str | float]]]]:
-    """Process completion results and extract prediction data.
+def run_perplexity_evaluation_example(
+    documents_file_path: Path,
+    task_instance: TextCompletionUsingDocumentsTask,
+    base_results: Iterable[tuple[str, dict[str, Any]]],
+) -> dict[str, Any]:
+    """Run an example evaluation using the perplexity evaluation method."""
+    # Use the base results as an example for perplexity evaluation. In practice, you can run a different model for evaluation if desired.
+    results = base_results
 
-    Args:
-        results: List of completion result dictionaries.
+    # Write the results to a file for evaluation.
+    results_to_evaluate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_for_perplexity_eval.jsonl")
+    task_instance.write_items(results_to_evaluate_path, results, strict=False)
 
-    Returns:
-        List of tuples containing (predicted_content, target_content_logprob, predicted_content_top_logprobs).
-    """
-    results_to_eval = []
-    for _, result in results:
-        if result["text_with_mask"] != "" and result.get("to_eval", True):
-            predicted_content = result["predicted_content"]
-            target_content_logprob = BaseRAGTextCompleter.get_target_content_logprob_with_fallback(result)
-            predicted_content_top_logprobs = [
-                [item["token"], item["logprob"]] for item in result["predicted_content_top_logprobs"][0]
-            ]
-            results_to_eval.append((predicted_content, target_content_logprob, predicted_content_top_logprobs))
-        if "to_eval" in result:
-            result["to_eval"] = "True" if result["to_eval"] else "False"  # Convert to str.
-    return results_to_eval
+    # Evaluate the results.
+    metrics = task_instance.evaluate(
+        predictions=results_to_evaluate_path,
+        result_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics_perplexity.json"),
+        method=EvaluationMethod.PERPLEXITY,
+    )
+
+    return metrics
+
+
+def run_fair_keyword_evaluation_example(
+    documents_file_path: Path,
+    task_instance: TextCompletionUsingDocumentsTask,
+    base_model: BaseRAGTextCompleter,
+    base_results: Iterable[tuple[str, dict[str, Any]]],
+) -> dict[str, Any]:
+    """Run an example evaluation using the fair keyword evaluation method."""
+    # Write the base results to a file.
+    base_results_for_threshold_calculation_path = Path(
+        os.path.splitext(documents_file_path)[0] + "_tc_base_results_for_fair_keyword_t_calc.jsonl"
+    )
+    task_instance.write_items(base_results_for_threshold_calculation_path, base_results, strict=False)
+
+    # Initialize the scorer with the base predictions to evaluate candidate models.
+    task_instance.scorer = FairKeywordScorer(base_predictions=base_results_for_threshold_calculation_path)
+
+    # Prepare partial queries with to_eval flags based on threshold calculation from base results.
+    queries_with_to_eval_flags = task_instance.generate_partial_queries_to_eval(
+        verbose=True,
+    )
+
+    # For demonstration, we use the same base model for evaluation. In practice, you can use a different model for evaluation if desired.
+    model_to_eval = base_model
+
+    # Run the completion task with the model to evaluate.
+    results = list(
+        model_to_eval.complete_partial_queries(
+            partial_queries=queries_with_to_eval_flags,
+            verbose=True,
+        )
+    )
+
+    # Write the results to a file for evaluation.
+    results_to_evaulate_path = Path(
+        os.path.splitext(documents_file_path)[0] + "_tc_results_for_fair_keyword_eval.jsonl"
+    )
+    task_instance.write_items(results_to_evaulate_path, results, strict=False)
+
+    # Evaluate the results.
+    metrics = task_instance.evaluate(
+        predictions=results_to_evaulate_path,
+        result_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics_fair_keyword.json"),
+        method=EvaluationMethod.FAIR_KEYWORD,
+    )
+
+    # Write the full results for debugging.
+    verbose_base_results_output_path = Path(
+        os.path.splitext(documents_file_path)[0] + "_tc_verbose_base_results_for_fair_keyword.json"
+    )
+    task_instance.write_items(
+        path=verbose_base_results_output_path,
+        items=base_results,
+        verbose=True,
+    )
+    verbose_results_output_path = Path(
+        os.path.splitext(documents_file_path)[0] + "_tc_verbose_results_for_fair_keyword.json"
+    )
+    task_instance.write_items(
+        path=verbose_results_output_path,
+        items=results,
+        verbose=True,
+    )
+
+    # Evaluate the verbose results.
+    metrics_from_verbose = task_instance.evaluate(
+        predictions=verbose_results_output_path,
+        result_output_path=Path(
+            os.path.splitext(documents_file_path)[0] + "_tc_metrics_from_verbose_for_fair_keyword.json"
+        ),
+        method=EvaluationMethod.FAIR_KEYWORD,
+    )
+    assert metrics == metrics_from_verbose, (
+        "Metrics from verbose results should match metrics from non-verbose results."
+    )
+
+    return metrics
 
 
 if __name__ == "__main__":
@@ -57,7 +136,7 @@ if __name__ == "__main__":
     )
 
     # Prepare partial queries for each word.
-    queries = task_instance.generate_partial_queries(verbose=True)
+    queries = list(task_instance.generate_partial_queries(verbose=True))
 
     class DummyPhiRAGTextCompleter(BasePhiRAGTextCompleter):
         """A local class with a dummy RAG function."""
@@ -100,67 +179,24 @@ if __name__ == "__main__":
         )
     )
 
-    # Write the base results to a file.
-    base_results_for_threshold_calculation_path = Path(
-        os.path.splitext(documents_file_path)[0] + "_tc_base_results_for_t_calc.jsonl"
+    fair_keyword_metrics = run_fair_keyword_evaluation_example(
+        documents_file_path=documents_file_path,
+        task_instance=task_instance,
+        base_model=base_model,
+        base_results=base_results,
     )
-    task_instance.write_items(base_results_for_threshold_calculation_path, base_results, strict=False)
+    print("Fair Keyword Evaluation Metrics:", fair_keyword_metrics)
 
-    # Initialize the scorer with the base predictions to evaluate candidate models.
-    task_instance.scorer = FairKeywordScorer(base_predictions=base_results_for_threshold_calculation_path)
-
-    # Prepare partial queries with to_eval flags based on threshold calculation from base results.
-    queries_with_to_eval_flags = task_instance.generate_partial_queries_to_eval(
-        verbose=True,
+    perplexity_metrics = run_perplexity_evaluation_example(
+        documents_file_path=documents_file_path,
+        task_instance=task_instance,
+        base_results=base_results,
     )
-
-    # For demonstration, we use the same base model for evaluation. In practice, you can use a different model for evaluation if desired.
-    model_to_eval = base_model
-
-    # Run the completion task with the model to evaluate.
-    results = list(
-        model_to_eval.complete_partial_queries(
-            partial_queries=queries_with_to_eval_flags,
-            verbose=True,
-        )
-    )
-
-    # Write the results to a file for evaluation.
-    results_to_evaulate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_to_eval.jsonl")
-    task_instance.write_items(results_to_evaulate_path, results, strict=False)
-
-    # Evaluate the results.
-    metrics = task_instance.fair_keyword_evaluate(
-        to_eval_predictions=results_to_evaulate_path,
-        metrics_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics.json"),
-    )
-
-    # Write the full results for debugging.
-    verbose_base_results_output_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_verbose_base_results.json")
-    task_instance.write_items(
-        path=verbose_base_results_output_path,
-        items=base_results,
-        verbose=True,
-    )
-    verbose_results_output_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_verbose_results.json")
-    task_instance.write_items(
-        path=verbose_results_output_path,
-        items=results,
-        verbose=True,
-    )
-
-    # Evaluate the verbose results.
-    metrics_from_verbose = task_instance.fair_keyword_evaluate(
-        to_eval_predictions=verbose_results_output_path,
-        metrics_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics_from_verbose.json"),
-    )
-    assert metrics == metrics_from_verbose, (
-        "Metrics from verbose results should match metrics from non-verbose results."
-    )
+    print("Perplexity Evaluation Metrics:", perplexity_metrics)
 
     # Annotate each document with log probabilities.
     results_grouped_by_doc = defaultdict(list)
-    for _, result in results:
+    for _, result in base_results:
         results_grouped_by_doc[result["document_id"]].append(result)
     for doc_id, results_per_doc in results_grouped_by_doc.items():
         BaseRAGTextCompleter.generate_annotated_doc_html(

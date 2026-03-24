@@ -18,7 +18,11 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from transformers.generation.utils import GenerateOutput
 
-from kebab.tasks.metrics.text_completion.utils import get_target_content_prob_from_top_probs, process_logprobs_to_probs
+from kebab.tasks.metrics.text_completion.utils import (
+    get_target_content_prob_from_top_probs,
+    get_target_content_prob_with_fallback,
+    process_logprobs_to_probs,
+)
 from kebab.tasks.text_completion import TextCompletionTaskBase
 from kebab.utils.parallel_executor import parallel_execute
 
@@ -260,26 +264,6 @@ class BaseRAGTextCompleter(ABC):
         return results
 
     @staticmethod
-    def get_target_content_prob_with_fallback(result: dict[str, Any], top_k: int = 20) -> float:
-        """
-        Gets the target content probability with fallback.
-
-        Args:
-            result: A dictionary containing the result of text completion.
-            top_k: The number of top predictions to consider.
-        """
-        if result["target_content_prob"] != 0:
-            return result["target_content_prob"]
-        # Fallback to the smallest probability among the top k predicted tokens when the target
-        # content probability is 0.
-        target_content_prob = min(result["predicted_content_top_probs"].values())
-        # Fallback to a small value to avoid -inf log probability or when the prob is larger than 1 / top_k
-        # which usually means a shorter list of predictions being returned.
-        if target_content_prob > 1 / top_k or target_content_prob == 0:
-            target_content_prob = 1 / 100_000
-        return target_content_prob
-
-    @staticmethod
     def prepare_top_logprobs_from_json_response(
         json_response: str,
     ) -> tuple[list[dict[str, Any]] | None, str | None]:
@@ -375,9 +359,7 @@ class BaseRAGTextCompleter(ABC):
             if target_word_logprob == float("-inf"):
                 tooltip = "Incorrect prediction, "
                 if "predicted_content_top_probs" in result:
-                    target_word_logprob = math.log(
-                        BaseRAGTextCompleter.get_target_content_prob_with_fallback(result=result)
-                    )
+                    target_word_logprob = math.log(get_target_content_prob_with_fallback(result=result))
             color = BaseRAGTextCompleter.get_font_color(target_word_logprob)
             font_weight = "bold" if target_word_logprob <= BaseRAGTextCompleter.LOGPROB_THRESHOLDS[2] else "normal"
             tooltip += f"LogProb: {target_word_logprob:.3f}"
