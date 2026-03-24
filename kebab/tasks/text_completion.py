@@ -18,6 +18,7 @@ from typing import Any, ClassVar
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
+from kebab.tasks.metrics.text_completion.alternating_estimator import AlternatingEstimator, ModelInfo
 from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
 from kebab.tasks.metrics.text_completion.utils import get_target_content_prob_with_fallback
 from kebab.utils.io_helpers import (
@@ -35,6 +36,7 @@ class EvaluationMethod(Enum):
 
     PERPLEXITY = "perplexity"
     FAIR_KEYWORD = "fair_keyword"
+    ALTERNATING_ESTIMATION = "alternating_estimation"
 
 
 class TextCompletionTaskBase(Task):
@@ -285,16 +287,25 @@ class TextCompletionTaskBase(Task):
         if logger:
             logger.info(f"Starting {method.value} evaluation for the text completion task.")
 
+        metrics = {}
         if method == EvaluationMethod.FAIR_KEYWORD:
-            return self.__fair_keyword_evaluate(predictions, result_output_path, logger)
-        return self.__perplexity_evaluate(predictions, result_output_path, logger)
+            metrics = self.__fair_keyword_evaluate(predictions)
+        else:
+            metrics = self.__perplexity_evaluate(predictions)
+
+        if logger:
+            logger.info("Evaluation metrics calculated successfully.")
+            logger.info(f"Metrics: {metrics}")
+        if result_output_path:
+            save_dict_to_json(metrics, result_output_path)
+
+        return metrics
 
     def __perplexity_evaluate(
         self,
         predictions: Path,
-        result_output_path: Path | None = None,
-        logger: Logger | None = None,
     ) -> dict[str, float]:
+        # TODO (allenwang): also handle the verbose json output.
         predicted_vals = ItemJsonlReader[dict[str, str | float]](predictions).read_items()
         queries = self.generate_partial_queries()
         predictions_and_queries = zip(predicted_vals, queries, strict=True)
@@ -323,24 +334,13 @@ class TextCompletionTaskBase(Task):
             metrics_by_doc.append(metrics_per_doc)
         metrics["metrics_by_doc"] = metrics_by_doc
 
-        # TODO (allenwang-ms): Consider adding more evaluation metrics, such as BLEU, to assess the
-        # quality of predicted contents.
-
-        if logger:
-            logger.info("Evaluation metrics calculated successfully.")
-            logger.info(f"Metrics: {metrics}")
-        if result_output_path:
-            save_dict_to_json(metrics, result_output_path)
-
         return metrics
 
     def __fair_keyword_evaluate(
         self,
-        to_eval_predictions: Path,
-        metrics_output_path: Path | None = None,
-        logger: Logger | None = None,
+        predictions: Path,
     ) -> dict[str, float]:
-        predicted_vals = ItemJsonOrJsonlReader[dict[str, Any]](to_eval_predictions).read_items()
+        predicted_vals = ItemJsonOrJsonlReader[dict[str, Any]](predictions).read_items()
         predicted_vals_iter = (
             val for val in predicted_vals if val.get("text_with_mask", "not empty") != "" and val.get("to_eval", True)
         )
@@ -370,11 +370,45 @@ class TextCompletionTaskBase(Task):
         metrics["fair_keyword_num_eval_words"] = len(scores)
         metrics["fair_keyword_num_positive_scores"] = sum(1 for score in scores if score > 0)
 
+        return metrics
+
+    def alternating_evaluate(
+        self,
+        good_model_infos: dict[str, ModelInfo],
+        bad_model_infos: dict[str, ModelInfo],
+        dont_know_model_infos: dict[str, ModelInfo],
+        result_output_path: Path | None = None,
+        logger: Logger | None = None,
+    ) -> dict[str, Any]:
+        """Run the alternating estimation evaluation method to estimate model abilities and word informativeness."""
+        if logger:
+            logger.info(f"Starting {EvaluationMethod.ALTERNATING_ESTIMATION} evaluation for the text completion task.")
+
+        estimator = AlternatingEstimator(
+            good_model_infos=good_model_infos,
+            bad_model_infos=bad_model_infos,
+            dont_know_model_infos=dont_know_model_infos,
+        )
+
+        model_abilities, word_informativeness, _avg_word_logprobs, num_iterations = estimator.run()
+
+        model_names = list(estimator.model_infos)
+        num_words = len(word_informativeness)
+        metrics: dict[str, Any] = {
+            "num_predictions": num_words,
+            "positive_informativeness_ratio": sum(1 for w in word_informativeness if w > 0) / num_words,
+            "alternating_estimated_model_abilities": dict(
+                sorted(zip(model_names, model_abilities, strict=True), key=lambda x: x[1], reverse=True)
+            ),
+            "num_iterations": num_iterations,
+        }
+
         if logger:
             logger.info("Evaluation metrics calculated successfully.")
             logger.info(f"Metrics: {metrics}")
-        if metrics_output_path:
-            save_dict_to_json(metrics, metrics_output_path)
+        if result_output_path:
+            with open(result_output_path, "w", encoding="utf-8") as file:
+                json.dump(metrics, file, ensure_ascii=False, indent=2)
 
         return metrics
 

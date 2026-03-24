@@ -16,6 +16,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, override
 
+from kebab.tasks.metrics.text_completion.alternating_estimator import ModelInfo
 from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
 from kebab.tasks.text_completion import EvaluationMethod, TextCompletionUsingDocumentsTask
 from kebab.utils.rag_text_completer import (
@@ -127,6 +128,36 @@ def run_fair_keyword_evaluation_example(
     return metrics
 
 
+def run_alternating_evaluation_example(
+    documents_file_path: Path,
+    task_instance: TextCompletionUsingDocumentsTask,
+    base_results: Iterable[tuple[str, dict[str, Any]]],
+) -> dict[str, Any]:
+    """Run an example evaluation using the alternating estimation method."""
+    # Use the base results as an example for alternating estimation evaluation. In practice, you can run a different model for evaluation if desired.
+    results = base_results
+
+    # Write the results to a file for evaluation.
+    results_to_evaluate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_for_alternating_eval.jsonl")
+    task_instance.write_items(results_to_evaluate_path, results, verbose=True)
+
+    good_model_infos = {}
+    good_model_infos["phi_RAG_0_1"] = ModelInfo(predictions_path=results_to_evaluate_path)
+    bad_model_infos = {}
+    bad_model_infos["phi_RAG_0_-1"] = ModelInfo(predictions_path=results_to_evaluate_path)
+    dont_know_model_infos = {}
+    dont_know_model_infos["phi_RAG_0_0"] = ModelInfo(predictions_path=results_to_evaluate_path)
+
+    # Evaluate the results.
+    metrics = task_instance.alternating_evaluate(
+        good_model_infos=good_model_infos,
+        bad_model_infos=bad_model_infos,
+        dont_know_model_infos=dont_know_model_infos,
+    )
+
+    return metrics
+
+
 if __name__ == "__main__":
     # Create a text completion task instance.
     documents_file_path = Path(__file__).parents[2] / "tests" / "data" / "text_completion" / "documents.jsonl"
@@ -193,6 +224,13 @@ if __name__ == "__main__":
         base_results=base_results,
     )
     print("Perplexity Evaluation Metrics:", perplexity_metrics)
+
+    alternating_estimation_metrics = run_alternating_evaluation_example(
+        documents_file_path=documents_file_path,
+        task_instance=task_instance,
+        base_results=base_results,
+    )
+    print("Alternating Evaluation Metrics:", alternating_estimation_metrics)
 
     # Annotate each document with log probabilities.
     results_grouped_by_doc = defaultdict(list)
