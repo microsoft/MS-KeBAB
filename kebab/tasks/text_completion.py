@@ -22,6 +22,7 @@ from kebab.utils.io_helpers import (
     DocumentJsonlReader,
     EntityJsonlReader,
     ItemJsonlReader,
+    ItemJsonOrJsonlReader,
     resolve_path,
     save_dict_to_json,
 )
@@ -203,14 +204,18 @@ class TextCompletionTaskBase(Task):
         )
 
     def write_items(
-        self, path: Path, items: Iterable[dict[str, Any]], verbose: bool = False, strict: bool = True
+        self,
+        path: Path,
+        items: Iterable[dict[str, Any]] | Iterable[tuple[str, dict[str, Any]]],
+        verbose: bool = False,
+        strict: bool = True,
     ) -> None:
         """
         Write prediction items to the specified path.
 
         Args:
             path: The file path where the prediction items should be written.
-            items: An iterable of dictionaries, where if verbose is False, each dictionary must
+            items: An iterable of dictionaries or an iterable of (Id str, dictionary) tuples, where if verbose is False, each dictionary must
             contain:
                 - "predicted_content_top_probs": The top probabilities for the predicted content.
             verbose: Defaults to False, writes one JSONL line per item with only the required
@@ -221,14 +226,21 @@ class TextCompletionTaskBase(Task):
         """
         required_fields = ["predicted_content_top_probs"]
 
+        def unwrap(items: Iterable[dict[str, Any]] | Iterable[tuple[str, dict[str, Any]]]) -> Iterable[dict[str, Any]]:
+            for item in items:
+                if isinstance(item, tuple):
+                    yield item[1]
+                else:
+                    yield item
+
         if verbose:
-            output_items = list(items)
+            output_items = list(unwrap(items))
             with open(path, "w", encoding="utf-8", newline="\n") as file:
                 json.dump(output_items, file, ensure_ascii=False, indent=2, default=str)
                 file.write("\n")
         else:
             with open(path, "w", encoding="utf-8", newline="\n") as file:
-                for item in items:
+                for item in unwrap(items):
                     output_item = {key: item[key] for key in required_fields if key in item}
                     # Ensure all required fields are present when not in verbose mode.
                     if len(output_item) < len(required_fields):
@@ -304,8 +316,10 @@ class TextCompletionTaskBase(Task):
         if logger:
             logger.info("Starting evaluation for the text completion task.")
 
-        predicted_vals = ItemJsonlReader[dict[str, Any]](to_eval_predictions).read_items()
-        predicted_vals_iter = iter(predicted_vals)
+        predicted_vals = ItemJsonOrJsonlReader[dict[str, Any]](to_eval_predictions).read_items()
+        predicted_vals_iter = (
+            val for val in predicted_vals if val.get("text_with_mask", "not empty") != "" and val.get("to_eval", True)
+        )
         queries = self.__generate_partial_queries_with_thresholds()
 
         scores = []
@@ -319,6 +333,9 @@ class TextCompletionTaskBase(Task):
                     t=query["t"],
                 )
                 scores.append(score)
+
+        if next(predicted_vals_iter, None) is not None:
+            raise ValueError("Number of predictions exceeds the number of evaluation queries.")
 
         metrics = {}
         metrics["fair_keyword_total_score"] = sum(scores)
