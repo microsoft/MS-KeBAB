@@ -57,7 +57,7 @@ if __name__ == "__main__":
     )
 
     # Prepare partial queries for each word.
-    queries = list(task_instance.generate_partial_queries(verbose=True))
+    queries = task_instance.generate_partial_queries(verbose=True)
 
     class DummyPhiRAGTextCompleter(BasePhiRAGTextCompleter):
         """A local class with a dummy RAG function."""
@@ -93,16 +93,12 @@ if __name__ == "__main__":
     # )
 
     # Run the completion task with the base model on each word.
-    base_results = [
-        result
-        for _, result in sorted(
-            base_model.complete_partial_queries(
-                partial_queries=queries,
-                verbose=True,
-            ),
-            key=lambda x: int(x[0]),
+    base_results = list(
+        base_model.complete_partial_queries(
+            partial_queries=queries,
+            verbose=True,
         )
-    ]
+    )
 
     # Write the base results to a file.
     base_results_for_threshold_calculation_path = Path(
@@ -122,23 +118,19 @@ if __name__ == "__main__":
     model_to_eval = base_model
 
     # Run the completion task with the model to evaluate.
-    results = [
-        result
-        for _, result in sorted(
-            model_to_eval.complete_partial_queries(
-                partial_queries=queries_with_to_eval_flags,
-                verbose=True,
-            ),
-            key=lambda x: int(x[0]),
+    results = list(
+        model_to_eval.complete_partial_queries(
+            partial_queries=queries_with_to_eval_flags,
+            verbose=True,
         )
-    ]
+    )
 
     # Write the results to a file for evaluation.
     results_to_evaulate_path = Path(os.path.splitext(documents_file_path)[0] + "_tc_results_to_eval.jsonl")
     task_instance.write_items(results_to_evaulate_path, results, strict=False)
 
     # Evaluate the results.
-    task_instance.fair_keyword_evaluate(
+    metrics = task_instance.fair_keyword_evaluate(
         to_eval_predictions=results_to_evaulate_path,
         metrics_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics.json"),
     )
@@ -157,9 +149,18 @@ if __name__ == "__main__":
         verbose=True,
     )
 
+    # Evaluate the verbose results.
+    metrics_from_verbose = task_instance.fair_keyword_evaluate(
+        to_eval_predictions=verbose_results_output_path,
+        metrics_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics_from_verbose.json"),
+    )
+    assert metrics == metrics_from_verbose, (
+        "Metrics from verbose results should match metrics from non-verbose results."
+    )
+
     # Annotate each document with log probabilities.
     results_grouped_by_doc = defaultdict(list)
-    for result in results:
+    for _, result in results:
         results_grouped_by_doc[result["document_id"]].append(result)
     for doc_id, results_per_doc in results_grouped_by_doc.items():
         BaseRAGTextCompleter.generate_annotated_doc_html(

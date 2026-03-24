@@ -143,6 +143,49 @@ class ItemJsonlReader[DataItemType](ItemReader[DataItemType]):
                 yield obj
 
 
+class ItemJsonOrJsonlReader[DataItemType](ItemReader[DataItemType]):
+    """
+    Reader that auto-detects JSON vs JSONL format.
+    If the file contains a JSON array (e.g. ``[{...}, {...}]``), each element
+    is yielded. Otherwise the file is treated as JSONL where each line is a
+    separate JSON object.
+    """
+
+    path: Path
+    converter: Callable[[Any], DataItemType] | None
+
+    def __init__(
+        self,
+        path: Path,
+        converter: Callable[[Any], DataItemType] | None = None,
+    ):
+        """Initializes the reader.
+
+        Args:
+            path: The file path to the JSON or JSONL file.
+            converter: An optional converter function applied to each deserialized item.
+        """
+        self.path = path
+        self.converter = converter
+
+    def read_items(self) -> Iterable[DataItemType]:
+        """
+        Reads items from the file, auto-detecting the format.
+        Uses the file suffix to decide: ``.json`` is parsed as a JSON array,
+        ``.jsonl`` (or anything else) is parsed line-by-line as JSONL.
+
+        Returns:
+            Iterable[DataItemType]: An iterable of objects.
+        """
+        if self.path.suffix == ".json":
+            with open(self.path, encoding="utf-8") as file:
+                items = json.load(file)
+            for obj in items:
+                yield self.converter(obj) if self.converter is not None else obj
+        else:
+            yield from ItemJsonlReader(self.path, self.converter).read_items()
+
+
 class DocumentJsonlReader(ItemReader[Document]):
     """
     Reader for JSONL files containing `Document` objects.
