@@ -1477,6 +1477,7 @@ dependencies = [
     { name = "sentence-transformers" },
     { name = "tiktoken" },
     { name = "tqdm" },
+    { name = "transformers" },
     { name = "xlsxwriter" },
 ]
 
@@ -1508,6 +1509,7 @@ requires-dist = [
     { name = "sentence-transformers" },
     { name = "tiktoken" },
     { name = "tqdm" },
+    { name = "transformers" },
     { name = "xlsxwriter" },
 ]
 
