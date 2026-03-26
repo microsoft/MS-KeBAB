@@ -14,7 +14,7 @@ dependencies = [
     "requests",
     "tqdm",
     "tiktoken",
-    "transformers==4.55.0",
+    "transformers",
     "sentence-transformers",
     "nltk", # TODO(atorunova): replace with editdistance?
     "scipy",
@@ -31,7 +31,6 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "accelerate==1.6.0",
     "jupyter",
     "matplotlib",
     "pandas",
