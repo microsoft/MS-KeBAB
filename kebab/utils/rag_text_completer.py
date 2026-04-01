@@ -718,6 +718,8 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
     how augmented context is retrieved.
     """
 
+    model: Any
+
     def __init__(
         self,
         model_id: str = "Qwen/Qwen3-14B",
@@ -1058,6 +1060,8 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
     the `get_augmented_context` method, which should be provided by concrete subclasses to define
     how augmented context is retrieved.
     """
+
+    model: Any
 
     def __init__(
         self,
