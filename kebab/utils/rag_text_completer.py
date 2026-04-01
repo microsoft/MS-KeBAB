@@ -550,6 +550,7 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
     """A base implementation of a RAG text completer using a local model."""
 
     model_id: str
+    model: Any
     tokenizer: Any
     device: torch.device
 

@@ -58,4 +58,4 @@ pythonpath = ["kebab"]
 [tool.pyright]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
-exclude = ["**/__pycache__", "**/node_modules", "**/.*", "build"]
+exclude = ["**/__pycache__", "**/node_modules", "**/.*", "build", ".venv"]
