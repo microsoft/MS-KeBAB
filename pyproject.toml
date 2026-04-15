@@ -41,7 +41,7 @@ dev = [
     "pytest-cov",
     "pytest-mock",
     "ruff",
-    "torch>=2.8.0",
+    "torch",
 
     # GPU support for gpt-oss requires triton, which does not support Windows builds.
     # "triton@git+https://github.com/triton-lang/triton.git@d441626",
