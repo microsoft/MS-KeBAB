@@ -32,7 +32,7 @@ Example usage (from repository root):
     # Quick run from pair-sampling onwards to verify the logic
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --no-download-rebel --no-run-extract-fragments --no-resolve-property-names --no-resolve-property-values --no-run-filter --max-pair-count 100000
 
-    # With type resolution enabled (internal use case)
+    # With type resolution enabled (requires the type hierarchy file)
     uv run ./scripts/dataset/run_download_and_build_rebel_based_datasets.py --resolve-types --no-verify-md5
 
     # From pair sampling onwards (expects existing prior outputs)
