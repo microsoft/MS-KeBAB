@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 from kebab.tasks.metrics.text_completion.utils import get_target_content_prob_with_fallback
+from sklearn.isotonic import IsotonicRegression
 
 
 @dataclass
@@ -49,7 +50,6 @@ class AlternatingEstimator:
 
         logprobs = np.array(word_logprobs)  # (num_models, num_words)
         avg_logprobs = logprobs.mean(axis=0)  # (num_words,)
-        centered = logprobs - avg_logprobs  # (num_models, num_words)
         abilities = np.array(model_abilities)  # (num_models,)
         informativeness = np.zeros(logprobs.shape[1])
         max_change = float("inf")
@@ -58,9 +58,10 @@ class AlternatingEstimator:
         for _ in range(max_iterations):
             num_iterations += 1
 
-            # Estimate word informativeness from model abilities.
-            # informativeness[w] = sum over models of (ability[m] * centered[m][w])
-            informativeness = abilities @ centered  # (num_words,)
+            # Estimate word informativeness from model abilities using isotonic regression.
+            # For each word, fit a monotonically increasing function from abilities to logprobs,
+            # then measure informativeness as signed R² (fraction of variance explained).
+            informativeness = AlternatingEstimator.__estimate_informativeness_isotonic(abilities, logprobs)
 
             # Estimate model abilities from word informativeness.
             new_abilities = update_model_abilities(abilities, informativeness, logprobs)
@@ -74,6 +75,49 @@ class AlternatingEstimator:
             print(f"Warning: did not converge after {max_iterations} iterations (max_change={max_change:.2e}).")
 
         return abilities.tolist(), informativeness.tolist(), avg_logprobs.tolist(), num_iterations
+
+    @staticmethod
+    def __estimate_informativeness_isotonic(
+        abilities: np.ndarray,
+        logprobs: np.ndarray,
+    ) -> np.ndarray:
+        """Estimate word informativeness via isotonic regression R².
+
+        For each word, fits both increasing and decreasing monotonic regressions
+        from model abilities to logprobs. Informativeness is the signed R²:
+        positive if the increasing fit is better (good models score higher),
+        negative if the decreasing fit is better (anti-correlated).
+        """
+        num_words = logprobs.shape[1]
+        informativeness = np.zeros(num_words)
+        sort_order = np.argsort(abilities)
+        sorted_abilities = abilities[sort_order]
+
+        iso_inc = IsotonicRegression(increasing=True)
+        iso_dec = IsotonicRegression(increasing=False)
+
+        for w in range(num_words):
+            word_logprobs = logprobs[:, w]
+            total_var = np.var(word_logprobs)
+            if total_var == 0.0:
+                continue
+
+            sorted_logprobs = word_logprobs[sort_order]
+
+            fitted_inc = iso_inc.fit_transform(sorted_abilities, sorted_logprobs)
+            residual_var_inc = np.mean((sorted_logprobs - fitted_inc) ** 2)
+            r2_inc = 1.0 - residual_var_inc / total_var
+
+            fitted_dec = iso_dec.fit_transform(sorted_abilities, sorted_logprobs)
+            residual_var_dec = np.mean((sorted_logprobs - fitted_dec) ** 2)
+            r2_dec = 1.0 - residual_var_dec / total_var
+
+            if r2_inc >= r2_dec:
+                informativeness[w] = r2_inc
+            else:
+                informativeness[w] = -r2_dec
+
+        return informativeness
 
     @staticmethod
     def __update_model_abilities_weighted_avg(
