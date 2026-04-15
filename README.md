@@ -11,15 +11,11 @@ uv sync --locked
 
 ## Overview
 
-Our goal is to enable benchmarking of:
+This repository enables benchmarking of:
 - Different approaches for knowledge access (e.g., text-retrieval-augmentation vs. KB-augmentation),
 - Different approaches for surfacing knowledge from KBs, and
 - Different approaches for KB construction,
 - Different approaches for individual steps in KB construction (e.g., for entity extraction and clustering)
-
-Our current focus is on building a shared internal benchmark to encourage and facilitate cross-group collaborations across Microsoft.
-Eventually, we would like to publicly release the benchmark and build research communities around these shared tasks.
-
 
 ## Glossary
 
@@ -40,33 +36,33 @@ We describe the supported tasks and task instances below.
 ![](mskebab-tasks.png)
 
 ### Knowledge access task
-**Input:** A text corpus + a user input.  
-**Expected output:** A generated response.  
+**Input:** A text corpus + a user input.
+**Expected output:** A generated response.
 **Task instance(s):** Currently, one task instance comprising of document completion given initial few tokens of the document.
 
 ### KB surfacing task
-**Input instance:** A KB + a user input.  
-**Expected output:** A generated response.  
+**Input instance:** A KB + a user input.
+**Expected output:** A generated response.
 **Task instance(s):** Currently, one task instance comprising of document completion given initial few tokens of the document.
 
 ### KB construction task
-**Input:** A text corpus.  
-**Expected output:** A KB.  
+**Input:** A text corpus.
+**Expected output:** A KB.
 **Task instance(s):** We have not implemented any instances for this task yet.
 
 ### Entity extraction task
-**Input instance:** Text.  
-**Expected output instance:** A set of entity fragments.  
+**Input instance:** Text.
+**Expected output instance:** A set of entity fragments.
 **Task instance(s):** Currently, one task instance based on [ReDocRed](https://github.com/tonytan48/Re-DocRED).
 
 ### Entity linking task
-**Input instance:** A pair of entity fragments.  
-**Expected output instance:** Boolean prediction on whether they correspond to the same entity or not.  
+**Input instance:** A pair of entity fragments.
+**Expected output instance:** Boolean prediction on whether they correspond to the same entity or not.
 **Task instance(s):** Currently, one task instance based on [REBEL](https://github.com/Babelscape/rebel).
 
 ### Clustering task
-**Input:** A set of entity fragments.  
-**Expected output:** A KB.  
+**Input:** A set of entity fragments.
+**Expected output:** A KB.
 **Task instance(s):** Currently, one task instance based on [REBEL](https://github.com/Babelscape/rebel).
 
 
@@ -76,7 +72,7 @@ The repository is organized to ensure clarity and ease of navigation. Below is a
 
 * build/: Contains configuration files for automated builds.
 * docs/: Documentation resources, including experiment results.
-* kebab/: Contains the core implementation of the project, including all modules, utilities, and primary logic. 
+* kebab/: Contains the core implementation of the project, including all modules, utilities, and primary logic.
     * configs/: Configuration files for the benchmark.
     * contracts/: Core interfaces and abstractions that define the project's key contracts and APIs for document, entity, task, etc.
     * tasks/: Task-specific implementations for various task types, such as extraction, linking, and more.
@@ -103,8 +99,8 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ## Trademarks
 
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft 
-trademarks or logos is subject to and must follow 
+This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
+trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
