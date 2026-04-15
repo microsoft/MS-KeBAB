@@ -550,6 +550,7 @@ class BaseLocalLlmRAGTextCompleter(BaseRAGTextCompleter):
     """A base implementation of a RAG text completer using a local model."""
 
     model_id: str
+    model: Any
     tokenizer: Any
     device: torch.device
 
@@ -717,6 +718,8 @@ class BaseQwenRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
     the `get_augmented_context` method, which should be provided by concrete subclasses to define
     how augmented context is retrieved.
     """
+
+    model: Any
 
     def __init__(
         self,
@@ -1058,6 +1061,8 @@ class BaseGptOssRAGTextCompleter(BaseLocalLlmRAGTextCompleter):
     the `get_augmented_context` method, which should be provided by concrete subclasses to define
     how augmented context is retrieved.
     """
+
+    model: Any
 
     def __init__(
         self,
