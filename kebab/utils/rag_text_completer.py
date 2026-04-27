@@ -69,17 +69,12 @@ class BaseRAGTextCompleter(ABC):
 
         Returns:
             dict[str, Any]: A dictionary requiring the following:
-<<<<<<< HEAD
-                - "predicted_content" (str): The predicted content for the masked position.
-                - "target_content_logprob" (float): The log probability of the target content.
+                - "predicted_content_top_probs" (dict[str, float]): A dictionary containing the top
+                predicted tokens and their probabilities.
                 If the implementation involves making a request to a model, it must also include the following fields to provide information about the response and any potential errors:
                 - "request_status_code" (int): The status code of the request made to the model, if applicable.
                 - "request_error_message" (str): The error message if the request to the model failed, if applicable.
                 - "response_headers": (dict) The response headers from the model, if applicable.
-=======
-                - "predicted_content_top_probs" (dict[str, float]): A dictionary containing the top
-                predicted tokens and their probabilities.
->>>>>>> 47e137c (Fix minor comments)
         """
         raise NotImplementedError
 

@@ -15,6 +15,9 @@ from logging import Logger
 from pathlib import Path
 from typing import Any, ClassVar
 
+import numpy as np
+from scipy.special import logsumexp
+
 from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
