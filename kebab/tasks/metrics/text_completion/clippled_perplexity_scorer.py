@@ -7,8 +7,8 @@ import numpy as np
 from kebab.tasks.metrics.text_completion.utils import get_target_content_prob_from_top_probs, process_top_probs
 
 
-class FairKeywordScorer:
-    """Fair keyword evaluator for text completion tasks."""
+class ClippedPerplexityScorer:
+    """Clipped perplexity evaluator for text completion tasks."""
 
     def __init__(self, base_predictions: Path, a: float = -4.0, b: float = 1.0) -> None:
         """Initialize the evaluator."""
@@ -28,7 +28,7 @@ class FairKeywordScorer:
             predicted_content_top_probs: The top probabilities for the predicted content.
             target_content: The groundtruth content.
         """
-        return FairKeywordScorer.__calculate_t(
+        return ClippedPerplexityScorer.__calculate_t(
             predicted_content_top_probs=predicted_content_top_probs,
             target_content=target_content,
             a=self.a,
