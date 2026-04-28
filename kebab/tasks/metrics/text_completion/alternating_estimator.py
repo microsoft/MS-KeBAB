@@ -34,15 +34,39 @@ class AlternatingEstimator:
             good_model_infos, bad_model_infos, dont_know_model_infos
         )
 
+    UpdateModelAbilitiesFn = Callable[[np.ndarray, np.ndarray, np.ndarray], np.ndarray]
+    """Signature for a strategy that updates model abilities from
+    (current_abilities, word_informativeness, word_logprobs)."""
+
     def run(
         self,
         max_iterations: int = 100,
         convergence_threshold: float = 1e-6,
+        update_model_abilities: Callable[[np.ndarray, np.ndarray, np.ndarray], np.ndarray] | None = None,
     ) -> tuple[list[float], list[float], list[float], int]:
-        """Run the alternating estimator to estimate model abilities and word informativeness."""
-        update_model_abilities: Callable[[np.ndarray, np.ndarray, np.ndarray], np.ndarray] = (
-            AlternatingEstimator.__update_model_abilities_keywords_auto
-        )
+        """Run the alternating estimator to estimate model abilities and word informativeness.
+
+        Args:
+            max_iterations: Maximum number of alternating update iterations to run.
+            convergence_threshold: Stop early when the maximum absolute change in model
+                abilities between iterations falls below this value.
+            update_model_abilities: Optional strategy used to recompute model abilities from
+                ``(model_abilities, word_informativeness, word_logprobs)`` each iteration.
+                Defaults to the keywords-auto strategy.
+
+        Returns:
+            A tuple ``(model_abilities, word_informativeness, avg_word_logprobs, num_iterations)``:
+                - model_abilities (list[float]): Final estimated ability for each model, in the
+                  same order as ``self.model_infos``.
+                - word_informativeness (list[float]): Final estimated informativeness for each
+                  word.
+                - avg_word_logprobs (list[float]): Per-word average log probability across all
+                  models.
+                - num_iterations (int): Number of iterations actually performed before
+                  convergence or hitting ``max_iterations``.
+        """
+        if update_model_abilities is None:
+            update_model_abilities = AlternatingEstimator.__update_model_abilities_keywords_auto
 
         model_abilities = [info.ability for info in self.model_infos.values()]
         word_logprobs = [info.word_logprobs for info in self.model_infos.values()]
@@ -116,7 +140,7 @@ class AlternatingEstimator:
         word_informativeness: np.ndarray,
         word_logprobs: np.ndarray,
     ) -> np.ndarray:
-        # sort words in descending informativeness, keeping only positive informativeness.  Find the n that maximizes mean(informativeness[1:n])*sqrt(n).
+        # sort words in descending informativeness, keeping only positive informativeness. Find the n that maximizes mean(informativeness[1:n])*sqrt(n).
         positive_mask = word_informativeness > 0
         positive_informativeness = word_informativeness[positive_mask]
         if len(positive_informativeness) == 0:
@@ -132,6 +156,13 @@ class AlternatingEstimator:
 
         return word_logprobs[:, selected_mask].mean(axis=1)
 
+    INIT_GOOD_MODEL_ABILITY: float = 1.0
+    """Initial ability assigned to models in the "good" group."""
+    INIT_BAD_MODEL_ABILITY: float = -1.0
+    """Initial ability assigned to models in the "bad" group."""
+    INIT_DONT_KNOW_MODEL_ABILITY: float = 0.0
+    """Initial ability assigned to models in the "don't know" group."""
+
     @staticmethod
     def __init_model_infos(
         good_model_infos: dict[str, ModelInfo],
@@ -145,15 +176,11 @@ class AlternatingEstimator:
             duplicates = {name for name in all_names if all_names.count(name) > 1}
             raise ValueError(f"Duplicate model names across groups: {duplicates}")
 
-        init_good_model_ability = 1.0
-        init_bad_model_ability = -1.0
-        init_dont_know_model_ability = 0.0
-
         all_model_infos: dict[str, ModelInfo] = {}
         for model_infos, ability in [
-            (good_model_infos, init_good_model_ability),
-            (bad_model_infos, init_bad_model_ability),
-            (dont_know_model_infos, init_dont_know_model_ability),
+            (good_model_infos, AlternatingEstimator.INIT_GOOD_MODEL_ABILITY),
+            (bad_model_infos, AlternatingEstimator.INIT_BAD_MODEL_ABILITY),
+            (dont_know_model_infos, AlternatingEstimator.INIT_DONT_KNOW_MODEL_ABILITY),
         ]:
             for model_name, info in model_infos.items():
                 with open(info.predictions_path, encoding="utf-8") as f:
