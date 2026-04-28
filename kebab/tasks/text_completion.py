@@ -22,7 +22,7 @@ from kebab.contracts.document import Document
 from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
 from kebab.tasks.metrics.text_completion.alternating_estimator import AlternatingEstimator, ModelInfo
-from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
+from kebab.tasks.metrics.text_completion.clippled_perplexity_scorer import ClippedPerplexityScorer
 from kebab.tasks.metrics.text_completion.utils import get_target_content_prob_with_fallback
 from kebab.utils.io_helpers import (
     DocumentJsonlReader,
@@ -38,7 +38,7 @@ class EvaluationMethod(Enum):
     """Evaluation method for text completion tasks."""
 
     PERPLEXITY = "perplexity"
-    FAIR_KEYWORD = "fair_keyword"
+    CLIPPED_PERPLEXITY = "clipped_perplexity"
     ALTERNATING_ESTIMATION = "alternating_estimation"
 
 
@@ -76,7 +76,7 @@ class TextCompletionTaskBase(Task):
         """Initialize a text completion task."""
         super().__init__(name, schema=schema, root_for_relative_paths=root_for_relative_paths)
         self.__documents = resolve_path(documents, root_for_relative_paths)
-        self.scorer: FairKeywordScorer | None = None
+        self.scorer: ClippedPerplexityScorer | None = None
 
     def read_items(self) -> Iterable[Document]:
         """
@@ -291,8 +291,8 @@ class TextCompletionTaskBase(Task):
             logger.info(f"Starting {method.value} evaluation for the text completion task.")
 
         metrics = {}
-        if method == EvaluationMethod.FAIR_KEYWORD:
-            metrics = self.__fair_keyword_evaluate(predictions)
+        if method == EvaluationMethod.CLIPPED_PERPLEXITY:
+            metrics = self.__clipped_perplexity_evaluate(predictions)
         else:
             metrics = self.__perplexity_evaluate(predictions)
 
@@ -339,7 +339,7 @@ class TextCompletionTaskBase(Task):
 
         return metrics
 
-    def __fair_keyword_evaluate(
+    def __clipped_perplexity_evaluate(
         self,
         predictions: Path,
     ) -> dict[str, float]:
@@ -354,7 +354,7 @@ class TextCompletionTaskBase(Task):
             query: dict[str, Any]
             if query["text_with_mask"] != "" and query["to_eval"]:
                 prediction = next(predicted_vals_iter)
-                score = FairKeywordScorer.calculate_score(
+                score = ClippedPerplexityScorer.calculate_score(
                     predicted_content_top_probs=prediction["predicted_content_top_probs"],
                     target_content=query["target_content"],
                     t=query["t"],
@@ -365,13 +365,13 @@ class TextCompletionTaskBase(Task):
             raise ValueError("Number of predictions exceeds the number of evaluation queries.")
 
         metrics = {}
-        metrics["fair_keyword_total_score"] = sum(scores)
-        metrics["fair_keyword_mean_score"] = statistics.mean(scores)
-        metrics["fair_keyword_variance_score"] = (
-            statistics.variance(scores, metrics["fair_keyword_mean_score"]) if len(scores) > 1 else 0.0
+        metrics["clipped_perplexity_total_score"] = sum(scores)
+        metrics["clipped_perplexity_mean_score"] = statistics.mean(scores)
+        metrics["clipped_perplexity_variance_score"] = (
+            statistics.variance(scores, metrics["clipped_perplexity_mean_score"]) if len(scores) > 1 else 0.0
         )
-        metrics["fair_keyword_num_eval_words"] = len(scores)
-        metrics["fair_keyword_num_positive_scores"] = sum(1 for score in scores if score > 0)
+        metrics["clipped_perplexity_num_eval_words"] = len(scores)
+        metrics["clipped_perplexity_num_positive_scores"] = sum(1 for score in scores if score > 0)
 
         return metrics
 

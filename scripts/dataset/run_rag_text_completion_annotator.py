@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, override
 
 from kebab.tasks.metrics.text_completion.alternating_estimator import ModelInfo
-from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
+from kebab.tasks.metrics.text_completion.clippled_perplexity_scorer import ClippedPerplexityScorer
 from kebab.tasks.text_completion import EvaluationMethod, TextCompletionUsingDocumentsTask
 from kebab.utils.rag_text_completer import (
     BaseGptOssRAGTextCompleter,
@@ -50,21 +50,21 @@ def run_perplexity_evaluation_example(
     return metrics
 
 
-def run_fair_keyword_evaluation_example(
+def run_clipped_perplexity_evaluation_example(
     documents_file_path: Path,
     task_instance: TextCompletionUsingDocumentsTask,
     base_model: BaseRAGTextCompleter,
     base_results: Iterable[tuple[str, dict[str, Any]]],
 ) -> dict[str, Any]:
-    """Run an example evaluation using the fair keyword evaluation method."""
+    """Run an example evaluation using the clipped perplexity evaluation method."""
     # Write the base results to a file.
     base_results_for_threshold_calculation_path = Path(
-        os.path.splitext(documents_file_path)[0] + "_tc_base_results_for_fair_keyword_t_calc.jsonl"
+        os.path.splitext(documents_file_path)[0] + "_tc_base_results_for_clipped_perplexity_t_calc.jsonl"
     )
     task_instance.write_items(base_results_for_threshold_calculation_path, base_results, strict=False)
 
     # Initialize the scorer with the base predictions to evaluate candidate models.
-    task_instance.scorer = FairKeywordScorer(base_predictions=base_results_for_threshold_calculation_path)
+    task_instance.scorer = ClippedPerplexityScorer(base_predictions=base_results_for_threshold_calculation_path)
 
     # Prepare partial queries with to_eval flags based on threshold calculation from base results.
     queries_with_to_eval_flags = task_instance.generate_partial_queries_to_eval(
@@ -84,20 +84,20 @@ def run_fair_keyword_evaluation_example(
 
     # Write the results to a file for evaluation.
     results_to_evaulate_path = Path(
-        os.path.splitext(documents_file_path)[0] + "_tc_results_for_fair_keyword_eval.jsonl"
+        os.path.splitext(documents_file_path)[0] + "_tc_results_for_clipped_perplexity_eval.jsonl"
     )
     task_instance.write_items(results_to_evaulate_path, results, strict=False)
 
     # Evaluate the results.
     metrics = task_instance.evaluate(
         predictions=results_to_evaulate_path,
-        result_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics_fair_keyword.json"),
-        method=EvaluationMethod.FAIR_KEYWORD,
+        result_output_path=Path(os.path.splitext(documents_file_path)[0] + "_tc_metrics_clipped_perplexity.json"),
+        method=EvaluationMethod.CLIPPED_PERPLEXITY,
     )
 
     # Write the full results for debugging.
     verbose_base_results_output_path = Path(
-        os.path.splitext(documents_file_path)[0] + "_tc_verbose_base_results_for_fair_keyword.json"
+        os.path.splitext(documents_file_path)[0] + "_tc_verbose_base_results_for_clipped_perplexity.json"
     )
     task_instance.write_items(
         path=verbose_base_results_output_path,
@@ -105,7 +105,7 @@ def run_fair_keyword_evaluation_example(
         verbose=True,
     )
     verbose_results_output_path = Path(
-        os.path.splitext(documents_file_path)[0] + "_tc_verbose_results_for_fair_keyword.json"
+        os.path.splitext(documents_file_path)[0] + "_tc_verbose_results_for_clipped_perplexity.json"
     )
     task_instance.write_items(
         path=verbose_results_output_path,
@@ -117,9 +117,9 @@ def run_fair_keyword_evaluation_example(
     metrics_from_verbose = task_instance.evaluate(
         predictions=verbose_results_output_path,
         result_output_path=Path(
-            os.path.splitext(documents_file_path)[0] + "_tc_metrics_from_verbose_for_fair_keyword.json"
+            os.path.splitext(documents_file_path)[0] + "_tc_metrics_from_verbose_for_clipped_perplexity.json"
         ),
-        method=EvaluationMethod.FAIR_KEYWORD,
+        method=EvaluationMethod.CLIPPED_PERPLEXITY,
     )
     assert metrics == metrics_from_verbose, (
         "Metrics from verbose results should match metrics from non-verbose results."
@@ -210,13 +210,13 @@ if __name__ == "__main__":
         )
     )
 
-    fair_keyword_metrics = run_fair_keyword_evaluation_example(
+    clipped_perplexity_metrics = run_clipped_perplexity_evaluation_example(
         documents_file_path=documents_file_path,
         task_instance=task_instance,
         base_model=base_model,
         base_results=base_results,
     )
-    print("Fair Keyword Evaluation Metrics:", fair_keyword_metrics)
+    print("Clipped Perplexity Evaluation Metrics:", clipped_perplexity_metrics)
 
     perplexity_metrics = run_perplexity_evaluation_example(
         documents_file_path=documents_file_path,

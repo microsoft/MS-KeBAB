@@ -4,7 +4,7 @@
 from pathlib import Path
 
 import pytest
-from kebab.tasks.metrics.text_completion.fair_keyword_scorer import FairKeywordScorer
+from kebab.tasks.metrics.text_completion.clippled_perplexity_scorer import ClippedPerplexityScorer
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
 from kebab.utils.io_helpers import compare_files_ignore_linebreaks
 
@@ -161,7 +161,7 @@ def test_email_text_completion_read_items_and_generate_queries(email_text_comple
 def test_calculate_thresholds(text_completion_task) -> None:
     # Act
     predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "document_predictions.jsonl"
-    text_completion_task.scorer = FairKeywordScorer(base_predictions=predictions_file_path)
+    text_completion_task.scorer = ClippedPerplexityScorer(base_predictions=predictions_file_path)
     queries_with_to_eval_flags = list(text_completion_task.generate_partial_queries_to_eval())
 
     # Assert
