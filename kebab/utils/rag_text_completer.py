@@ -81,6 +81,7 @@ class BaseRAGTextCompleter(ABC):
         seed: int = 42,
         verbose: bool = False,
         max_requests_per_minute: int = 60,
+        max_tokens_per_minute: int | None = None,
         num_workers: int = 1,
         max_retries: int = 3,
         logger: logging.Logger | None = None,
@@ -97,6 +98,9 @@ class BaseRAGTextCompleter(ABC):
             verbose: Defaults to False. If True, includes additional information such as the
             original partial query and augmented context in the results for debugging.
             max_requests_per_minute: The maximum number of requests per minute for rate limiting.
+            max_tokens_per_minute: Optional maximum number of tokens per minute for rate limiting.
+                When provided the effective throughput is governed by whichever limit
+                (requests or tokens) is stricter.
             num_workers: The number of worker threads to use for parallel processing.
             max_retries: The maximum number of retries for failed requests.
             logger: An optional logger instance for logging.
@@ -110,7 +114,8 @@ class BaseRAGTextCompleter(ABC):
 
         logger.info(
             f"Starting complete_partial_queries: num_workers={num_workers}, "
-            f"max_requests_per_minute={max_requests_per_minute}, max_retries={max_retries}"
+            f"max_requests_per_minute={max_requests_per_minute}, "
+            f"max_tokens_per_minute={max_tokens_per_minute}, max_retries={max_retries}"
         )
 
         def process_query(query: dict[str, Any]) -> dict[str, Any]:
@@ -166,8 +171,12 @@ class BaseRAGTextCompleter(ABC):
 
             if status_code == rate_limit_status_code:
                 retry_delay = default_retry_delay
-                if "Retry-After" in result.get("response_headers", {}):
-                    retry_delay = int(result["response_headers"]["Retry-After"])
+                headers = result.get("response_headers", {})
+                if "retry-after" in headers:
+                    try:
+                        retry_delay = int(headers["retry-after"])
+                    except (ValueError, TypeError):
+                        pass  # fall back to default_retry_delay
                 return (True, retry_delay)
 
             # Any other non-success status code.
@@ -182,6 +191,7 @@ class BaseRAGTextCompleter(ABC):
             num_workers=num_workers,
             max_retries=max_retries,
             max_requests_per_minute=max_requests_per_minute,
+            max_tokens_per_minute=max_tokens_per_minute,
             should_retry=should_retry_completion,
             logger=logger,
         ):
