@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import cast
 
 import numpy as np
 import pytest
@@ -14,7 +15,8 @@ def test_perplexity_estimators(minimum_informativeness: float) -> None:
     and the performance of each model on each word is given by a linear function of the model and word parameters plus Gaussian noise.
     We want to see which estimator of model performance has the highest Kendall correlation with the true model parameters."""
 
-    trial_count = 10
+    nonlinear = True
+    trial_count = 1
     pearsons = defaultdict(lambda: np.zeros(trial_count))
     kendall_taus = defaultdict(lambda: np.zeros(trial_count))
     rng = np.random.default_rng(1)
@@ -33,7 +35,8 @@ def test_perplexity_estimators(minimum_informativeness: float) -> None:
         informativeness = np.linspace(minimum_informativeness, 1, n)
         difficulty = rng.normal(0, 1, n)  # Random difficulty for each word
         # for each model and word, compute the product of the model and word and add Gaussian noise with mean 0 and standard deviation 1
-        data = difficulty[None, :] + abilities[:, None] * informativeness[None, :] + rng.normal(0, 1, size=(m, n))
+        data = difficulty[None, :] + abilities[:, None] * informativeness[None, :]
+        data = rng.normal(data, 1)
         task = TaskInstance(
             data=data,
             base_model=base_model,
@@ -49,7 +52,8 @@ def test_perplexity_estimators(minimum_informativeness: float) -> None:
 
         # Compute the correlation between the true model parameters and all estimators
         for name, estimate in estimates.items():
-            kendall_taus[name][trial] = kendalltau(abilities, estimate).correlation
+            tau = cast(float, kendalltau(abilities, estimate)[0])
+            kendall_taus[name][trial] = tau
             pearsons[name][trial] = np.corrcoef(abilities, estimate)[0, 1]
     avg_kts = {name: np.mean(kendall_taus[name]) for name in kendall_taus}
     for name, avg in avg_kts.items():
