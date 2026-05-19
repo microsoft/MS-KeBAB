@@ -15,8 +15,8 @@ def test_perplexity_estimators(minimum_informativeness: float) -> None:
     and the performance of each model on each word is given by a linear function of the model and word parameters plus Gaussian noise.
     We want to see which estimator of model performance has the highest Kendall correlation with the true model parameters."""
 
-    nonlinear = True
-    trial_count = 1
+    nonlinear = False
+    trial_count = 10
     pearsons = defaultdict(lambda: np.zeros(trial_count))
     kendall_taus = defaultdict(lambda: np.zeros(trial_count))
     rng = np.random.default_rng(1)
@@ -34,9 +34,16 @@ def test_perplexity_estimators(minimum_informativeness: float) -> None:
         # Generate n evenly spaced numbers between -1 and 1, with the option to make them mostly negative to test estimator robustness in that setting
         informativeness = np.linspace(minimum_informativeness, 1, n)
         difficulty = rng.normal(0, 1, n)  # Random difficulty for each word
-        # for each model and word, compute the product of the model and word and add Gaussian noise with mean 0 and standard deviation 1
-        data = difficulty[None, :] + abilities[:, None] * informativeness[None, :]
-        data = rng.normal(data, 1)
+        if nonlinear:
+            sort_order = np.argsort(abilities)
+            data = rng.dirichlet(np.ones((m, n)))
+            for j in range(2, m):
+                data[sort_order[j], :] += data[sort_order[j - 1], :]
+            data = data * informativeness[None, :]
+        else:
+            # for each model and word, compute the product of the model and word and add Gaussian noise with mean 0 and standard deviation 1
+            data = abilities[:, None] * informativeness[None, :]
+        data = difficulty[None, :] + rng.normal(data, 5e-1)
         task = TaskInstance(
             data=data,
             base_model=base_model,
