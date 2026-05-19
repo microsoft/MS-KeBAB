@@ -20,7 +20,10 @@ from kebab.contracts.entity import Entity
 from kebab.contracts.task import Task, TaskType
 from kebab.tasks.metrics.text_completion.alternating_estimator import AlternatingEstimator, ModelInfo
 from kebab.tasks.metrics.text_completion.clipped_perplexity_scorer import ClippedPerplexityScorer
-from kebab.tasks.metrics.text_completion.utils import get_target_content_prob_with_fallback
+from kebab.tasks.metrics.text_completion.utils import (
+    calculate_brier_score_for_prediction,
+    get_target_content_prob_with_fallback,
+)
 from kebab.utils.io_helpers import (
     DocumentJsonlReader,
     EntityJsonlReader,
@@ -306,20 +309,29 @@ class TextCompletionTaskBase(Task):
         predictions: Path,
     ) -> dict[str, float]:
         # TODO (allenwang): also handle the verbose json output.
-        predicted_vals = ItemJsonlReader[dict[str, str | float]](predictions).read_items()
+        predicted_vals = ItemJsonlReader[dict[str, Any]](predictions).read_items()
         queries = self.generate_partial_queries()
         predictions_and_queries = zip(predicted_vals, queries, strict=True)
 
         log_probs = []
         log_probs_by_doc = defaultdict(list)
+        brier_scores = []
+        brier_scores_by_doc = defaultdict(list)
         for prediction, query in predictions_and_queries:
             log_prob = math.log(get_target_content_prob_with_fallback(prediction))
             log_probs.append(log_prob)
             log_probs_by_doc[query["document_id"]].append(log_prob)
+            brier_score = calculate_brier_score_for_prediction(
+                predicted_content_top_probs=prediction["predicted_content_top_probs"],
+                target_content=query["target_content"],
+                top_k=20,
+            )
+            brier_scores.append(brier_score)
+            brier_scores_by_doc[query["document_id"]].append(brier_score)
 
         metrics = {}
         if log_probs:
-            TextCompletionTaskBase.__calculate_metrics(metrics, log_probs)
+            TextCompletionTaskBase.__calculate_metrics(metrics, log_probs, brier_scores)
         else:
             raise ValueError("No log probabilities found in predictions.")
 
@@ -328,7 +340,9 @@ class TextCompletionTaskBase(Task):
             metrics_per_doc = {}
             if log_probs_per_doc:
                 metrics_per_doc["document_id"] = doc_id
-                TextCompletionTaskBase.__calculate_metrics(metrics_per_doc, log_probs_per_doc)
+                TextCompletionTaskBase.__calculate_metrics(
+                    metrics_per_doc, log_probs_per_doc, brier_scores_by_doc[doc_id]
+                )
             else:
                 raise ValueError(f"No log probabilities found for document {doc_id}.")
             metrics_by_doc.append(metrics_per_doc)
@@ -416,14 +430,16 @@ class TextCompletionTaskBase(Task):
     """Minimum number of samples required to compute variance."""
 
     @staticmethod
-    def __calculate_metrics(metrics: dict[str, Any], log_probs: list[float]) -> None:
+    def __calculate_metrics(metrics: dict[str, Any], log_probs: list[float], brier_scores: list[float]) -> None:
         """
         Fill the metrics dictionary based on the provided log probabilities.
 
         Args:
             metrics: The dictionary to fill with metrics.
             log_probs: A list of log probability values.
+            brier_scores: A list of Brier score values.
         """
+        metrics["num_predictions"] = len(log_probs)
         metrics["mean_log_prob"] = statistics.mean(log_probs)
         metrics["variance_log_prob"] = (
             statistics.variance(log_probs, metrics["mean_log_prob"])
@@ -431,7 +447,13 @@ class TextCompletionTaskBase(Task):
             else 0.0
         )
         metrics["perplexity"] = math.exp(-metrics["mean_log_prob"])
-        metrics["num_predictions"] = len(log_probs)
+
+        metrics["brier_score_mean"] = statistics.mean(brier_scores)
+        metrics["brier_score_variance"] = (
+            statistics.variance(brier_scores, metrics["brier_score_mean"])
+            if len(brier_scores) >= TextCompletionTaskBase._MIN_SAMPLES_FOR_VARIANCE
+            else 0.0
+        )
 
 
 class TextCompletionUsingDocumentsTask(TextCompletionTaskBase):

@@ -106,3 +106,40 @@ def get_target_content_prob_with_fallback(result: dict[str, Any], top_k: int = 2
     if target_content_prob > 1 / top_k or target_content_prob == 0:
         target_content_prob = 1 / 100_000
     return target_content_prob
+
+
+def calculate_brier_score_for_prediction(
+    predicted_content_top_probs: dict[str, float],
+    target_content: str,
+    top_k: int,
+) -> float:
+    """Calculate the Brier score for a prediction over the top-k predicted tokens.
+
+    The target's probability is the sum of the probabilities of all top-k tokens
+    that match the target content (case-insensitive exact match). Matched tokens
+    are treated as a single "target" bucket; remaining tokens contribute their
+    squared probabilities.
+
+    Args:
+        target_content: The expected content to fill in the mask.
+        predicted_content_top_probs: A dict mapping predicted tokens to their probabilities.
+        top_k: The number of top predicted tokens to consider.
+
+    Returns:
+        The Brier score: ``(p_target - 1)^2 + sum_{i != target} p_i^2``. Returns
+        ``2.0`` when the target is not found within the top-k predictions.
+    """
+    # Combine duplicates, sort descending, normalize, then slice to top_k.
+    top_k_probs = dict(list(process_top_probs(predicted_content_top_probs).items())[:top_k])
+    target_content_prob = get_target_content_prob_from_top_probs(top_k_probs, target_content)
+
+    # Target not found in top-k -> return 2.
+    if target_content_prob == 0:
+        return 2.0
+
+    # Brier score: matched tokens form the target bucket; the rest contribute p^2.
+    target_lower = target_content.strip().lower()
+    brier_score = (target_content_prob - 1) ** 2 + sum(
+        p**2 for token, p in top_k_probs.items() if token.strip().lower() != target_lower
+    )
+    return brier_score
