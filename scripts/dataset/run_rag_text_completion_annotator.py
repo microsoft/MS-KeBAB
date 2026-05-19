@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, override
 
 from kebab.tasks.metrics.text_completion.alternating_estimator import ModelInfo
-from kebab.tasks.metrics.text_completion.clippled_perplexity_scorer import ClippedPerplexityScorer
+from kebab.tasks.metrics.text_completion.clipped_perplexity_scorer import ClippedPerplexityScorer
 from kebab.tasks.text_completion import EvaluationMethod, TextCompletionUsingDocumentsTask
 from kebab.utils.rag_text_completer import (
     BaseGptOssRAGTextCompleter,
