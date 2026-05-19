@@ -4,7 +4,7 @@
 from pathlib import Path
 
 import pytest
-from kebab.tasks.metrics.text_completion.clippled_perplexity_scorer import ClippedPerplexityScorer
+from kebab.tasks.metrics.text_completion.clipped_perplexity_scorer import ClippedPerplexityScorer
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
 from kebab.utils.io_helpers import compare_files_ignore_linebreaks
 
