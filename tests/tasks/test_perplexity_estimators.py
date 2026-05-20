@@ -9,13 +9,13 @@ from scipy.stats import kendalltau
 
 # To view the output of the print statements, run this test with:
 # pytest -s tests/tasks/test_perplexity_estimators.py
+@pytest.mark.parametrize("nonlinear", [True, False])
 @pytest.mark.parametrize("minimum_informativeness", [-0.9])  # [-0.9, -1, -1.1])
-def test_perplexity_estimators(minimum_informativeness: float) -> None:
+def test_perplexity_estimators(nonlinear: bool, minimum_informativeness: float) -> None:
     """Compare estimators for model performance in a setting where we have m models and n words,
     and the performance of each model on each word is given by a linear function of the model and word parameters plus Gaussian noise.
     We want to see which estimator of model performance has the highest Kendall correlation with the true model parameters."""
 
-    nonlinear = True
     trial_count = 10
     correlations = defaultdict(lambda: [(0.0, 0.0)] * trial_count)
     rng = np.random.default_rng(1)
