@@ -126,40 +126,37 @@ class EstimatorContext:
 
     def estimator_alternating(self) -> np.ndarray:
         m, n = self.data.shape
-        longppl_iter_estimator = np.zeros(m)
-        longppl_iter_estimator[self.task.evaluator_model] = 1
-        # longppl_iter_estimator[evaluator_model - 1] = 1
-        # longppl_iter_estimator[5] = 1
-        # longppl_iter_estimator[2] = -1
-        longppl_iter_estimator[self.task.base_model] = -1
-        # longppl3 initialisation is robust to wrong evaluator but not to wrong base
-        # longppl_iter_estimator = self.estimator_increasing()
+        ability_estimate = np.zeros(m)
+        ability_estimate[self.task.evaluator_model] = 1
+        ability_estimate[self.task.base_model] = -1
+        if False:
+            ability_estimate = self.estimator_exhaustive_increasing()
         # word_std = np.std(self.data, axis=0)
         word_mean = np.mean(self.data, axis=0)
         standardized = self.data - word_mean[None, :]  # / (word_std[None, :] + 1e-8)
         if False:
             i = 1
-            longppl_iter_estimator[0 : i - 1] = -1
-            longppl_iter_estimator[i:] = 1
+            ability_estimate[0 : i - 1] = -1
+            ability_estimate[i:] = 1
         if False:  # special first iteration
-            has_nonzero_ability = longppl_iter_estimator != 0
+            has_nonzero_ability = ability_estimate != 0
             subset_mean = np.mean(self.data[has_nonzero_ability, :], axis=0)
             subset_word_effect = np.dot(
-                longppl_iter_estimator[has_nonzero_ability],
+                ability_estimate[has_nonzero_ability],
                 self.data[has_nonzero_ability, :] - subset_mean[None, :],
             )
             # is_keyword_subset = top(subset_word_effect)
             # longppl_iter_estimator = data[:, is_keyword_subset].mean(axis=1)
             weight = np.maximum(0, subset_word_effect)
-            longppl_iter_estimator = np.dot(self.data, weight) / np.sum(weight)
+            ability_estimate = np.dot(self.data, weight) / np.sum(weight)
         for _ in range(25):
-            # longppl_iter_estimator's mean doesn't need to be subtracted because standardized has zero mean
-            word_effect_iter = np.dot(longppl_iter_estimator, standardized)
+            # ability_estimate's mean doesn't need to be subtracted because standardized has zero mean
+            informativeness = np.dot(ability_estimate, standardized)
             # is_keyword_iter = topk(word_effect_iter, n // pct)
             if False:
-                word_effect_iter2 = -distance_to_sorted_all(longppl_iter_estimator, standardized)
+                word_effect_iter2 = -distance_to_sorted_all(ability_estimate, standardized)
                 is_keyword_iter2 = topk(word_effect_iter2, n // 4)
-                is_keyword_iter = topk(word_effect_iter, n // 4)
+                is_keyword_iter = topk(informativeness, n // 4)
                 in1not2 = is_keyword_iter & ~is_keyword_iter2
                 in2not1 = is_keyword_iter2 & ~is_keyword_iter
                 print(f"in1not2: {np.mean(in1not2)} in2not1: {np.mean(in2not1)}")
@@ -167,18 +164,62 @@ class EstimatorContext:
                 # print(
                 #     f"Proportion of keywords (iterative method): {np.mean(is_keyword_iter)} Propportion positive: {np.mean(word_effect_iter > 0)}"
                 # )
-                longppl_iter_estimator = self.data[:, is_keyword_iter].mean(axis=1)
+                ability_estimate = self.data[:, is_keyword_iter].mean(axis=1)
             else:
-                weight = np.maximum(0, word_effect_iter)
-                longppl_iter_estimator = np.dot(self.data, weight) / np.sum(weight)
-        return longppl_iter_estimator
+                weight = np.maximum(0, informativeness)
+                # standarization is irrelevant here since it will shift all estimates by a constant
+                ability_estimate = np.dot(self.data, weight) / np.sum(weight)
+        return ability_estimate
+
+    def estimator_alternating_iso(self) -> np.ndarray:
+        m, n = self.data.shape
+        ability_estimate = np.zeros(m)
+        ability_estimate[self.task.evaluator_model] = 1
+        ability_estimate[self.task.base_model] = -1
+        word_mean = np.mean(self.data, axis=0)
+        standardized = self.data - word_mean[None, :]
+        iso_inc = IsotonicRegression(increasing=True)
+        for _ in range(25):
+            sort_order = np.argsort(ability_estimate)
+            sorted_abilities = ability_estimate[sort_order]
+            sorted_matrix = standardized[sort_order, :]
+            informativeness = np.zeros(n)
+            for c in range(n):
+                sorted_logprobs = sorted_matrix[:, c]
+                fitted_inc = iso_inc.fit_transform(sorted_abilities, sorted_logprobs)
+                if True:
+                    informativeness[c] = fitted_inc[-1]
+                else:
+                    residual_var = np.mean((sorted_logprobs - fitted_inc) ** 2)
+                    total_var = np.var(sorted_logprobs)
+                    informativeness[c] = 1 - residual_var / total_var
+
+            weight = np.maximum(0, informativeness)
+            # standarization is irrelevant here since it will shift all estimates by a constant
+            ability_estimate = np.dot(self.data, weight) / np.sum(weight)
+        return ability_estimate
 
     @property
     def orderings(self):
         model_count = self.data.shape[0]
         return list(permutations(range(model_count)))
 
-    def score_ordering(self, ordering, matrix):
+    def score_abilities_linear(self, abilities, standardized):
+        if abilities[self.task.base_model] > abilities[self.task.evaluator_model]:
+            return -np.inf
+        informativeness = np.dot(abilities, standardized) / np.dot(abilities, abilities)
+        dist = (standardized - abilities[:, None] * informativeness[None, :]) ** 2
+        return np.sum(-dist)
+
+    def estimator_exhaustive_linear(self) -> np.ndarray:
+        word_mean = np.mean(self.data, axis=0)
+        standardized = self.data - word_mean[None, :]
+        ordering_scores = [
+            self.score_abilities_linear(np.asarray(ordering), standardized) for ordering in self.orderings
+        ]
+        return np.asarray(self.orderings[np.argmax(ordering_scores)])
+
+    def score_ordering(self, ordering, matrix) -> float:
         if ordering[self.task.base_model] > ordering[self.task.evaluator_model]:
             return -np.inf
         dist = distance_to_sorted_all(ordering, matrix)
@@ -186,8 +227,8 @@ class EstimatorContext:
         # return np.sum(np.clip(threshold - dist, 0, None))
         return np.sum(-dist)
 
-    def estimator_increasing(self) -> np.ndarray:
-        ordering_scores = [self.score_ordering(ordering, matrix=self.data) for ordering in self.orderings]
+    def estimator_exhaustive_increasing(self) -> np.ndarray:
+        ordering_scores = [self.score_ordering(np.asarray(ordering), matrix=self.data) for ordering in self.orderings]
         if self.verbose:
             print(f"Ordering scores: {ordering_scores}")
             # dist = distance_to_sorted_all(np.asarray([3, 1, 2, 0]), self.data)
@@ -200,7 +241,7 @@ class EstimatorContext:
         dist = distance_to_sorted_all_iso(np.asarray(ordering), matrix)
         return np.sum(-dist)
 
-    def estimator_increasing_iso(self) -> np.ndarray:
+    def estimator_exhaustive_iso(self) -> np.ndarray:
         ordering_scores = [self.score_ordering_iso(ordering, matrix=self.data) for ordering in self.orderings]
         if self.verbose:
             print(f"Ordering scores iso: {ordering_scores}")
@@ -257,7 +298,7 @@ def distance_to_sorted(arr):
     return cost
 
 
-def distance_to_sorted_all(ability, matrix):
+def distance_to_sorted_all(ability, matrix: np.ndarray) -> np.ndarray:
     sorted_indices = np.argsort(ability)
     ncol = np.shape(matrix)[1]
     cost = np.zeros(ncol)
@@ -268,7 +309,7 @@ def distance_to_sorted_all(ability, matrix):
     return cost
 
 
-def distance_to_sorted_all_iso(ability, matrix):
+def distance_to_sorted_all_iso(ability, matrix: np.ndarray) -> np.ndarray:
     iso_inc = IsotonicRegression(increasing=True)
     ncol = np.shape(matrix)[1]
     sort_order = np.argsort(ability)

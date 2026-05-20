@@ -9,25 +9,26 @@ from scipy.stats import kendalltau
 
 # To view the output of the print statements, run this test with:
 # pytest -s tests/tasks/test_perplexity_estimators.py
-@pytest.mark.parametrize("minimum_informativeness", [-0.9])  # , -1, -1.1])
+@pytest.mark.parametrize("minimum_informativeness", [-0.9])  # [-0.9, -1, -1.1])
 def test_perplexity_estimators(minimum_informativeness: float) -> None:
     """Compare estimators for model performance in a setting where we have m models and n words,
     and the performance of each model on each word is given by a linear function of the model and word parameters plus Gaussian noise.
     We want to see which estimator of model performance has the highest Kendall correlation with the true model parameters."""
 
-    nonlinear = False
+    nonlinear = True
     trial_count = 10
-    pearsons = defaultdict(lambda: np.zeros(trial_count))
-    kendall_taus = defaultdict(lambda: np.zeros(trial_count))
+    correlations = defaultdict(lambda: [(0.0, 0.0)] * trial_count)
     rng = np.random.default_rng(1)
     for trial in range(trial_count):
         m = 4  # Number of models
         n = 1000  # Number of words
-        # Deliberately imperfect choice of base and evaluator models to make the task non-trivial but not impossible
-        base_model = 1
-        evaluator_model = m - 2
-        # base_model = 0
-        # evaluator_model = m - 1
+        if True:
+            # Deliberately imperfect choice of base and evaluator models to make the task non-trivial but not impossible
+            base_model = 1
+            evaluator_model = m - 2
+        else:
+            base_model = 0
+            evaluator_model = m - 1
 
         # Generate m evenly spaced numbers between 0 and 1
         abilities = np.linspace(0, 1, m)
@@ -35,11 +36,12 @@ def test_perplexity_estimators(minimum_informativeness: float) -> None:
         informativeness = np.linspace(minimum_informativeness, 1, n)
         difficulty = rng.normal(0, 1, n)  # Random difficulty for each word
         if nonlinear:
-            sort_order = np.argsort(abilities)
-            data = rng.dirichlet(np.ones((m, n)))
-            for j in range(2, m):
-                data[sort_order[j], :] += data[sort_order[j - 1], :]
-            data = data * informativeness[None, :]
+            # construct a matrix where the first row is zero, the last row is one, and middle rows increase.
+            # we do this by taking the cumulative sum of positive random numbers.
+            increments = rng.gamma(1, 1, (m, n)) / rng.gamma(1, 1, (m, n))
+            increments[0, :] = 0
+            data = np.cumsum(increments, axis=0)
+            data = data / data[m - 1, :] * informativeness[None, :]
         else:
             # for each model and word, compute the product of the model and word and add Gaussian noise with mean 0 and standard deviation 1
             data = abilities[:, None] * informativeness[None, :]
@@ -60,23 +62,12 @@ def test_perplexity_estimators(minimum_informativeness: float) -> None:
         # Compute the correlation between the true model parameters and all estimators
         for name, estimate in estimates.items():
             tau = cast(float, kendalltau(abilities, estimate)[0])
-            kendall_taus[name][trial] = tau
-            pearsons[name][trial] = np.corrcoef(abilities, estimate)[0, 1]
-    avg_kts = {name: np.mean(kendall_taus[name]) for name in kendall_taus}
-    for name, avg in avg_kts.items():
-        print(f"Average Kendall tau for {name} estimator: {avg}")
-        if not name.startswith("ideal") and False:
+            rho = cast(float, np.corrcoef(abilities, estimate)[0, 1])
+            correlations[name][trial] = (tau, rho)
+    avg_correlations = {name: np.mean(pairs, axis=0) for name, pairs in correlations.items()}
+    for name, avg in avg_correlations.items():
+        print(f"Average correlation for {name} estimator: {avg}")
+        if not name.startswith("ideal") and not name.startswith("exhaustive"):
             # Assert that alternating estimator beats all other non-ideal estimators
-            assert avg_kts["alternating"] >= avg
-            if not name.startswith("alternating"):
-                assert avg_kts["increasing"] >= avg
-                assert avg_kts["increasing_iso"] >= avg
-    avg_pearsons = {name: np.mean(pearsons[name]) for name in pearsons}
-    for name, avg in avg_pearsons.items():
-        print(f"Average Pearson correlation for {name} estimator: {avg}")
-        if not name.startswith("ideal") and False:
-            # Assert that alternating estimator beats all other non-ideal estimators
-            assert avg_pearsons["alternating"] >= avg
-            if not name.startswith("alternating"):
-                assert avg_pearsons["increasing"] >= avg
-                assert avg_pearsons["increasing_iso"] >= avg
+            for i in range(len(avg)):
+                assert avg_correlations["alternating"][i] >= avg[i]
