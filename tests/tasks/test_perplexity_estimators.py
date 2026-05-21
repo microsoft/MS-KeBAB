@@ -45,7 +45,7 @@ def test_perplexity_estimators(nonlinear: bool, minimum_informativeness: float) 
         else:
             # for each model and word, compute the product of the model and word and add Gaussian noise with mean 0 and standard deviation 1
             data = abilities[:, None] * informativeness[None, :]
-        data = difficulty[None, :] + rng.normal(data, 5e-1)
+        data = difficulty[None, :] + rng.normal(data, 9e-1)
         task = TaskInstance(
             data=data,
             base_model=base_model,
