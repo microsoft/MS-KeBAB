@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 from collections import defaultdict
 from typing import cast
 
@@ -8,7 +11,7 @@ from tests.tasks.model_ability_estimators import TaskInstance, run_all_estimator
 
 
 # To view the output of the print statements, run this test with:
-# pytest -s tests/tasks/test_perplexity_estimators.py
+# pytest -s tests/tasks/test_model_ability_estimators.py
 @pytest.mark.parametrize("nonlinear", [True, False])
 @pytest.mark.parametrize("minimum_informativeness", [-0.9])  # [-0.9, -1, -1.1])
 def test_model_ability_estimators(nonlinear: bool, minimum_informativeness: float) -> None:
