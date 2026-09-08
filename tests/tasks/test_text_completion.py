@@ -1,10 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-import math
 from pathlib import Path
 
 import pytest
+from kebab.tasks.metrics.text_completion.clipped_perplexity_scorer import ClippedPerplexityScorer
 from kebab.tasks.text_completion import TextCompletionUsingDocumentsTask
 from kebab.utils.io_helpers import compare_files_ignore_linebreaks
 
@@ -37,9 +37,13 @@ def test_text_completion_read_items_and_generate_queries(text_completion_task, t
     partial_queries = list(text_completion_task.generate_partial_queries())
     text_completion_task.write_items(
         predictions_output_file_path,
-        [(query["target_content"], -0.1) for query in partial_queries],
+        [
+            {
+                "predicted_content_top_probs": {query["target_content"]: 0.1},
+            }
+            for query in partial_queries
+        ],
     )
-    metrics = text_completion_task.evaluate(predictions_output_file_path)
 
     # Assert
     assert items[0].document_id == "doc_0"
@@ -64,14 +68,31 @@ def test_text_completion_read_items_and_generate_queries(text_completion_task, t
         predictions_file_path,
         predictions_output_file_path,
     )
-    assert metrics["mean_log_prob"] == -0.1
-    assert metrics["variance_log_prob"] == 0.0
-    assert math.isclose(metrics["perplexity"], 1.105, abs_tol=1e-3)
 
 
-def test_text_completion_generate_verbose_partial_queries(text_completion_task) -> None:
+def test_text_completion_generate_verbose_partial_queries(text_completion_task, tmp_path: Path) -> None:
+    # Arrange
+    predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "document_predictions_verbose.json"
+    predictions_output_file_path = tmp_path / "document_predictions_verbose.json"
+
     # Act
     verbose_partial_queries = list(text_completion_task.generate_partial_queries(verbose=True))
+    text_completion_task.write_items(
+        predictions_output_file_path,
+        [
+            query
+            if query["text_with_mask"] == ""
+            else query
+            | {
+                "predicted_content": query["target_content"],
+                "target_content_prob": 0.1,
+                "predicted_content_top_probs": {query["target_content"]: 0.1},
+            }
+            for query in verbose_partial_queries
+        ],
+        verbose=True,
+        strict=False,
+    )
 
     # Assert
     # The verbose partial queries should include skipped words/spaces/punctuations with empty
@@ -90,6 +111,10 @@ def test_text_completion_generate_verbose_partial_queries(text_completion_task) 
         {"text_with_mask": "The capital of France is <mask>", "target_content": "Paris", "document_id": "doc_0"},
         {"text_with_mask": "", "target_content": ".", "document_id": "doc_0"},
     ]
+    assert compare_files_ignore_linebreaks(
+        predictions_file_path,
+        predictions_output_file_path,
+    )
 
 
 def test_text_completion_generate_partial_queries_with_words_after_mask(text_completion_task) -> None:
@@ -131,3 +156,13 @@ def test_email_text_completion_read_items_and_generate_queries(email_text_comple
         "target_content": "population",
         "document_id": "email_1",
     }
+
+
+def test_calculate_thresholds(text_completion_task) -> None:
+    # Act
+    predictions_file_path = Path(__file__).parents[1] / "data" / "text_completion" / "document_predictions.jsonl"
+    text_completion_task.scorer = ClippedPerplexityScorer(base_predictions=predictions_file_path)
+    queries_with_to_eval_flags = list(text_completion_task.generate_partial_queries_to_eval())
+
+    # Assert
+    assert all(not query["to_eval"] for query in queries_with_to_eval_flags)
